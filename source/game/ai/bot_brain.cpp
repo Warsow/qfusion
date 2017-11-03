@@ -118,12 +118,12 @@ BotBrain::BotBrain( Bot *bot, float skillLevel_ )
 	skillLevel( skillLevel_ ),
 	reactionTime( 320 - From0UpToMax( 300, BotSkill() ) ),
 	nextTargetChoiceAt( level.time ),
-	targetChoicePeriod( 800 - From0UpToMax( 300, BotSkill() ) ),
+	targetChoicePeriod( 1000 ),
 	itemsSelector( bot->self ),
 	selectedNavEntity( nullptr, std::numeric_limits<float>::max(), 0, 0 ),
 	prevSelectedNavEntity( nullptr ),
-	triggeredPlanningDanger( Vec3( vec3_origin ), Vec3( vec3_origin ), 0 ),
-	actualDanger( Vec3( vec3_origin ), Vec3( vec3_origin ), 0 ),
+	triggeredPlanningDanger( nullptr ),
+	actualDanger( nullptr ),
 	squad( nullptr ),
 	botEnemyPool( bot->self, this, skillLevel_ ),
 	selectedEnemies( bot->selectedEnemies ),
@@ -204,6 +204,13 @@ void BotBrain::OnEnemyViewed( const edict_t *enemy ) {
 	}
 }
 
+void BotBrain::OnEnemyOriginGuessed( const edict_t *enemy, unsigned minMillisSinceLastSeen, const float *guessedOrigin ) {
+	botEnemyPool.OnEnemyOriginGuessed( enemy, minMillisSinceLastSeen, guessedOrigin );
+	if( squad ) {
+		squad->OnBotGuessedEnemyOrigin( self, enemy, minMillisSinceLastSeen, guessedOrigin );
+	}
+}
+
 void BotBrain::OnPain( const edict_t *enemy, float kick, int damage ) {
 	botEnemyPool.OnPain( self, enemy, kick, damage );
 	if( squad ) {
@@ -218,78 +225,40 @@ void BotBrain::OnEnemyDamaged( const edict_t *target, int damage ) {
 	}
 }
 
-inline const SelectedNavEntity &BotBrain::GetOrUpdateSelectedNavEntity() {
+const SelectedNavEntity &BotBrain::GetOrUpdateSelectedNavEntity() {
 	if( selectedNavEntity.IsValid() ) {
 		return selectedNavEntity;
 	}
 
+	ForceSetNavEntity( itemsSelector.SuggestGoalNavEntity( selectedNavEntity ) );
+	return selectedNavEntity;
+}
+
+void BotBrain::ForceSetNavEntity( const SelectedNavEntity &selectedNavEntity_ ) {
 	// Use direct access to the field to skip assertion
-	prevSelectedNavEntity = selectedNavEntity.navEntity;
-	selectedNavEntity = itemsSelector.SuggestGoalNavEntity( selectedNavEntity );
+	this->prevSelectedNavEntity = this->selectedNavEntity.navEntity;
+	this->selectedNavEntity = selectedNavEntity_;
 
 	if( !selectedNavEntity.IsEmpty() ) {
 		self->ai->botRef->lastItemSelectedAt = level.time;
 	} else if( self->ai->botRef->lastItemSelectedAt >= self->ai->botRef->noItemAvailableSince ) {
 		self->ai->botRef->noItemAvailableSince = level.time;
 	}
-
-	return selectedNavEntity;
 }
 
 void BotBrain::UpdateBlockedAreasStatus() {
-	if( activeEnemyPool->ActiveEnemies().empty() || ShouldRushHeadless() ) {
-		// Reset all possibly blocked areas
-		RouteCache()->SetDisabledRegions( nullptr, nullptr, 0, DroppedToFloorAasAreaNum() );
-		return;
-	}
+	// The old functionality has been temporarily disabled,
+	// and its deprecation produces better bot behaviour (but rather stupid sometimes).
 
-	// Wait for enemies selection, do not perform cache flushing
-	// which is extremely expensive and are likely to be overridden next frame
-	if( !selectedEnemies.AreValid() ) {
-		return;
-	}
+	// It used to mark as blocked all areas near selected active enemies
+	// (except they are close and marking this areas as blocked did not leave non-blocked areas around the bot).
+	// This approach has failed, not only the code determining whether an area should be blocked was not reliable,
+	// but this also used to add lots of jitter to the planner choice, since areas become available once the bot
+	// turns away the visible active enemy.
 
-	StaticVector<Vec3, EnemyPool::MAX_TRACKED_ENEMIES> mins;
-	StaticVector<Vec3, EnemyPool::MAX_TRACKED_ENEMIES> maxs;
-
-	AiGroundTraceCache *groundTraceCache = AiGroundTraceCache::Instance();
-	for( const Enemy *enemy: selectedEnemies ) {
-		if( selectedEnemies.IsPrimaryEnemy( enemy ) && WillAttackMelee() ) {
-			continue;
-		}
-
-		// TODO: This may act as cheating since actual enemy origin is used.
-		// This is kept for conformance to following ground trace check.
-		float squareDistance = DistanceSquared( self->s.origin, enemy->ent->s.origin );
-		// (Otherwise all nearby paths are treated as blocked by enemy)
-		if( squareDistance < 72.0f ) {
-			continue;
-		}
-		float distance = 1.0f / Q_RSqrt( squareDistance );
-		float side = 24.0f + 96.0f * BoundedFraction( distance - 72.0f, 4 * 384.0f );
-
-		// Try to drop an enemy origin to floor
-		// TODO: AiGroundTraceCache interface forces using an actual enemy origin
-		// and not last seen one, so this may act as cheating.
-		vec3_t origin;
-		// If an enemy is close to ground (an origin may and has been dropped to floor)
-		if( groundTraceCache->TryDropToFloor( enemy->ent, 128.0f, origin, level.time - enemy->LastSeenAt() ) ) {
-			// Do not use bounds lower than origin[2] (except some delta)
-			mins.push_back( Vec3( -side, -side, -8.0f ) + origin );
-			maxs.push_back( Vec3( +side, +side, 128.0f ) + origin );
-		} else {
-			// Use a bit lower bounds (an enemy is likely to fall down)
-			mins.push_back( Vec3( -side, -side, -192.0f ) + origin );
-			maxs.push_back( Vec3( +side, +side, +108.0f ) + origin );
-		}
-	}
-
-	// getting mins[0] address for an empty vector in debug will trigger an assertion
-	if( !mins.empty() ) {
-		RouteCache()->SetDisabledRegions( &mins[0], &maxs[0], mins.size(), DroppedToFloorAasAreaNum() );
-	} else {
-		RouteCache()->SetDisabledRegions( nullptr, nullptr, 0, DroppedToFloorAasAreaNum() );
-	}
+	// The proper solution is maintaining a list of blockers for each nav entity / choke point
+	// and listen to in-game events whether the area (not in AAS sense) became available
+	// (a blocker has been killed or has been seen somewhere else).
 }
 
 bool BotBrain::FindDodgeDangerSpot( const Danger &danger, vec3_t spotOrigin ) {
@@ -311,32 +280,17 @@ void BotBrain::CheckNewActiveDanger() {
 		return;
 	}
 
-	if( !self->ai->botRef->dangersDetector.FindDangers() ) {
+	const Danger *danger = self->ai->botRef->perceptionManager.PrimaryDanger();
+	if( !danger ) {
 		return;
 	}
 
-	actualDanger = *self->ai->botRef->dangersDetector.primaryDanger;
-	bool needsUrgentReplanning = false;
-	// The old danger has timed out
-	if( !triggeredPlanningDanger.IsValid() ) {
-		needsUrgentReplanning = true;
-	}
-	// The old danger is about to time out
-	else if( level.time - triggeredPlanningDanger.timeoutAt < Danger::TIMEOUT / 3 ) {
-		needsUrgentReplanning = true;
-	} else if( actualDanger.splash != triggeredPlanningDanger.splash ) {
-		needsUrgentReplanning = true;
-	} else if( actualDanger.attacker != triggeredPlanningDanger.attacker ) {
-		needsUrgentReplanning = true;
-	} else if( actualDanger.damage - triggeredPlanningDanger.damage > 10 ) {
-		needsUrgentReplanning = true;
-	} else if( ( actualDanger.hitPoint - triggeredPlanningDanger.hitPoint ).SquaredLength() > 32 * 32 ) {
-		needsUrgentReplanning = true;
-	} else if( actualDanger.direction.Dot( triggeredPlanningDanger.direction ) < 0.9 ) {
-		needsUrgentReplanning = true;
-	}
+	// Trying to do urgent replanning based on more sophisticated formulae was a bad idea.
+	// The bot has inertia and cannot change dodge direction so fast,
+	// and it just lead to no actual dodging performed since the actual mean dodge vector is about zero.
 
-	if( needsUrgentReplanning ) {
+	actualDanger = *danger;
+	if( !triggeredPlanningDanger.IsValid() ) {
 		triggeredPlanningDanger = actualDanger;
 		nextActiveGoalUpdateAt = level.time;
 	}
@@ -363,11 +317,11 @@ bool BotBrain::Threat::IsValidFor( const edict_t *self_ ) const {
 
 	// It is not cheap to call so do it after all other tests have passed
 	vec3_t lookDir;
-	AngleVectors( self_->s.origin, lookDir, nullptr, nullptr );
+	AngleVectors( self_->s.angles, lookDir, nullptr, nullptr );
 	Vec3 toThreat( inflictor->s.origin );
 	toThreat -= self_->s.origin;
 	toThreat.NormalizeFast();
-	return toThreat.Dot( lookDir ) < 0;
+	return toThreat.Dot( lookDir ) < self_->ai->botRef->FovDotFactor();
 }
 
 void BotBrain::PrepareCurrWorldState( WorldState *worldState ) {
@@ -385,7 +339,7 @@ void BotBrain::PrepareCurrWorldState( WorldState *worldState ) {
 		worldState->EnemyHasGoodFarRangeWeaponsVar().SetValue( selectedEnemies.HaveGoodFarRangeWeapons() );
 		worldState->EnemyHasGoodMiddleRangeWeaponsVar().SetValue( selectedEnemies.HaveGoodMiddleRangeWeapons() );
 		worldState->EnemyHasGoodCloseRangeWeaponsVar().SetValue( selectedEnemies.HaveGoodCloseRangeWeapons() );
-		worldState->EnemyCanHitVar().SetValue( selectedEnemies.CanHit( self ) );
+		worldState->EnemyCanHitVar().SetValue( selectedEnemies.CanHit() );
 	} else {
 		worldState->EnemyOriginVar().SetIgnore( true );
 		worldState->HasThreateningEnemyVar().SetIgnore( true );
@@ -402,14 +356,18 @@ void BotBrain::PrepareCurrWorldState( WorldState *worldState ) {
 		worldState->IsReactingToEnemyLostVar().SetValue( false );
 		worldState->HasReactedToEnemyLostVar().SetValue( false );
 		worldState->LostEnemyLastSeenOriginVar().SetValue( lostEnemies.LastSeenOrigin() );
-		trace_t trace;
-		G_Trace( &trace, self->s.origin, nullptr, nullptr, lostEnemies.ActualOrigin().Data(), self, MASK_AISOLID );
-		if( trace.fraction == 1.0f ) {
-			worldState->MightSeeLostEnemyAfterTurnVar().SetValue( true );
-		} else if( game.edicts + trace.ent == lostEnemies.TraceKey() ) {
-			worldState->MightSeeLostEnemyAfterTurnVar().SetValue( true );
-		} else {
-			worldState->MightSeeLostEnemyAfterTurnVar().SetValue( false );
+		worldState->MightSeeLostEnemyAfterTurnVar().SetValue( false );
+		Vec3 toEnemiesDir( lostEnemies.LastSeenOrigin() );
+		toEnemiesDir -= self->s.origin;
+		toEnemiesDir.NormalizeFast();
+		if( toEnemiesDir.Dot( self->ai->botRef->EntityPhysicsState()->ForwardDir() ) < self->ai->botRef->FovDotFactor() ) {
+			if( EntitiesPvsCache::Instance()->AreInPvs( self, lostEnemies.TraceKey() ) ) {
+				trace_t trace;
+				G_Trace( &trace, self->s.origin, nullptr, nullptr, lostEnemies.LastSeenOrigin().Data(), self, MASK_AISOLID );
+				if( trace.fraction == 1.0f || game.edicts + trace.ent == lostEnemies.TraceKey() ) {
+					worldState->MightSeeLostEnemyAfterTurnVar().SetValue( true );
+				}
+			}
 		}
 	} else {
 		worldState->IsReactingToEnemyLostVar().SetIgnore( true );
@@ -520,13 +478,14 @@ void BotBrain::PrepareCurrWorldState( WorldState *worldState ) {
 		worldState->DodgeDangerSpotVar().SetIgnore( true );
 	}
 
-	worldState->HasReactedToThreatVar().SetValue( false );
 	if( activeThreat.IsValidFor( self ) ) {
 		worldState->ThreatInflictedDamageVar().SetValue( (short)activeThreat.totalDamage );
 		worldState->ThreatPossibleOriginVar().SetValue( activeThreat.possibleOrigin );
+		worldState->HasReactedToThreatVar().SetValue( false );
 	} else {
 		worldState->ThreatInflictedDamageVar().SetIgnore( true );
 		worldState->ThreatPossibleOriginVar().SetIgnore( true );
+		worldState->HasReactedToThreatVar().SetIgnore( true );
 	}
 
 	worldState->ResetTacticalSpots();

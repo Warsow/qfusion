@@ -32,7 +32,7 @@ struct SelectedMiscTactics {
 
 	inline void Clear() {
 		willAdvance = false;
-		willRetreat = true;
+		willRetreat = false;
 
 		shouldBeSilent = false;
 		shouldMoveCarefully = false;
@@ -51,7 +51,7 @@ struct SelectedMiscTactics {
 
 	inline void PreferRunRatherThanAttack() {
 		shouldAttack = true;
-		shouldKeepXhairOnEnemy = true;
+		shouldKeepXhairOnEnemy = false;
 	}
 };
 
@@ -126,6 +126,7 @@ class BotBrain : public AiBaseBrain
 	const NavEntity *prevSelectedNavEntity;
 
 	const SelectedNavEntity &GetOrUpdateSelectedNavEntity();
+	void ForceSetNavEntity( const SelectedNavEntity &selectedNavEntity_ );
 
 	inline bool HasJustPickedGoalItem() const {
 		if( lastNavTargetReachedAt < prevThinkAt ) {
@@ -184,7 +185,9 @@ protected:
 		bool CheckHasShell() const override { return ::HasShell( bot ); }
 		float ComputeDamageToBeKilled() const override { return DamageToKill( bot ); }
 		void OnEnemyRemoved( const Enemy *enemy ) override;
-		void TryPushNewEnemy( const edict_t *enemy ) override { TryPushEnemyOfSingleBot( bot, enemy ); }
+		void TryPushNewEnemy( const edict_t *enemy, const float *suggestedOrigin ) override {
+			TryPushEnemyOfSingleBot( bot, enemy, suggestedOrigin );
+		}
 		void SetBotRoleWeight( const edict_t *bot_, float weight ) override {}
 		float GetAdditionalEnemyWeight( const edict_t *bot_, const edict_t *enemy ) const override { return 0; }
 		void OnBotEnemyAssigned( const edict_t *bot_, const Enemy *enemy ) override {}
@@ -233,6 +236,8 @@ public:
 	inline unsigned MaxTrackedEnemies() const { return botEnemyPool.MaxTrackedEnemies(); }
 
 	void OnEnemyViewed( const edict_t *enemy );
+	void OnEnemyOriginGuessed( const edict_t *enemy, unsigned minMillisSinceLastSeen, const float *guessedOrigin = nullptr );
+
 	void AfterAllEnemiesViewed() {}
 	void UpdateSelectedEnemies();
 

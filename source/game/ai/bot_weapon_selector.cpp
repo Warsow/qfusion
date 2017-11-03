@@ -106,37 +106,102 @@ bool SelectedEnemies::Contain( const Enemy *enemy ) const {
 	return false;
 }
 
-bool SelectedEnemies::AreThreatening() const {
-	CheckValid( __FUNCTION__ );
-	const int64_t levelTime = level.time;
-	for( const Enemy *activeEnemy: activeEnemies ) {
-		if( levelTime - activeEnemy->LastAttackedByTime() < 1000 ) {
-			return true;
-		}
+float SelectedEnemies::MaxThreatFactor() const {
+	if( maxThreatFactorComputedAt == level.time ) {
+		return maxThreatFactor;
+	}
 
-		// Try cut off quite expensive AngleVectors() call
-		// TODO: Check environment trace too
-		if( activeEnemy->ent->r.client ) {
-			// If an enemy can shoot soon
-			if( activeEnemy->ent->r.client->ps.stats[STAT_WEAPON_TIME] < 300 ) {
-				Vec3 enemyToBotDir( self->s.origin );
-				enemyToBotDir -= activeEnemy->ent->s.origin;
-				enemyToBotDir.NormalizeFast();
-				if( enemyToBotDir.Dot( activeEnemy->LookDir() ) > 0.9f ) {
-					return true;
-				}
-			}
-		} else {
-			Vec3 enemyToBotDir( self->s.origin );
-			enemyToBotDir -= activeEnemy->ent->s.origin;
-			enemyToBotDir.NormalizeFast();
-			if( enemyToBotDir.Dot( activeEnemy->LookDir() ) > 0.9f ) {
-				return true;
-			}
+	if( activeEnemies.empty() ) {
+		return 0.0f;
+	}
+
+	maxThreatFactor = 0;
+	for( int i = 0, end = (int)activeEnemies.size(); i < end; ++i ) {
+		float factor = GetThreatFactor( i );
+		if( factor > maxThreatFactor ) {
+			maxThreatFactor = factor;
 		}
 	}
 
-	return false;
+	return maxThreatFactor;
+}
+
+float SelectedEnemies::GetThreatFactor( int enemyNum ) const {
+	if( threatFactorsComputedAt[enemyNum] == level.time ) {
+		return threatFactors[enemyNum];
+	}
+
+	threatFactorsComputedAt[enemyNum] = level.time;
+	threatFactors[enemyNum] = ComputeThreatFactor( enemyNum );
+	return threatFactors[enemyNum];
+}
+
+float SelectedEnemies::ComputeThreatFactor( int enemyNum ) const {
+	const Enemy *enemy = activeEnemies[enemyNum];
+	float entFactor = ComputeThreatFactor( enemy->ent, enemyNum );
+	if( level.time - activeEnemies[enemyNum]->LastAttackedByTime() < 1000 ) {
+		entFactor = sqrtf( entFactor );
+	}
+
+	return entFactor;
+}
+
+float SelectedEnemies::ComputeThreatFactor( const edict_t *ent, int enemyNum ) const {
+	if( !ent ) {
+		return 0.0f;
+	}
+
+	// Try cutting off further expensive calls by doing this cheap test first
+	if( const auto *client = ent->r.client ) {
+		// Can't shoot soon.
+		if( client->ps.stats[STAT_WEAPON_TIME] > 500 ) {
+			return 0.0f;
+		}
+	}
+
+	Vec3 enemyToBotDir( self->s.origin );
+	enemyToBotDir -= ent->s.origin;
+	enemyToBotDir.NormalizeFast();
+
+	float dot;
+
+	if( ent->ai && ent->ai->botRef ) {
+		dot = enemyToBotDir.Dot( ent->ai->botRef->EntityPhysicsState()->ForwardDir() );
+		if( dot < self->ai->botRef->FovDotFactor() ) {
+			return 0.0f;
+		}
+	} else {
+		vec3_t enemyLookDir;
+		AngleVectors( ent->s.angles, enemyLookDir, nullptr, nullptr );
+		dot = enemyToBotDir.Dot( enemyLookDir );
+		// There is no threat if the bot is not in fov for a client (but not for a turret for example)
+		if ( ent->r.client && dot < 0.2f ) {
+			return 0.0f;
+		}
+	}
+
+	if( !EntitiesPvsCache::Instance()->AreInPvs( ent, self ) ) {
+		return 0.0f;
+	}
+
+	if( ent->s.effects & ( EF_QUAD | EF_CARRIER ) ) {
+		return 1.0f;
+	}
+
+	// Its guaranteed that the enemy cannot hit
+	if( dot < 0.7f ) {
+		return 0.5f * dot;
+	}
+
+	if( enemyNum >= 0 ) {
+		if( !GetCanHit( enemyNum ) ) {
+			dot *= 0.5f;
+		}
+	} else if( !TestCanHit( ent ) ) {
+		dot *= 0.5f;
+	}
+
+	return sqrtf( dot );
 }
 
 float SelectedEnemies::TotalInflictedDamage() const {
@@ -179,38 +244,117 @@ float SelectedEnemies::MaxDotProductOfEnemyViewAndDirToBot() const {
 	return maxDot;
 }
 
-bool SelectedEnemies::CanHit( const edict_t *ent ) const {
+bool SelectedEnemies::ArePotentiallyHittable() const {
 	CheckValid( __FUNCTION__ );
 
-	edict_t *targetEnt = const_cast<edict_t *>( ent );
+	if( arePotentiallyHittableComputedAt == level.time ) {
+		return arePotentiallyHittable;
+	}
+
 	trace_t trace;
-	for( const Enemy *activeEnemy: activeEnemies ) {
-		edict_t *enemyEnt = const_cast<edict_t *>( activeEnemy->ent );
-		Vec3 traceStart( enemyEnt->s.origin );
-		if( enemyEnt->r.client ) {
-			// Put likely case (not crouching) first
-			if( enemyEnt->r.client->ps.stats[PM_STAT_CROUCHTIME] == 0 ) {
-				traceStart.Z() += playerbox_stand_viewheight;
-			} else {
-				traceStart.Z() += playerbox_crouch_viewheight;
-			}
+	Vec3 viewPoint( self->s.origin );
+	viewPoint.Z() += self->viewheight;
+	const auto *pvsCache = EntitiesPvsCache::Instance();
+	for( const auto *enemy: activeEnemies ) {
+		const auto *enemyEnt = enemy->ent;
+		if( !enemyEnt ) {
+			continue;
 		}
-		G_Trace( &trace, traceStart.Data(), nullptr, nullptr, targetEnt->s.origin, enemyEnt, MASK_AISOLID );
+		if( !pvsCache->AreInPvs( self, enemyEnt ) ) {
+			continue;
+		}
+		SolidWorldTrace( &trace, viewPoint.Data(), enemyEnt->s.origin );
+		if( trace.fraction == 1.0f ) {
+			arePotentiallyHittableComputedAt = level.time;
+			arePotentiallyHittable = true;
+			return true;
+		}
+	}
+
+	arePotentiallyHittableComputedAt = level.time;
+	arePotentiallyHittable = false;
+	return false;
+}
+
+bool SelectedEnemies::CanHit() const {
+	CheckValid( __FUNCTION__ );
+
+	if( canEnemiesHitComputedAt == level.time ) {
+		return canEnemiesHit;
+	}
+
+	for( int i = 0, end = (int)activeEnemies.size(); i < end; ++i ) {
+		if( GetCanHit( i ) ) {
+			canEnemiesHitComputedAt = level.time;
+			canEnemiesHit = true;
+			return true;
+		}
+	}
+
+	canEnemiesHitComputedAt = level.time;
+	canEnemiesHit = false;
+	return false;
+}
+
+bool SelectedEnemies::GetCanHit( int enemyNum ) const {
+	if( canEnemyHitComputedAt[enemyNum] == level.time ) {
+		return canEnemyHit[enemyNum];
+	}
+
+	canEnemyHitComputedAt[enemyNum] = level.time;
+	canEnemyHit[enemyNum] = TestCanHit( activeEnemies[enemyNum]->ent );
+	return canEnemyHit[enemyNum];
+}
+
+bool SelectedEnemies::TestCanHit( const edict_t *enemy ) const {
+	if( !enemy ) {
+		return false;
+	}
+
+	Vec3 enemyToBot( self->s.origin );
+	enemyToBot -= enemy->s.origin;
+	enemyToBot.NormalizeFast();
+
+	if( enemy->ai && enemy->ai->botRef ) {
+		if( enemyToBot.Dot( self->ai->botRef->EntityPhysicsState()->ForwardDir() ) < self->ai->botRef->FovDotFactor() ) {
+			return false;
+		}
+	} else if ( enemy->r.client ) {
+		vec3_t forwardDir;
+		AngleVectors( enemy->s.origin, forwardDir, nullptr, nullptr );
+		if( enemyToBot.Dot( forwardDir ) < 0 ) {
+			return false;
+		}
+	}
+
+	if( !EntitiesPvsCache::Instance()->AreInPvs( enemy, self ) ) {
+		return false;
+	}
+
+	edict_t *targetEnt = const_cast<edict_t *>( self );
+	trace_t trace;
+	edict_t *enemyEnt = const_cast<edict_t *>( enemy );
+	Vec3 traceStart( enemyEnt->s.origin );
+	traceStart.Z() += enemyEnt->viewheight;
+
+	G_Trace( &trace, traceStart.Data(), nullptr, nullptr, targetEnt->s.origin, enemyEnt, MASK_AISOLID );
+	if( trace.fraction != 1.0f && game.edicts + trace.ent == targetEnt ) {
+		return true;
+	}
+
+	// If there is a distinct chest point (we call it chest since it is usually on chest position)
+	if( abs( targetEnt->viewheight ) > 8 ) {
+		Vec3 targetPoint( targetEnt->s.origin );
+		targetPoint.Z() += targetEnt->viewheight;
+		G_Trace( &trace, traceStart.Data(), nullptr, nullptr, targetPoint.Data(), enemyEnt, MASK_AISOLID );
 		if( trace.fraction != 1.0f && game.edicts + trace.ent == targetEnt ) {
 			return true;
 		}
-
-		vec3_t bounds[2];
-		VectorCopy( ent->r.absmin, bounds[0] );
-		VectorCopy( ent->r.absmax, bounds[1] );
-		for( int i = 0; i < 8; ++i ) {
-			vec3_t traceEnd = { bounds[( i >> 2 ) & 1][0], bounds[( i >> 1 ) & 1][0], bounds[( i >> 0 ) & 1][2] };
-			G_Trace( &trace, traceStart.Data(), nullptr, nullptr, traceEnd, enemyEnt, MASK_AISOLID );
-			if( trace.fraction != 1.0f && game.edicts + trace.ent == targetEnt ) {
-				return true;
-			}
-		}
 	}
+
+	// Don't waste cycles on further tests (as it used to be).
+	// This test is for getting a coarse info anyway.
+
 	return false;
 }
 
@@ -351,7 +495,7 @@ bool BotWeaponSelector::CheckFastWeaponSwitchAction( const WorldState &worldStat
 	bool botMovesFast, enemyMovesFast;
 
 	int chosenWeapon = WEAP_NONE;
-	if( worldState.DamageToKill() < 75 ) {
+	if( worldState.DamageToKill() < 50 ) {
 		chosenWeapon = SuggestFinishWeapon( worldState );
 	}
 	// Try to hit escaping enemies hard in a single shot
@@ -417,7 +561,16 @@ void BotWeaponSelector::SuggestSniperRangeWeapon( const WorldState &worldState )
 		if( PlasmasReadyToFireCount() && weaponChoiceRandom > 0.5f ) {
 			chosenWeapon = WEAP_PLASMAGUN;
 		}
+	} else if( !self->ai->botRef->ShouldKeepXhairOnEnemy() ) {
+		// In this case try preferring weapons that does not require precise aiming.
+		// Otherwise the bot is unlikely to start firing at all due to view angles mismatch.
+		if( PlasmasReadyToFireCount() && weaponChoiceRandom > 0.7f ) {
+			chosenWeapon = WEAP_PLASMAGUN;
+		} else if( ShellsReadyToFireCount() ) {
+			chosenWeapon = WEAP_RIOTGUN;
+		}
 	}
+
 	if( chosenWeapon == WEAP_NONE ) {
 		if( worldState.DamageToKill() > 50.0f ) {
 			if( BoltsReadyToFireCount() ) {
@@ -560,6 +713,12 @@ void BotWeaponSelector::SuggestFarRangeWeapon( const WorldState &worldState ) {
 		weaponScores[MG].score *= 1.75f;
 	}
 
+	// Add extra scores for weapons that do not require precise aiming in this case
+	if( !self->ai->botRef->ShouldKeepXhairOnEnemy() ) {
+		weaponScores[PG].score *= 3.0f;
+		weaponScores[RG].score *= 2.0f;
+	}
+
 	int chosenWeapon = ChooseWeaponByScores( weaponScores, weaponScores + 4 );
 
 	if( chosenWeapon == WEAP_NONE ) {
@@ -652,6 +811,17 @@ void BotWeaponSelector::SuggestMiddleRangeWeapon( const WorldState &worldState )
 	weaponScores[RG].score *= 1.0f - 0.5f * targetEnvironment.factor;
 	weaponScores[GL].score *= targetEnvironment.factor;
 
+	// Add extra scores for weapons that do not require precise aiming in this case
+	if( !self->ai->botRef->ShouldKeepXhairOnEnemy() ) {
+		weaponScores[PG].score *= 1.5f;
+		weaponScores[RG].score *= 2.0f;
+		weaponScores[GL].score *= 1.5f;
+		if( self->ai->botRef->WillRetreat() ) {
+			weaponScores[PG].score *= 1.5f;
+			weaponScores[GL].score *= 1.5f;
+		}
+	}
+
 	chosenWeapon = ChooseWeaponByScores( weaponScores, weaponScores + 6 );
 	if( chosenWeapon == WEAP_NONE ) {
 		chosenWeapon = WEAP_GUNBLADE;
@@ -698,15 +868,14 @@ void BotWeaponSelector::SuggestCloseRangeWeapon( const WorldState &worldState ) 
 		if( shellsCount > 0 ) {
 			chosenWeapon = WEAP_RIOTGUN;
 		}
-		// High-skill bots have high accuracy, so they may fight quite well with EB on short range.
-		else if( ( weaponChoiceRandom < self->ai->botRef->Skill() ) && BoltsReadyToFireCount() ) {
-			chosenWeapon = WEAP_ELECTROBOLT;
-		} else if( BulletsReadyToFireCount() > 0 ) {
-			chosenWeapon = WEAP_MACHINEGUN;
+		if( plasmasCount > 0 ) {
+			chosenWeapon = WEAP_PLASMAGUN;
 		} else if( lasersCount > 0 ) {
 			chosenWeapon = WEAP_LASERGUN;
-		} else if( plasmasCount > 0 ) {
-			chosenWeapon = WEAP_PLASMAGUN;
+		} else if( BulletsReadyToFireCount() ) {
+			chosenWeapon = WEAP_MACHINEGUN;
+		} else if( BoltsReadyToFireCount() ) {
+			chosenWeapon = WEAP_ELECTROBOLT;
 		} else {
 			chosenWeapon = WEAP_GUNBLADE;
 		}
@@ -875,7 +1044,8 @@ int BotWeaponSelector::SuggestFinishWeapon( const WorldState &worldState ) {
 
 static bool IsEscapingFromStandingEntity( const edict_t *escaping, const edict_t *standing, float escapingVelocitySqLen ) {
 	// Too low relative speed with almost standing enemy
-	if( escaping->speed < DEFAULT_DASHSPEED * 1.35f ) {
+	float speedThreshold = DEFAULT_PLAYERSPEED * 1.35f;
+	if( escapingVelocitySqLen < speedThreshold * speedThreshold ) {
 		return false;
 	}
 
@@ -940,97 +1110,86 @@ int BotWeaponSelector::SuggestHitEscapingEnemyWeapon( const WorldState &worldSta
 		return WEAP_NONE;
 	}
 
-	if( worldState.DistanceToEnemy() < GetLaserRange() ) {
-		// If target will be lost out of sight, its worth to do a fast weapon switching
-		// Extrapolate bot origin for 0.5 seconds
-		Vec3 extrapolatedBotOrigin = 0.5f * Vec3( self->velocity ) + self->s.origin;
-		Vec3 predictedBotOrigin( extrapolatedBotOrigin );
-		// Extrapolate enemy origin for 0.5 seconds
-		Vec3 extrapolatedEnemyOrigin = 0.5f * selectedEnemies.LastSeenVelocity() + selectedEnemies.LastSeenOrigin();
-		Vec3 predictedEnemyOrigin( extrapolatedEnemyOrigin );
+	// If target will be lost out of sight, its worth to do a fast weapon switching
 
-		trace_t trace;
-		// Predict bot position after 0.5 seconds
-		G_Trace( &trace, self->s.origin, playerbox_stand_mins, playerbox_stand_maxs,
-				 extrapolatedBotOrigin.Data(), self, MASK_AISOLID );
-		if( trace.fraction != 1.0f ) {
-			predictedBotOrigin = Vec3( trace.endpos );
-			// Compensate Z for ground trace hit point
-			if( trace.endpos[2] > extrapolatedBotOrigin.Z() ) {
-				predictedBotOrigin.Z() += std::min( 24.0f, trace.endpos[2] = extrapolatedEnemyOrigin.Z() );
-			}
-		}
-		// Predict enemy origin after 0.5 seconds
-		G_Trace( &trace, selectedEnemies.LastSeenOrigin().Data(), playerbox_stand_mins, playerbox_stand_maxs,
-				 extrapolatedEnemyOrigin.Data(), const_cast<edict_t *>( selectedEnemies.Ent() ), MASK_AISOLID );
-		if( trace.fraction != 1.0f ) {
-			predictedEnemyOrigin = Vec3( trace.endpos );
-			if( trace.endpos[2] > extrapolatedEnemyOrigin.Z() ) {
-				predictedEnemyOrigin.Z() += std::min( 24.0f, trace.endpos[2] - extrapolatedEnemyOrigin.Z() );
-			}
-		}
+	constexpr float predictionSeconds = 0.8f;
 
-		// Check whether bot may hit enemy after 0.5s
+	// Extrapolate bot origin
+	Vec3 extrapolatedBotOrigin( self->velocity );
+	extrapolatedBotOrigin *= predictionSeconds;
+	extrapolatedBotOrigin += self->s.origin;
+	Vec3 predictedBotOrigin( extrapolatedBotOrigin );
+
+	// Extrapolate enemy origin
+	float *initialEnemyOrigin = selectedEnemies.LastSeenOrigin().Data();
+	Vec3 extrapolatedEnemyOrigin( selectedEnemies.LastSeenVelocity() );
+	extrapolatedEnemyOrigin *= predictionSeconds;
+	extrapolatedEnemyOrigin += initialEnemyOrigin;
+	Vec3 predictedEnemyOrigin( extrapolatedEnemyOrigin );
+
+	float *const mins = playerbox_stand_mins;
+	float *const maxs = playerbox_stand_maxs;
+
+	trace_t trace;
+	// Get a coarse predicted bot origin
+	G_Trace( &trace, self->s.origin, mins, playerbox_stand_maxs, extrapolatedBotOrigin.Data(), self, MASK_AISOLID );
+	if( trace.fraction != 1.0f ) {
+		predictedBotOrigin.Set( trace.endpos );
+		// Compensate Z for ground trace hit point
+		if( trace.endpos[2] > extrapolatedBotOrigin.Z() ) {
+			predictedBotOrigin.Z() += -playerbox_stand_mins[2];
+		}
+	}
+
+	// Get a coarse predicted enemy origin
+	auto *skip = const_cast<edict_t *>( selectedEnemies.Ent() );
+	G_Trace( &trace, initialEnemyOrigin, mins, maxs, extrapolatedEnemyOrigin.Data(), skip, MASK_AISOLID );
+	if( trace.fraction != 1.0f ) {
+		predictedEnemyOrigin.Set( trace.endpos );
+		if( trace.endpos[2] > extrapolatedEnemyOrigin.Z() ) {
+			predictedEnemyOrigin.Z() += -playerbox_stand_mins[2];
+		}
+	}
+
+	// Check whether the bot is likely to be able to hit the enemy
+	if( trap_inPVS( predictedBotOrigin.Data(), predictedBotOrigin.Data() ) ) {
 		G_Trace( &trace, predictedBotOrigin.Data(), nullptr, nullptr, predictedEnemyOrigin.Data(), self, MASK_AISOLID );
 		// Still may hit, keep using current weapon
 		if( trace.fraction == 1.0f || selectedEnemies.Ent() == game.edicts + trace.ent ) {
 			return WEAP_NONE;
 		}
+	}
 
-		TestTargetEnvironment( Vec3( self->s.origin ), selectedEnemies.LastSeenOrigin(), selectedEnemies.Ent() );
-		// Hit fast-moving enemy using EB
-		if( BoltsReadyToFireCount() && ( enemyMovesFast || targetEnvironment.factor < 0.5f ) ) {
+	// Only switch to EB on far range. Keep using the current weapon.
+	if( worldState.DistanceToEnemy() > GetLaserRange() ) {
+		if( BoltsReadyToFireCount() ) {
 			return WEAP_ELECTROBOLT;
 		}
-		// Bot moves fast or target environment is good for explosives. Choose RL, GL or GB
-		if( RocketsReadyToFireCount() ) {
-			return WEAP_ROCKETLAUNCHER;
+		return WEAP_NONE;
+	}
+
+	// Hit fast-moving enemy using EB
+	if( BoltsReadyToFireCount() && ( enemyMovesFast && !botMovesFast ) ) {
+		return WEAP_ELECTROBOLT;
+	}
+
+	if( botMovesFast && !enemyMovesFast ) {
+		TestTargetEnvironment( Vec3( self->s.origin ), selectedEnemies.LastSeenOrigin(), selectedEnemies.Ent() );
+		if( targetEnvironment.factor > 0.5f ) {
+			if( RocketsReadyToFireCount() ) {
+				return WEAP_ROCKETLAUNCHER;
+			}
+			if( GrenadesReadyToFireCount() ) {
+				return WEAP_GRENADELAUNCHER;
+			}
 		}
-		if( GrenadesReadyToFireCount() ) {
-			return WEAP_GRENADELAUNCHER;
-		}
+	}
+
+	if( BlastsReadyToFireCount() && worldState.DamageToKill() < 100 ) {
 		return WEAP_GUNBLADE;
 	}
 
-	TestTargetEnvironment( Vec3( self->s.origin ), selectedEnemies.LastSeenOrigin(), selectedEnemies.Ent() );
-
-	enum { EB, RL, GB, MAX_WEAPONS };
-	WeaponAndScore weaponScores[MAX_WEAPONS] =
-	{
-		WeaponAndScore( WEAP_ELECTROBOLT, BoltsReadyToFireCount() > 0 ),
-		WeaponAndScore( WEAP_ROCKETLAUNCHER, RocketsReadyToFireCount() > 0 ),
-		WeaponAndScore( WEAP_GUNBLADE, 0.8f )
-	};
-
-	weaponScores[EB].score *= 1.0f + 0.33f * self->ai->botRef->Skill();
-	if( enemyMovesFast ) {
-		weaponScores[EB].score += 0.33f;
-	}
-
-	weaponScores[RL].score *= 1.33f * ( 0.3f + 0.7f * targetEnvironment.factor );
-	weaponScores[GB].score *= 0.6f + 0.4f * targetEnvironment.factor;
-	if( botMovesFast ) {
-		weaponScores[GB].score += 0.33f;
-	}
-
-	weaponScores[EB].score *= 0.3f + 0.7f * BoundedFraction( worldState.DistanceToEnemy(), 2000.0f );
-	weaponScores[RL].score *= 1.0f - BoundedFraction( worldState.DistanceToEnemy(), 1500.0f );
-	weaponScores[GB].score *= 1.0f - 0.3f * BoundedFraction( worldState.DistanceToEnemy(), 2500.0f );
-
-	// We are sure that weapon switch not only costs nothing, but even is intended, so do not call ChooseWeaponByScore()
-	int weapon = WEAP_NONE;
-	float maxScore = 0.0f;
-	for( int i = 0; i < MAX_WEAPONS; ++i ) {
-		if( maxScore < weaponScores[i].score ) {
-			maxScore = weaponScores[i].score;
-			weapon = weaponScores[i].weapon;
-		}
-	}
-
-	constexpr const char *format = "(hit escaping) raw scores: EB %.2f RL %.2f GB %.2f chose %s\n";
-	Debug( format, weaponScores[EB].score, weaponScores[RL].score, weaponScores[GB].score, WeapName( weapon ) );
-
-	return weapon;
+	return WEAP_NONE;
 }
 
 bool BotWeaponSelector::CheckForShotOfDespair( const WorldState &worldState ) {

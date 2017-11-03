@@ -584,13 +584,13 @@ AiBaseActionRecord *AiBaseBrain::ReconstructPlan( PlannerNode *lastNode ) const 
 
 	AiBaseActionRecord *firstInPlan = recordsStack[numNodes - 1];
 	AiBaseActionRecord *lastInPlan = recordsStack[numNodes - 1];
-	G_Printf( "Plan is %s", firstInPlan->Name() );
+	Debug( "Built plan is:\n" );
+	Debug( "  %s\n", firstInPlan->Name() );
 	for( int i = numNodes - 2; i >= 0; --i ) {
 		lastInPlan->nextInPlan = recordsStack[i];
 		lastInPlan = recordsStack[i];
-		G_Printf( "->%s", recordsStack[i]->Name() );
+		Debug( "->%s\n", recordsStack[i]->Name() );
 	}
-	G_Printf( "\n" );
 
 	lastInPlan->nextInPlan = nullptr;
 	return firstInPlan;
@@ -612,6 +612,9 @@ void AiBaseBrain::SetGoalAndPlan( AiBaseGoal *activeGoal_, AiBaseActionRecord *p
 	}
 
 	this->activeGoal = activeGoal_;
+#if 0
+	AITools_DrawColorLine( self->s.origin, ( Vec3( 0, 0, 56 ) + self->s.origin ).Data(), activeGoal_->DebugColor(), 0 );
+#endif
 
 	this->planHead = planHead_;
 	this->planHead->Activate();

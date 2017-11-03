@@ -12,7 +12,7 @@
 Bot::Bot( edict_t *self_, float skillLevel_ )
 	: Ai( self_, &botBrain, AiAasRouteCache::NewInstance(), &movementState.entityPhysicsState, PREFERRED_TRAVEL_FLAGS, ALLOWED_TRAVEL_FLAGS ),
 	weightConfig( self_ ),
-	dangersDetector( self_ ),
+	perceptionManager( self_ ),
 	botBrain( this, skillLevel_ ),
 	skillLevel( skillLevel_ ),
 	selectedEnemies( self_ ),
@@ -63,6 +63,7 @@ Bot::Bot( edict_t *self_, float skillLevel_ )
 	walkCarefullyMovementAction( this ),
 	bunnyStraighteningReachChainMovementAction( this ),
 	bunnyToBestShortcutAreaMovementAction( this ),
+	bunnyToBestFloorClusterPointMovementAction( this ),
 	bunnyInterpolatingReachChainMovementAction( this ),
 	walkOrSlideInterpolatingReachChainMovementAction( this ),
 	combatDodgeSemiRandomlyToTargetMovementAction( this ),
@@ -78,12 +79,14 @@ Bot::Bot( edict_t *self_, float skillLevel_ )
 	similarWorldStateInstanceId( 0 ),
 	lastItemSelectedAt( 0 ),
 	noItemAvailableSince( 0 ),
+	lastBlockedNavTargetReportedAt( 0 ),
 	keptInFovPoint( self_ ),
 	nextRotateInputAttemptAt( 0 ),
 	inputRotationBlockingTimer( 0 ),
 	lastInputRotationFailureAt( 0 ),
 	lastChosenLostOrHiddenEnemy( nullptr ),
-	lastChosenLostOrHiddenEnemyInstanceId( 0 ) {
+	lastChosenLostOrHiddenEnemyInstanceId( 0 ),
+	visitedAreasCache( self_ ) {
 	self->r.client->movestyle = GS_CLASSICBUNNY;
 	// Enable skimming for bots (since it is useful and should not be noticed from a 3rd person POV).
 	self->r.client->ps.pmove.stats[PM_STAT_FEATURES] &= PMFEAT_CORNERSKIMMING;
@@ -145,7 +148,7 @@ void Bot::ApplyInput( BotInput *input, BotMovementPredictionContext *context ) {
 		auto *entityPhysicsState_ = &context->movementState->entityPhysicsState;
 		if( !input->hasAlreadyComputedAngles ) {
 			TryRotateInput( input, context );
-			Vec3 newAngles( GetNewViewAngles( entityPhysicsState_->Angles(), input->IntendedLookDir(),
+			Vec3 newAngles( GetNewViewAngles( entityPhysicsState_->Angles().Data(), input->IntendedLookDir(),
 											  context->predictionStepMillis, input->TurnSpeedMultiplier() ) );
 			input->SetAlreadyComputedAngles( newAngles );
 		}
@@ -177,6 +180,15 @@ bool Bot::TryRotateInput( BotInput *input, BotMovementPredictionContext *context
 	if( !keptInFovPoint.IsActive() || nextRotateInputAttemptAt > level.time ) {
 		*prevRotation = BotInputRotation::NONE;
 		return false;
+	}
+
+	// Cut off an expensive PVS call early
+	if( input->IsRotationAllowed( BotInputRotation::ALL_KINDS_MASK ) ) {
+		// We do not utilize PVS cache since it might produce different results for predicted and actual bot origin
+		if( !trap_inPVS( keptInFovPoint.Origin().Data(), botOrigin ) ) {
+			*prevRotation = BotInputRotation::NONE;
+			return false;
+		}
 	}
 
 	Vec3 selfToPoint( keptInFovPoint.Origin() );
@@ -346,7 +358,9 @@ void Bot::UpdateKeptInFovPoint() {
 		Vec3 origin( selectedEnemies.ClosestEnemyOrigin( self->s.origin ) );
 		if( !GetMiscTactics().shouldKeepXhairOnEnemy ) {
 			if( !selectedEnemies.HaveQuad() && !selectedEnemies.HaveCarrier() ) {
-				if( origin.SquareDistanceTo( self->s.origin ) > 1024 * 1024 ) {
+				float distanceThreshold = 768.0f + 1024.0f * selectedEnemies.MaxThreatFactor();
+				distanceThreshold *= 0.5f + 0.5f * self->ai->botRef->GetEffectiveOffensiveness();
+				if( origin.SquareDistanceTo( self->s.origin ) > distanceThreshold * distanceThreshold ) {
 					return;
 				}
 			}
@@ -370,10 +384,11 @@ void Bot::UpdateKeptInFovPoint() {
 
 		Vec3 origin( lostOrHiddenEnemy->LastSeenPosition() );
 		if( !GetMiscTactics().shouldKeepXhairOnEnemy ) {
-			float distanceThreshold = 768.0f;
-			if( lostOrHiddenEnemy->ent && lostOrHiddenEnemy->ent->s.effects & ( EF_QUAD | EF_CARRIER ) ) {
-				distanceThreshold = 2048.0f;
+			float distanceThreshold = 384.0f;
+			if( lostOrHiddenEnemy->ent ) {
+				distanceThreshold += 1024.0f * selectedEnemies.ComputeThreatFactor( lostOrHiddenEnemy->ent );
 			}
+			distanceThreshold *= 0.5f + 0.5f * self->ai->botRef->GetEffectiveOffensiveness();
 			if( origin.SquareDistanceTo( self->s.origin ) > distanceThreshold * distanceThreshold ) {
 				lastChosenLostOrHiddenEnemy = nullptr;
 				return;
@@ -386,7 +401,15 @@ void Bot::UpdateKeptInFovPoint() {
 	}
 
 	lastChosenLostOrHiddenEnemy = nullptr;
-	keptInFovPoint.Deactivate();
+
+	// Check whether there is a valid active threat.
+	// Set the kept in fov point to a possible threat origin in that case.
+	if( !botBrain.activeThreat.IsValidFor( self ) ) {
+		keptInFovPoint.Deactivate();
+		return;
+	}
+
+	keptInFovPoint.Activate( botBrain.activeThreat.possibleOrigin, (unsigned)botBrain.activeThreat.lastHitTimestamp );
 }
 
 void Bot::TouchedOtherEntity( const edict_t *entity ) {
@@ -422,6 +445,16 @@ void Bot::TouchedOtherEntity( const edict_t *entity ) {
 	}
 }
 
+Vec3 Bot::GetNewViewAngles( const vec3_t oldAngles, const Vec3 &desiredDirection,
+							unsigned frameTime, float angularSpeedMultiplier ) const {
+	// A hack for evil hard bots aiming
+	if( GetSelectedEnemies().AreValid() && GetMiscTactics().shouldKeepXhairOnEnemy && Skill() > 0.33f ) {
+		angularSpeedMultiplier *= 1.0f + 0.33f * ( Skill() - 0.33f );
+	}
+
+	return Ai::GetNewViewAngles( oldAngles, desiredDirection, frameTime, angularSpeedMultiplier );
+}
+
 void Bot::EnableAutoAlert( const AiAlertSpot &alertSpot, AlertCallback callback, void *receiver ) {
 	// First check duplicate ids. Fail on error since callers of this method are internal.
 	for( unsigned i = 0; i < alertSpots.size(); ++i ) {
@@ -448,104 +481,18 @@ void Bot::DisableAutoAlert( int id ) {
 	FailWith( "Can't find alert spot by id %d\n", id );
 }
 
-void Bot::RegisterVisibleEnemies() {
-	if( G_ISGHOSTING( self ) || GS_MatchState() == MATCH_STATE_COUNTDOWN || GS_ShootingDisabled() ) {
-		return;
-	}
-
-	CheckIsInThinkFrame( __FUNCTION__ );
-
-	// Compute look dir before loop
-	vec3_t lookDir;
-	AngleVectors( self->s.angles, lookDir, nullptr, nullptr );
-
-	const float dotFactor = FovDotFactor();
-
-	struct EntAndDistance {
-		int entNum;
-		float distance;
-
-		EntAndDistance( int entNum_, float distance_ ) : entNum( entNum_ ), distance( distance_ ) {}
-		bool operator<( const EntAndDistance &that ) const { return distance < that.distance; }
-	};
-
-	// Do not call inPVS() and G_Visible() for potential targets inside a loop for all clients.
-	// In worst case when all bots may see each other we get N^2 traces and PVS tests
-	// First, select all candidate targets along with distance to a bot.
-	// Then choose not more than BotBrain::maxTrackedEnemies nearest enemies for calling OnEnemyViewed()
-	// It may cause data loss (far enemies may have higher logical priority),
-	// but in a common good case (when there are few visible enemies) it preserves data,
-	// and in the worst case mentioned above it does not act weird from player POV and prevents server hang up.
-	// Note: non-client entities also may be candidate targets.
-	StaticVector<EntAndDistance, MAX_EDICTS> candidateTargets;
-
-	for( int i = 1; i < game.numentities; ++i ) {
-		edict_t *ent = game.edicts + i;
-		if( botBrain.MayNotBeFeasibleEnemy( ent ) ) {
-			continue;
-		}
-
-		// Reject targets quickly by fov
-		Vec3 toTarget( ent->s.origin );
-		toTarget -= self->s.origin;
-		float squareDistance = toTarget.SquaredLength();
-		if( squareDistance < 1 ) {
-			continue;
-		}
-		if( squareDistance > ent->aiVisibilityDistance * ent->aiVisibilityDistance ) {
-			continue;
-		}
-
-		float invDistance = Q_RSqrt( squareDistance );
-		toTarget *= invDistance;
-		if( toTarget.Dot( lookDir ) < dotFactor ) {
-			continue;
-		}
-
-		// It seams to be more instruction cache-friendly to just add an entity to a plain array
-		// and sort it once after the loop instead of pushing an entity in a heap on each iteration
-		candidateTargets.emplace_back( EntAndDistance( ENTNUM( ent ), 1.0f / invDistance ) );
-	}
-
-	std::sort( candidateTargets.begin(), candidateTargets.end() );
-
-	// Select inPVS/visible targets first to aid instruction cache, do not call callbacks in loop
-	StaticVector<edict_t *, MAX_CLIENTS> targetsInPVS;
-	StaticVector<edict_t *, MAX_CLIENTS> visibleTargets;
-
-	static_assert( AiBaseEnemyPool::MAX_TRACKED_ENEMIES <= MAX_CLIENTS, "targetsInPVS capacity may be exceeded" );
-
-	for( int i = 0, end = std::min( candidateTargets.size(), botBrain.MaxTrackedEnemies() ); i < end; ++i ) {
-		edict_t *ent = game.edicts + candidateTargets[i].entNum;
-		if( trap_inPVS( self->s.origin, ent->s.origin ) ) {
-			targetsInPVS.push_back( ent );
-		}
-	}
-
-	for( auto ent: targetsInPVS )
-		if( G_Visible( self, ent ) ) {
-			visibleTargets.push_back( ent );
-		}
-
-	// Call bot brain callbacks on visible targets
-	for( auto ent: visibleTargets )
-		botBrain.OnEnemyViewed( ent );
-
-	botBrain.AfterAllEnemiesViewed();
-
-	CheckAlertSpots( visibleTargets );
-}
-
-void Bot::CheckAlertSpots( const StaticVector<edict_t *, MAX_CLIENTS> &visibleTargets ) {
+void Bot::CheckAlertSpots( const StaticVector<uint16_t, MAX_CLIENTS> &visibleTargets ) {
 	float scores[MAX_ALERT_SPOTS];
 
+	edict_t *const gameEdicts = game.edicts;
 	// First compute scores (good for instruction cache)
 	for( unsigned i = 0; i < alertSpots.size(); ++i ) {
 		float score = 0.0f;
 		const auto &alertSpot = alertSpots[i];
 		const float squareRadius = alertSpot.radius * alertSpot.radius;
 		const float invRadius = 1.0f / alertSpot.radius;
-		for( const edict_t *ent: visibleTargets ) {
+		for( uint16_t entNum: visibleTargets ) {
+			edict_t *ent = gameEdicts + entNum;
 			float squareDistance = DistanceSquared( ent->s.origin, alertSpot.origin.Data() );
 			if( squareDistance > squareRadius ) {
 				continue;
@@ -716,7 +663,7 @@ void Bot::SayVoiceMessages() {
 //==========================================
 void Bot::OnBlockedTimeout() {
 	self->health = 0;
-	blockedTimeout = level.time + BLOCKED_TIMEOUT;
+	blockedTimeoutAt = level.time + BLOCKED_TIMEOUT;
 	self->die( self, self, self, 100000, vec3_origin );
 	G_Killed( self, self, self, 999, vec3_origin, MOD_SUICIDE );
 	self->nextThink = level.time + 1;
@@ -735,8 +682,9 @@ void Bot::GhostingFrame() {
 	botBrain.ClearGoalAndPlan();
 
 	movementState.Reset();
+	fallbackMovementPath.Deactivate();
 
-	blockedTimeout = level.time + BLOCKED_TIMEOUT;
+	blockedTimeoutAt = level.time + BLOCKED_TIMEOUT;
 	self->nextThink = level.time + 100;
 
 	// wait 4 seconds after entering the level
@@ -794,8 +742,6 @@ void Bot::Think() {
 		return;
 	}
 
-	RegisterVisibleEnemies();
-
 	UpdateKeptInFovPoint();
 
 	if( CanChangeWeapons() ) {
@@ -826,6 +772,9 @@ void Bot::ActiveFrame() {
 	}
 
 	CheckBlockingDueToInputRotation();
+
+	// Always calls Frame() and calls Think() if needed
+	perceptionManager.Update();
 
 	weaponsSelector.Frame( botBrain.cachedWorldState );
 
@@ -864,4 +813,35 @@ void Bot::CallActiveClientThink( const BotInput &input ) {
 
 	ClientThink( self, &ucmd, 0 );
 	self->nextThink = level.time + 1;
+}
+
+void Bot::OnMovementToNavTargetBlocked() {
+	auto *selectedNavEntity = &botBrain.selectedNavEntity;
+	if( !selectedNavEntity->IsValid() || selectedNavEntity->IsEmpty() ) {
+		return;
+	}
+
+	// If a new nav target is set in blocked state, the bot remains blocked
+	// for few millis since the ground acceleration is finite.
+	// Prevent classifying just set nav targets as ones that have led to blocking.
+	if( level.time - lastBlockedNavTargetReportedAt < 400 ) {
+		return;
+	}
+
+	lastBlockedNavTargetReportedAt = level.time;
+
+	// Force replanning
+	botBrain.ClearGoalAndPlan();
+
+	const auto *navEntity = selectedNavEntity->GetNavEntity();
+	if( !navEntity ) {
+		// It is very likely that the nav entity was based on a tactical spot.
+		// Disable all nearby tactical spots for the origin
+		roamingManager.DisableSpotsInRadius( navEntity->Origin(), 144.0f );
+		selectedNavEntity->InvalidateNextFrame();
+		return;
+	}
+
+	botBrain.itemsSelector.MarkAsDisabled( *navEntity, 4000 );
+	selectedNavEntity->InvalidateNextFrame();
 }

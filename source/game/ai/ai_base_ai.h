@@ -17,6 +17,8 @@ class alignas ( 4 )AiEntityPhysicsState
 	// These fields are accessed way too often, so packing benefits does not outweigh unpacking performance loss.
 	vec3_t origin;
 	vec3_t velocity;
+	float speed;
+	float speed2D;
 	// Unpacking of these fields is much cheaper than calling AngleVectors() that uses the expensive fsincos instruction
 	// 12 bytes totally
 	signed short forwardDir[3];
@@ -36,47 +38,37 @@ class alignas ( 4 )AiEntityPhysicsState
 public:
 	// CONTENTS flags, cannot be compressed
 	int waterType;
-
 private:
 	signed short angles[3];
-	static_assert( MAX_EDICTS == ( 1 << 10 ), "Fields bits count assumes 1024 as game entities count limit" );
-	// Add an extra bit for -1 entity num sign
-	short groundEntNum : 11;
-	unsigned short selfEntNum : 10;
+	static_assert( MAX_EDICTS < ( 1 << 15 ), "Fields bits count assumes 2^15 as game entities count limit" );
+	// Use a signed type for indicating an absent ground entity by a negative value
+	int16_t groundEntNum;
+	uint16_t selfEntNum;
 	// This needs some precision (can be used to restore trace fraction if needed), so its packed into 2 bytes
-	unsigned short heightOverGround;
+	uint16_t heightOverGround;
 
 	inline void SetHeightOverGround( float heightOverGround_ ) {
 		if( heightOverGround_ <= GROUND_TRACE_DEPTH ) {
-			this->heightOverGround = ( decltype( this->heightOverGround ) )( heightOverGround_ * 256 );
+			this->heightOverGround = ( uint16_t )( heightOverGround_ * 256 );
 		} else {
-			this->heightOverGround = ( decltype( this->heightOverGround ) )( ( GROUND_TRACE_DEPTH + 1 ) * 256 + 1 );
+			this->heightOverGround = ( uint16_t )( ( GROUND_TRACE_DEPTH + 1 ) * 256 + 1 );
 		}
 	}
 
-public:
-	signed char droppedToFloorOriginOffset;
+	mutable int16_t groundNormalZ;
 
+	inline void SetGroundNormalZ( float value ) {
+		this->groundNormalZ = (int16_t)( value * std::numeric_limits<int16_t>::max() );
+	}
 private:
-	unsigned currAasAreaNum : 20;
-	unsigned droppedToFloorAasAreaNum : 20;
-	unsigned speed : 18;
-	unsigned speed2D : 18;
+	uint16_t currAasAreaNum;
+	uint16_t droppedToFloorAasAreaNum;
 
 	inline void SetSpeed( const vec3_t velocity_ ) {
 		float squareSpeed2D = velocity_[0] * velocity_[0] + velocity_[1] * velocity_[1];
 		float squareSpeed = squareSpeed2D + velocity_[2] * velocity_[2];
-		// If a square value is very low, leave it as-is
-		if( squareSpeed > 0.001f ) {
-			this->speed = ( decltype( this->speed ) )( sqrtf( squareSpeed ) * 16.0f );
-		} else {
-			this->speed = ( decltype( this->speed ) )( squareSpeed * 16.0f );
-		}
-		if( squareSpeed2D > 0.001f ) {
-			this->speed2D = ( decltype( this->speed2D ) )( sqrtf( squareSpeed2D ) * 16.0f );
-		} else {
-			this->speed2D = ( decltype( this->speed2D ) )( squareSpeed2D * 16.0f );
-		}
+		this->speed = squareSpeed > 0.001f ? sqrtf( squareSpeed ) : 0;
+		this->speed2D = squareSpeed2D > 0.001f ? sqrtf( squareSpeed2D ) : 0;
 	}
 
 	inline void UpdateDirs( const vec3_t angles_ ) {
@@ -89,18 +81,20 @@ private:
 	void UpdateAreaNums();
 
 public:
-	unsigned short waterLevel : 2;
+	int8_t droppedToFloorOriginOffset;
+	uint8_t waterLevel;
 
 	AiEntityPhysicsState()
-		: waterType( 0 ),
+		: speed( 0 ),
+		speed2D( 0 ),
+		waterType( 0 ),
 		groundEntNum( 0 ),
 		selfEntNum( 0 ),
 		heightOverGround( 0 ),
-		droppedToFloorOriginOffset( 0 ),
+		groundNormalZ( 0 ),
 		currAasAreaNum( 0 ),
 		droppedToFloorAasAreaNum( 0 ),
-		speed( 0 ),
-		speed2D( 0 ),
+		droppedToFloorOriginOffset( 0 ),
 		waterLevel( 0 ) {}
 
 	inline void UpdateFromEntity( const edict_t *ent ) {
@@ -111,9 +105,11 @@ public:
 		SetAngles( ent->s.angles );
 		this->groundEntNum = -1;
 		if( ent->groundentity ) {
-			this->groundEntNum = ( decltype( this->groundEntNum ) )( ENTNUM( const_cast<edict_t *>( ent->groundentity ) ) );
+			this->groundEntNum = ( decltype( this->groundEntNum ) )( ENTNUM( ent->groundentity ) );
 		}
-		this->selfEntNum = ( decltype( this->selfEntNum ) )ENTNUM( const_cast<edict_t *>( ent ) );
+		this->selfEntNum = ( decltype( this->selfEntNum ) )ENTNUM( ent );
+		// Compute lazily on demand in this case
+		SetGroundNormalZ( 0 );
 
 		UpdateAreaNums();
 	}
@@ -126,6 +122,7 @@ public:
 		SetAngles( pmove->playerState->viewangles );
 		this->groundEntNum = ( decltype( this->groundEntNum ) )pmove->groundentity;
 		this->selfEntNum = ( decltype( this->selfEntNum ) )( pmove->playerState->playerNum + 1 );
+		SetGroundNormalZ( pmove->groundentity >= 0 ? pmove->groundplane.normal[2] : 0 );
 
 		UpdateAreaNums();
 	}
@@ -180,9 +177,8 @@ public:
 	}
 	inline void SetVelocity( const Vec3 &velocity_ ) { SetVelocity( velocity_.Data() ); }
 
-	// Note: there might be mismatch with an actual value computed from the velocity
-	inline float Speed() const { return speed / 16.0f; }
-	inline float Speed2D() const { return speed2D / 16.0f; }
+	inline float Speed() const { return speed; }
+	inline float Speed2D() const { return speed2D; }
 	// These getters are provided for compatibility with the other code
 	inline float SquareSpeed() const {
 		float unpackedSpeed = Speed();
@@ -195,6 +191,51 @@ public:
 
 	inline Vec3 ForwardDir() const { return UnpackedDir( forwardDir ); }
 	inline Vec3 RightDir() const { return UnpackedDir( rightDir ); }
+
+	// Returns number of start areas to use in routing
+	inline int PrepareRoutingStartAreas( int *areaNums ) const {
+		int numAreas = 0;
+
+		if( int areaNum = CurrAasAreaNum() ) {
+			areaNums[numAreas++] = areaNum;
+		}
+
+		if( int areaNum = DroppedToFloorAasAreaNum() ) {
+			if( numAreas ) {
+				if( areaNums[0] != areaNum ) {
+					areaNums[numAreas++] = areaNum;
+				}
+			} else {
+				areaNums[numAreas++] = areaNum;
+			}
+		}
+
+		return numAreas;
+	}
+
+	inline float GetGroundNormalZ() const {
+		if( groundNormalZ != 0 ) {
+			return groundNormalZ / std::numeric_limits<int16_t>::max();
+		}
+		if( groundEntNum < 0 ) {
+			return 0;
+		}
+
+		// In worst case that is rarely gets triggered the bot is on ground
+		// but the ground normal has not been computed yet, and was not initially available.
+		// Compute it right now following PMove() implementation.
+		// This lazy approach really helps reducing amount of expensive trace calls.
+		trace_t trace;
+		auto *start = const_cast<float *>( Origin() );
+		Vec3 end( Origin() );
+		end.Z() -= 0.25f;
+		edict_t *self = game.edicts + selfEntNum;
+		G_Trace( &trace, start, playerbox_stand_mins, playerbox_stand_maxs, end.Data(), self, MASK_PLAYERSOLID );
+		if( trace.fraction != 1.0f ) {
+			groundNormalZ = (int16_t)( trace.plane.normal[2] / std::numeric_limits<int16_t>::max() );
+		}
+		return groundNormalZ;
+	}
 };
 
 class Ai : public EdictRef, public AiFrameAwareUpdatable
@@ -221,10 +262,11 @@ protected:
 	// Can point to external (predicted) entity physics state during movement planning.
 	AiEntityPhysicsState *entityPhysicsState;
 
-	int allowedAasTravelFlags;
-	int preferredAasTravelFlags;
+	// Preferred and allowed travel flags
+	int travelFlags[2];
+	ArrayRange<int> travelFlagsRange;
 
-	int64_t blockedTimeout;
+	int64_t blockedTimeoutAt;
 
 	vec3_t angularViewSpeed;
 
@@ -269,8 +311,8 @@ public:
 		AiEntityPhysicsState *entityPhysicsState_,
 		int preferredAasTravelFlags_,
 		int allowedAasTravelFlags_,
-		float yawSpeed = 270.0f,
-		float pitchSpeed = 140.0f );
+		float yawSpeed = 330.0f,
+		float pitchSpeed = 170.0f );
 
 	virtual ~Ai() override {};
 
@@ -286,8 +328,10 @@ public:
 	// Exposed for native and script actions
 	int CheckTravelTimeMillis( const Vec3 &from, const Vec3 &to, bool allowUnreachable = true );
 
-	inline int PreferredTravelFlags() const { return preferredAasTravelFlags; }
-	inline int AllowedTravelFlags() const { return allowedAasTravelFlags; }
+	inline int PreferredTravelFlags() const { return travelFlags[0]; }
+	inline int AllowedTravelFlags() const { return travelFlags[1]; }
+
+	inline const ArrayRange<int> TravelFlags() const { return travelFlagsRange; }
 
 	// Accepts a touched entity and its old solid before touch
 	void TouchedEntity( edict_t *ent );
@@ -302,6 +346,25 @@ public:
 
 	static constexpr unsigned BLOCKED_TIMEOUT = 15000;
 
+	unsigned MillisInBlockedState() const {
+		int64_t diff = BLOCKED_TIMEOUT - ( blockedTimeoutAt - level.time );
+		return diff >= 0 ? (unsigned)diff : 0;
+	}
+
+	bool IsBlocked() const {
+		// Blocking is checked in Think() frames (usually every 64 millis),
+		// so the blockedTimeoutAt value might be a bit outdated
+		return MillisInBlockedState() > 64 + 16;
+	}
+
+	unsigned MillisUntilBlockedTimeout() const {
+		// Returning a positive BLOCKED_TIMEOUT might be confusing in this case
+		if( !IsBlocked() ) {
+			return 0;
+		}
+		int64_t diff = level.time - blockedTimeoutAt;
+		return diff >= 0 ? (unsigned)diff : 0;
+	}
 protected:
 	const char *Nick() const {
 		return self->r.client ? self->r.client->netname : self->classname;
@@ -312,11 +375,12 @@ protected:
 	// This function produces very basic but reliable results.
 	// Imitation of human-like aiming should be a burden of callers that prepare the desiredDirection.
 	inline Vec3 GetNewViewAngles( const Vec3 &oldAngles, const Vec3 &desiredDirection,
-								  unsigned frameTime, float angularSpeedMultiplier = 1.0f ) const {
+								  unsigned frameTime, float angularSpeedMultiplier ) const {
 		return GetNewViewAngles( oldAngles.Data(), desiredDirection, frameTime, angularSpeedMultiplier );
 	}
-	Vec3 GetNewViewAngles( const vec3_t oldAngles, const Vec3 &desiredDirection,
-						   unsigned frameTime, float angularSpeedMultiplier = 1.0f ) const;
+
+	virtual Vec3 GetNewViewAngles( const vec3_t oldAngles, const Vec3 &desiredDirection,
+								   unsigned frameTime, float angularSpeedMultiplier ) const;
 
 	void UpdateReachChain( const ReachChainVector &oldReachChain,
 						   ReachChainVector *currReachChain,

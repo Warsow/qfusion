@@ -14,10 +14,19 @@ void BotItemsSelector::UpdateInternalItemAndGoalWeights() {
 		}
 	}
 
-	FOREACH_NAVENT( goalEnt )
-	{
+	const auto levelTime = level.time;
+	auto *navEntitiesRegistry = NavEntitiesRegistry::Instance();
+	for( auto it = navEntitiesRegistry->begin(), end = navEntitiesRegistry->end(); it != end; ++it ) {
+		const NavEntity *goalEnt = *it;
 		// Picking clients as goal entities is currently disabled
 		if( goalEnt->IsClient() ) {
+			continue;
+		}
+
+		// Do not even try to compute a weight for the disabled item
+		if( disabledForSelectionUntil[goalEnt->Id()] >= levelTime ) {
+			internalEntityWeights[goalEnt->Id()] = 0;
+			internalPickupGoalWeights[goalEnt->Id()] = 0;
 			continue;
 		}
 
@@ -174,9 +183,18 @@ SelectedNavEntity BotItemsSelector::SuggestGoalNavEntity( const SelectedNavEntit
 	UpdateInternalItemAndGoalWeights();
 
 	StaticVector<NavEntityAndWeight, MAX_NAVENTS> rawWeightCandidates;
-	FOREACH_NAVENT( navEnt )
-	{
+	const auto levelTime = level.time;
+	auto *navEntitiesRegistry = NavEntitiesRegistry::Instance();
+	for( auto it = navEntitiesRegistry->begin(), end = navEntitiesRegistry->end(); it != end; ++it ) {
+		const NavEntity *navEnt = *it;
 		if( navEnt->IsDisabled() ) {
+			continue;
+		}
+
+		// We cannot just set a zero internal weight for a temporarily disabled nav entity
+		// (it might be overridden by an external weight, and we should not modify external weights
+		// as script users expect them remaining the same unless explicitly changed via script API)
+		if( disabledForSelectionUntil[navEnt->Id()] >= levelTime ) {
 			continue;
 		}
 
@@ -210,6 +228,16 @@ SelectedNavEntity BotItemsSelector::SuggestGoalNavEntity( const SelectedNavEntit
 
 	// Sort all pre-selected candidates by their raw weights
 	std::sort( rawWeightCandidates.begin(), rawWeightCandidates.end() );
+
+	// Try checking whether the bot is in some floor cluster to give a greater weight for items in the same cluster
+	int currFloorClusterNum = 0;
+	const auto &entityPhysicsState = self->ai->botRef->EntityPhysicsState();
+	const auto *aasFloorClusterNums = AiAasWorld::Instance()->AreaFloorClusterNums();
+	if( aasFloorClusterNums[entityPhysicsState->CurrAasAreaNum()] ) {
+		currFloorClusterNum = aasFloorClusterNums[entityPhysicsState->CurrAasAreaNum()];
+	} else if( aasFloorClusterNums[entityPhysicsState->DroppedToFloorAasAreaNum()] ) {
+		currFloorClusterNum = aasFloorClusterNums[entityPhysicsState->DroppedToFloorAasAreaNum()];
+	}
 
 	const NavEntity *currGoalNavEntity = currSelectedNavEntity.navEntity;
 	float currGoalEntWeight = 0.0f;
@@ -265,6 +293,14 @@ SelectedNavEntity BotItemsSelector::SuggestGoalNavEntity( const SelectedNavEntit
 		float cost = 0.0001f + moveCost + WAIT_TIME_WEIGHT * waitDuration * navEnt->CostInfluence();
 
 		weight = ( 1000 * weight ) / cost;
+
+		// If the bot is inside a floor cluster
+		if( currFloorClusterNum ) {
+			// Greatly increase weight for items in the same floor cluster
+			if( currFloorClusterNum == aasFloorClusterNums[navEnt->AasAreaNum()] ) {
+				weight *= 4.0f;
+			}
+		}
 
 		// Store current weight of the current goal entity
 		if( currGoalNavEntity == navEnt ) {

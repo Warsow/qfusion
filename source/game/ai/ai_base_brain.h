@@ -20,13 +20,14 @@ protected:
 	edict_t *self;
 	const char *name;
 	const unsigned updatePeriod;
+	int debugColor;
 
 	float weight;
 
 public:
 	// Don't pass self as a constructor argument (self->ai ptr might not been set yet)
 	inline AiBaseGoal( Ai *ai, const char *name_, unsigned updatePeriod_ )
-		: self( ai->self ), name( name_ ), updatePeriod( updatePeriod_ ), weight( 0.0f ) {
+		: self( ai->self ), name( name_ ), updatePeriod( updatePeriod_ ), debugColor( 0 ), weight( 0.0f ) {
 		Register( ai, this );
 	}
 
@@ -45,6 +46,8 @@ public:
 	inline bool operator<( const AiBaseGoal &that ) const {
 		return this->weight > that.weight;
 	}
+
+	inline int DebugColor() const { return debugColor; }
 
 	inline const char *Name() const { return name; }
 	inline unsigned UpdatePeriod() const { return updatePeriod; }
@@ -448,8 +451,8 @@ protected:
 	int DroppedToFloorAasAreaNum() const { return self->ai->aiRef->entityPhysicsState->DroppedToFloorAasAreaNum(); }
 	Vec3 DroppedToFloorOrigin() const { return self->ai->aiRef->entityPhysicsState->DroppedToFloorOrigin(); }
 
-	int PreferredAasTravelFlags() const { return self->ai->aiRef->preferredAasTravelFlags; }
-	int AllowedAasTravelFlags() const { return self->ai->aiRef->allowedAasTravelFlags; }
+	int PreferredAasTravelFlags() const { return self->ai->aiRef->PreferredTravelFlags(); }
+	int AllowedAasTravelFlags() const { return self->ai->aiRef->AllowedTravelFlags(); }
 
 	const AiAasWorld *AasWorld() const { return self->ai->aiRef->aasWorld; }
 	AiAasRouteCache *RouteCache() { return self->ai->aiRef->routeCache; }

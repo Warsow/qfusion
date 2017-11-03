@@ -132,11 +132,11 @@ void AiSquad::SquadEnemyPool::OnEnemyRemoved( const Enemy *enemy ) {
 		bot->OnEnemyRemoved( enemy );
 }
 
-void AiSquad::SquadEnemyPool::TryPushNewEnemy( const edict_t *enemy ) {
+void AiSquad::SquadEnemyPool::TryPushNewEnemy( const edict_t *enemy, const float *suggestedOrigin ) {
 	CheckSquadValid();
 	for( Bot *bot: squad->bots )
 		if( !bot->IsGhosting() ) {
-			TryPushEnemyOfSingleBot( bot->Self(), enemy );
+			TryPushEnemyOfSingleBot( bot->Self(), enemy, suggestedOrigin );
 		}
 }
 
@@ -303,6 +303,33 @@ void AiSquad::Think() {
 }
 
 bool AiSquad::CheckCanMoveTogether() const {
+	// Test for a possible cheap shortcut using floor cluster nums of the bots
+	if( auto firstClusterNum = GetBotFloorCluster( bots[0] ) ) {
+		// Check whether all bots are in the same floor cluster
+		unsigned i = 1;
+		for(; i < bots.size(); ++i ) {
+			if( firstClusterNum != GetBotFloorCluster( bots[i] ) ) {
+				break;
+			}
+		}
+
+		// All bots are in the same floor cluster.
+		if( i == bots.size() ) {
+			// Just check the distance between bots corresponding to CONNECTIVITY_MOVE_CENTISECONDS
+			// Assume the average moving speed to be 450 ups (average as physics defines in 3D space)
+			float distanceThreshold = 450 * ( CONNECTIVITY_MOVE_CENTISECONDS * 1e-2f );
+			for( i = 0; i < bots.size() / 2 + 1; ++i ) {
+				for( unsigned j = 1; j < bots.size(); ++j ) {
+					float squareDistance = DistanceSquared( bots[i]->self->s.origin, bots[j]->self->s.origin );
+					if( squareDistance > distanceThreshold * distanceThreshold ) {
+						return false;
+					}
+				}
+			}
+			return true;
+		}
+	}
+
 	// Check whether each bot is reachable for at least a single other bot
 	// or may reach at least a single other bot
 	// (some reachabilities such as teleports are not reversible)
@@ -328,10 +355,15 @@ bool AiSquad::CheckCanMoveTogether() const {
 bool AiSquad::CheckCanFightTogether() const {
 	// Just check that each bot is visible for each other one
 	trace_t trace;
+	const auto *pvsCache = EntitiesPvsCache::Instance();
 	for( unsigned i = 0; i < bots.size(); ++i ) {
 		for( unsigned j = i + 1; j < bots.size(); ++j ) {
 			edict_t *firstEnt = const_cast<edict_t*>( bots[i]->Self() );
 			edict_t *secondEnt = const_cast<edict_t*>( bots[j]->Self() );
+			if( !pvsCache->AreInPvs( firstEnt, secondEnt ) ) {
+				continue;
+			}
+
 			G_Trace( &trace, firstEnt->s.origin, nullptr, nullptr, secondEnt->s.origin, firstEnt, MASK_AISOLID );
 			if( trace.fraction != 1.0f && trace.ent != ENTNUM( secondEnt ) ) {
 				return false;
@@ -339,6 +371,18 @@ bool AiSquad::CheckCanFightTogether() const {
 		}
 	}
 	return true;
+}
+
+int AiSquad::GetBotFloorCluster( Bot *bot ) const {
+	const auto *aasFloorClusters = AiAasWorld::Instance()->AreaFloorClusterNums();
+	// Zero area nums are handled by the dummy zero cluster num for the zero area
+	if( int clusterNum = aasFloorClusters[bot->EntityPhysicsState()->CurrAasAreaNum()] ) {
+		return clusterNum;
+	}
+	if( int clusterNum = aasFloorClusters[bot->EntityPhysicsState()->DroppedToFloorAasAreaNum()] ) {
+		return clusterNum;
+	}
+	return 0;
 }
 
 void AiSquad::UpdateBotRoleWeights() {
@@ -526,15 +570,18 @@ void AiSquad::CheckMembersInventory() {
 
 	for( unsigned botNum = 0; botNum < bots.size(); ++botNum ) {
 		// We can't set special goal immediately (a dropped entity must touch a solid first)
-		// For this case, we just prevent dropping for this bot for 1000 ms
-		if( level.time - lastDroppedForBotTimestamps[botNum] < 1000 ) {
+		// For this case, we just prevent dropping for this bot for 2000 ms
+		if( level.time - lastDroppedForBotTimestamps[botNum] < 2000 ) {
 			continue;
 		}
 
-		// Bot already has a some special goal that the squad owns
-		// TODO: Needs special method for check since special goals have gone
-		// if (bots[botNum]->HasSpecialGoal() && bots[botNum]->IsSpecialGoalSetBy(this))
-		//    continue;
+		// Check whether a bot is likely to already have a dropped item as a goal
+		const SelectedNavEntity &selectedNavEntity = bots[botNum]->GetSelectedNavEntity();
+		if( selectedNavEntity.IsValid() && !selectedNavEntity.IsEmpty() ) {
+			if( selectedNavEntity.navEntity->IsDroppedEntity() && selectedNavEntity.GetCost() > 3.0f ) {
+				continue;
+			}
+		}
 
 		bool needsWeapon = maxBotWeaponTiers[botNum] <= 2;
 		// TODO: Check player class abilities
@@ -652,10 +699,15 @@ bool AiSquad::ShouldNotDropItemsNow() const {
 	// Check not more than 4 most recently seen stealers.
 	// Use trace instead of path travel time estimation because pathfinder may fail to find a path.
 	trace_t trace;
+	const auto *pvsCache = EntitiesPvsCache::Instance();
 	for( unsigned i = 0, end = std::min( 4u, potentialStealers.size() ); i < end; ++i ) {
 		PotentialStealer stealer = potentialStealers[i];
 		for( const Bot *bot: bots ) {
 			edict_t *botEnt = const_cast<edict_t*>( bot->Self() );
+			if( !pvsCache->AreInPvs( botEnt, stealer.enemy->ent ) ) {
+				continue;
+			}
+
 			G_Trace( &trace, botEnt->s.origin, nullptr, nullptr, stealer.extrapolatedOrigin.Data(), botEnt, MASK_AISOLID );
 			if( trace.fraction == 1.0f || game.edicts + trace.ent == stealer.enemy->ent ) {
 				return true;
@@ -733,26 +785,20 @@ void AiSquad::SetDroppedEntityAsBotGoal( edict_t *ent ) {
 		AI_FailWith( tag, "target_ent is not set or not in use" );
 	}
 
+	// Allow other bots (and itself) to grab this item too
+	// (But the suppliant has a priority since the goal has been set immediately)
+	AI_AddNavEntity( ent, (ai_nav_entity_flags)( AI_NAV_REACH_AT_TOUCH | AI_NAV_DROPPED ) );
+
 	// Check whether bot has been removed
 	edict_t *bot = ent->target_ent;
 	if( !bot->ai || !bot->ai->botRef ) {
 		return;
 	}
 
-	// The enemy should point to a squad ref
-	AiSquad *squad = (AiSquad *)ent->enemy;
-	if( !squad ) {
-		AI_FailWith( tag, "Squad is not set" );
-	}
-
-	// Force dropped item as a special goal for the suppliant
-	// TODO: Bot should be waiting for this entity (if he has interrupt its curr motion for this)
-	// TODO: Just notify bot brain
-	// TODO: This should be handled via goal BotPickupDroppedItem goal that should have high priority
-	// bot->ai->botRef->SetSpecialGoalFromEntity(ent, squad);
-	// Allow other bots (and itself) to grab this item too
-	// (But the suppliant has a priority since the goal has been set immediately)
-	AI_AddNavEntity( ent, (ai_nav_entity_flags)( AI_NAV_REACH_AT_TOUCH | AI_NAV_DROPPED ) );
+	const NavEntity *navEntity = NavEntitiesRegistry::Instance()->NavEntityForEntity( ent );
+	SelectedNavEntity selectedNavEntity( navEntity, 1.0f, 5.0f, level.time + 2000 );
+	bot->ai->botRef->ForceSetNavEntity( selectedNavEntity );
+	bot->ai->botRef->ForcePlanBuilding();
 }
 
 bool AiSquad::RequestWeaponAndAmmoDrop( unsigned botNum, const int *maxBotWeaponTiers, Suppliers &supplierCandidates ) {
@@ -920,10 +966,21 @@ bool AiSquad::RequestArmorDrop( unsigned botNum, bool wouldSupplyArmor[MAX_SIZE]
 }
 
 bool AiSquad::RequestDrop( unsigned botNum, bool wouldSupply[MAX_SIZE], Suppliers &suppliers, void ( Bot::*dropFunc )() ) {
+	const int botFloorClusterNum = GetBotFloorCluster( bots[botNum] );
+	// Disallow dropping items outside of floor clusters
+	if( !botFloorClusterNum ) {
+		return false;
+	}
+
 	for( const unsigned supplierNum: suppliers ) {
 		if( !wouldSupply[supplierNum] ) {
 			continue;
 		}
+
+		if( botFloorClusterNum != GetBotFloorCluster( bots[supplierNum] ) ) {
+			continue;
+		}
+
 		// We have checked this once during supplier candidates selection
 		// mostly for suppliers selection algorithm optimization,
 		// but this may have changed during weapon/health/armor drops in this frame.

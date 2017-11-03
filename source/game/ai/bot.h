@@ -2,7 +2,7 @@
 #define AI_BOT_H
 
 #include "static_vector.h"
-#include "ai_dangers_detector.h"
+#include "bot_perception_manager.h"
 #include "bot_brain.h"
 #include "ai_base_ai.h"
 #include "vec3.h"
@@ -47,10 +47,15 @@ class Bot : public Ai
 	friend class BotBrain;
 	friend class AiSquad;
 	friend class AiBaseEnemyPool;
+	friend class BotPerceptionManager;
 	friend class BotFireTargetCache;
 	friend class BotItemsSelector;
 	friend class BotWeaponSelector;
 	friend class BotRoamingManager;
+	friend class TacticalSpotsRegistry;
+	friend class BotVisitedAreasCache;
+	friend class BotFallbackMovementPath;
+	friend class BotSameFloorClusterAreasCache;
 	friend class BotBaseGoal;
 	friend class BotGrabItemGoal;
 	friend class BotKillEnemyGoal;
@@ -77,6 +82,7 @@ class Bot : public Ai
 	friend class BotGenericRunBunnyingMovementAction;
 	friend class BotBunnyStraighteningReachChainMovementAction;
 	friend class BotBunnyToBestShortcutAreaMovementAction;
+	friend class BotBunnyToBestFloorClusterPointMovementAction;
 	friend class BotBunnyInterpolatingReachChainMovementAction;
 	friend class BotWalkOrSlideInterpolatingReachChainMovementAction;
 	friend class BotCombatDodgeSemiRandomlyToTargetMovementAction;
@@ -103,6 +109,10 @@ public:
 	}
 	void OnEnemyDamaged( const edict_t *enemy, int damage ) {
 		botBrain.OnEnemyDamaged( enemy, damage );
+	}
+
+	void RegisterEvent( const edict_t *ent, int event, int parm ) {
+		perceptionManager.RegisterEvent( ent, event, parm );
 	}
 
 	inline void OnAttachedToSquad( AiSquad *squad ) {
@@ -208,6 +218,13 @@ public:
 		movementPredictionContext.OnInterceptedPMoveTouchTriggers( pm, previousOrigin );
 	}
 
+	inline const AiEntityPhysicsState *EntityPhysicsState() const {
+		return entityPhysicsState;
+	}
+
+	// The movement code should use this method if there really are no
+	// feasible ways to continue traveling to the nav target.
+	void OnMovementToNavTargetBlocked();
 protected:
 	virtual void Frame() override;
 	virtual void Think() override;
@@ -218,19 +235,25 @@ protected:
 		UpdateScriptWeaponsStatus();
 	}
 
+	virtual void SetFrameAffinity( unsigned modulo, unsigned offset ) override {
+		AiFrameAwareUpdatable::SetFrameAffinity( modulo, offset );
+		botBrain.SetFrameAffinity( modulo, offset );
+		perceptionManager.SetFrameAffinity( modulo, offset );
+	}
+
 	virtual void OnNavTargetTouchHandled() override {
 		botBrain.selectedNavEntity.InvalidateNextFrame();
 	}
 
 	virtual void TouchedOtherEntity( const edict_t *entity ) override;
 
+	virtual Vec3 GetNewViewAngles( const vec3_t oldAngles, const Vec3 &desiredDirection,
+								   unsigned frameTime, float angularSpeedMultiplier ) const override;
 private:
-	void RegisterVisibleEnemies();
-
 	inline bool IsPrimaryAimEnemy( const edict_t *enemy ) const { return botBrain.IsPrimaryAimEnemy( enemy ); }
 
 	BotWeightConfig weightConfig;
-	DangersDetector dangersDetector;
+	BotPerceptionManager perceptionManager;
 	BotBrain botBrain;
 
 	float skillLevel;
@@ -299,6 +322,7 @@ private:
 	BotWalkCarefullyMovementAction walkCarefullyMovementAction;
 	BotBunnyStraighteningReachChainMovementAction bunnyStraighteningReachChainMovementAction;
 	BotBunnyToBestShortcutAreaMovementAction bunnyToBestShortcutAreaMovementAction;
+	BotBunnyToBestFloorClusterPointMovementAction bunnyToBestFloorClusterPointMovementAction;
 	BotBunnyInterpolatingReachChainMovementAction bunnyInterpolatingReachChainMovementAction;
 	BotWalkOrSlideInterpolatingReachChainMovementAction walkOrSlideInterpolatingReachChainMovementAction;
 	BotCombatDodgeSemiRandomlyToTargetMovementAction combatDodgeSemiRandomlyToTargetMovementAction;
@@ -337,7 +361,7 @@ private:
 	static constexpr unsigned MAX_ALERT_SPOTS = 3;
 	StaticVector<AlertSpot, MAX_ALERT_SPOTS> alertSpots;
 
-	void CheckAlertSpots( const StaticVector<edict_t *, MAX_CLIENTS> &visibleTargets );
+	void CheckAlertSpots( const StaticVector<uint16_t, MAX_CLIENTS> &visibleTargets );
 
 	static constexpr unsigned MAX_SCRIPT_WEAPONS = 3;
 
@@ -353,6 +377,8 @@ private:
 
 	int64_t lastItemSelectedAt;
 	int64_t noItemAvailableSince;
+
+	int64_t lastBlockedNavTargetReportedAt;
 
 	inline bool ShouldUseRoamSpotAsNavTarget() const {
 		const auto &selectedNavEntity = GetSelectedNavEntity();
@@ -511,6 +537,19 @@ public:
 	bool CheckShot( const AimParams &aimParams, const BotInput *input,
 					const SelectedEnemies &selectedEnemies, const GenericFireDef &fireDef );
 
+	bool TryTraceShot( trace_t *tr, const Vec3 &newLookDir,
+					   const AimParams &aimParams,
+					   const GenericFireDef &fireDef );
+
+	bool CheckSplashTeamDamage( const vec3_t hitOrigin, const AimParams &aimParams, const GenericFireDef &fireDef );
+
+	// A helper to determine whether continuous-fire weapons should be fired even if there is an obstacle in-front.
+	// Should be called if a TryTraceShot() call has set non-unit fraction.
+	bool IsShotBlockedBySolidWall( trace_t *tr,
+								   float distanceThreshold,
+								   const AimParams &aimParams,
+								   const GenericFireDef &fireDef );
+
 	void LookAtEnemy( float coordError, const vec3_t fire_origin, vec3_t target, BotInput *input );
 	void PressAttack( const GenericFireDef *fireDef, const GenericFireDef *builtinFireDef,
 					  const GenericFireDef *scriptFireDef, BotInput *input );
@@ -530,12 +569,21 @@ public:
 	StaticVector<int, MAX_SAVED_AREAS> savedLandingAreas;
 	StaticVector<int, MAX_SAVED_AREAS> savedPlatformAreas;
 
+	BotFallbackMovementPath fallbackMovementPath;
+	BotVisitedAreasCache visitedAreasCache;
+
 	void CheckTargetProximity();
 
 public:
 	// These methods are exposed mostly for script interface
 	inline unsigned NextSimilarWorldStateInstanceId() {
 		return ++similarWorldStateInstanceId;
+	}
+	inline void ForceSetNavEntity( const SelectedNavEntity &selectedNavEntity_ ) {
+		botBrain.ForceSetNavEntity( selectedNavEntity_ );
+	}
+	inline void ForcePlanBuilding() {
+		botBrain.ClearGoalAndPlan();
 	}
 	inline void SetNavTarget( NavTarget *navTarget ) {
 		botBrain.SetNavTarget( navTarget );

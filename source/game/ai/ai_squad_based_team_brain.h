@@ -56,6 +56,9 @@ private:
 	bool CheckCanFightTogether() const;
 	bool CheckCanMoveTogether() const;
 
+	int GetBotFloorCluster( Bot *bot ) const;
+	bool IsInTheSameFloorCluster( Bot *bot, int givenClusterNum ) const;
+
 	void UpdateBotRoleWeights();
 
 	int64_t lastDroppedByBotTimestamps[MAX_SIZE];
@@ -109,7 +112,7 @@ protected:
 		virtual bool CheckHasShell() const override;
 		virtual float ComputeDamageToBeKilled() const override;
 		virtual void OnEnemyRemoved( const Enemy *enemy ) override;
-		virtual void TryPushNewEnemy( const edict_t *enemy ) override;
+		virtual void TryPushNewEnemy( const edict_t *enemy, const float *suggestedOrigin ) override;
 
 		void SetBotRoleWeight( const edict_t *bot, float weight ) override;
 		float GetAdditionalEnemyWeight( const edict_t *bot, const edict_t *enemy ) const override;
@@ -160,6 +163,10 @@ public:
 
 	inline void OnBotViewedEnemy( const edict_t *bot, const edict_t *enemy ) {
 		squadEnemyPool->OnEnemyViewed( enemy );
+	}
+	inline void OnBotGuessedEnemyOrigin( const edict_t *bot, const edict_t *enemy,
+										 unsigned minMillisSinceLastSeen, const float *specifiedOrigin ) {
+		squadEnemyPool->OnEnemyOriginGuessed( enemy, minMillisSinceLastSeen, specifiedOrigin );
 	}
 	inline void OnBotPain( const edict_t *bot, const edict_t *enemy, float kick, int damage ) {
 		squadEnemyPool->OnPain( bot, enemy, kick, damage );

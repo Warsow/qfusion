@@ -105,9 +105,12 @@ class TacticalSpotsBuilder {
 	}
 
 	void TryAddSpotFromPoint( const Vec3 &point );
-	int TestPointForGoodAreaNum( const Vec3 &point );
-	bool IsGoodSpotPosition( const Vec3 &point, const uint16_t *nearbySpotNums,
-							 uint16_t numNearbySpots, int *numVisNearbySpots, int *areaNum );
+	int TestPointForGoodAreaNum( const vec3_t point );
+	bool IsGoodSpotPosition( vec3_t point,
+							 const uint16_t *nearbySpotNums,
+							 uint16_t numNearbySpots,
+							 int *numVisNearbySpots,
+							 int *areaNum );
 
 	TacticalSpot *AllocSpot() {
 		return AllocItem( &spots, &numSpots, &spotsCapacity );
@@ -715,11 +718,26 @@ void TacticalSpotsBuilder::FindCandidatePoints() {
 		AddAreaFacePoints( candidateAreas[i] );
 	}
 
-	// Add areas centers
+	// Add areas centers and (maybe) intermediate points
 	for( int i = 0; i < numCandidateAreas; i++ ) {
-		Vec3 areaPoint( aasAreas[i].center );
-		areaPoint.Z() = aasAreas[i].mins[2];
+		const auto &area = aasAreas[i];
+		Vec3 areaPoint( area.center );
+		areaPoint.Z() = area.mins[2];
 		AddCandidatePoint( areaPoint );
+		// Add intermediate points for large areas
+		const int step = 108;
+		const int xSteps = (int)( area.maxs[0] - area.mins[0] ) / step;
+		const int ySteps = (int)( area.maxs[1] - area.mins[0] ) / step;
+		if( xSteps < 2 || ySteps < 2 ) {
+			continue;
+		}
+		for( int xi = 0; xi < xSteps; ++xi ) {
+			for( int yi = 0; yi < ySteps; ++yi ) {
+				areaPoint.X() = area.mins[0] + xi * step;
+				areaPoint.Y() = area.mins[1] + yi * step;
+				AddCandidatePoint( areaPoint );
+			}
+		}
 	}
 }
 
@@ -802,7 +820,7 @@ void TacticalSpotsBuilder::TryAddSpotFromPoint( const Vec3 &point ) {
 			// Usually spots are picked on ground, add an offset to avoid being qualified as starting in solid
 			spotOrigin.Z() += 1.0f;
 			int numVisNearbySpots, areaNum;
-			if( IsGoodSpotPosition( spotOrigin, nearbySpotNums, numNearbySpots, &numVisNearbySpots, &areaNum ) ) {
+			if( IsGoodSpotPosition( spotOrigin.Data(), nearbySpotNums, numNearbySpots, &numVisNearbySpots, &areaNum ) ) {
 				if( numVisNearbySpots > bestNumVisNearbySpots ) {
 					bestNumVisNearbySpots = numVisNearbySpots;
 					bestSpotOrigin = spotOrigin;
@@ -830,9 +848,9 @@ void TacticalSpotsBuilder::TryAddSpotFromPoint( const Vec3 &point ) {
 	gridBuilder.AddSpot( bestSpotOrigin.Data(), (uint16_t)( numSpots - 1 ) );
 }
 
-static constexpr float SPOT_SQUARE_PROXIMITY_THRESHOLD = 172.0f * 172.0f;
+static constexpr float SPOT_SQUARE_PROXIMITY_THRESHOLD = 96.0f * 96.0f;
 
-int TacticalSpotsBuilder::TestPointForGoodAreaNum( const Vec3 &point ) {
+int TacticalSpotsBuilder::TestPointForGoodAreaNum( const vec3_t point ) {
 	const auto *aasWorld = AiAasWorld::Instance();
 	int areaNum = aasWorld->FindAreaNum( point );
 	if( !areaNum ) {
@@ -878,27 +896,22 @@ int TacticalSpotsBuilder::TestPointForGoodAreaNum( const Vec3 &point ) {
 	return 0;
 }
 
-bool TacticalSpotsBuilder::IsGoodSpotPosition( const Vec3 &point, const uint16_t *nearbySpotNums,
-											   uint16_t numNearbySpots, int *numVisNearbySpots, int *areaNum ) {
+bool TacticalSpotsBuilder::IsGoodSpotPosition( vec3_t point,
+											   const uint16_t *nearbySpotNums,
+											   uint16_t numNearbySpots,
+											   int *numVisNearbySpots,
+											   int *areaNum ) {
 	trace_t trace;
 	// Test whether there is a solid inside extended spot bounds
-	SolidWorldTrace( &trace, point.Data(), point.Data(), testedMins, testedMaxs );
+	SolidWorldTrace( &trace, point, point, testedMins, testedMaxs );
 	if( trace.fraction != 1.0f || trace.startsolid ) {
-		return false;
-	}
-
-	// Operate on these local vars. Do not modify output params unless the result is successful.
-	int numVisNearbySpots_ = 0;
-	int areaNum_ = 0;
-
-	if( !( areaNum_ = TestPointForGoodAreaNum( point ) ) ) {
 		return false;
 	}
 
 	// Check whether there is really a ground below
 	Vec3 groundedPoint( point );
 	groundedPoint.Z() -= 32.0f;
-	SolidWorldTrace( &trace, point.Data(), groundedPoint.Data() );
+	SolidWorldTrace( &trace, point, groundedPoint.Data() );
 	if( trace.fraction == 1.0f || trace.startsolid || trace.allsolid ) {
 		return false;
 	}
@@ -909,13 +922,35 @@ bool TacticalSpotsBuilder::IsGoodSpotPosition( const Vec3 &point, const uint16_t
 		return false;
 	}
 
+	// Important: set point origin to an origin of a player standing here
+	// This is an assumption of TacticalSpotsRegistry::FindClosestToTargetWalkableSpot()
+	VectorCopy( trace.endpos, point );
+	point[2] += -playerbox_stand_mins[2] + 1 + 4;
+
+	// Also very important: round coordinates to 4 units as WorldState vars do.
+	// Avoid being surprised by noticeable values mismatch.
+	for( int i = 0; i < 3; ++i ) {
+		point[i] = 4 * ( ( (int)point[i] ) / 4 );
+	}
+
+	// Operate on these local vars. Do not modify output params unless the result is successful.
+	int numVisNearbySpots_ = 0;
+	int areaNum_ = 0;
+
+	if( !( areaNum_ = TestPointForGoodAreaNum( point ) ) ) {
+		return false;
+	}
+
+	vec3_t traceMins, traceMaxs;
+	TacticalSpotsRegistry::GetSpotsWalkabilityTraceBounds( traceMins, traceMaxs );
+
 	// Test whether there are way too close visible spots.
 	// Also compute overall spots visibility.
 	for( unsigned i = 0; i < numNearbySpots; ++i ) {
 		const auto &spot = spots[nearbySpotNums[i]];
-		SolidWorldTrace( &trace, point.Data(), spot.origin );
+		SolidWorldTrace( &trace, point, spot.origin, traceMins, traceMaxs );
 		if( trace.fraction == 1.0f && !trace.startsolid ) {
-			if( DistanceSquared( point.Data(), spot.origin ) < SPOT_SQUARE_PROXIMITY_THRESHOLD ) {
+			if( DistanceSquared( point, spot.origin ) < SPOT_SQUARE_PROXIMITY_THRESHOLD ) {
 				return false;
 			}
 			numVisNearbySpots_++;
@@ -1760,6 +1795,24 @@ int TacticalSpotsRegistry::FindEvadeDangerSpots( const OriginParams &originParam
 	CandidateSpots candidateSpots;
 	SelectPotentialDodgeSpots( originParams, problemParams, boundsSpots, numSpotsInBounds, candidateSpots );
 
+	// Try preferring spots that conform well to the existing velocity direction
+	if( const edict_t *ent = originParams.originEntity ) {
+		// Make sure that the current entity params match problem params
+		if( VectorCompare( ent->s.origin, originParams.origin ) ) {
+			float squareSpeed = VectorLengthSquared( ent->velocity );
+			if( squareSpeed > DEFAULT_PLAYERSPEED * DEFAULT_PLAYERSPEED ) {
+				Vec3 velocityDir( ent->velocity );
+				velocityDir *= 1.0f / sqrtf( squareSpeed );
+				for( auto &spotAndScore: candidateSpots ) {
+					Vec3 toSpotDir( spots[spotAndScore.spotNum].origin );
+					toSpotDir -= ent->s.origin;
+					toSpotDir.NormalizeFast();
+					spotAndScore.score *= 1.0f + velocityDir.Dot( toSpotDir );
+				}
+			}
+		}
+	}
+
 	ReachCheckedSpots reachCheckedSpots;
 	if( problemParams.checkToAndBackReachability ) {
 		CheckSpotsReachFromOriginAndBack( originParams, problemParams, candidateSpots, insideSpotNum, reachCheckedSpots );
@@ -1906,37 +1959,49 @@ Vec3 TacticalSpotsRegistry::MakeDodgeDangerDir( const OriginParams &originParams
 	return result;
 }
 
-bool TacticalSpotsRegistry::FindClosestToTargetWalkableSpot( const OriginParams &originParams,
-															 int targetAreaNum,
-															 vec3_t *spotOrigin ) const {
+int TacticalSpotsRegistry::FindClosestToTargetWalkableSpot( const OriginParams &originParams,
+															int targetAreaNum,
+															vec3_t spotOrigin ) const {
 	uint16_t spotNums[MAX_SPOTS_PER_QUERY];
 	uint16_t insideSpotNum;
 	uint16_t numSpots_ = FindSpotsInRadius( originParams, spotNums, &insideSpotNum );
 
 	const auto *routeCache = originParams.routeCache;
+	const float *origin = originParams.origin;
 	const int originAreaNum = originParams.originAreaNum;
-	const int allowedTravelFlags = originParams.allowedTravelFlags;
+	const int allowedFlags = originParams.allowedTravelFlags;
+	const int preferredFlags = originParams.preferredTravelFlags;
+	constexpr int fallbackTravelFlags = BotFallbackMovementPath::TRAVEL_FLAGS;
 
-	// Assume that max allowed travel time to spot does not exceed travel time
-	// required to cover the search radius walking with 250 units of speed
-	const int maxTravelTimeToSpotWalking = (int)( originParams.searchRadius / 250.0f );
-
-	const int currTravelTimeToTarget = routeCache->TravelTimeToGoalArea( originAreaNum, targetAreaNum, allowedTravelFlags );
-	if( !currTravelTimeToTarget ) {
-		return false;
-	}
+	// Assume that max allowed travel time to spot does not exceed travel time required to cover the search radius
+	const int maxTravelTimeToSpotWalking = (int)( originParams.searchRadius * 3.0f );
 
 	trace_t trace;
 
 	const TacticalSpot *bestSpot = nullptr;
-	int bestCombinedTravelTime = -1;
+	int bestTravelTimeFromSpotToTarget = std::numeric_limits<int>::max();
 	int travelTimeToSpotWalking, travelTimeFromSpotToTarget;
+
+	// Test for coarse walkability from a feet point
+	vec3_t traceMins, traceMaxs;
+	GetSpotsWalkabilityTraceBounds( traceMins, traceMaxs );
 
 	for( uint16_t i = 0; i < numSpots_; ++i ) {
 		const uint16_t spotNum = spotNums[i];
 		const auto &spot = spots[spotNum];
 
-		travelTimeToSpotWalking = routeCache->TravelTimeToGoalArea( originAreaNum, spot.aasAreaNum, TFL_WALK );
+		// Cut off computations early in this case
+		if( spot.aasAreaNum == originAreaNum ) {
+			continue;
+		}
+
+		// Reject spots that are in another area but close
+		// It might occur if the spot is on boundary edge with a current area
+		if( DistanceSquared( spot.origin, originParams.origin ) < 32.0f * 32.0f ) {
+			continue;
+		}
+
+		travelTimeToSpotWalking = routeCache->TravelTimeToGoalArea( originAreaNum, spot.aasAreaNum, fallbackTravelFlags );
 		if( !travelTimeToSpotWalking ) {
 			continue;
 		}
@@ -1947,31 +2012,148 @@ bool TacticalSpotsRegistry::FindClosestToTargetWalkableSpot( const OriginParams 
 			continue;
 		}
 
-		travelTimeFromSpotToTarget = routeCache->TravelTimeToGoalArea( originAreaNum, spot.aasAreaNum, allowedTravelFlags );
+		// Do a double test to match generic routing behaviour.
+		travelTimeFromSpotToTarget = routeCache->TravelTimeToGoalArea( spot.aasAreaNum, targetAreaNum, preferredFlags );
 		if( !travelTimeFromSpotToTarget ) {
+			travelTimeFromSpotToTarget = routeCache->TravelTimeToGoalArea( spot.aasAreaNum, targetAreaNum, allowedFlags );
+			if( !travelTimeFromSpotToTarget ) {
+				continue;
+			}
+		}
+
+		if( travelTimeFromSpotToTarget >= bestTravelTimeFromSpotToTarget ) {
 			continue;
 		}
 
-		if( travelTimeFromSpotToTarget > currTravelTimeToTarget ) {
-			continue;
-		}
-
-		int combinedTravelTime = travelTimeToSpotWalking + travelTimeFromSpotToTarget;
-		if( combinedTravelTime <= bestCombinedTravelTime ) {
-			continue;
-		}
-
-		SolidWorldTrace( &trace, originParams.origin, spot.origin );
+		float *start = const_cast<float *>( origin );
+		float *end = const_cast<float *>( spot.origin );
+		edict_t *skip = const_cast<edict_t *>( originParams.originEntity );
+		// We have to test against entities and not only solid world in this case
+		// (results of the method are critical for escaping from blocked state)
+		G_Trace( &trace, start, traceMins, traceMaxs, end, skip, MASK_AISOLID );
 		if( trace.fraction != 1.0f ) {
 			continue;
 		}
 
-		bestCombinedTravelTime = combinedTravelTime;
+		bestTravelTimeFromSpotToTarget = travelTimeFromSpotToTarget;
 		bestSpot = &spot;
 	}
 
 	if( bestSpot ) {
-		VectorCopy( bestSpot->origin, *spotOrigin );
+		VectorCopy( bestSpot->origin, spotOrigin );
+		return bestTravelTimeFromSpotToTarget;
+	}
+
+	return 0;
+}
+
+bool TacticalSpotsRegistry::FindShortSideStepDodgeSpot( const OriginParams &originParams,
+														const vec3_t keepVisibleOrigin,
+														vec3_t spotOrigin ) const {
+	trace_t trace;
+	Vec3 tmpVec3( 0, 0, 0 );
+	Vec3 *droppedToFloorOrigin = nullptr;
+	if( auto originEntity = originParams.originEntity ) {
+		if( originEntity->groundentity ) {
+			tmpVec3.Set( originEntity->s.origin );
+			tmpVec3.Z() += originEntity->r.mins[2];
+			droppedToFloorOrigin = &tmpVec3;
+		} else if( originEntity->ai && originEntity->ai->botRef ) {
+			const auto &entityPhysicsState = originEntity->ai->botRef->EntityPhysicsState();
+			if( entityPhysicsState->HeightOverGround() < 32.0f ) {
+				tmpVec3.Set( entityPhysicsState->Origin() );
+				tmpVec3.Z() += playerbox_stand_mins[2];
+				tmpVec3.Z() -= entityPhysicsState->HeightOverGround();
+				droppedToFloorOrigin = &tmpVec3;
+			}
+		} else {
+			auto *ent = const_cast<edict_t *>( originEntity );
+			Vec3 end( originEntity->s.origin );
+			end.Z() += originEntity->r.mins[2] - 32.0f;
+			G_Trace( &trace, ent->s.origin, ent->r.mins, ent->r.maxs, end.Data(), ent, MASK_SOLID );
+			if( trace.fraction != 1.0f && ISWALKABLEPLANE( &trace.plane ) ) {
+				tmpVec3.Set( trace.endpos );
+				droppedToFloorOrigin = &tmpVec3;
+			}
+		}
+	} else {
+		Vec3 end( originParams.origin );
+		end.Z() -= 48.0f;
+		G_Trace( &trace, const_cast<float *>( originParams.origin ), nullptr, nullptr, end.Data(), nullptr, MASK_SOLID );
+		if( trace.fraction != 1.0f && ISWALKABLEPLANE( &trace.plane ) ) {
+			tmpVec3.Set( trace.endpos );
+			droppedToFloorOrigin = &tmpVec3;
+		}
+	}
+
+	if( !droppedToFloorOrigin ) {
+		return false;
+	}
+
+	Vec3 testedOrigin( *droppedToFloorOrigin );
+	// Make sure it is at least 1 unit above the ground
+	testedOrigin.Z() += ( -playerbox_stand_mins[2] ) + 1.0f;
+
+	float bestScore = -1.0f;
+	vec3_t bestDir;
+
+	Vec3 keepVisible2DDir( keepVisibleOrigin );
+	keepVisible2DDir -= originParams.origin;
+	keepVisible2DDir.Z() = 0;
+	keepVisible2DDir.Normalize();
+
+	edict_t *const ignore = originParams.originEntity ? const_cast<edict_t *>( originParams.originEntity ) : nullptr;
+	const float dx = playerbox_stand_maxs[0] - playerbox_stand_mins[0];
+	const float dy = playerbox_stand_maxs[1] - playerbox_stand_mins[1];
+	for( int i = -1; i <= 1; ++i ) {
+		for( int j = -1; j <= 1; ++j ) {
+			// Disallow diagonal moves (can't be checked so easily by just adding an offset)
+			// Disallow staying at the current origin as well.
+			if( ( i && j ) || !( i || j ) ) {
+				continue;
+			}
+
+			testedOrigin.X() = droppedToFloorOrigin->X() + i * dx;
+			testedOrigin.Y() = droppedToFloorOrigin->Y() + j * dy;
+			float *mins = playerbox_stand_mins;
+			float *maxs = playerbox_stand_maxs;
+			G_Trace( &trace, testedOrigin.Data(), mins, maxs, testedOrigin.Data(), ignore, MASK_SOLID );
+			if( trace.fraction != 1.0f || trace.startsolid ) {
+				continue;
+			}
+
+			// Check ground below
+			Vec3 groundTraceEnd( testedOrigin );
+			groundTraceEnd.Z() -= 72.0f;
+			G_Trace( &trace, testedOrigin.Data(), nullptr, nullptr, groundTraceEnd.Data(), ignore, MASK_SOLID );
+			if( trace.fraction == 1.0f || trace.allsolid ) {
+				continue;
+			}
+			if( !ISWALKABLEPLANE( &trace.plane ) ) {
+				continue;
+			}
+			if( trace.contents & ( CONTENTS_LAVA | CONTENTS_SLIME | CONTENTS_NODROP | CONTENTS_DONOTENTER ) ) {
+				continue;
+			}
+
+			Vec3 spot2DDir( testedOrigin.Data() );
+			spot2DDir -= originParams.origin;
+			spot2DDir.Z() = 0;
+			spot2DDir.Normalize();
+
+			// Give side spots a greater score, but make sure the score is always positive for each spot
+			float score = ( 1.0f - fabsf( spot2DDir.Dot( keepVisible2DDir ) ) ) + 0.1f;
+			if( score > bestScore ) {
+				bestScore = score;
+				spot2DDir.CopyTo( bestDir );
+			}
+		}
+	}
+
+	if( bestScore > 0 ) {
+		VectorCopy( bestDir, spotOrigin );
+		VectorScale( spotOrigin, sqrtf( dx * dx + dy * dy ), spotOrigin );
+		VectorAdd( spotOrigin, droppedToFloorOrigin->Data(), spotOrigin );
 		return true;
 	}
 

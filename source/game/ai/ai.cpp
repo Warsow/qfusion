@@ -189,6 +189,8 @@ void AI_JoinedTeam( edict_t *ent, int team ) {
 void AI_CommonFrame() {
 	AiAasWorld::Instance()->Frame();
 
+	EntitiesPvsCache::Instance()->Update();
+
 	NavEntitiesRegistry::Instance()->Update();
 
 	AiManager::Instance()->Update();
@@ -480,6 +482,10 @@ void AI_Think( edict_t *self ) {
 	}
 
 	self->ai->aiRef->Update();
+}
+
+void AI_RegisterEvent( edict_t *ent, int event, int parm ) {
+	AiManager::Instance()->RegisterEvent( ent, event, parm );
 }
 
 void AI_SpawnBot( const char *team ) {
