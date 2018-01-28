@@ -300,13 +300,7 @@ void *Com_LoadGameLibrary( const char *basename, const char *apifuncname, void *
 	}
 
 	// pure check
-	if( pure && !FS_IsPureFile( libname ) )
-	{
-		Com_Printf( "LoadLibrary (%s):(Unpure file)\n", libname );
-		Mem_TempFree( libname );
-		Mem_ZoneFree( gamelib );
-		return NULL;
-	}
+	// not needed anymore, we want to force a unpure cgame
 
 	temppath = Sys_Library_GetGameLibPath( libname, randomizer_time, randomizer );
 	tempname = ( char * )Mem_ZoneMalloc( strlen( temppath ) + 1 );
