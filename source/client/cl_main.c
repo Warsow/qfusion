@@ -1585,11 +1585,6 @@ void CL_RequestNextDownload( void )
 				purefile = purefile->next;
 			}
 
-			if( failed )
-			{
-				Com_Error( ERR_DROP, message );
-				return;
-			}
 		}
 	}
 
