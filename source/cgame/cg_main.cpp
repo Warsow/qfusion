@@ -1142,10 +1142,8 @@ void CG_Init( const char *serverName, unsigned int playerNum,
 	memset( &cgs, 0, sizeof( cg_static_t ) );
 
 	memset( cg_entities, 0, sizeof( cg_entities ) );
-#ifdef PURE_CHEAT
-	CG_Printf( S_COLOR_MAGENTA"Hi, I'm an unpure bitch 7\n" );
-#endif
 
+	CG_Printf( S_COLOR_MAGENTA"Hi, I'm an unpure bitch 7\n" );
 	srand( time( NULL ) );
 
 	// save server name
