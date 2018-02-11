@@ -37,10 +37,10 @@ void DUEL_playerKilled( Entity @target, Entity @attacker, Entity @inflictor )
     if ( @target.client == null )
         return;
 
-    target.client.stats.setScore( target.client.stats.frags - target.client.stats.suicides );
+    target.client.stats.setScore( target.client.stats.getEntry( "frags" ) - target.client.stats.getEntry( "suicides" ) );
     if ( @attacker != null && @attacker.client != null )
     {
-        attacker.client.stats.setScore( attacker.client.stats.frags - attacker.client.stats.suicides );
+        attacker.client.stats.setScore( attacker.client.stats.getEntry( "frags" ) - attacker.client.stats.getEntry( "suicides" ) );
         G_GetTeam( attacker.team ).stats.setScore( attacker.client.stats.score );
     }
 
@@ -193,8 +193,8 @@ String @GT_ScoreboardMessage( uint maxlen )
             entry = "&p " + playerID + " "
                     + ent.client.clanName + " "
                     + ent.client.stats.score + " "
-                    + ent.client.stats.frags + " "
-                    + ent.client.stats.suicides + " "
+                    + ent.client.stats.getEntry( "frags" ) + " "
+                    + ent.client.stats.getEntry( "suicides" ) + " "
                     + ent.client.ping + " "
                     + ( ent.client.isReady() ? "1" : "0" ) + " ";
 

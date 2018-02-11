@@ -751,7 +751,7 @@ String @GT_ScoreboardMessage( uint maxlen )
             {
                 // "Name Clan Score Frags Ping R"
                 entry = "&p " + playerID + " " + ent.client.clanName + " "
-                        + ent.client.stats.score + " " + ent.client.stats.frags + " "
+                        + ent.client.stats.score + " " + ent.client.stats.getEntry( "frags" ) + " "
                         + ent.client.ping + " " + ( ent.client.isReady() ? "1" : "0" ) + " ";
             }
 
@@ -769,9 +769,9 @@ void GT_updateScore( Client @client )
     if ( @client != null )
     {
         if ( gametype.isInstagib )
-            client.stats.setScore( client.stats.frags + caRound.getPlayerBonusScore( client ) );
+            client.stats.setScore( client.stats.getEntry( "frags" ) + caRound.getPlayerBonusScore( client ) );
         else
-            client.stats.setScore( int( client.stats.totalDamageGiven * 0.01 ) + caRound.getPlayerBonusScore( client ) );
+            client.stats.setScore( int( client.stats.getEntry( "total_damage_given" ) * 0.01 ) + caRound.getPlayerBonusScore( client ) );
     }
 }
 

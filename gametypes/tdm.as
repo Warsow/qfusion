@@ -33,7 +33,7 @@ int TDM_SCORE_NET( Stats @stats )
     if ( @stats == null )
         return 0;
 
-    return ( stats.frags - stats.teamFrags ) - stats.deaths;
+    return ( stats.getEntry( "frags" ) - stats.getEntry( "team_frags" ) ) - stats.getEntry( "deaths " );
 }
 
 // a player has just died. The script is warned about it so it can account scores
@@ -54,10 +54,10 @@ void TDM_playerKilled( Entity @target, Entity @attacker, Entity @inflictor )
     Team @team;
 
     @team = @G_GetTeam( target.team );
-    team.stats.setScore( team.stats.frags - ( team.stats.teamFrags + team.stats.suicides ) );
+    team.stats.setScore( team.stats.getEntry( "frags" ) - ( team.stats.getEntry( "team_frags" ) + team.stats.getEntry( "suicides" ) ) );
 
     @team = @G_GetTeam( target.team == TEAM_ALPHA ? TEAM_BETA : TEAM_ALPHA );
-    team.stats.setScore( team.stats.frags - ( team.stats.teamFrags + team.stats.suicides ) );
+    team.stats.setScore( team.stats.getEntry( "frags" ) - ( team.stats.getEntry( "team_frags" ) + team.stats.getEntry( "suicides" ) ) );
 
     // drop items
     if ( ( G_PointContents( target.origin ) & CONTENTS_NODROP ) == 0 )
@@ -256,7 +256,7 @@ String @GT_ScoreboardMessage( uint maxlen )
                 // "Name Clan Score Net Ping R"
                 entry = "&p " + playerID + " "
                         + ent.client.clanName + " "
-                        + ( ent.client.stats.score + ent.client.stats.deaths - ent.client.stats.suicides) + " "
+                        + ( ent.client.stats.score + ent.client.stats.getEntry( "deaths" ) - ent.client.stats.getEntry( "suicides" ) ) + " "
                         + ent.client.stats.score + " "
                         + ent.client.ping + " "
                         + ( ent.client.isReady() ? "1" : "0" ) + " ";
@@ -266,7 +266,7 @@ String @GT_ScoreboardMessage( uint maxlen )
                 // "Name Clan Score Net Ping R"
                 entry = "&p " + playerID + " "
                         + ent.client.clanName + " "
-                        + ( ent.client.stats.score + ent.client.stats.deaths - ent.client.stats.suicides) + " "
+                        + ( ent.client.stats.score + ent.client.stats.getEntry( "deaths" ) - ent.client.stats.getEntry( "suicides" ) ) + " "
                         + ent.client.stats.score + " "
                         + ent.client.ping + " "
                         + ( ent.client.isReady() ? "1" : "0" ) + " ";

@@ -37,9 +37,9 @@ void DM_playerKilled( Entity @target, Entity @attacker, Entity @inflictor )
 
     // update player score based on player stats
 
-    target.client.stats.setScore( target.client.stats.frags - target.client.stats.suicides );
+    target.client.stats.setScore( target.client.stats.getEntry( "frags" ) - target.client.stats.getEntry( "suicides" ) );
     if ( @attacker != null && @attacker.client != null )
-        attacker.client.stats.setScore( attacker.client.stats.frags - attacker.client.stats.suicides );
+        attacker.client.stats.setScore( attacker.client.stats.getEntry( "frags" ) - attacker.client.stats.getEntry( "suicides" ) );
 
     // drop items
     if ( ( G_PointContents( target.origin ) & CONTENTS_NODROP ) == 0 )
@@ -217,7 +217,7 @@ void GT_PlayerRespawn( Entity @ent, int old_team, int new_team )
 
             ent.client.inventoryGiveItem( i );
 
-            if ( match.getState() <= MATCH_STATE_WARMUP )
+            if ( true || match.getState() <= MATCH_STATE_WARMUP )
             {
                 @item = @G_GetItem( i );
 

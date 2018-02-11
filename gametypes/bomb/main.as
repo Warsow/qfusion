@@ -387,7 +387,7 @@ String @GT_ScoreboardMessage( uint maxlen )
 				entry = "&p " + playerId
 					+ " " + client.clanName
 					+ " " + client.stats.score
-					+ " " + client.stats.frags
+					+ " " + client.stats.getEntry( "frags" )
 					+ " " + client.ping
 					+ " " + statusIcon
 					+ " "; // don't delete me!
@@ -399,7 +399,7 @@ String @GT_ScoreboardMessage( uint maxlen )
 				entry = "&p " + playerId
 					+ " " + client.clanName
 					+ " " + client.stats.score
-					+ " " + client.stats.frags
+					+ " " + client.stats.getEntry( "frags" )
 					+ " " + player.getInventoryLabel() // W1 W2 W3
 					+ " " + client.ping
 					+ " " + statusIcon
@@ -424,7 +424,7 @@ void GT_updateScore( Client @client )
 	if ( gametype.isInstagib )
 	{
 		client.stats.setScore(
-			stats.frags - stats.teamFrags
+			stats.getEntry( "frags" ) - stats.getEntry( "team_frags" )
 			+ player.defuses * POINTS_DEFUSE
 		);
 
@@ -433,8 +433,8 @@ void GT_updateScore( Client @client )
 
 	// 2 * teamDamage because totalDamage includes it
 	client.stats.setScore( int(
-		( stats.frags - stats.teamFrags ) * 0.5
-		+ ( stats.totalDamageGiven - 2 * stats.totalTeamDamageGiven ) * 0.01
+		( stats.getEntry( "frags" ) - stats.getEntry( "team_frags" ) ) * 0.5
+		+ ( stats.getEntry( "damage_given" ) - 2 * stats.getEntry( "team_damage_given" ) ) * 0.01
 		+ player.defuses * POINTS_DEFUSE )
 	);
 }
