@@ -273,6 +273,7 @@ static void Con_Dump_f( void ) {
 	buffer = Mem_TempMalloc( buffer_size );
 
 	Con_BufferText( buffer, newline );
+	buffer_size = COM_UncolorBuffer( buffer, buffer_size, buffer );
 
 	QMutex_Unlock( con.mutex );
 

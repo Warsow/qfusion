@@ -705,6 +705,36 @@ const char *COM_RemoveColorTokensExt( const char *str, bool draw ) {
 	return cleanString;
 }
 
+/*
+* COM_UncolorBuffer
+*
+* Remove color tokens from the `in` buffer and write it to the `out`
+* buffer. `out` buffer must be at least as long as `in`.
+* It is valid to pass a buffer as both `in` and `out` to uncolor it
+* inplace.
+* Returns numer of chars written to the `out` buffer.
+*/
+int COM_UncolorBuffer( const char *in, int in_size, char *out ) {
+	const char *end = in + in_size;
+	char *outp = out, c;
+	int gc;
+
+	while( in < end ) {
+		gc = Q_GrabCharFromColorString( &in, &c, NULL );
+		switch( gc ) {
+			case GRABCHAR_END:
+				++in;
+			case GRABCHAR_CHAR:
+				*outp++ = c;
+			case GRABCHAR_COLOR:
+				break;
+			default:
+				assert( 0 );
+		}
+	}
+
+	return outp - out;
+}
 
 /*
 * COM_SanitizeColorString
