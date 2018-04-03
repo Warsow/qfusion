@@ -241,7 +241,6 @@ void *Q_memset32( void *dest, int c, size_t dwords );
 int Q_GrabCharFromColorString( const char **pstr, char *c, int *colorindex );
 const char *COM_RemoveColorTokensExt( const char *str, bool draw );
 #define COM_RemoveColorTokens( in ) COM_RemoveColorTokensExt( in,false )
-int COM_UncolorBuffer( const char *in, int in_size, char *out );
 int COM_SanitizeColorString( const char *str, char *buf, int bufsize, int maxprintablechars, int startcolor );
 const char *Q_ColorStringTerminator( const char *str, int finalcolor );
 int Q_ColorStrLastColor( int previous, const char *s, int maxlen );

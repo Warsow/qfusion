@@ -111,7 +111,7 @@ void Sys_ConsoleOutput( char *string ) {
 		return;
 	}
 
-	if ( isatty( STDOUT_FILENO ) ) {
+	if( isatty( STDOUT_FILENO ) ) {
 		Sys_AnsiColorPrint( string );
 	} else {
 		fputs( COM_RemoveColorTokens( string ), stdout );
