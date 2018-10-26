@@ -332,6 +332,8 @@ void CTF_UpdateBotExtraGoals( Entity @ent )
         enemyTeam = TEAM_ALPHA;
     else 
         return;
+
+	bot.clearOverriddenEntityWeights();
     
     // Flags defence/offence/carrier support is managed by native code
     // using provided status of defence/offence spots.
@@ -365,10 +367,6 @@ void CTF_UpdateBotExtraGoals( Entity @ent )
                         bot.overrideEntityWeight( teamBase.owner, 9.0f );
                     }
                     // do not camp at our flag spot, hide somewhere else
-                    else 
-                    {      
-                        bot.overrideEntityWeight( teamBase.owner, 9.0f * ( botToHomeBaseDist / 768.0f ) );
-                    }
                 }
             }
         }
