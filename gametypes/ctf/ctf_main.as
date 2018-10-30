@@ -310,78 +310,255 @@ bool GT_Command( Client @client, const String &cmdString, const String &argsStri
 
 void CTF_UpdateBotsExtraGoals()
 {
-    Entity @ent;
+	cFlagBase @alphaBase = @CTF_getBaseForTeam( TEAM_ALPHA );
+	cFlagBase @betaBase = @CTF_getBaseForTeam( TEAM_BETA );
+	// we dont know what to do in this case...
+	if ( @alphaBase == null || @betaBase == null )
+		return;
+
+	bool alphaFlagStolen = false;
+	bool betaFlagStolen = false;
+	bool alphaFlagDropped = false;
+	bool betaFlagDropped = false;
+	if ( @alphaBase.carrier != @alphaBase.owner )
+	{
+		alphaFlagStolen = true;
+		if ( @alphaBase.carrier.client == null )
+			alphaFlagDropped = true;
+	}
+	if ( @betaBase.carrier != @betaBase.owner )
+	{
+		betaFlagStolen = true;
+		if ( @betaBase.carrier.client == null )
+			betaFlagDropped = true;
+	}
+
+	// just clear overridden script entity weights in this case
+	if ( !alphaFlagStolen && !betaFlagStolen )
+	{
+		for ( int i = 1; i <= maxClients; ++i )
+		{
+			Bot @bot = @G_GetEntity( i ).client.getBot();
+			if ( @bot != null )
+				bot.clearOverriddenEntityWeights();
+		}
+		return;
+	}
+
+	// if there's no mutual steal situation
+	if ( !( alphaFlagStolen && !alphaFlagDropped && betaFlagStolen && !betaFlagDropped ) )
+	{
+		for ( int i = 1; i <= maxClients; ++i )
+		{
+			Entity @ent = @G_GetEntity( i );
+			Bot @bot = @ent.client.getBot();
+			if ( @bot == null )
+				continue;
+
+			bot.clearOverriddenEntityWeights();
+
+			int enemyTeam;
+			cFlagBase @teamBase;
+			cFlagBase @enemyBase;
+			bool teamFlagStolen;
+			bool teamFlagDropped;
+			bool enemyFlagStolen;
+			bool enemyFlagDropped;
+			if ( ent.team == TEAM_ALPHA )
+			{
+				enemyTeam = TEAM_BETA;
+				@teamBase = @alphaBase;
+				@enemyBase = @betaBase;
+				teamFlagStolen = alphaFlagStolen;
+				teamFlagDropped = alphaFlagDropped;
+				enemyFlagStolen = betaFlagStolen;
+				enemyFlagDropped = betaFlagDropped;
+			}
+			else
+			{
+				enemyTeam = TEAM_ALPHA;
+				@teamBase = @betaBase;
+				@enemyBase = @alphaBase;
+				teamFlagStolen = betaFlagStolen;
+				teamFlagDropped = betaFlagDropped;
+				enemyFlagStolen = alphaFlagStolen;
+				enemyFlagDropped = alphaFlagDropped;
+			}
+
+			// 1) check carrier/non-carrier specific actions
+
+			// if the bot is a carrier
+			if ( ( ent.effects & EF_CARRIER ) != 0 )
+			{
+				// if our flag is at the base
+				if ( !teamFlagStolen )
+				{
+					bot.overrideEntityWeight( @teamBase.owner, 9.0f );
+				}
+				// return to our base but do not camp at flag spot
+				// the flag is dropped and its likely to be returned soon
+				else if ( teamBase.owner.origin.distance( ent.origin ) > 192.0f )
+				{
+					bot.overrideEntityWeight( @teamBase.owner, 9.0f );
+				}
+			}
+			// if the bot is not a defender of the team flag
+			else if ( bot.defenceSpotId < 0 )
+			{
+				// if the bot team has a carrier
+				if ( enemyFlagStolen && !enemyFlagDropped )
+				{
+					// follow the carrier
+					if ( ent.origin.distance( enemyBase.carrier.origin ) > 192.0f )
+					{
+						bot.overrideEntityWeight( @enemyBase.carrier, 3.0f );
+					}
+				}
+			}
+
+			// 2) these weigths apply both for every bot in team
+
+			if ( enemyFlagDropped )
+			{
+				bot.overrideEntityWeight( @enemyBase.carrier, 9.0f );
+			}
+			if ( teamFlagDropped )
+			{
+				bot.overrideEntityWeight( @teamBase.carrier, 9.0f );
+			}
+		}
+
+		return;
+	}
+
+	// Both flags are stolen and carried. This is a tricky case.
+	// Bots should rush the enemy base, except the carrier and its supporter (if we have found one)
+	// TODO: we do not cover 1 vs 1 situation (a carrier vs a carrier)
+	bool hasACarrierSupporter = false;
+	bool hasEnemyBaseAttackers = false;
     for ( int i = 1; i <= maxClients; ++i )
     {
-        @ent = @G_GetEntity( i );
-        CTF_UpdateBotExtraGoals( ent );
-    }
-}
+        Entity @ent = @G_GetEntity( i );
+		Bot @bot = @ent.client.getBot();
+		if ( @bot == null )
+			continue;
 
+		bot.clearOverriddenEntityWeights();
 
-void CTF_UpdateBotExtraGoals( Entity @ent )
-{
-    Bot @bot = @ent.client.getBot();
-    if ( @bot == null )
-        return;
+		int enemyTeam;
+		cFlagBase @teamBase;
+		cFlagBase @enemyBase;
+		if ( ent.team == TEAM_ALPHA )
+		{
+			enemyTeam = TEAM_BETA;
+			@teamBase = @alphaBase;
+			@enemyBase = @betaBase;
+		}
+		else
+		{
+			enemyTeam = TEAM_ALPHA;
+			@teamBase = @betaBase;
+			@enemyBase = @alphaBase;
+		}
 
-    int enemyTeam;
-    if ( ent.team == TEAM_ALPHA )
-        enemyTeam = TEAM_BETA;
-    else if ( ent.team == TEAM_BETA )
-        enemyTeam = TEAM_ALPHA;
-    else 
-        return;
+		// if the bot is a carrier
+		if ( ( ent.effects & EF_CARRIER ) != 0 )
+		{
+			// return to our base but do not camp at flag spot
+			// note: we have significantly increased the distance threshold
+			// so they roam over the base grabbing various items
+			// otherwise bots are an easy prey for enemies rushing the base
+			if ( teamBase.owner.origin.distance( ent.origin ) > 768.0f )
+			{
+				bot.overrideEntityWeight( @teamBase.owner, 9.0f );
+			}
+		}
+		else
+		{
+			// if already at enemy base, stay there (but do not consider that a goal)
+			const float distanceToEnemyBase = enemyBase.owner.origin.distance( ent.origin );
+			if ( enemyBase.owner.origin.distance( ent.origin ) < 256.0f )
+			{
+				hasEnemyBaseAttackers = true;
+				continue;
+			}
 
-	bot.clearOverriddenEntityWeights();
-    
-    // Flags defence/offence/carrier support is managed by native code
-    // using provided status of defence/offence spots.
+			// always force the first other bot to rush enemy base
+			if ( !hasEnemyBaseAttackers )
+			{
+				bot.overrideEntityWeight( @enemyBase.owner, 6.0f );
+				hasEnemyBaseAttackers = true;
+				continue;
+			}
 
-    // The only thing should be managed in scripts is returning to a base.
-    // (Carrier behaviour differs for custom gametypes).
+			// check whether the bot does not have powerups
+			// do not waste powerup time on camping at own base
+			bool mustAttack = false;
+			Client @client = @ent.client;
+			if ( client.inventoryCount( POWERUP_QUAD ) > 0 )
+			{
+				// prevent killing quad bearer and stealing the quad
+				if ( ent.health > 50 )
+					mustAttack = true;
+			}
+			else if ( client.inventoryCount( POWERUP_SHELL ) > 0 )
+			{
+				mustAttack = true;
+			}
+			else if ( client.inventoryCount( POWERUP_REGEN ) > 0 )
+			{
+				mustAttack = true;
+			}
 
-    // Also dropped flags are managed here too.
+			if ( mustAttack )
+			{
+				bot.overrideEntityWeight( @enemyBase.owner, 9.0f );
+				hasEnemyBaseAttackers = true;
+			}
 
-    cFlagBase @teamBase = @CTF_getBaseForTeam( ent.team );
+			if ( !hasACarrierSupporter )
+			{
+				// follow the flag carrier that has the enemy flag
+				if( ent.origin.distance( enemyBase.carrier.origin ) > 192.0f )
+				{
+					bot.overrideEntityWeight( @enemyBase.carrier, 3.0f );
+					hasACarrierSupporter = true;
+					continue;
+				}
+			}
 
-    if ( @teamBase != null )
-    {
-        // The bot is a carrier, so it should return to the team base
-        if ( ( ent.effects & EF_CARRIER ) != 0 )
-        {
-            if ( @teamBase.owner != null )
-            {
-                // the flag is at our base, return to the base
-                if ( ( teamBase.owner.effects & EF_CARRIER ) != 0 )
-                {
-                    bot.overrideEntityWeight( teamBase.owner, 9.0f );
-                }
-                // our flag is stolen    
-                else
-                {
-                    float botToHomeBaseDist = teamBase.owner.origin.distance( ent.origin );
-                    // return to our base
-                    if ( botToHomeBaseDist > 768.0f )
-                    {
-                        bot.overrideEntityWeight( teamBase.owner, 9.0f );
-                    }
-                    // do not camp at our flag spot, hide somewhere else
-                }
-            }
-        }
+			// if the bot does not have a substantial stack, stay at base with the carrier
+			bool stayAtBase = false;
+			if ( !gametype.isInstagib )
+			{
+				// is very basic but is alreadys close to the limit of complexity desirable for scripts
+				// rush enemy base if there is at least 50 hp + 50 armor or 100 hp
+				// requiring larger stack leads to lack of interest in leaving own base
+				if( ent.health < 50 || ( ent.health < 100 && client.armor < 45 ) )
+				{
+					stayAtBase = true;
+				}
+				// TODO: check weapons as well?
+			}
 
-        // it's team flag, dropped somewhere
-        if ( @teamBase.carrier != @teamBase.owner && @teamBase.carrier.client == null )
-            bot.overrideEntityWeight( teamBase.carrier, 9.0f );
-    } 
+			if ( stayAtBase )
+			{
+				// follow the flag carrier that has the enemy flag
+				bot.overrideEntityWeight( @enemyBase.carrier, 3.0f );
+				hasACarrierSupporter = true;
+				continue;
+			}
 
-    cFlagBase @enemyBase = @CTF_getBaseForTeam( enemyTeam );
-    if ( @enemyBase != null )
-    {
-        // it's team flag, dropped somewhere
-        if ( @enemyBase.carrier != @enemyBase.owner && @enemyBase.carrier.client == null )
-            bot.overrideEntityWeight( enemyBase.carrier, 9.0f );
+			// attack the enemy base using slightly lowered weight
+			// TODO: replace by min()
+			float attackSupportWeight = 5.0f * ( distanceToEnemyBase / 1024.0f );
+			if ( attackSupportWeight > 5.0f )
+			{
+				attackSupportWeight = 5.0f;
+			}
+			bot.overrideEntityWeight( @enemyBase.owner, attackSupportWeight );
+			hasEnemyBaseAttackers = true;
+		}
     }
 }
 
