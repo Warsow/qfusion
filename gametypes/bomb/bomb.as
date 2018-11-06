@@ -176,47 +176,22 @@ void bombInit()
 
 void bombSetCarrier( Entity @ent )
 {
-    // If the bomb did not touch a solid (is in the DROPPING state),
-    // site defence spots were kept, as well as weight of the site chosen for planting.
-    if ( bombState != BOMBSTATE_DROPPING )
-    {
-        // Clear the bomb model weight
-        BOMB_SetEntityGoalWeightForTeam( attackingTeam, bombModel, 0.0f );
-        // Attack the site chosen by bots.
-        if ( @BOMB_BOTS_SITE != null )
-        {
-            // Set a small weight for all bots so they will attack the site alone
-            // if they are not assigned as carrier supporters by native code.
-            // Otherwise they should follow the carrier, thus the weight is small to be overridden.
-            BOMB_SetEntityGoalWeightForTeam( attackingTeam, BOMB_BOTS_SITE.indicator, 0.5f );
-            // Set a huge site weight for the carrier        
-            Bot @botCarrier = ent.client.getBot();
-            if ( @botCarrier != null )
-                botCarrier.overrideEntityWeight( BOMB_BOTS_SITE.indicator, 12.0f );
-        }
-    }
-
 	if ( @bombCarrier != null )
 	{
 		bombCarrier.effects &= ~EF_CARRIER;
 		bombCarrier.modelindex2 = 0;
 	}
-    // If a bomb was dropped and now is carried again
-    else if ( bombState == BOMBSTATE_DROPPED ) 
-    {
-        // Defenders should stop leave the dropped bomb spot
-        AI::RemoveDefenceSpot( defendingTeam, 0 );
-        // Tell attackers that the bomb has been picked up
-        AI::NavEntityReached( bombModel );
-        // Remove the goal 
-        AI::RemoveNavEntity( bombModel );
-        // Defend the bomb sites
-        BOMB_AddDefenceSpotsForSites();
-    }
 
 	@bombCarrier = @ent;
 	bombCarrier.effects |= EF_CARRIER;
 	bombCarrier.modelindex2 = modelBombBackpack;
+
+	// if the bomb was dropped and now is carried again
+    if ( bombState == BOMBSTATE_DROPPED )
+    {
+		// the carrier is expected to be assigned at the moment of this call
+		BOTS_OnBombPicked();
+    }
 
 	hide( @bombModel );
 	hide( @bombSprite );
@@ -375,23 +350,7 @@ void bombPlant( cBombSite @site )
 	bombActionTime = levelTime;
 	bombState = BOMBSTATE_PLANTING;
 
-    // Tell attackers they have reached the site
-    AI::NavEntityReached( site.indicator ); 
-    // Clear site weight for attackers
-    BOMB_SetEntityGoalWeightForTeam( attackingTeam, site.indicator, 0.0f );
-    // Add a goal for bombModel
-	AI::AddNavEntity( bombModel, AI_NAV_REACH_ON_EVENT );
-    // Set bomb model weight for attackers
-    BOMB_SetEntityGoalWeightForTeam( attackingTeam, bombModel, 12.0f );
-    // Remove old defending team defence spots
-    BOMB_RemoveDefenceSpotsForSites();
-    // Defending team should defend the bomb model
-    AIDefenceSpot defenceSpot( 0, bombModel, 768.0f );
-    defenceSpot.minDefenders = 5;
-    defenceSpot.maxDefenders = 999;
-    AI::AddDefenceSpot( defendingTeam, defenceSpot );
-    // Force all defenders to reach the defence spot
-    AI::DefenceSpotAlert( defendingTeam, 0, 1.0f, uint(15000) );
+	BOTS_OnBombInPlace( site );
 }
 
 void bombArm(array<Entity @> @nearby)
@@ -421,21 +380,7 @@ void bombArm(array<Entity @> @nearby)
 	if( @fastPlanter != null && ! isFastPlant() )
 		@fastPlanter = null;
 
-    // Notify attackers that the bomb has been armed
-	AI::NavEntityReached( bombModel );
-    // Clear bomb weight for attackers. The weight will be managed by defense spot native code.
-    BOMB_SetEntityGoalWeightForTeam( attackingTeam, bombModel, 0.0f ); 
-    // Remove a defence spot for defending team
-    AI::RemoveDefenceSpot( defendingTeam, 0 );
-    // Add a defence spot for attacking team
-    AIDefenceSpot defenceSpot( 0, bombModel, 768.0f );
-    defenceSpot.minDefenders = 5;
-    defenceSpot.maxDefenders = 999;    
-    AI::AddDefenceSpot( attackingTeam, defenceSpot );
-    // Force all attackers to reach the spot
-    AI::DefenceSpotAlert( attackingTeam, 0, 1.0f, uint(15000) );
-    // Set bomb model weight for defenders
-    BOMB_SetEntityGoalWeightForTeam( defendingTeam, bombModel, 12.0f );
+	BOTS_OnBombArmed();
 }
 
 // missing an and :DD
@@ -911,19 +856,51 @@ void bombGiveToRandom()
 
 	int playerNum = int( random() * team.numPlayers );
 
+	Entity @chosenCarrier = null;
+	// first pass: try avoid giving bomb to bots
+	// find a non-bot player that has index closest to the chosen player number
 	for ( int i = 0; @team.ent( i ) != null; i++ )
 	{
-		if ( i == playerNum )
+		Entity @ent = @team.ent( i );
+		if ( i < playerNum )
 		{
-			Entity @ent = @team.ent( i );
+			// Save the last not-bot player
+			if ( @ent.client.getBot() == null )
+				@chosenCarrier = @ent;
+		}
+		else
+		{
+			if ( @ent.client.getBot() == null )
+			{
+				@chosenCarrier = @ent;
+				break;
+			}
 
-			bombSetCarrier( @ent );
+			// test next player
+			playerNum++;
+			continue;
 
-			G_CenterPrintFormatMsg( null, "%s has the bomb!", ent.client.name );
-
-			break;
 		}
 	}
+
+	if( @chosenCarrier == null )
+	{
+		// try again without skipping bots
+		playerNum = int( random() * team.numPlayers );
+		for ( int i = 0; @team.ent( i ) != null; i++ )
+		{
+			if ( i == playerNum )
+			{
+				@chosenCarrier = @team.ent( i );
+				break;
+			}
+		}
+	}
+
+
+	bombSetCarrier( @chosenCarrier );
+
+	G_CenterPrintFormatMsg( null, "%s has the bomb!", chosenCarrier.client.name );
 }
 
 bool entCanSee( Entity @ent, Vec3 point )
@@ -1037,21 +1014,6 @@ void dynamite_stop( Entity @ent )
 		bombSprite.origin = origin;
 		bombMinimap.origin = origin;
 
-        // Add a goal entity for the bombModel entity
-		AI::AddNavEntity( bombModel, AI_NAV_REACH_AT_TOUCH );
-        // Set a weight for the bombModel goal
-        BOMB_SetEntityGoalWeightForTeam( attackingTeam, bombModel, 12.0f );
-        // Stop attacking the site
-        if ( @BOMB_BOTS_SITE != null )
-            BOMB_SetEntityGoalWeightForTeam( attackingTeam, BOMB_BOTS_SITE.indicator, 0.0f );
-        // The bomb location is known, stop defend the spots
-        BOMB_RemoveDefenceSpotsForSites();    
-        // Defending team should protect the bomb from being picked up
-        AIDefenceSpot defenceSpot( 0, bombModel, 768.0f );
-        defenceSpot.minDefenders = 5;
-        defenceSpot.maxDefenders = 999;
-        AI::AddDefenceSpot( defendingTeam, defenceSpot );
-        // Force all defenders to reach the spot
-        AI::DefenceSpotAlert( defendingTeam, 0, 1.0f, uint(15000) );
+        BOTS_OnBombDropped();
 	}
 }

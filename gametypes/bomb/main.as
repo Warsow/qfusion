@@ -730,6 +730,8 @@ void GT_ThinkRules()
 	}
 
 	GENERIC_Think();
+
+	BOMB_UpdateBotsExtraGoals();
 }
 
 // The game has detected the end of the match state, but it
