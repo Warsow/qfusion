@@ -28,6 +28,7 @@ void BOTS_OnBombDropped()
     AIDefenceSpot defenceSpot( 0, bombModel, 1024.0f );
     defenceSpot.minDefenders = 5;
     defenceSpot.maxDefenders = 999;
+    defenceSpot.alertMessage = "Prevent picking the bomb";
     AI::AddDefenceSpot( defendingTeam, defenceSpot );
 
     // Force all defenders to reach the spot by triggering an alert
@@ -77,6 +78,7 @@ void BOTS_OnBombInPlace( cBombSite @site )
 	AIDefenceSpot defenceSpot( 0, bombModel, 1024.0f );
     defenceSpot.minDefenders = 5;
     defenceSpot.maxDefenders = 999;
+    defenceSpot.alertMessage = "Prevent planting the bomb";
     AI::AddDefenceSpot( defendingTeam, defenceSpot );
 
     // Force all defenders to reach the defence spot by forcing an alert for 15 seconds
@@ -101,6 +103,7 @@ void BOTS_OnBombArmed()
     AIDefenceSpot defenceSpot( 0, bombModel, 1024.0f );
     defenceSpot.minDefenders = 5;
     defenceSpot.maxDefenders = 999;
+    defenceSpot.alertMessage = "Prevent defusing the bomb";
     AI::AddDefenceSpot( attackingTeam, defenceSpot );
 
     // Force all attackers to reach the defence spot by forcing an alert for 30 seconds
