@@ -214,17 +214,10 @@ cBombSite @BOTS_PickAttackSite( Entity @botCarrier )
 
 void BOTS_SetupNewRound()
 {
-	G_Print( "Setup new round\n" );
-
 	AI::RemoveAllObjectiveSpots();
     
     // Setup initial defence spots for current defenders
     BOTS_StartDefendingSites();
-
-	if( @bombCarrier == null )
-	{
-		G_Print( "Warning: no bomb carrier is found\n" );
-	}
 
     // Clear all external entity weights just to ensure everything is reset.
 	// Check whether some bot is a bomb carrier at the same time.
@@ -256,9 +249,7 @@ void BOTS_SetupNewRound()
 
 void BOTS_StartDefendingSites()
 {    
-	G_Print( "StartDefendingAllSites()\n" );
-
-    int spotId = 1;
+	int spotId = 1;
 	for ( cBombSite @site = @siteHead; @site != null; @site = @site.next )
     {
         AIDefenceSpot defenceSpot( spotId, site.indicator, 1024.0f );
