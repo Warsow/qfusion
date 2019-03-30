@@ -42,7 +42,8 @@ abstract class AIScriptGoal
 	// Override this method in a subclass
 	void getDesiredWorldState( AIWorldState &worldState )
 	{
-		worldState.setIgnoreAll( true );
+		//Keep this commented until a sane WorldState script API is really implemented
+		//worldState.setIgnoreAll( true );
 	}
 }
 
