@@ -771,7 +771,7 @@ void GT_updateScore( Client @client )
         if ( gametype.isInstagib )
             client.stats.setScore( client.stats.getEntry( "frags" ) + caRound.getPlayerBonusScore( client ) );
         else
-            client.stats.setScore( int( client.stats.getEntry( "total_damage_given" ) * 0.01 ) + caRound.getPlayerBonusScore( client ) );
+            client.stats.setScore( int( client.stats.getEntry( "damage_given" ) * 0.01 ) + caRound.getPlayerBonusScore( client ) );
     }
 }
 
