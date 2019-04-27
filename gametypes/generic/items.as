@@ -238,3 +238,31 @@ Entity @GENERIC_DropCurrentWeapon( Client @client, bool addAmmo )
 {
     return GENERIC_DropWeapon( client, @G_GetItem( client.weapon ), addAmmo );
 }
+
+void GENERIC_GiveAllWeapons( Client @client )
+{
+	if ( gametype.isInstagib )
+    {
+        client.inventoryGiveItem( WEAP_INSTAGUN );
+        client.inventorySetCount( AMMO_INSTAS, 1 );
+        client.inventorySetCount( AMMO_WEAK_INSTAS, 1 );
+        return;
+    }
+
+    // the gunblade can't be given (because it can't be dropped)
+    client.inventorySetCount( WEAP_GUNBLADE, 1 );
+    client.inventorySetCount( AMMO_GUNBLADE, 1 ); // enable gunblade blast
+
+    // give all weapons
+    for ( int i = WEAP_GUNBLADE + 1; i < WEAP_TOTAL; i++ )
+    {
+        if ( i == WEAP_INSTAGUN || i == WEAP_SHOCKWAVE ) // dont add IG/SW...
+            continue;
+
+        client.inventoryGiveItem( i );
+
+        Item @ammoItem = @G_GetItem( G_GetItem( i ).ammoTag );
+        if ( @ammoItem != null )
+            client.inventorySetCount( ammoItem.tag, ammoItem.inventoryMax );
+    }
+}
