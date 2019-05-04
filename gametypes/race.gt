@@ -10,5 +10,6 @@ race/race.as;
 race/race_commands.as;
 race/race_entities.as;
 race/race_player.as;
+race/race_storage.as;
 
 legacy/quake1.as;
