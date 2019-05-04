@@ -1151,22 +1151,98 @@ void RACE_SetUpMatch()
     G_RemoveDeadBodies();
 }
 
-///*****************************************************************
-/// MODULE SCRIPT CALLS
-///*****************************************************************
-
-String randmap;
-String randmap_passed = "";
-int64 randmap_time = 0;
-
-bool GT_Command( Client @client, const String &cmdString, const String &argsString, int argc )
+class CommandHandlersRegistry
 {
-    if ( cmdString == "gametype" )
-    {
-        String response = "";
+	private array<CommandHandler @> handlers;
+
+	void register( CommandHandler @handler )
+	{
+		handlers.insertLast( handler );
+		handler.registerGameCommand();
+	}
+
+	bool handle( Client @client, const String &cmdString, const String &argsString, int argc )
+	{
+		if( @client == null )
+			return false;
+
+		for( uint i = 0; i < handlers.size(); ++i )
+		{
+			CommandHandler @handler = handlers[i];
+			if ( handler.canHandle( cmdString ) )
+				return handler.handle( client, argsString, argc );
+		}
+
+		G_PrintMsg( client.getEnt(), "Unknown command " + cmdString );
+		return false;
+	}
+}
+
+CommandHandlersRegistry commandHandlersRegistry;
+
+abstract class CommandHandler
+{
+	const String @name;
+
+	CommandHandler( const String @name )
+	{
+		@this.name = @name;
+	}
+
+	private void shouldBeUnreachable()
+	{
+		// Force a crash... TODO: Enable rasing exceptions and throw something
+		Entity @bogusEntity = null;
+		bogusEntity.origin = Vec3( 0, 0, 0 );
+	}
+
+	void registerGameCommand()
+	{
+		shouldBeUnreachable();
+	}
+
+	bool canHandle( const String &cmdString )
+	{
+		return name == cmdString;
+	}
+
+	bool handle( Client @client, const String &argsString, int argc )
+	{
+		shouldBeUnreachable();
+		return false;
+	}
+}
+
+mixin class RegistersGameCommand
+{
+	void registerGameCommand() override
+	{
+		G_RegisterCommand( name );
+	}
+}
+
+mixin class UsesExistingCommand
+{
+	void registerGameCommand() override
+	{
+		// Just to override the CommandHandler::registerGameCommand()
+		// default implementation that should be unreachable
+	}
+}
+
+class GametypeCommandHandler : CommandHandler, RegistersGameCommand
+{
+	GametypeCommandHandler()
+	{
+		super( "gametype" );
+	}
+
+	bool handle( Client @client, const String &argsString, int argc ) override
+	{
         Cvar fs_game( "fs_game", "", 0 );
         String manifest = gametype.manifest;
 
+		String response = "";
         response += "\n";
         response += "Gametype " + gametype.name + " : " + gametype.title + "\n";
         response += "----------------\n";
@@ -1177,91 +1253,140 @@ bool GT_Command( Client @client, const String &cmdString, const String &argsStri
 
         G_PrintMsg( client.getEnt(), response );
         return true;
-    }
-    else if ( cmdString == "cvarinfo" )
-    {
-        GENERIC_CheatVarResponse( client, cmdString, argsString, argc );
+	}
+};
+
+class CVarInfoHandler : CommandHandler, UsesExistingCommand
+{
+	CVarInfoHandler()
+	{
+		super( "cvarinfo" );
+	}
+
+	bool handle( Client @client, const String &argsString, int argc ) override
+	{
+		GENERIC_CheatVarResponse( client, this.name, argsString, argc );
         return true;
-    }
-    else if ( cmdString == "callvotevalidate" )
-    {
-        String votename = argsString.getToken( 0 );
+	}
+}
 
-        if ( votename == "randmap" )
+String randmap;
+String randmap_passed = "";
+int64 randmap_time = 0;
+
+class CallvoteValidateHandler : CommandHandler, UsesExistingCommand
+{
+	CallvoteValidateHandler()
+	{
+		super( "callvotevalidate" );
+	}
+
+	array<const String @> collectMapsForPattern( const String &pattern, const String &current )
+	{
+		array<const String @> result;
+		String lowercaseMap;
+
+		const String lowercaseCurrent = current.tolower();
+		const String lowercasePattern = pattern.tolower();
+
+		if ( pattern == "" || pattern == "*" )
+		{
+			for ( int i = 0; ; i++ )
+			{
+				const String @map = ML_GetMapByNum( i );
+				if ( @map == null )
+					break;
+
+				lowercaseMap = map.tolower();
+				if ( lowercaseMap == lowercaseCurrent )
+					continue;
+
+				result.insertLast( map );
+			}
+
+			return result;
+		}
+
+		for ( int i = 0; ; i++ )
         {
-            Cvar mapname( "mapname", "", 0 );
-            String current = mapname.string.tolower();
-            String pattern = argsString.getToken( 1 ).tolower();
-            String[] maps;
-            const String @map;
-            String lmap;
-            int i = 0;
+            const String @map = ML_GetMapByNum( i );
+            if ( @map == null )
+				break;
 
-            if ( pattern == "*" )
-                pattern = "";
+            lowercaseMap = map.tolower();
+            if( lowercaseMap == lowercaseCurrent )
+				continue;
 
-            do
+            bool match = false;
+            // TODO: This should be a native method
+            for ( uint p = 0; p < lowercaseMap.length(); p++ )
             {
-                @map = ML_GetMapByNum( i );
-                if ( @map != null)
+                uint eq = 0;
+                while ( eq < lowercasePattern.length() && p + eq < lowercaseMap.length() )
                 {
-                    lmap = map.tolower();
-                    uint p;
-                    bool match = false;
-                    if ( pattern == "" )
-                    {
-                        match = true;
-                    }
-                    else
-                    {
-                        for ( p = 0; p < map.length(); p++ )
-                        {
-                            uint eq = 0;
-                            while ( eq < pattern.length() && p + eq < lmap.length() )
-                            {
-                                if ( lmap[p + eq] != pattern[eq] )
-                                    break;
-                                eq++;
-                            }
-                            if ( eq == pattern.length() )
-                            {
-                                match = true;
-                                break;
-                            }
-                        }
-                    }
-                    if ( match && map != current )
-                        maps.insertLast( map );
+                    if ( lowercaseMap[p + eq] != lowercasePattern[eq] )
+                        break;
+
+                    eq++;
                 }
-                i++;
-            }
-            while ( @map != null );
-
-            if ( maps.length() == 0 )
-            {
-                client.printMessage( "No matching maps\n" );
-                return false;
+                if ( eq == lowercasePattern.length() )
+                {
+                    match = true;
+                    break;
+                }
             }
 
-            if ( levelTime - randmap_time < 80 )
-            {
-                G_PrintMsg( null, S_COLOR_YELLOW + "Chosen map: " + S_COLOR_WHITE + randmap + S_COLOR_YELLOW + " (out of " + S_COLOR_WHITE + maps.length() + S_COLOR_YELLOW + " matches)\n" );
-                return true;
-            }
-
-            randmap_time = levelTime;
-            randmap = maps[rand() % maps.length()];
+            if ( match )
+                result.insertLast( map );
         }
-        else
+
+        return result;
+	}
+
+	bool handle( Client @client, const String &argsString, int argc ) override
+	{
+		String votename = argsString.getToken( 0 );
+		if ( votename != "randmap" )
+		{
+			client.printMessage( "Unknown callvote " + votename + "\n" );
+            return false;
+		}
+
+        Cvar mapname( "mapname", "", 0 );
+        array<const String @> maps = collectMapsForPattern( argsString.getToken( 1 ), mapname.string );
+
+        if ( maps.length() == 0 )
         {
-            client.printMessage( "Unknown callvote " + votename + "\n" );
+            client.printMessage( "No matching maps\n" );
             return false;
         }
 
+        if ( levelTime - randmap_time < 80 )
+        {
+			String message;
+			message += S_COLOR_YELLOW + "Chosen map: " + S_COLOR_WHITE + randmap;
+			message += S_COLOR_YELLOW + " (out of " + S_COLOR_WHITE + maps.length();
+			message += S_COLOR_YELLOW + " matches)\n";
+            G_PrintMsg( null, message );
+            return true;
+        }
+
+        randmap_time = levelTime;
+        randmap = maps[rand() % maps.length()];
+
         return true;
-    }
-    else if ( cmdString == "callvotepassed" )
-    {
+	}
+}
+
+class CallvotePassedHandler : CommandHandler, UsesExistingCommand
+{
+	CallvotePassedHandler()
+	{
+		super( "callvotepassed" );
+	}
+
+	bool handle( Client @client, const String &argsString, int argc ) override
+	{
         String votename = argsString.getToken( 0 );
 
         if ( votename == "randmap" )
@@ -1271,44 +1396,96 @@ bool GT_Command( Client @client, const String &cmdString, const String &argsStri
         }
 
         return true;
-    }
-    else if ( ( cmdString == "racerestart" ) || ( cmdString == "kill" ) )
-    {
-        if ( @client != null )
-        {
-            Player @player = RACE_GetPlayer( client );
-            if ( player.inRace )
-                player.cancelRace();
+	}
+}
 
-            if ( client.team == TEAM_SPECTATOR && !gametype.isTeamBased )
-                client.team = TEAM_PLAYERS;
-            client.respawn( false );
-        }
+// Warning: mixing in RegistersGameCommand prevents "kill" command registration
+class RaceRestartHandler : CommandHandler
+{
+	RaceRestartHandler()
+	{
+		super( "racerestart" );
+	}
 
-        return true;
-    }
-    else if ( cmdString == "practicemode" )
-    {
-        RACE_GetPlayer( client ).togglePracticeMode();
-        return true;
-    }
-    else if ( cmdString == "noclip" )
-    {
+	void registerGameCommand() override
+	{
+		G_RegisterCommand( "racerestart" );
+		G_RegisterCommand( "kill" );
+	}
+
+	bool canHandle( const String &cmdString ) override
+	{
+		// The super method tries to match the string against 'racerestart'
+		return CommandHandler::canHandle( cmdString ) || ( cmdString == "kill" );
+	}
+
+	bool handle( Client @client, const String &argsString, int argc ) override
+	{
+		if ( @client == null )
+			return true;
+
         Player @player = RACE_GetPlayer( client );
+        if ( player.inRace )
+            player.cancelRace();
+
+        if ( client.team == TEAM_SPECTATOR && !gametype.isTeamBased )
+            client.team = TEAM_PLAYERS;
+
+        client.respawn( false );
+
+        return true;
+	}
+}
+
+class PracticeModeHandler : CommandHandler, RegistersGameCommand
+{
+	PracticeModeHandler()
+	{
+		super( "practicemode" );
+	}
+
+	bool handle( Client @client, const String &argsString, int argc ) override
+	{
+		RACE_GetPlayer( client ).togglePracticeMode();
+        return true;
+	}
+}
+
+class NoClipHandler: CommandHandler, RegistersGameCommand
+{
+	NoClipHandler()
+	{
+		super( "noclip" );
+	}
+
+	bool handle( Client @client, const String &argsString, int argc ) override
+	{
+		Player @player = RACE_GetPlayer( client );
         return player.toggleNoclip();
-    }
-    else if ( cmdString == "position" )
-    {
-        String action = argsString.getToken( 0 );
+	}
+}
+
+class PositionHandler : CommandHandler, RegistersGameCommand
+{
+	PositionHandler()
+	{
+		super( "position" );
+	}
+
+	bool handle( Client @client, const String &argsString, int argc ) override
+	{
+		String action = argsString.getToken( 0 );
         if ( action == "save" )
         {
             return RACE_GetPlayer( client ).savePosition();
         }
-        else if ( action == "load" )
+
+        if ( action == "load" )
         {
             return RACE_GetPlayer( client ).loadPosition( true );
         }
-        else if ( action == "speed" && argsString.getToken( 1 ) != "" )
+
+        if ( action == "speed" && argsString.getToken( 1 ) != "" )
         {
             Position @position = RACE_GetPlayer( client ).savedPosition();
             String speed = argsString.getToken( 1 );
@@ -1330,43 +1507,58 @@ bool GT_Command( Client @client, const String &cmdString, const String &argsStri
         }
 
         return true;
-    }
-    else if ( cmdString == "top" )
-    {
-        RecordTime @top = levelRecords[0];
+	}
+}
+
+class TopCommandHandler : CommandHandler, RegistersGameCommand
+{
+	TopCommandHandler()
+	{
+		super( "top" );
+	}
+
+	bool handle( Client @client, const String &argsString, int argc ) override
+	{
+		RecordTime @top = levelRecords[0];
         if ( !top.saved )
         {
             client.printMessage( S_COLOR_RED + "No records yet.\n" );
+            return true;
         }
-        else
+
+        Table table( "r r r l l" );
+        for ( int i = MAX_RECORDS - 1; i >= 0; i-- )
         {
-            Table table( "r r r l l" );
-            for ( int i = MAX_RECORDS - 1; i >= 0; i-- )
-            {
-                RecordTime @record = levelRecords[i];
-                if ( record.saved )
-                {
-                    table.addCell( ( i + 1 ) + "." );
-                    table.addCell( S_COLOR_GREEN + RACE_TimeToString( record.finishTime ) );
-                    table.addCell( S_COLOR_YELLOW + "[+" + RACE_TimeToString( record.finishTime - top.finishTime ) + "]" );
-                    table.addCell( S_COLOR_WHITE + record.playerName );
-                    if ( record.login != "" )
-                        table.addCell( "(" + S_COLOR_YELLOW + record.login + S_COLOR_WHITE + ")" );
-                    else
-                        table.addCell( "" );
-                }
-            }
-            uint rows = table.numRows();
-            for ( uint i = 0; i < rows; i++ )
-                client.printMessage( table.getRow( i ) + "\n" );
+            RecordTime @record = levelRecords[i];
+            if ( !record.saved )
+				continue;
+
+            table.addCell( ( i + 1 ) + "." );
+            table.addCell( S_COLOR_GREEN + RACE_TimeToString( record.finishTime ) );
+            table.addCell( S_COLOR_YELLOW + "[+" + RACE_TimeToString( record.finishTime - top.finishTime ) + "]" );
+            table.addCell( S_COLOR_WHITE + record.playerName );
+            if ( record.login != "" )
+                table.addCell( "(" + S_COLOR_YELLOW + record.login + S_COLOR_WHITE + ")" );
+            else
+                table.addCell( "" );
         }
+
+        uint rows = table.numRows();
+        for ( uint i = 0; i < rows; i++ )
+            client.printMessage( table.getRow( i ) + "\n" );
 
         return true;
-    }
+	}
+}
 
-    G_PrintMsg( null, "unknown: " + cmdString + "\n" );
 
-    return false;
+///*****************************************************************
+/// MODULE SCRIPT CALLS
+///*****************************************************************
+
+bool GT_Command( Client @client, const String &cmdString, const String &argsString, int argc )
+{
+    return commandHandlersRegistry.handle( client, cmdString, argsString, argc );
 }
 
 // select a spawning point for a player
@@ -1754,14 +1946,17 @@ void GT_InitGametype()
     G_ConfigString( CS_SCB_PLAYERTAB_LAYOUT, "%n 112 %s 52 %t 96 %l 48 %s 52" );
     G_ConfigString( CS_SCB_PLAYERTAB_TITLES, "Name Clan Time Ping Racing" );
 
-    // add commands
-    G_RegisterCommand( "gametype" );
-    G_RegisterCommand( "racerestart" );
-    G_RegisterCommand( "kill" );
-    G_RegisterCommand( "practicemode" );
-    G_RegisterCommand( "noclip" );
-    G_RegisterCommand( "position" );
-    G_RegisterCommand( "top" );
+	// add commands
+	commandHandlersRegistry.register( @GametypeCommandHandler() );
+	commandHandlersRegistry.register( @RaceRestartHandler() );
+	commandHandlersRegistry.register( @PracticeModeHandler() );
+	commandHandlersRegistry.register( @NoClipHandler() );
+	commandHandlersRegistry.register( @PositionHandler() );
+	commandHandlersRegistry.register( @TopCommandHandler() );
+
+	commandHandlersRegistry.register( @CallvoteValidateHandler() );
+	commandHandlersRegistry.register( @CallvotePassedHandler() );
+	commandHandlersRegistry.register( @CVarInfoHandler() );
 
     // add votes
     G_RegisterCallvote( "randmap", "<* | pattern>", "string", "Changes to a random map" );
