@@ -24,10 +24,6 @@ const int HUD_RECORDS = 3;
 
 String levelRecordPlayerName;
 
-// ch : MM
-const uint RECORD_SEND_INTERVAL = 5 * 60 * 1000; // 5 minutes
-int64 lastRecordSent = 0;
-
 enum eMenuItems
 {
     MI_EMPTY,
@@ -1150,9 +1146,6 @@ void RACE_SetUpMatch()
     }
 
     G_RemoveDeadBodies();
-
-    // ch : clear last recordSentTime
-    lastRecordSent = levelTime;
 }
 
 ///*****************************************************************
@@ -1594,12 +1587,6 @@ void GT_ThinkRules()
             client.setHUDStat( STAT_MESSAGE_ALPHA, CS_GENERAL + 1 );
         if ( levelRecords[2].playerName.length() > 0 )
             client.setHUDStat( STAT_MESSAGE_BETA, CS_GENERAL + 2 );
-    }
-
-    // ch : send intermediate results
-    if ( ( lastRecordSent + RECORD_SEND_INTERVAL ) >= levelTime )
-    {
-
     }
 }
 
