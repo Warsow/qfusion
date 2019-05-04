@@ -8,5 +8,6 @@ generic/bots.as;
 
 race/race.as;
 race/race_commands.as;
+race/race_player.as;
 
 legacy/quake1.as;
