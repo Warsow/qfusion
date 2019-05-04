@@ -67,7 +67,6 @@ int prcAnnouncerFlagScoreEnemy02;
 
 bool firstSpawn = false;
 
-Cvar ctfAllowPowerupDrop( "ctf_powerupDrop", "0", CVAR_ARCHIVE );
 Cvar ctfInstantFlag( "ctf_instantFlag", "0", CVAR_ARCHIVE );
 
 ///*****************************************************************
@@ -114,20 +113,23 @@ void CTF_playerKilled( Entity @target, Entity @attacker, Entity @inflictor )
         // drop ammo pack (won't drop anything if player doesn't have any ammo)
         target.dropItem( AMMO_PACK );
 
-        if ( ctfAllowPowerupDrop.boolean )
-        {
-            if ( target.client.inventoryCount( POWERUP_QUAD ) > 0 )
-            {
-                target.dropItem( POWERUP_QUAD );
-                target.client.inventorySetCount( POWERUP_QUAD, 0 );
-            }
+		if ( target.client.inventoryCount( POWERUP_QUAD ) > 0 )
+		{
+			target.dropItem( POWERUP_QUAD );
+			target.client.inventorySetCount( POWERUP_QUAD, 0 );
+		}
 
-            if ( target.client.inventoryCount( POWERUP_SHELL ) > 0 )
-            {
-                target.dropItem( POWERUP_SHELL );
-                target.client.inventorySetCount( POWERUP_SHELL, 0 );
-            }
-        }
+		if ( target.client.inventoryCount( POWERUP_SHELL ) > 0 )
+		{
+			target.dropItem( POWERUP_SHELL );
+			target.client.inventorySetCount( POWERUP_SHELL, 0 );
+		}
+
+		if ( target.client.inventoryCount( POWERUP_REGEN ) > 0 )
+		{
+			target.dropItem( POWERUP_REGEN );
+			target.client.inventorySetCount( POWERUP_REGEN, 0 );
+		}
     }
 	
     // check for generic awards for the frag
@@ -219,37 +221,7 @@ bool GT_Command( Client @client, const String &cmdString, const String &argsStri
     {
         String votename = argsString.getToken( 0 );
 
-        if ( votename == "ctf_powerup_drop" )
-        {
-            String voteArg = argsString.getToken( 1 );
-            if ( voteArg.len() < 1 )
-            {
-                client.printMessage( "Callvote " + votename + " requires at least one argument\n" );
-                return false;
-            }
-
-            int value = voteArg.toInt();
-            if ( voteArg != "0" && voteArg != "1" )
-            {
-                client.printMessage( "Callvote " + votename + " expects a 1 or a 0 as argument\n" );
-                return false;
-            }
-
-            if ( voteArg == "0" && !ctfAllowPowerupDrop.boolean )
-            {
-                client.printMessage( "Powerup drop is already disallowed\n" );
-                return false;
-            }
-
-            if ( voteArg == "1" && ctfAllowPowerupDrop.boolean )
-            {
-                client.printMessage( "Powerup drop is already allowed\n" );
-                return false;
-            }
-
-            return true;
-        }
-        else if ( votename == "ctf_flag_instant" )
+        if ( votename == "ctf_flag_instant" )
         {
             String voteArg = argsString.getToken( 1 );
             if ( voteArg.len() < 1 )
@@ -287,14 +259,7 @@ bool GT_Command( Client @client, const String &cmdString, const String &argsStri
     {
         String votename = argsString.getToken( 0 );
 
-        if ( votename == "ctf_powerup_drop" )
-        {
-            if ( argsString.getToken( 1 ).toInt() > 0 )
-                ctfAllowPowerupDrop.set( 1 );
-            else
-                ctfAllowPowerupDrop.set( 0 );
-        }
-        else if ( votename == "ctf_flag_instant" )
+        if ( votename == "ctf_flag_instant" )
         {
             if ( argsString.getToken( 1 ).toInt() > 0 )
                 ctfInstantFlag.set( 1 );

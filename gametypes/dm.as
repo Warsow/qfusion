@@ -17,9 +17,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-Cvar dmAllowPowerupDrop( "dm_powerupDrop", "1", CVAR_ARCHIVE );
-Cvar dmAllowPowerups( "dm_allowPowerups", "1", CVAR_ARCHIVE );
-
 ///*****************************************************************
 /// NEW MAP ENTITY DEFINITIONS
 ///*****************************************************************
@@ -55,19 +52,22 @@ void DM_playerKilled( Entity @target, Entity @attacker, Entity @inflictor )
 
         target.dropItem( AMMO_PACK );
 
-        if ( dmAllowPowerupDrop.boolean )
+        if ( target.client.inventoryCount( POWERUP_QUAD ) > 0 )
         {
-            if ( target.client.inventoryCount( POWERUP_QUAD ) > 0 )
-            {
-                target.dropItem( POWERUP_QUAD );
-                target.client.inventorySetCount( POWERUP_QUAD, 0 );
-            }
+            target.dropItem( POWERUP_QUAD );
+            target.client.inventorySetCount( POWERUP_QUAD, 0 );
+        }
 
-            if ( target.client.inventoryCount( POWERUP_SHELL ) > 0 )
-            {
-                target.dropItem( POWERUP_SHELL );
-                target.client.inventorySetCount( POWERUP_SHELL, 0 );
-            }
+        if ( target.client.inventoryCount( POWERUP_SHELL ) > 0 )
+        {
+            target.dropItem( POWERUP_SHELL );
+            target.client.inventorySetCount( POWERUP_SHELL, 0 );
+        }
+
+        if ( target.client.inventoryCount( POWERUP_REGEN ) > 0 )
+        {
+			target.dropItem( POWERUP_REGEN );
+			target.client.inventorySetCount( POWERUP_REGEN, 0 );
         }
     }
     
@@ -127,99 +127,6 @@ bool GT_Command( Client @client, const String &cmdString, const String &argsStri
         response += "----------------\n";
 
         G_PrintMsg( client.getEnt(), response );
-        return true;
-    }
-    else if ( cmdString == "callvotevalidate" )
-    {
-        String votename = argsString.getToken( 0 );
-        if ( votename == "dm_allow_powerups" )
-        {
-            String voteArg = argsString.getToken( 1 );
-            if ( voteArg.len() < 1 )
-            {
-                client.printMessage( "Callvote " + votename + " requires at least one argument\n" );
-                return false;
-            }
-
-            int value = voteArg.toInt();
-            if ( voteArg != "0" && voteArg != "1" )
-            {
-                client.printMessage( "Callvote " + votename + " expects a 1 or a 0 as argument\n" );
-                return false;
-            }
-
-            if ( voteArg == "0" && !dmAllowPowerups.boolean )
-            {
-            	client.printMessage( "Powerups are already disallowed\n" );
-                return false;
-            }
-
-            if ( voteArg == "1" && dmAllowPowerups.boolean )
-            {
-            	client.printMessage( "Powerups are already allowed\n" );
-                return false;
-            }
-
-            return true;
-        }
-
-        if ( votename == "dm_powerup_drop" )
-        {
-            String voteArg = argsString.getToken( 1 );
-            if ( voteArg.len() < 1 )
-            {
-                client.printMessage( "Callvote " + votename + " requires at least one argument\n" );
-                return false;
-            }
-
-            int value = voteArg.toInt();
-            if ( voteArg != "0" && voteArg != "1" )
-            {
-                client.printMessage( "Callvote " + votename + " expects a 1 or a 0 as argument\n" );
-                return false;
-            }
-
-            if ( voteArg == "0" && !dmAllowPowerupDrop.boolean )
-            {
-            	client.printMessage( "Powerup drop is already disallowed\n" );
-                return false;
-            }
-
-            if ( voteArg == "1" && dmAllowPowerupDrop.boolean )
-            {
-            	client.printMessage( "Powerup drop is already allowed\n" );
-                return false;
-            }
-
-            return true;
-        }
-
-        client.printMessage( "Unknown callvote " + votename + "\n" );
-        return false;
-    }
-    else if ( cmdString == "callvotepassed" )
-    {
-        String votename = argsString.getToken( 0 );
-        if ( votename == "dm_allow_powerups" )
-        {
-        	if( argsString.getToken( 1 ).toInt() > 0 )
-            	dmAllowPowerups.set( 1 );
-            else
-            	dmAllowPowerups.set( 0 );
-
-            // force a match restart to update
-            match.launchState( MATCH_STATE_POSTMATCH );
-            return true;
-        }
-
-        if ( votename == "dm_powerup_drop" )
-        {
-            if( argsString.getToken( 1 ).toInt() > 0 )
-            	dmAllowPowerupDrop.set( 1 );
-            else
-            	dmAllowPowerupDrop.set( 0 );
-        }
-
         return true;
     }
 
@@ -455,8 +362,6 @@ void GT_InitGametype()
                  + "set g_teams_allow_uneven \"0\"\n"
                  + "set g_countdown_time \"5\"\n"
                  + "set g_maxtimeouts \"3\" // -1 = unlimited\n"
-                 + "set dm_allowPowerups \"1\"\n"
-                 + "set dm_powerupDrop \"1\"\n"
                  + "\necho \"" + gametype.name + ".cfg executed\"\n";
 
         G_WriteFile( "configs/server/gametypes/" + gametype.name + ".cfg", config );
@@ -465,9 +370,6 @@ void GT_InitGametype()
     }
 
     gametype.spawnableItemsMask = ( IT_WEAPON | IT_AMMO | IT_ARMOR | IT_POWERUP | IT_HEALTH );
-
-    if( !dmAllowPowerups.boolean )
-		gametype.spawnableItemsMask &= ~IT_POWERUP;
 
     if ( gametype.isInstagib )
         gametype.spawnableItemsMask &= ~uint(G_INSTAGIB_NEGATE_ITEMMASK);
@@ -517,10 +419,6 @@ void GT_InitGametype()
     // add commands
     G_RegisterCommand( "drop" );
     G_RegisterCommand( "gametype" );
-
-    // add callvotes
-    G_RegisterCallvote( "dm_allow_powerups", "1 or 0", "bool", "Enables or disables the spawning of powerups" );
-    G_RegisterCallvote( "dm_powerup_drop", "1 or 0", "bool", "Enables or disables the dropping of powerups at dying" );
 
     G_Print( "Gametype '" + gametype.title + "' initialized\n" );
 }

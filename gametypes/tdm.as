@@ -17,8 +17,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-Cvar tdmAllowPowerupDrop( "tdm_powerupDrop", "0", CVAR_ARCHIVE );
-
 ///*****************************************************************
 /// NEW MAP ENTITY DEFINITIONS
 ///*****************************************************************
@@ -70,21 +68,6 @@ void TDM_playerKilled( Entity @target, Entity @attacker, Entity @inflictor )
 
         // drop ammo pack (won't drop anything if player doesn't have any ammo)
         target.dropItem( AMMO_PACK );
-
-        if ( tdmAllowPowerupDrop.boolean )
-        {
-            if ( target.client.inventoryCount( POWERUP_QUAD ) > 0 )
-            {
-                target.dropItem( POWERUP_QUAD );
-                target.client.inventorySetCount( POWERUP_QUAD, 0 );
-            }
-
-            if ( target.client.inventoryCount( POWERUP_SHELL ) > 0 )
-            {
-                target.dropItem( POWERUP_SHELL );
-                target.client.inventorySetCount( POWERUP_SHELL, 0 );
-            }
-        }
     }
 
     // check for generic awards for the frag
@@ -164,58 +147,6 @@ bool GT_Command( Client @client, const String &cmdString, const String &argsStri
         response += "----------------\n";
 
         G_PrintMsg( client.getEnt(), response );
-        return true;
-    }
-    else if ( cmdString == "callvotevalidate" )
-    {
-        String votename = argsString.getToken( 0 );
-
-        if ( votename == "tdm_powerup_drop" )
-        {
-            String voteArg = argsString.getToken( 1 );
-            if ( voteArg.len() < 1 )
-            {
-                client.printMessage( "Callvote " + votename + " requires at least one argument\n" );
-                return false;
-            }
-
-            int value = voteArg.toInt();
-            if ( voteArg != "0" && voteArg != "1" )
-            {
-                client.printMessage( "Callvote " + votename + " expects a 1 or a 0 as argument\n" );
-                return false;
-            }
-
-            if ( voteArg == "0" && !tdmAllowPowerupDrop.boolean )
-            {
-                client.printMessage( "Powerup drop is already disallowed\n" );
-                return false;
-            }
-
-            if ( voteArg == "1" && tdmAllowPowerupDrop.boolean )
-            {
-                client.printMessage( "Powerup drop is already allowed\n" );
-                return false;
-            }
-
-            return true;
-        }
-
-        client.printMessage( "Unknown callvote " + votename + "\n" );
-        return false;
-    }
-    else if ( cmdString == "callvotepassed" )
-    {
-        String votename = argsString.getToken( 0 );
-
-        if ( votename == "tdm_powerup_drop" )
-        {
-            if ( argsString.getToken( 1 ).toInt() > 0 )
-                tdmAllowPowerupDrop.set( 1 );
-            else
-                tdmAllowPowerupDrop.set( 0 );
-        }
-
         return true;
     }
 
@@ -549,8 +480,6 @@ void GT_InitGametype()
     // add commands
     G_RegisterCommand( "drop" );
     G_RegisterCommand( "gametype" );
-
-    G_RegisterCallvote( "tdm_powerup_drop", "<1 or 0>", "bool", "Enables or disables the dropping of powerups at dying" );
 
     G_Print( "Gametype '" + gametype.title + "' initialized\n" );
 }
