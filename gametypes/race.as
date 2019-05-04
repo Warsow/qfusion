@@ -982,14 +982,17 @@ String RACE_TimeDiffString( uint time, uint reference, bool clean )
 {
     if ( reference == 0 && clean )
         return "";
-    else if ( reference == 0 )
+
+    if ( reference == 0 )
         return S_COLOR_WHITE + "--:--.---";
-    else if ( time == reference )
+
+    if ( time == reference )
         return S_COLOR_YELLOW + "+-" + RACE_TimeToString( 0 );
-    else if ( time < reference )
+
+    if ( time < reference )
         return S_COLOR_GREEN + "-" + RACE_TimeToString( reference - time );
-    else
-        return S_COLOR_RED + "+" + RACE_TimeToString( time - reference );
+
+    return S_COLOR_RED + "+" + RACE_TimeToString( time - reference );
 }
 
 void RACE_UpdateHUDTopScores()
