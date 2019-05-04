@@ -7,5 +7,6 @@ generic/matchstates.as;
 generic/bots.as;
 
 race/race.as;
+race/race_commands.as;
 
 legacy/quake1.as;
