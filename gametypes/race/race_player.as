@@ -146,14 +146,6 @@ class Player
     Position practicePosition;
     Position preRacePosition;
 
-    void setupArrays( int size )
-    {
-        this.sectorTimes.resize( size );
-        this.bestSectorTimes.resize( size );
-        this.arraysSetUp = true;
-        this.clear();
-    }
-
     void clear()
     {
         @this.client = null;
@@ -169,19 +161,23 @@ class Player
         this.heardReady = false;
         this.heardGo = false;
 
-        if ( !this.arraysSetUp )
-            return;
-
-        for ( int i = 0; i < numCheckpoints; i++ )
-        {
-            this.sectorTimes[i] = 0;
-            this.bestSectorTimes[i] = 0;
-        }
+		if( this.sectorTimes.size() != numCheckpoints )
+		{
+			this.sectorTimes.resize( numCheckpoints );
+		}
+		if( this.bestSectorTimes.size() != numCheckpoints )
+		{
+			this.bestSectorTimes.resize( numCheckpoints );
+		}
+		for ( int i = 0; i < numCheckpoints; i++ )
+		{
+			this.sectorTimes[i] = 0;
+			this.bestSectorTimes[i] = 0;
+		}
     }
 
     Player()
     {
-        this.arraysSetUp = false;
         this.clear();
     }
 
@@ -456,16 +452,11 @@ class Player
 
         str = "Current: " + RACE_TimeToString( this.finishTime );
 
-        for ( int i = 0; i < MAX_RECORDS; i++ )
+        const String @rankAsString = localRecordsStorage.getFinalRankAsString( this.finishTime );
+        if( @rankAsString != null )
         {
-            if ( !levelRecords[i].saved )
-                break;
-            if ( this.finishTime <= levelRecords[i].finishTime )
-            {
-                str += " (" + S_COLOR_GREEN + "#" + ( i + 1 ) + S_COLOR_WHITE + ")"; // extra id when on server record beating time
-                break;
-            }
-        }
+			str += " (" + S_COLOR_GREEN + "#" + rankAsString + S_COLOR_WHITE + ")";
+		}
 
         Entity @ent = this.client.getEnt();
         G_CenterPrintMsg( ent, str + "\n" + RACE_TimeDiffString( this.finishTime, this.bestFinishTime, true ) );
@@ -474,7 +465,7 @@ class Player
         this.report.addCell( "Personal:" );
         this.report.addCell( RACE_TimeDiffString( this.finishTime, this.bestFinishTime, false ) );
         this.report.addCell( "Server:" );
-        this.report.addCell( RACE_TimeDiffString( this.finishTime, levelRecords[0].finishTime, false ) );
+        this.report.addCell( RACE_TimeDiffString( this.finishTime, localRecordsStorage.getBestTime(), false ) );
         uint rows = this.report.numRows();
         for ( uint i = 0; i < rows; i++ )
             G_PrintMsg( ent, this.report.getRow( i ) + "\n" );
@@ -489,53 +480,7 @@ class Player
                 this.bestSectorTimes[i] = this.sectorTimes[i];
         }
 
-        // see if the player improved one of the top scores
-        for ( int top = 0; top < MAX_RECORDS; top++ )
-        {
-            if ( !levelRecords[top].saved || this.finishTime < levelRecords[top].finishTime )
-            {
-                String cleanName = this.client.name.removeColorTokens().tolower();
-                String login = "";
-                if ( this.client.getUserInfoKey( "cl_mm_session" ).toInt() > 0 )
-                    login = this.client.getUserInfoKey( "cl_mm_login" );
-
-                if ( top == 0 )
-                {
-                    this.client.addAward( S_COLOR_GREEN + "Server record!" );
-                    G_PrintMsg( null, this.client.name + S_COLOR_YELLOW + " set a new server record: "
-                            + S_COLOR_WHITE + RACE_TimeToString( this.finishTime ) + "\n" );
-                }
-
-                int remove = MAX_RECORDS - 1;
-                for ( int i = 0; i < MAX_RECORDS; i++ )
-                {
-                    if ( levelRecords[i].login == "" ? levelRecords[i].playerName.removeColorTokens().tolower() == cleanName : levelRecords[i].login == login )
-                    {
-                        if ( i < top )
-                        {
-                            remove = -1; // he already has a better time, don't save it
-                            break;
-                        }
-
-                        remove = i;
-                    }
-                }
-
-                if ( remove != -1 )
-                {
-                    // move the other records down
-                    for ( int i = remove; i > top; i-- )
-                        levelRecords[i].Copy( levelRecords[i - 1] );
-
-                    levelRecords[top].Store( this.client );
-
-                    RACE_WriteTopScores();
-                    RACE_UpdateHUDTopScores();
-                }
-
-                break;
-            }
-        }
+		localRecordsStorage.addCompletedRun( this );
 
         // set up for respawning the player with a delay
         Entity @respawner = G_SpawnEntity( "race_respawner" );
@@ -572,14 +517,19 @@ class Player
 
         str = "Current: " + RACE_TimeToString( this.sectorTimes[id] );
 
-        for ( int i = 0; i < MAX_RECORDS; i++ )
-        {
-            if ( this.sectorTimes[id] <= levelRecords[i].sectorTimes[id] )
-            {
-                str += " (" + S_COLOR_GREEN + "#" + ( i + 1 ) + S_COLOR_WHITE + ")"; // extra id when on server record beating time
-                break;
-            }
-        }
+		const String @sectorRank = localRecordsStorage.getSectorRankAsString( this.sectorTimes[id], id );
+		if ( @sectorRank != null )
+		{
+			// extra id when on server record beating time
+			str += " (" + S_COLOR_GREEN + "#" + sectorRank + S_COLOR_WHITE + ")";
+		}
+
+		uint topRecordTime = 0;
+		RecordTime @topRecord = localRecordsStorage.findRecordByNum( 0 );
+		if( @topRecord != null )
+		{
+			topRecordTime = topRecord.sectorTimes[id];
+		}
 
         Entity @ent = this.client.getEnt();
         G_CenterPrintMsg( ent, str + "\n" + RACE_TimeDiffString( this.sectorTimes[id], this.bestSectorTimes[id], true ) );
@@ -588,10 +538,10 @@ class Player
         this.report.addCell( "Personal:" );
         this.report.addCell( RACE_TimeDiffString( this.sectorTimes[id], this.bestSectorTimes[id], false ) );
         this.report.addCell( "Server:" );
-        this.report.addCell( RACE_TimeDiffString( this.sectorTimes[id], levelRecords[0].sectorTimes[id], false ) );
+        this.report.addCell( RACE_TimeDiffString( this.sectorTimes[id], topRecordTime, false ) );
 
         // if beating the level record on this sector give an award
-        if ( this.sectorTimes[id] < levelRecords[0].sectorTimes[id] )
+        if ( ( @topRecord == null ) || this.sectorTimes[id] < topRecord.sectorTimes[id] )
         {
             this.client.addAward( "Sector record on sector " + this.currentSector + "!" );
         }

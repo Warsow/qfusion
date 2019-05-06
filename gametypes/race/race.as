@@ -112,9 +112,15 @@ void RACE_UpdateHUDTopScores()
 {
     for ( int i = 0; i < HUD_RECORDS; i++ )
     {
-        G_ConfigString( CS_GENERAL + i, "" ); // somehow it is not shown the first time if it isn't initialized like this
-        if ( levelRecords[i].saved && levelRecords[i].playerName.length() > 0 )
-            G_ConfigString( CS_GENERAL + i, "#" + ( i + 1 ) + " - " + levelRecords[i].playerName + " - " + RACE_TimeToString( levelRecords[i].finishTime ) );
+		// Somehow it is not shown the first time if it isn't initialized like this
+		G_ConfigString( CS_GENERAL + i, "" );
+
+		RecordTime @record = localRecordsStorage.findRecordByNum( i );
+		if ( @record == null )
+			continue;
+
+		String timeString = RACE_TimeToString( record.finishTime );
+		G_ConfigString( CS_GENERAL + i, "#" + ( i + 1 ) + " - " + record.playerName + " - " + timeString );
     }
 }
 
@@ -247,27 +253,24 @@ void GT_ScoreEvent( Client @client, const String &score_event, const String &arg
     }
     else if ( score_event == "userinfochanged" )
     {
-        if ( @client != null && client.getUserInfoKey( "cl_mm_session" ).toInt() > 0 )
+        if ( @client != null )
         {
             String login = client.getUserInfoKey( "cl_mm_login" );
             if ( login != "" )
             {
-                // find out if he holds a record better than his current time
-                Player @player = RACE_GetPlayer( client );
-                for ( int i = 0; i < MAX_RECORDS; i++ )
-                {
-                    if ( !levelRecords[i].saved )
-                        break;
-                    if ( levelRecords[i].login == login
-                            && ( !player.hasTime || levelRecords[i].finishTime < player.bestFinishTime ) )
-                    {
-                        player.hasTime = true;
-                        player.bestFinishTime = levelRecords[i].finishTime;
-                        for ( int j = 0; j < numCheckpoints; j++ )
-                            player.bestSectorTimes[j] = levelRecords[i].sectorTimes[j];
-                        break;
-                    }
-                }
+				// find out if he holds a record better than his current time
+				RecordTime @record = localRecordsStorage.findRecordByLogin( login );
+				if( @record != null )
+				{
+					Player @player = RACE_GetPlayer( client );
+					if ( !player.hasTime || record.finishTime < player.bestFinishTime )
+					{
+						player.hasTime = true;
+						player.bestFinishTime = record.finishTime;
+						for ( int j = 0; j < numCheckpoints; j++ )
+							player.bestSectorTimes[j] = record.sectorTimes[j];
+					}
+				}
             }
         }
     }
@@ -371,17 +374,26 @@ void GT_ThinkRules()
             client.setHUDStat( STAT_TIME_SELF, player.raceTime() / 100 );
 
         client.setHUDStat( STAT_TIME_BEST, player.bestFinishTime / 100 );
-        client.setHUDStat( STAT_TIME_RECORD, levelRecords[0].finishTime / 100 );
 
-        client.setHUDStat( STAT_TIME_ALPHA, -9999 );
-        client.setHUDStat( STAT_TIME_BETA, -9999 );
+		RecordTime @record = localRecordsStorage.findRecordByNum( 0 );
+		if ( @record != null )
+			client.setHUDStat( STAT_TIME_RECORD, record.finishTime / 100 );
+		else
+			client.setHUDStat( STAT_TIME_RECORD, 0 );
 
-        if ( levelRecords[0].playerName.length() > 0 )
-            client.setHUDStat( STAT_MESSAGE_OTHER, CS_GENERAL );
-        if ( levelRecords[1].playerName.length() > 0 )
-            client.setHUDStat( STAT_MESSAGE_ALPHA, CS_GENERAL + 1 );
-        if ( levelRecords[2].playerName.length() > 0 )
-            client.setHUDStat( STAT_MESSAGE_BETA, CS_GENERAL + 2 );
+		client.setHUDStat( STAT_TIME_ALPHA, -9999 );
+		client.setHUDStat( STAT_TIME_BETA, -9999 );
+
+		if ( @record != null )
+			client.setHUDStat( STAT_MESSAGE_OTHER, CS_GENERAL );
+
+		@record = localRecordsStorage.findRecordByNum( 1 );
+		if ( @record != null )
+			client.setHUDStat( STAT_MESSAGE_ALPHA, CS_GENERAL + 1 );
+
+		@record = localRecordsStorage.findRecordByNum( 2 );
+		if ( @record != null )
+			client.setHUDStat( STAT_MESSAGE_BETA, CS_GENERAL + 2 );
     }
 }
 
@@ -396,8 +408,7 @@ bool GT_MatchStateFinished( int incomingMatchState )
         match.stopAutorecord();
         demoRecording = false;
 
-        // ch : also send rest of results
-        RACE_WriteTopScores();
+        localRecordsStorage.save();
 
         if ( randmap_passed != "" )
             G_CmdExecute( "map " + randmap_passed );
@@ -444,15 +455,8 @@ void GT_Shutdown()
 void GT_SpawnGametype()
 {
     //G_Print( "numCheckPoints: " + numCheckpoints + "\n" );
-
-    // setup the checkpoints arrays sizes adjusted to numCheckPoints
-    for ( int i = 0; i < maxClients; i++ )
-        players[i].setupArrays( numCheckpoints );
-
-    for ( int i = 0; i < MAX_RECORDS; i++ )
-        levelRecords[i].setupArrays( numCheckpoints );
-
-    RACE_LoadTopScores();
+    localRecordsStorage.load();
+    RACE_UpdateHUDTopScores();
 }
 
 // Important: This function is called before any entity is spawned, and
