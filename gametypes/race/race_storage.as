@@ -67,15 +67,27 @@ class RecordTime
 	}
 }
 
+/**
+ * Manages storage and retrieval of (local) race records.
+ */
 class LocalRecordsStorage
 {
 	private array<RecordTime @> records;
 
+	/**
+	 * Given a map name creates a full path in the game filesystem
+	 * for a file that should serve as a local storage on a disk.
+	 * @param mapName a name of the map. The letters case does not matter.
+	 * @return a path for the file in the game filesystem.
+	 */
 	private String @createFullPath( const String &mapName )
 	{
 		return "race/local/" + mapName.tolower() + ".txt";
 	}
 
+	/**
+	 * Loads local race records from a disk.
+	 */
 	void load()
 	{
 		Cvar mapName( "mapname", "", 0 );
@@ -155,6 +167,11 @@ class LocalRecordsStorage
 		}
 	}
 
+	/**
+	 * Tries to retrieve a local record by a player name.
+	 * @param name a player name. The letters case does not matter.
+	 * @return a reference to a found record or null if not found.
+	 */
 	RecordTime @findRecordByName( const String &name )
 	{
 		String cleanName = name.removeColorTokens().tolower();
@@ -170,6 +187,11 @@ class LocalRecordsStorage
 		return null;
 	}
 
+	/**
+	 * Tries to retrieve a local record by a MM login.
+	 * @param login a MM login. The letters case is significant.
+	 * @return a reference to a found record or null if not found.
+	 */
 	RecordTime @findRecordByLogin( const String &login )
 	{
 		for ( uint i = 0; i < records.size(); ++i )
@@ -184,16 +206,26 @@ class LocalRecordsStorage
 		return null;
 	}
 
-	RecordTime @findRecordByNum( int num )
+	/**
+	 * Tries to retrieve a local record by a numeric rank.
+	 * @param rank a rank to look a record for. Must be non-negative.
+	 * @return a reference to a found record or null if not found.
+	 */
+	RecordTime @findRecordByRank( int rank )
 	{
-		if( num < int( records.size() ) )
+		if( rank < int( records.size() ) )
 		{
-			return @records[num];
+			return @records[rank];
 		}
 
 		return null;
 	}
 
+	/**
+	 * Tries to make a string representation of a local rank for a finish time.
+	 * @param finishTime a final time of a completed run.
+	 * @return a reference to a string or null if it cannot be defined.
+	 */
 	const String @getFinalRankAsString( uint finishTime ) const
 	{
 		for ( uint i = 0; i < records.size(); ++i )
@@ -207,6 +239,12 @@ class LocalRecordsStorage
 		return null;
 	}
 
+	/**
+	 * Tries to make a string representation of a local rank for a sector time.
+	 * @param sectorTime a racing time of the sector.
+	 * @param sectorNum a number of the sector.
+	 * @return a reference to a string or null if it cannot be defined.
+	 */
 	const String @getSectorRankAsString( uint sectorTime, int sectorNum ) const
 	{
 		for ( uint i = 0; i < records.size(); ++i )
@@ -220,6 +258,10 @@ class LocalRecordsStorage
 		return null;
 	}
 
+	/**
+	 * Gets a currently best local finish time.
+	 * @return a best local time or zero if there's no records.
+	 */
 	uint getBestTime() const
 	{
 		if ( records.size() > 0 )
@@ -229,6 +271,9 @@ class LocalRecordsStorage
 		return 0;
 	}
 
+	/**
+	 * Saves local race records to a disk.
+	 */
 	void save()
 	{
 		Cvar mapName( "mapname", "", 0 );
@@ -299,7 +344,11 @@ class LocalRecordsStorage
 		}
 	}
 
-	void addCompletedRun( Player @runner )
+	/**
+	 * Registers a just completed race run if it's necessary for the records tracking.
+	 * @param runner a player that has just completed a race run.
+	 */
+	void registerCompletedRun( Player @runner )
 	{
 		// See if the runner improved one of the top scores
 		uint top = 0;
@@ -365,4 +414,7 @@ class LocalRecordsStorage
 	}
 }
 
+/**
+ * A global singleton instance of the {@code LocalRecordsStorage}.
+ */
 LocalRecordsStorage localRecordsStorage;

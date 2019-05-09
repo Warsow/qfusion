@@ -383,7 +383,7 @@ class TopCommandHandler : CommandHandler, RegistersGameCommand
 
 	bool handle( Client @client, const String &argsString, int argc ) override
 	{
-		RecordTime @top = localRecordsStorage.findRecordByNum( 0 );
+		RecordTime @top = localRecordsStorage.findRecordByRank( 0 );
 		if ( @top == null )
 		{
 			client.printMessage( S_COLOR_RED + "No records yet.\n" );
@@ -393,7 +393,7 @@ class TopCommandHandler : CommandHandler, RegistersGameCommand
 		Table table( "r r r l l" );
 		for ( int i = MAX_RECORDS - 1; i >= 0; i-- )
 		{
-			RecordTime @record = localRecordsStorage.findRecordByNum( i );
+			RecordTime @record = localRecordsStorage.findRecordByRank( i );
 			if ( @record == null )
 				continue;
 

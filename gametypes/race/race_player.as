@@ -498,7 +498,7 @@ class Player
 				this.bestSectorTimes[i] = this.sectorTimes[i];
 		}
 
-		localRecordsStorage.addCompletedRun( this );
+		localRecordsStorage.registerCompletedRun( this );
 
 		// set up for respawning the player with a delay
 		Entity @respawner = G_SpawnEntity( "race_respawner" );
@@ -543,7 +543,7 @@ class Player
 		}
 
 		uint topRecordTime = 0;
-		RecordTime @topRecord = localRecordsStorage.findRecordByNum( 0 );
+		RecordTime @topRecord = localRecordsStorage.findRecordByRank( 0 );
 		if( @topRecord != null )
 		{
 			topRecordTime = topRecord.sectorTimes[id];

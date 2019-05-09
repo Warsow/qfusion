@@ -115,7 +115,7 @@ void RACE_UpdateHUDTopScores()
 		// Somehow it is not shown the first time if it isn't initialized like this
 		G_ConfigString( CS_GENERAL + i, "" );
 
-		RecordTime @record = localRecordsStorage.findRecordByNum( i );
+		RecordTime @record = localRecordsStorage.findRecordByRank( i );
 		if ( @record == null )
 			continue;
 
@@ -375,7 +375,7 @@ void GT_ThinkRules()
 
 		client.setHUDStat( STAT_TIME_BEST, player.bestFinishTime / 100 );
 
-		RecordTime @record = localRecordsStorage.findRecordByNum( 0 );
+		RecordTime @record = localRecordsStorage.findRecordByRank( 0 );
 		if ( @record != null )
 			client.setHUDStat( STAT_TIME_RECORD, record.finishTime / 100 );
 		else
@@ -387,11 +387,11 @@ void GT_ThinkRules()
 		if ( @record != null )
 			client.setHUDStat( STAT_MESSAGE_OTHER, CS_GENERAL );
 
-		@record = localRecordsStorage.findRecordByNum( 1 );
+		@record = localRecordsStorage.findRecordByRank( 1 );
 		if ( @record != null )
 			client.setHUDStat( STAT_MESSAGE_ALPHA, CS_GENERAL + 1 );
 
-		@record = localRecordsStorage.findRecordByNum( 2 );
+		@record = localRecordsStorage.findRecordByRank( 2 );
 		if ( @record != null )
 			client.setHUDStat( STAT_MESSAGE_BETA, CS_GENERAL + 2 );
 	}
