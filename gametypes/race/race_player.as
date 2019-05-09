@@ -448,7 +448,7 @@ class Player
         this.postRace = true;
 
         // send the final time to MM
-        this.client.setRaceTime( -1, this.finishTime );
+        this.client.completeRaceRun( this.finishTime );
 
         str = "Current: " + RACE_TimeToString( this.finishTime );
 
@@ -511,7 +511,7 @@ class Player
         this.sectorTimes[id] = this.raceTime();
 
         // send this checkpoint to MM
-        this.client.setRaceTime( id, this.sectorTimes[id] );
+        this.client.setSectorTime( id, this.sectorTimes[id] );
 
         // print some output and give awards if earned
 
