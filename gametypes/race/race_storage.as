@@ -1,51 +1,51 @@
 class RecordTime
 {
 	uint position;
-    uint[] sectorTimes;
-    uint finishTime;
-    String playerName;
-    String login;
+	uint[] sectorTimes;
+	uint finishTime;
+	String playerName;
+	String login;
 
-    RecordTime()
-    {
+	RecordTime()
+	{
 		this.position = uint( -1 );
-        this.finishTime = 0;
+		this.finishTime = 0;
 
-        this.sectorTimes.resize( numCheckpoints );
-        for ( int i = 0; i < numCheckpoints; ++i )
+		this.sectorTimes.resize( numCheckpoints );
+		for ( int i = 0; i < numCheckpoints; ++i )
 			this.sectorTimes[i] = 0;
-    }
+	}
 
-    ~RecordTime() {}
+	~RecordTime() {}
 
-    void clear()
-    {
-        this.playerName = "";
-        this.login = "";
-        this.finishTime = 0;
+	void clear()
+	{
+		this.playerName = "";
+		this.login = "";
+		this.finishTime = 0;
 
-        for ( int i = 0; i < numCheckpoints; i++ )
+		for ( int i = 0; i < numCheckpoints; i++ )
 			this.sectorTimes[i] = 0;
-    }
+	}
 
-    void Copy( RecordTime &other )
-    {
-        this.finishTime = other.finishTime;
-        this.playerName = other.playerName;
-        this.login = other.login;
-        for ( int i = 0; i < numCheckpoints; i++ )
-            this.sectorTimes[i] = other.sectorTimes[i];
-    }
+	void Copy( RecordTime &other )
+	{
+		this.finishTime = other.finishTime;
+		this.playerName = other.playerName;
+		this.login = other.login;
+		for ( int i = 0; i < numCheckpoints; i++ )
+			this.sectorTimes[i] = other.sectorTimes[i];
+	}
 
-    void Store( Client @client )
-    {
-        Player @player = RACE_GetPlayer( client );
-        this.finishTime = player.finishTime;
-        this.playerName = client.name;
-        this.login = client.getUserInfoKey( "cl_mm_login" );
-        for ( int i = 0; i < numCheckpoints; i++ )
-            this.sectorTimes[i] = player.sectorTimes[i];
-    }
+	void Store( Client @client )
+	{
+		Player @player = RACE_GetPlayer( client );
+		this.finishTime = player.finishTime;
+		this.playerName = client.name;
+		this.login = client.getUserInfoKey( "cl_mm_login" );
+		for ( int i = 0; i < numCheckpoints; i++ )
+			this.sectorTimes[i] = player.sectorTimes[i];
+	}
 }
 
 class LocalRecordsStorage
@@ -66,7 +66,7 @@ class LocalRecordsStorage
 			return;
 
 		parseFileContents( fileContents );
-    }
+	}
 
 	private void parseFileContents( String &contents )
 	{
@@ -227,22 +227,22 @@ class LocalRecordsStorage
 	{
 		contents += "\"" + int( record.finishTime );
 		// optionally storing it in a token with another value provides backwards compatibility
-        if ( record.login != "" )
-        {
-            contents += "|" + record.login;
+		if ( record.login != "" )
+		{
+			contents += "|" + record.login;
 		}
 
-        contents += "\" \"" + record.playerName + "\" ";
+		contents += "\" \"" + record.playerName + "\" ";
 
-        // add the sectors
-        contents += "\"" + numCheckpoints + "\" ";
+		// add the sectors
+		contents += "\"" + numCheckpoints + "\" ";
 
-        for ( int j = 0; j < numCheckpoints; j++ )
-        {
-            contents += "\"" + record.sectorTimes[j] + "\" ";
+		for ( int j = 0; j < numCheckpoints; j++ )
+		{
+			contents += "\"" + record.sectorTimes[j] + "\" ";
 		}
 
-        contents += "\n";
+		contents += "\n";
 	}
 
 	private RecordTime @grow()
@@ -299,12 +299,12 @@ class LocalRecordsStorage
 		}
 
 		if ( top == 0 )
-        {
-            runner.client.addAward( S_COLOR_GREEN + "Server record!" );
-            // TODO: Announce that the record is contested against a world record in this case.
-            G_PrintMsg( null, runner.client.name + S_COLOR_YELLOW + " set a new server record: "
-                    + S_COLOR_WHITE + RACE_TimeToString( runner.finishTime ) + "\n" );
-        }
+		{
+			runner.client.addAward( S_COLOR_GREEN + "Server record!" );
+			// TODO: Announce that the record is contested against a world record in this case.
+			G_PrintMsg( null, runner.client.name + S_COLOR_YELLOW + " set a new server record: "
+					+ S_COLOR_WHITE + RACE_TimeToString( runner.finishTime ) + "\n" );
+		}
 
 		String login = runner.client.getUserInfoKey( "cl_mm_login" );
 
