@@ -402,6 +402,9 @@ class LocalRecordsStorage
 			this.remove( @existingRecord );
 		}
 
+		// send the final time to MM
+		runner.client.completeRaceRun( runner.finishTime );
+
 		// Make sure we have a clean addressable cell at `top`
 		this.expandAtPosition( top );
 		// Store the record at `top`

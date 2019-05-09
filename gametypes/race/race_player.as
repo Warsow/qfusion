@@ -465,9 +465,6 @@ class Player
 		this.inRace = false;
 		this.postRace = true;
 
-		// send the final time to MM
-		this.client.completeRaceRun( this.finishTime );
-
 		str = "Current: " + RACE_TimeToString( this.finishTime );
 
 		const String @rankAsString = localRecordsStorage.getFinalRankAsString( this.finishTime );
