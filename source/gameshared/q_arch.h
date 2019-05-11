@@ -192,116 +192,7 @@ typedef unsigned long ioctl_param_t;
 
 typedef uintptr_t socket_handle_t;
 
-#endif
-
-//==============================================
-
-#if defined ( __linux__ ) || defined ( __FreeBSD__ )
-
-#define HAVE_INLINE
-
-#ifndef HAVE_STRCASECMP // SDL_config.h seems to define this too...
-#define HAVE_STRCASECMP
-#endif
-
-#define HAVE_TYPEOF
-
-#define LIB_DIRECTORY "libs"
-#define LIB_PREFIX "lib"
-#define LIB_SUFFIX ".so"
-
-#ifndef __ANDROID__
-#define MUMBLE_SUPPORT
-#define OPENAL_RUNTIME
-#endif
-
-// FIXME: move these to CMakeLists.txt
-#define LIBZ_LIBNAME "libz.so.1|libz.so"
-#define LIBCURL_LIBNAME "libcurl.so.4|libcurl.so.3|libcurl.so"
-#define LIBPNG_LIBNAME "libpng16.so.16|libpng15.so.15|libpng14.so.14|libpng12.so.0|libpng.so"
-#define LIBJPEG_LIBNAME "libjpeg.so.8|libjpeg.so"
-#define LIBOGG_LIBNAME "libogg.so.0|libogg.so"
-#define LIBVORBIS_LIBNAME "libvorbis.so.0|libvorbis.so"
-#define LIBVORBISFILE_LIBNAME "libvorbisfile.so.3|libvorbisfile.so"
-#define LIBTHEORA_LIBNAME "libtheora.so.0|libtheora.so"
-#define LIBFREETYPE_LIBNAME "libfreetype.so.6|libfreetype.so"
-
-#if defined ( __FreeBSD__ )
-#define BUILDSTRING "FreeBSD"
-#define OSNAME "FreeBSD"
-#elif defined ( __ANDROID__ )
-#define BUILDSTRING "Android"
-#define OSNAME "Android"
-#else
-#define BUILDSTRING "Linux"
-#define OSNAME "Linux"
-#endif
-
-#define STEAMQUERY_OS 'l'
-
-#ifdef __i386__
-#if defined ( __FreeBSD__ )
-#define ARCH "freebsd_i386"
-#define CPUSTRING "i386"
-#elif defined ( __ANDROID__ )
-#define ARCH "android_x86"
-#define CPUSTRING "i386"
-#else
-#define ARCH "i386"
-#define CPUSTRING "i386"
-#endif
-#elif defined ( __x86_64__ )
-#if defined __FreeBSD__
-#define ARCH "freebsd_x86_64"
-#define CPUSTRING "x86_64"
-#else
-#define ARCH "x86_64"
-#define CPUSTRING "x86_64"
-#endif
-#elif defined ( __powerpc__ )
-#define ARCH "ppc"
-#define CPUSTRING "ppc"
-#elif defined ( __alpha__ )
-#define ARCH "axp"
-#define CPUSTRING "axp"
-#elif defined ( __arm__ )
-#if defined ( __ANDROID__ )
-#define ARCH "android_armeabi-v7a"
-#define CPUSTRING "arm"
-#else
-#define ARCH "arm"
-#define CPUSTRING "arm"
-#endif
-#elif defined ( _MIPS_ARCH )
-#if defined ( __ANDROID__ )
-#define ARCH "android_mips"
-#define CPUSTRING "mips"
-#else
-#define ARCH "mips"
-#define CPUSTRING "mips"
-#endif
-#else
-#define CPUSTRING "Unknown"
-#define ARCH "Unknown"
-#endif
-
-#define VAR( x ) # x
-
-#include <alloca.h>
-
-// wsw : aiwa : 64bit integers and integer-pointer types
-typedef int ioctl_param_t;
-
-typedef int socket_handle_t;
-
-#define SOCKET_ERROR ( -1 )
-#define INVALID_SOCKET ( -1 )
-
-#endif
-
-//==============================================
-
-#if defined ( __APPLE__ ) && defined ( __MACH__ )
+#elif defined ( __APPLE__ ) && defined ( __MACH__ )
 
 #ifndef __MACOSX__
 #define __MACOSX__
@@ -344,6 +235,70 @@ typedef int socket_handle_t;
 
 #include <alloca.h>
 
+typedef int ioctl_param_t;
+
+typedef int socket_handle_t;
+
+#define SOCKET_ERROR ( -1 )
+#define INVALID_SOCKET ( -1 )
+
+#else
+
+#define HAVE_INLINE
+
+#ifndef HAVE_STRCASECMP // SDL_config.h seems to define this too...
+#define HAVE_STRCASECMP
+#endif
+
+#define HAVE_TYPEOF
+
+#define LIB_DIRECTORY "libs"
+#define LIB_PREFIX "lib"
+#define LIB_SUFFIX ".so"
+
+#ifndef __ANDROID__
+#define MUMBLE_SUPPORT
+#define OPENAL_RUNTIME
+#endif
+
+// FIXME: move these to CMakeLists.txt
+#define LIBZ_LIBNAME "libz.so.1|libz.so"
+#define LIBCURL_LIBNAME "libcurl.so.4|libcurl.so.3|libcurl.so"
+#define LIBPNG_LIBNAME "libpng16.so.16|libpng15.so.15|libpng14.so.14|libpng12.so.0|libpng.so"
+#define LIBJPEG_LIBNAME "libjpeg.so.8|libjpeg.so"
+#define LIBOGG_LIBNAME "libogg.so.0|libogg.so"
+#define LIBVORBIS_LIBNAME "libvorbis.so.0|libvorbis.so"
+#define LIBVORBISFILE_LIBNAME "libvorbisfile.so.3|libvorbisfile.so"
+#define LIBTHEORA_LIBNAME "libtheora.so.0|libtheora.so"
+#define LIBFREETYPE_LIBNAME "libfreetype.so.6|libfreetype.so"
+
+#if defined ( __ANDROID__ )
+#define BUILDSTRING "Android"
+#define OSNAME "Android"
+#endif
+
+#define STEAMQUERY_OS 'l'
+
+#if defined ( __ANDROID__ )
+#ifdef __i386__
+#define ARCH "android_x86"
+#define CPUSTRING "i386"
+#elif defined ( __arm__ )
+#define ARCH "android_armeabi-v7a"
+#define CPUSTRING "arm"
+#elif defined ( _MIPS_ARCH )
+#define ARCH "android_mips"
+#define CPUSTRING "mips"
+#endif
+#endif
+
+#define VAR( x ) # x
+
+#if defined ( __linux__ )
+#include <alloca.h>
+#endif
+
+// wsw : aiwa : 64bit integers and integer-pointer types
 typedef int ioctl_param_t;
 
 typedef int socket_handle_t;

@@ -55,7 +55,7 @@ file(GLOB SERVER_SOURCES
 	"../../third-party/sqlite-amalgamation/sqlite3.c"
 )
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+if (WIN32)
     file(GLOB SERVER_PLATFORM_SOURCES 
         "../win32/win_fs.cpp"
         "../win32/win_net.cpp"
@@ -69,7 +69,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     )
 
     # Link Ole32.lib for CoCreateGUID()
-    set(SERVER_PLATFORM_LIBRARIES "ws2_32.lib" "winmm.lib" "Ole32.lib")
+    set(SERVER_PLATFORM_LIBRARIES ws2_32.lib winmm.lib Ole32.lib)
     set(SERVER_BINARY_TYPE WIN32)
 else()
     file(GLOB SERVER_PLATFORM_SOURCES 
@@ -84,7 +84,12 @@ else()
     )
 
     # Link libuuid
-    set(SERVER_PLATFORM_LIBRARIES "pthread" "dl" "m" "uuid")
+    if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+        set(SERVER_PLATFORM_LIBRARIES pthread dl m uuid)
+    else()
+        set(SERVER_PLATFORM_LIBRARIES pthread m uuid)
+    endif()
+
     set(SERVER_BINARY_TYPE "")
 endif()
 

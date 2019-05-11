@@ -2,7 +2,7 @@ project(${QFUSION_CLIENT_NAME})
 
 include_directories(${ZLIB_INCLUDE_DIR} ${CURL_INCLUDE_DIR})
 
-if (USE_SDL2 OR (${CMAKE_SYSTEM_NAME} MATCHES "Linux"))
+if (USE_SDL2 OR (UNIX AND NOT APPLE))
     include_directories(${SDL2_INCLUDE_DIR})
 endif()
 
@@ -48,7 +48,7 @@ file(GLOB CLIENT_COMMON_SOURCES
     "../../third-party/sqlite-amalgamation/sqlite3.c"
 )
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+if (WIN32)
 	file(GLOB CLIENT_PLATFORM_HEADERS
 		"../win32/resource.h"
 		"../win32/conproc.h"
@@ -78,7 +78,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
             "../win32/qfusion.rc"
         )
 
-        set(CLIENT_PLATFORM_LIBRARIES ${SDL2_LIBRARY} ${SDL2MAIN_LIBRARY} "ws2_32.lib" "winmm.lib" "Ole32.lib")
+        set(CLIENT_PLATFORM_LIBRARIES ${SDL2_LIBRARY} ${SDL2MAIN_LIBRARY} ws2_32.lib winmm.lib Ole32.lib)
     else()
         file(GLOB CLIENT_PLATFORM_SOURCES
             "../win32/win_fs.cpp"
@@ -99,15 +99,14 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
             "../win32/qfusion.rc"
         )
 
-        set(CLIENT_PLATFORM_LIBRARIES "ws2_32.lib" "winmm.lib" "Ole32.lib")
+        set(CLIENT_PLATFORM_LIBRARIES ws2_32.lib winmm.lib Ole32.lib)
     endif()
 
     set(CLIENT_BINARY_TYPE WIN32)
 
     set(BUNDLE_RESOURCES "")
-endif()
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+elseif (APPLE)
 	set(CLIENT_PLATFORM_HEADERS "")
 	
     file(GLOB CLIENT_PLATFORM_SOURCES
@@ -145,9 +144,8 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 			${QFUSION_DATA_DIR}/docs
 		)
 	endif()
-endif()
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+else()
 	set(CLIENT_PLATFORM_HEADERS "")
 
     if (USE_SDL2)
@@ -170,7 +168,11 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
             "../sdl/sdl_client.cpp"
         )
 
-        set(CLIENT_PLATFORM_LIBRARIES ${SDL2_LIBRARY} "pthread" "m" "dl" "rt" "uuid")
+        if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+            set(CLIENT_PLATFORM_LIBRARIES ${SDL2_LIBRARY} pthread m dl rt uuid)
+        else()
+            set(CLIENT_PLATFORM_LIBRARIES ${SDL2_LIBRARY} pthread m uuid)
+        endif()
     else()
         file(GLOB CLIENT_PLATFORM_SOURCES
             "../unix/unix_fs.cpp"
@@ -191,7 +193,11 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
             "../sdl/sdl_input_joy.cpp"
         )
     
-        set(CLIENT_PLATFORM_LIBRARIES ${SDL2_LIBRARY} "pthread" "dl" "m" "X11" "Xi" "Xext" "Xrandr" "rt" "uuid")
+        if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+            set(CLIENT_PLATFORM_LIBRARIES ${SDL2_LIBRARY} pthread dl m X11 Xi Xext Xrandr rt uuid)
+        else()
+            set(CLIENT_PLATFORM_LIBRARIES ${SDL2_LIBRARY} pthread m X11 Xi Xext Xrandr uuid)
+        endif()
     endif()
     set(CLIENT_BINARY_TYPE "")
 
@@ -209,7 +215,7 @@ endif()
 add_executable(${QFUSION_CLIENT_NAME} ${CLIENT_BINARY_TYPE} ${CLIENT_HEADERS} ${CLIENT_PLATFORM_HEADERS} ${CLIENT_COMMON_SOURCES} ${CLIENT_PLATFORM_SOURCES} ${BUNDLE_RESOURCES})
 add_dependencies(${QFUSION_CLIENT_NAME} angelwrap cgame cin ftlib game ref_gl snd_openal_soft ui)
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+if (APPLE)
     set_target_properties(${QFUSION_CLIENT_NAME} PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${QFUSION_MAC_INFO_PLIST})
     set_target_properties(${QFUSION_CLIENT_NAME} PROPERTIES XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@executable_path/../Frameworks @executable_path/../Resources/base @executable_path/../Resources/libs")
     set_source_files_properties(${QFUSION_MAC_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)

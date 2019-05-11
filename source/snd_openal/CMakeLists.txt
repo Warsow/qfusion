@@ -19,13 +19,11 @@ file(GLOB SND_OPENAL_SOURCES
 )
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-        set(SND_OPENAL_PLATFORM_LIBRARIES "m" "dl" "atomic")
-else ()
-        set(SND_OPENAL_PLATFORM_LIBRARIES "")
+        set(SND_OPENAL_PLATFORM_LIBRARIES m dl atomic)
 endif()
 
 # Force -O3 for GCC or Clang release builds
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR "Darwin")
+if (APPLE OR ${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     if(${CMAKE_BUILD_TYPE} MATCHES "Release")
         set_source_files_properties("snd_propagation.cpp" PROPERTIES COMPILE_FLAGS "-O3")
     endif ()

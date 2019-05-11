@@ -63,7 +63,7 @@ set(LIBROCKET_INCLUDE_DIR ${LIBROCKET_DIR}/Include)
 set(LIBROCKET_SOURCE_DIR ${LIBROCKET_DIR}/Source)
 
 # Windows specific settings
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+if (WIN32)
     set(QFUSION_WINDOWS_ARCH "x86")
 
     if ((MINGW AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64") OR (CMAKE_SIZEOF_VOID_P EQUAL 8))
@@ -103,10 +103,9 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
         set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} /MD /W4")
         set(CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL} /MD /W4")	
     endif()
-endif()
 
 # OS X specific settings
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+elseif (APPLE)
     set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD_64_BIT)")        # Compile only 64-bit version
     set(CMAKE_OSX_SYSROOT "macosx")                                # Compile with latest available OS X sdk
     set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "10.8")     # Use 10.8 as deployment target
@@ -125,10 +124,9 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
-endif()
 
-# Linux or mingw specific settings
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR MINGW)
+# Unix specific settings
+else()
     # If no build type was specified - use release build settings
     if (NOT CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE "Release")
@@ -149,7 +147,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR MINGW)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
 
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=500")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
 
     # -Wl,--as-needed
     add_common_link_flags("-Wl,--as-needed")
@@ -211,7 +209,7 @@ if (NOT GAME_MODULES_ONLY)
 endif()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR MINGW)
-    if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    if (WIN32)
         STRING(TOLOWER "win32_${QFUSION_WINDOWS_ARCH}.tar.gz" TAR_GZ_NAME)
     else()
         STRING(TOLOWER "${CMAKE_SYSTEM_NAME}_${CMAKE_SYSTEM_PROCESSOR}.tar.gz" TAR_GZ_NAME)
@@ -226,14 +224,14 @@ endif()
 
 set(DEFAULT_CMAKE_EXECUTABLE_SUFFIX "${CMAKE_EXECUTABLE_SUFFIX}")
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+if (WIN32)
     set(CMAKE_EXECUTABLE_SUFFIX "_${QFUSION_WINDOWS_ARCH}${CMAKE_EXECUTABLE_SUFFIX}")
     set(CMAKE_SHARED_LIBRARY_PREFIX "")
     set(CMAKE_SHARED_LIBRARY_SUFFIX "_${QFUSION_WINDOWS_ARCH}${CMAKE_SHARED_LIBRARY_SUFFIX}")
 endif()
 
 if (NOT GAME_MODULES_ONLY)
-    if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    if (WIN32)
         find_windows_release_libs(ZLIB_LIBRARY)
         find_windows_release_libs(CURL_LIBRARY)
         find_windows_release_libs(ANGELSCRIPT_LIBRARY)
@@ -274,14 +272,26 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Do not add 'OR MINGW' here - we need
     set(ZLIB_LIBRARY "")
     add_definitions(-DZLIB_RUNTIME)
 
-    set(CMAKE_EXECUTABLE_SUFFIX ".${CMAKE_SYSTEM_PROCESSOR}${CMAKE_EXECUTABLE_SUFFIX}")
+    add_definitions(-DBUILDSTRING="${CMAKE_SYSTEM_NAME}")
+    add_definitions(-DOSNAME="${CMAKE_SYSTEM_NAME}")
+    add_definitions(-DARCH="${CMAKE_SYSTEM_PROCESSOR}")
+    add_definitions(-DCPUSTRING="${CMAKE_SYSTEM_PROCESSOR}")
     set(CMAKE_SHARED_LIBRARY_SUFFIX "_${CMAKE_SYSTEM_PROCESSOR}${CMAKE_SHARED_LIBRARY_SUFFIX}")
-endif()
+    set(CMAKE_EXECUTABLE_SUFFIX ".${CMAKE_SYSTEM_PROCESSOR}${CMAKE_EXECUTABLE_SUFFIX}")
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+elseif (APPLE)
     set(CMAKE_SHARED_LIBRARY_SUFFIX "_mac${CMAKE_SHARED_LIBRARY_SUFFIX}")
 
     capitalize(QFUSION_CLIENT_NAME)
+
+elseif (UNIX)
+    string(TOLOWER ${CMAKE_SYSTEM_NAME} OSNAME)
+    add_definitions(-DBUILDSTRING="${CMAKE_SYSTEM_NAME}")
+    add_definitions(-DOSNAME="${CMAKE_SYSTEM_NAME}")
+    add_definitions(-DARCH="${OSNAME}_${CMAKE_SYSTEM_PROCESSOR}")
+    add_definitions(-DCPUSTRING="${CMAKE_SYSTEM_PROCESSOR}")
+    set(CMAKE_SHARED_LIBRARY_SUFFIX "_${OSNAME}_${CMAKE_SYSTEM_PROCESSOR}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    set(CMAKE_EXECUTABLE_SUFFIX ".${OSNAME}_${CMAKE_SYSTEM_PROCESSOR}${CMAKE_EXECUTABLE_SUFFIX}")
 endif()
 
 add_subdirectory(angelwrap)

@@ -28,6 +28,9 @@ FIXME:  This will be remidied once a native Mac port is complete
 #endif
 
 #include <signal.h>
+#ifndef SIGIOT
+#define SIGIOT SIGABRT
+#endif
 #include <stdlib.h>
 #include <limits.h>
 #include <sys/time.h>
@@ -43,7 +46,7 @@ FIXME:  This will be remidied once a native Mac port is complete
 #include <errno.h>
 #include <locale.h>
 
-#if defined ( __FreeBSD__ )
+#if defined ( __FreeBSD__ ) || defined ( __OpenBSD__ ) || defined ( __NetBSD__ ) || defined ( __DragonFly__ )
 #include <machine/param.h>
 #endif
 
