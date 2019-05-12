@@ -347,8 +347,9 @@ class LocalRecordsStorage
 	/**
 	 * Registers a just completed race run if it's necessary for the records tracking.
 	 * @param runner a player that has just completed a race run.
+	 * @return false if the run is not worth saving and has been rejected.
 	 */
-	void registerCompletedRun( Player @runner )
+	bool registerCompletedRun( Player @runner )
 	{
 		// See if the runner improved one of the top scores
 		uint top = 0;
@@ -363,7 +364,7 @@ class LocalRecordsStorage
 		{
 			// Prevent infinite growth of the top list
 			if ( top == MAX_RECORDS )
-				return;
+				return false;
 		}
 
 		if ( top == 0 )
@@ -391,7 +392,7 @@ class LocalRecordsStorage
 			// The runner already has a better time, don't save the new run
 			if ( existingRecord.finishTime <= runner.finishTime )
 			{
-				return;
+				return false;
 			}
 
 			// TODO: All of this is much simpler if a linked list is used.
@@ -402,9 +403,6 @@ class LocalRecordsStorage
 			this.remove( @existingRecord );
 		}
 
-		// send the final time to MM
-		runner.client.completeRaceRun( runner.finishTime );
-
 		// Make sure we have a clean addressable cell at `top`
 		this.expandAtPosition( top );
 		// Store the record at `top`
@@ -414,6 +412,8 @@ class LocalRecordsStorage
 
 		// Save the current state to a disk
 		this.save();
+
+		return true;
 	}
 }
 

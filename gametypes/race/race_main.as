@@ -394,6 +394,8 @@ void GT_ThinkRules()
 		@record = localRecordsStorage.findRecordByRank( 2 );
 		if ( @record != null )
 			client.setHUDStat( STAT_MESSAGE_BETA, CS_GENERAL + 2 );
+
+		player.checkContestedRecordStatus();
 	}
 }
 

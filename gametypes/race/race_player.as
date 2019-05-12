@@ -140,6 +140,32 @@ class Table
 	}
 }
 
+class ContestedRecord
+{
+	RunStatusQuery @query;
+	uint finalTime;
+
+	ContestedRecord( RunStatusQuery @query, uint finalTime )
+	{
+		@this.query = query;
+		this.finalTime = finalTime;
+	}
+
+	~ContestedRecord()
+	{
+		// Release the native object
+		query.deleteSelf();
+	}
+
+	bool isReady { get const { return query.isReady; } }
+
+	bool hasFailed { get const { return query.hasFailed; } }
+
+	int worldRank { get const { return query.worldRank; } }
+
+	int personalRank { get const { return query.personalRank; } }
+}
+
 class Player
 {
 	Client @client;
@@ -158,6 +184,8 @@ class Player
 
 	bool heardReady;
 	bool heardGo;
+
+	ContestedRecord @contestedRecord;
 
 	// hettoo : practicemode
 	int noclipWeapon;
@@ -495,7 +523,14 @@ class Player
 				this.bestSectorTimes[i] = this.sectorTimes[i];
 		}
 
-		localRecordsStorage.registerCompletedRun( this );
+		// if the run was not rejected by the local storage
+		if( localRecordsStorage.registerCompletedRun( this ) )
+		{
+			// Send the final time to MM.
+			// This also starts contesting the status of a completed run
+			// against global world and personal records if possible.
+			this.sendRaceRun( this.finishTime );
+		}
 
 		// set up for respawning the player with a delay
 		Entity @respawner = G_SpawnEntity( "race_respawner" );
@@ -504,6 +539,87 @@ class Player
 		respawner.count = this.client.playerNum;
 
 		G_AnnouncerSound( this.client, G_SoundIndex( "sounds/misc/timer_ploink" ), GS_MAX_TEAMS, false, null );
+	}
+
+	private void sendRaceRun( int64 time )
+	{
+		RunStatusQuery @query = this.client.completeRaceRun( time );
+		if ( @query == null )
+		{
+			return;
+		}
+
+		if ( @contestedRecord != null )
+		{
+			// Allow the old object to be garbage-collected
+			@contestedRecord = null;
+			// TODO: Put an assertion that we start contesting a better record
+		}
+
+		@contestedRecord = @ContestedRecord( query, time );
+	}
+
+	void checkContestedRecordStatus()
+	{
+		if ( @contestedRecord == null )
+		{
+			return;
+		}
+
+		if ( !contestedRecord.isReady )
+		{
+			return;
+		}
+
+		// Create a local object reference so we can still use the object in this scope
+		ContestedRecord @record = @contestedRecord;
+		// Allow the object to be garbage-collected at leaving of this method scope
+		@contestedRecord = null;
+
+		if ( record.hasFailed )
+		{
+			G_PrintMsg( client.getEnt(), S_COLOR_YELLOW + "Failed to fetch the global record status\n" );
+			// Allow the object to be garbage-collected
+			@contestedRecord = null;
+			return;
+		}
+
+		// Retrieved ranks start from 1
+		if ( record.worldRank == 1 )
+		{
+			String message = this.client.name;
+			String login = this.client.getUserInfoKey( "cl_mm_login" );
+			if ( login != "" )
+			{
+				message += S_COLOR_WHITE + "(" + S_COLOR_YELLOW + login + S_COLOR_WHITE + ")";
+			}
+
+			message += S_COLOR_CYAN + " made a new " + S_COLOR_RED;
+			message += "*** WORLD RECORD ***" + S_COLOR_CYAN + " with ";
+			message += S_COLOR_WHITE + RACE_TimeToString( record.finalTime );
+			message += S_COLOR_CYAN + "!\n";
+			G_PrintMsg( null, message );
+			return;
+		}
+
+		String message;
+		// Retrieved ranks start from 1
+		if ( record.personalRank == 1 )
+		{
+			message += S_COLOR_MAGENTA + "The time " + S_COLOR_WHITE;
+			message += RACE_TimeToString( record.finalTime );
+			message += S_COLOR_MAGENTA + " was your global personal record and ";
+			message += S_COLOR_WHITE + "#" + record.worldRank;
+			message += S_COLOR_MAGENTA + " in the world!\n";
+		}
+		else
+		{
+			message += "The time " + RACE_TimeToString( record.finalTime );
+			message += S_COLOR_WHITE + " was your global personal result ";
+			message += "#" + record.personalRank + " and #" + record.worldRank + " in the world!\n";
+		}
+
+		G_PrintMsg( client.getEnt(), message );
 	}
 
 	bool touchCheckPoint( int id )
