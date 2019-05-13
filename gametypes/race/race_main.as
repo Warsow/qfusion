@@ -396,6 +396,18 @@ void GT_ThinkRules()
 			client.setHUDStat( STAT_MESSAGE_BETA, CS_GENERAL + 2 );
 
 		player.checkContestedRecordStatus();
+
+		// Add a play time at this map if a client is racing/practicing and is running relatively fast.
+		// Note: unauthorized clients get rejected at the native engine code level.
+		if( !player.inRace && !player.practicing )
+			continue;
+
+		Vec3 velocity2D( client.getEnt().velocity );
+		velocity2D.z = 0;
+		if( velocity2D.length() < 500 )
+			continue;
+
+		client.addToRacePlayTime( frameTime );
 	}
 }
 
