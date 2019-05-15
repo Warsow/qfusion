@@ -171,6 +171,7 @@ class LocalRecordsStorage
 	 * Tries to retrieve a local record by a player name.
 	 * @param name a player name. The letters case does not matter.
 	 * @return a reference to a found record or null if not found.
+	 * @note records that have a specified MM login are excluded from retrieval.
 	 */
 	RecordTime @findRecordByName( const String &name )
 	{
@@ -178,6 +179,10 @@ class LocalRecordsStorage
 		for ( uint i = 0; i < records.size(); ++i )
 		{
 			RecordTime @record = @records[i];
+			if ( record.login != "" )
+			{
+				continue;
+			}
 			if ( record.playerName.removeColorTokens().tolower() == cleanName )
 			{
 				return @record;
