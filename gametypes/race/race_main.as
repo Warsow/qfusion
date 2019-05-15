@@ -258,18 +258,10 @@ void GT_ScoreEvent( Client @client, const String &score_event, const String &arg
 			String login = client.getUserInfoKey( "cl_mm_login" );
 			if ( login != "" )
 			{
-				// find out if he holds a record better than his current time
 				RecordTime @record = localRecordsStorage.findRecordByLogin( login );
-				if( @record != null )
+				if ( @record != null )
 				{
-					Player @player = RACE_GetPlayer( client );
-					if ( !player.hasTime || record.finishTime < player.bestFinishTime )
-					{
-						player.hasTime = true;
-						player.bestFinishTime = record.finishTime;
-						for ( int j = 0; j < numCheckpoints; j++ )
-							player.bestSectorTimes[j] = record.sectorTimes[j];
-					}
+					RACE_GetPlayer( client ).takeTimesFromRecord( record );
 				}
 			}
 		}

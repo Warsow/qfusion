@@ -229,6 +229,27 @@ class Player
 
 	~Player() {}
 
+	void takeTimesFromRecord( const RecordTime &record )
+	{
+		if ( this.hasTime && record.finishTime >= this.bestFinishTime )
+		{
+			return;
+		}
+
+		this.hasTime = true;
+		this.bestFinishTime = record.finishTime;
+
+		if( this.bestSectorTimes.size() != numCheckpoints )
+		{
+			this.bestSectorTimes.resize( numCheckpoints );
+		}
+
+		for ( int j = 0; j < numCheckpoints; j++ )
+		{
+			this.bestSectorTimes[j] = record.sectorTimes[j];
+		}
+	}
+
 	bool preRace()
 	{
 		return !this.inRace && !this.practicing && !this.postRace && this.client.team != TEAM_SPECTATOR;
