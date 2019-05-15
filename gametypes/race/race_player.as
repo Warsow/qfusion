@@ -554,10 +554,7 @@ class Player
 		}
 
 		// set up for respawning the player with a delay
-		Entity @respawner = G_SpawnEntity( "race_respawner" );
-		respawner.nextThink = levelTime + 5000;
-		@respawner.think = race_respawner_think;
-		respawner.count = this.client.playerNum;
+		this.schedulePostRaceRespawn();
 
 		G_AnnouncerSound( this.client, G_SoundIndex( "sounds/misc/timer_ploink" ), GS_MAX_TEAMS, false, null );
 	}
@@ -742,6 +739,68 @@ class Player
 		else
 			this.enterPracticeMode();
 	}
+
+	private void schedulePostRaceRespawn()
+	{
+		Entity @respawner = G_SpawnEntity( "race_respawner" );
+		respawner.nextThink = levelTime + 5000;
+		@respawner.think = race_respawner_think;
+		respawner.count = this.client.playerNum;
+	}
+
+	private void scheduleForcedRespawn()
+	{
+		Entity @respawner = G_SpawnEntity( "race_respawner" );
+		// Put some delay so catching early possible anomalies
+		// tied to this deferred execution is more likely.
+		respawner.nextThink = levelTime + 500;
+		@respawner.think = race_respawner_think2;
+		respawner.count = this.client.playerNum;
+	}
+
+	void handleUserInfoChangedEvent()
+	{
+		String login = client.getUserInfoKey( "cl_mm_login" );
+		RecordTime @record;
+		if ( login != "" )
+		{
+			@record = localRecordsStorage.findRecordByLogin( login );
+		}
+		else
+		{
+			@record = localRecordsStorage.findRecordByName( client.name );
+
+			const bool wasPreRace = this.preRace();
+			// Prevent an infinite looping at respawning at start position
+			if( !wasPreRace )
+			{
+				this.cancelRace();
+				// We should respawn the client immediately.
+				// Unfortunately this leads to an infinite recursion
+				// as the "user info changed" event is fired on respawn.
+				this.scheduleForcedRespawn();
+			}
+
+			// MM login value is the same while a client keeps connected.
+			// Identifying players by names is more troublesome.
+			// Changing a user name is like switching an account.
+			// We have to clear the player state.
+			// Hopefully it gets refilled by the found record.
+			// This could fail if the local records capacity is exceeded.
+			// Should not really be worse than it used to be
+			// (local records were not even retrieved for a connecting not loggged in clients).
+			// TODO: Check whether a name was really modified
+			// (it is not for most invocations of this events handler).
+			this.clear();
+			// Hack: Let the respawner think we're in a post race state
+			this.postRace = !wasPreRace;
+		}
+
+		if ( @record != null )
+		{
+			this.takeTimesFromRecord( record );
+		}
+	}
 }
 
 Player[] players( maxClients );
@@ -757,14 +816,35 @@ Player @RACE_GetPlayer( Client @client )
 	return player;
 }
 
-// the player has finished the race. This entity times his automatic respawning
+// TODO: Should be an anonymous function
 void race_respawner_think( Entity @respawner )
 {
 	Client @client = G_GetClient( respawner.count );
 
-	// the client may have respawned on their own, so check if they are in postRace
+	// An invocation of this callback has a substantial delay after touching the final trigger.
+	// A client might have respawned on its own and started a new run or did something else.
+	// Respawn the client only if it still in game and is in "post-race" state.
 	if ( RACE_GetPlayer( client ).postRace && client.team != TEAM_SPECTATOR )
+	{
 		client.respawn( false );
+	}
 
-	respawner.freeEntity(); // free the respawner
+	respawner.freeEntity();
+}
+
+// TODO: Should be an anonymous function
+void race_respawner_think2( Entity @respawner )
+{
+	Client @client = G_GetClient( respawner.count );
+
+	// An invocation of this callback has a small delay.
+	// However this still leaves a room for performing actions on client's own.
+	// Respawn the client only if it is still in game and is not at the start position.
+	if ( !RACE_GetPlayer( client ).preRace() && client.team != TEAM_SPECTATOR )
+	{
+		G_PrintMsg( client.getEnt(), S_COLOR_RED + "Your user info was changed. Forcing respawn...\n" );
+		client.respawn( false );
+	}
+
+	respawner.freeEntity();
 }

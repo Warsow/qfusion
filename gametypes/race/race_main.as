@@ -255,15 +255,7 @@ void GT_ScoreEvent( Client @client, const String &score_event, const String &arg
 	{
 		if ( @client != null )
 		{
-			String login = client.getUserInfoKey( "cl_mm_login" );
-			if ( login != "" )
-			{
-				RecordTime @record = localRecordsStorage.findRecordByLogin( login );
-				if ( @record != null )
-				{
-					RACE_GetPlayer( client ).takeTimesFromRecord( record );
-				}
-			}
+			RACE_GetPlayer( client ).handleUserInfoChangedEvent();
 		}
 	}
 }
