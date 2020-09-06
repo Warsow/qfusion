@@ -1,3 +1,14 @@
+[Title]
 Team Deathmatch
 
+[Flags]
+Team
+
+[BotConfig]
+FixedForMap
+
+[Maps]
+wdm1:4 wdm6:4 wdm7:8 wdm8:8 wdm9:8 wdm13:8 wdm16:6 wdm18:6 wdm19:6
+
+[Description]
 Team-vs-team game mode. The goal of a team deathmatch game is to frag as many players of the opposing team as possible until the time or frag limit is reached.

@@ -1,3 +1,14 @@
+[Title]
 Capture the Flag
 
+[Flags]
+Team
+
+[BotConfig]
+7
+
+[Maps]
+wctf1:8 wctf4:8 wctf6:8
+
+[Description]
 Team game mode where the goal is to acquire the enemy teams flag and return it to your base.

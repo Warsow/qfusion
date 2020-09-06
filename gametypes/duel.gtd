@@ -1,3 +1,14 @@
+[Title]
 Duel
 
+[Flags]
+None
+
+[BotConfig]
+1
+
+[Maps]
+wdm2 wdm3 wdm5 wdm6 wdm10 wdm11 wdm12 wdm14 wdm15 wdm17
+
+[Description]
 Duel is a 1vs1 game mode. The standard match lasts 10 minutes, if there's a draw there will be added 120 seconds overtime. The player who does the most frags wins the map.

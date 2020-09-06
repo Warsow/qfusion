@@ -1,3 +1,14 @@
+[Title]
 Clan Arena
 
+[Flags]
+Team Round
+
+[BotConfig]
+BestForMap
+
+[Maps]
+wca1:6-12
+
+[Description]
 Team game mode where you aim to eliminate the entire other team before your team dies. Clan Arena has no item pickups, you spawn with all weapons.

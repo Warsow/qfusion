@@ -1,3 +1,14 @@
+[Title]
 Deathmatch
 
+[Flags]
+None
+
+[BotConfig]
+BestForMap
+
+[Maps]
+wdm1:4-6 wdm2:3-4 wdm3:3-4 wdm5:3-4 wdm6:3-5 wdm7:7-15 wdm8:7-15 wdm9:5-8 wdm10:3-5 wdm11:3-5 wdm12:3-5 wdm13:7-15 wdm14:3-5 wdm15:3-5 wdm16:3-5 wdm17:3-5 wdm18:4-6 wdm19:4-6
+
+[Description]
 The goal of a deathmatch game is to frag as many other players as possible until the time or frag limit is reached.

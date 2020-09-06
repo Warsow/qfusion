@@ -1,3 +1,14 @@
+[Title]
 Bomb and Defuse
 
+[Flags]
+team round
+
+[BotConfig]
+9
+
+[Maps]
+wbomb1 wbomb2 wbomb4 wbomb6
+
+[Description]
 Team game mode where in which players join either the attacking team or the defending team. Each team attempts to complete their mission objective, either planting the bomb or defending the bomb site, or eliminate the opposing team.
