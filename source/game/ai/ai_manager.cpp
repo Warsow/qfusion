@@ -199,7 +199,7 @@ static struct { const char *name; const char *model; } botCharacters[] = {
 	{ "Goddess",    "monada" },
 	{ "Athena",     "monada" },
 
-	{ "Silver",     "silverclas" },
+	{ "Silver",     "silverclaw" },
 	{ "Cathy",      "silverclaw" },
 	{ "MishiMishi", "silverclaw" },
 	{ "Lobita",     "silverclaw" },
