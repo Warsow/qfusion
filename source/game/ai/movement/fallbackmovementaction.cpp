@@ -6,6 +6,7 @@
 #include "../manager.h"
 #include "../trajectorypredictor.h"
 
+/*
 void FallbackMovementAction::PlanPredictionStep( Context *context ) {
 	bool handledSpecialMovement = false;
 	if( auto *fallback = module->activeMovementScript ) {
@@ -304,6 +305,6 @@ MovementScript *FallbackMovementAction::TryFindAasBasedFallback( Context *contex
 	}
 
 	return nullptr;
-}
+}*/
 
 

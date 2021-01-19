@@ -4,6 +4,7 @@
 #include "../navigation/aaselementsmask.h"
 #include "../manager.h"
 
+/*
 class WeaponJumpableSpotDetector: public BestJumpableSpotDetector {
 public:
 	SpotAndScore *spots { nullptr };
@@ -760,4 +761,4 @@ bool WeaponJumpWeaponsTester::Exec( MovementPredictionContext *context, Schedule
 	}
 
 	return false;
-}
+}*/

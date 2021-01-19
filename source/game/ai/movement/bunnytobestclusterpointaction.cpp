@@ -1,17 +1,17 @@
 #include "bunnytobestclusterpointaction.h"
 #include "movementlocal.h"
+#include "basescript2.h"
 
-BunnyToBestFloorClusterPointAction::BunnyToBestFloorClusterPointAction( BotMovementModule *module_ )
-	: BunnyTestingMultipleLookDirsAction( module_, NAME, COLOR_RGB( 255, 0, 255 ) ) {
-	suggestedAction = &module->bunnyTestingNextReachDirsAction;
+BunnyToBestFloorClusterPointAction::BunnyToBestFloorClusterPointAction( BaseScript2 *script )
+	: BunnyTestingMultipleLookDirsAction( script, NAME, COLOR_RGB( 255, 0, 255 ) ) {
 }
 
 void BunnyToBestFloorClusterPointAction::OnApplicationSequenceStarted( MovementPredictionContext *context ) {
 	Super::OnApplicationSequenceStarted( context );
 
 	FloorClusterAreasCache *const caches[2] = {
-		&module->predictionContext.sameFloorClusterAreasCache,
-		&module->predictionContext.nextFloorClusterAreasCache
+		&m_script->m_module->m_sameFloorClusterAreasCache,
+		&m_script->m_module->m_nextFloorClusterAreasCache
 	};
 
 	bool *const testedFlags[2] = { &this->hasTestedSameCluster, &this->hasTestedNextCluster };

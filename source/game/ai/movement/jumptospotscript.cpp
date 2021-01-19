@@ -5,7 +5,7 @@
 #include "bestjumpablespotdetector.h"
 #include "../manager.h"
 #include "../bot.h"
-
+/*
 void JumpToSpotScript::Activate( const vec3_t startOrigin_,
 								 const vec3_t targetOrigin_,
 								 unsigned timeout,
@@ -746,4 +746,4 @@ MovementScript *FallbackMovementAction::TryShortcutOtherFallbackByJumping( Conte
 	auto *fallback = &module->jumpToSpotScript;
 	fallback->Activate( entityPhysicsState.Origin(), predictionResults.origin, predictionResults.millisAhead );
 	return fallback;
-}
+}*/

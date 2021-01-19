@@ -17,7 +17,7 @@ class BunnyToBestFloorClusterPointAction final : public BunnyTestingMultipleLook
 
 	void OnApplicationSequenceFailed( MovementPredictionContext *context, unsigned ) override;
 public:
-	explicit BunnyToBestFloorClusterPointAction( BotMovementModule *module_ );
+	explicit BunnyToBestFloorClusterPointAction( BaseScript2 *script );
 
 	void BeforePlanning() override {
 		Super::BeforePlanning();

@@ -4,6 +4,8 @@
 class Bot;
 class BotMovementModule;
 
+class BaseScript2;
+
 #include "predictioncontext.h"
 
 class BaseMovementAction : public MovementPredictionConstants
@@ -14,7 +16,7 @@ class BaseMovementAction : public MovementPredictionConstants
 protected:
 	// Must be set by RegisterSelf() call. We have to break a circular dependency.
 	Bot *bot { nullptr };
-	BotMovementModule *const module;
+	BaseScript2 *const m_script;
 	const char *name;
 
 	// An action could set this field in PlanPredictionStep()
@@ -45,10 +47,6 @@ protected:
 	bool stopPredictionOnEnteringWater { true };
 	bool failPredictionOnEnteringHazardImpactZone { true };
 
-	inline BaseMovementAction &DummyAction();
-	inline class FlyUntilLandingAction &FlyUntilLandingAction();
-	inline class LandOnSavedAreasAction &LandOnSavedAreasAction();
-
 	void Debug( const char *format, ... ) const;
 	// We want to have a full control over movement code assertions, so use custom ones for this class
 	inline void Assert( bool condition, const char *message = nullptr ) const;
@@ -68,8 +66,8 @@ protected:
 
 	bool HasTouchedNavEntityThisFrame( MovementPredictionContext *context );
 public:
-	inline BaseMovementAction( BotMovementModule *module_, const char *name_, int debugColor_ = 0 )
-		: module( module_ ), name( name_ ), debugColor( debugColor_ ) {
+	inline BaseMovementAction( BaseScript2 *script_, const char *name_, int debugColor_ = 0 )
+		: m_script( script_ ), name( name_ ), debugColor( debugColor_ ) {
 		RegisterSelf();
 	}
 	virtual void PlanPredictionStep( MovementPredictionContext *context ) = 0;
@@ -107,10 +105,10 @@ public:
 };
 
 #define DECLARE_MOVEMENT_ACTION_CONSTRUCTOR( name, debugColor_ ) \
-	name( BotMovementModule *module_ ) : BaseMovementAction( module_, #name, debugColor_ )
+	name( BaseScript2 *script ) : BaseMovementAction( script, #name, debugColor_ )
 
 // Lets not create excessive headers for these dummy action declarations
-
+/*
 class HandleTriggeredJumppadAction : public BaseMovementAction
 {
 public:
@@ -133,6 +131,6 @@ class FlyUntilLandingAction : public BaseMovementAction
 public:
 	DECLARE_MOVEMENT_ACTION_CONSTRUCTOR( FlyUntilLandingAction, COLOR_RGB( 0, 255, 0 ) ) {}
 	void PlanPredictionStep( MovementPredictionContext *context ) override;
-};
+};*/
 
 #endif

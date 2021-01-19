@@ -1,6 +1,7 @@
 #include "usewalkablenodescript.h"
 #include "movementlocal.h"
 
+/*
 void UseWalkableNodeScript::Activate( const vec3_t nodeOrigin_, float reachRadius_, int nodeAasAreaNum_, unsigned timeout_ ) {
 	VectorCopy( nodeOrigin_, this->nodeOrigin );
 	this->reachRadius = reachRadius_;
@@ -106,4 +107,4 @@ MovementScript *FallbackMovementAction::TryFindNearbyRampAreasFallback( Context 
 	}
 
 	return nullptr;
-}
+}*/

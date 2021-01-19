@@ -116,7 +116,18 @@ class BotMovementModule {
 	friend class FallDownScript;
 	friend class JumpOverBarrierScript;
 
+	friend class BaseScript2;
+
 	Bot *const bot;
+
+	MovementPredictionContext::PredictedPath m_sharedCachedPath;
+
+	SameFloorClusterAreasCache m_sameFloorClusterAreasCache;
+	NextFloorClusterAreasCache m_nextFloorClusterAreasCache;
+
+	BaseScript2 *m_activeScript { nullptr };
+
+	wsw::StaticVector<BaseScript2 *, 10> m_scripts;
 
 	static constexpr unsigned MAX_SAVED_AREAS = MovementPredictionContext::MAX_SAVED_LANDING_AREAS;
 	wsw::StaticVector<int, MAX_SAVED_AREAS> savedLandingAreas;
@@ -130,39 +141,35 @@ class BotMovementModule {
 	Int64Align4 lastWeaponJumpTriggeringFailedAt { 0 };
 
 	// Must be initialized before any of movement actions constructors is called
-	wsw::StaticVector<BaseMovementAction *, 20> movementActions;
+	//wsw::StaticVector<BaseMovementAction *, 20> movementActions;
 
-	FallbackMovementAction fallbackMovementAction;
-	HandleTriggeredJumppadAction handleTriggeredJumppadAction;
-	LandOnSavedAreasAction landOnSavedAreasAction;
-	RidePlatformAction ridePlatformAction;
-	SwimMovementAction swimMovementAction;
-	FlyUntilLandingAction flyUntilLandingAction;
-	CampASpotMovementAction campASpotMovementAction;
-	BunnyToStairsOrRampExitAction bunnyToStairsOrRampExitAction;
-	BunnyTestingNextReachDirsAction bunnyTestingNextReachDirsAction;
-	BunnyToBestVisibleReachAction bunnyToBestVisibleReachAction;
-	BunnyToBestFloorClusterPointAction bunnyToBestFloorClusterPointAction;
-	BunnyTestingMultipleTurnsAction bunnyTestingMultipleTurnsAction;
-	CombatDodgeSemiRandomlyToTargetAction combatDodgeSemiRandomlyToTargetAction;
-	ScheduleWeaponJumpAction scheduleWeaponJumpAction;
-	TryTriggerWeaponJumpAction tryTriggerWeaponJumpAction;
-	CorrectWeaponJumpAction correctWeaponJumpAction;
+	//FallbackMovementAction fallbackMovementAction;
+	//HandleTriggeredJumppadAction handleTriggeredJumppadAction;
+	//LandOnSavedAreasAction landOnSavedAreasAction;
+	//RidePlatformAction ridePlatformAction;
+	//SwimMovementAction swimMovementAction;
+	//FlyUntilLandingAction flyUntilLandingAction;
+	//CampASpotMovementAction campASpotMovementAction;
+	//BunnyToStairsOrRampExitAction bunnyToStairsOrRampExitAction;
+	//BunnyTestingNextReachDirsAction bunnyTestingNextReachDirsAction;
+	//BunnyToBestVisibleReachAction bunnyToBestVisibleReachAction;
+	//BunnyToBestFloorClusterPointAction bunnyToBestFloorClusterPointAction;
+	//BunnyTestingMultipleTurnsAction bunnyTestingMultipleTurnsAction;
+	//CombatDodgeSemiRandomlyToTargetAction combatDodgeSemiRandomlyToTargetAction;
+	//ScheduleWeaponJumpAction scheduleWeaponJumpAction;
+	//TryTriggerWeaponJumpAction tryTriggerWeaponJumpAction;
+	//CorrectWeaponJumpAction correctWeaponJumpAction;
 
 	BotMovementState movementState;
 
-	MovementPredictionContext predictionContext;
+	//UseWalkableNodeScript useWalkableNodeScript;
+	//UseRampExitScript useRampExitScript;
+	//UseStairsExitScript useStairsExitScript;
+	//UseWalkableTriggerScript useWalkableTriggerScript;
 
-	UseWalkableNodeScript useWalkableNodeScript;
-	UseRampExitScript useRampExitScript;
-	UseStairsExitScript useStairsExitScript;
-	UseWalkableTriggerScript useWalkableTriggerScript;
-
-	JumpToSpotScript jumpToSpotScript;
-	FallDownScript fallDownScript;
-	JumpOverBarrierScript jumpOverBarrierScript;
-
-	MovementScript *activeMovementScript { nullptr };
+	//JumpToSpotScript jumpToSpotScript;
+	//FallDownScript fallDownScript;
+	//JumpOverBarrierScript jumpOverBarrierScript;
 
 	int64_t nextRotateInputAttemptAt { 0 };
 	int64_t inputRotationBlockingTimer { 0 };
@@ -183,14 +190,6 @@ class BotMovementModule {
 	}
 public:
 	explicit BotMovementModule( Bot *bot_ );
-
-	inline void OnInterceptedPredictedEvent( int ev, int parm ) {
-		predictionContext.OnInterceptedPredictedEvent( ev, parm );
-	}
-
-	inline void OnInterceptedPMoveTouchTriggers( pmove_t *pm, const vec3_t previousOrigin ) {
-		predictionContext.OnInterceptedPMoveTouchTriggers( pm, previousOrigin );
-	}
 
 	inline void SetCampingSpot( const AiCampingSpot &campingSpot ) {
 		movementState.campingSpotState.Activate( campingSpot );
@@ -224,7 +223,7 @@ public:
 
 	void Reset() {
 		movementState.Reset();
-		activeMovementScript = nullptr;
+		m_activeScript = nullptr;
 	}
 
 	bool CanInterruptMovement() const;

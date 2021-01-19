@@ -3,6 +3,7 @@
 
 #include "movementscript.h"
 
+/*
 class FallDownScript: public MovementScript {
 	vec3_t startOrigin { 0, 0, 0 };
 	vec3_t targetOrigin { 0, 0, 0 };
@@ -26,6 +27,6 @@ public:
 	bool TryDeactivate( MovementPredictionContext *context = nullptr ) override;
 
 	void SetupMovement( MovementPredictionContext *context ) override;
-};
+};*/
 
 #endif

@@ -11,8 +11,8 @@ class BunnyToStairsOrRampExitAction: public BunnyHopAction {
 	bool TryFindAndSaveLookDir( MovementPredictionContext *context );
 	void TrySaveExitFloorCluster( MovementPredictionContext *context, int exitAreaNum );
 public:
-	explicit BunnyToStairsOrRampExitAction( BotMovementModule *module_ ):
-		BunnyHopAction( module_, "BunnyToStairsOrRampExitAction", COLOR_RGB( 0, 255, 255 ) ) {}
+	explicit BunnyToStairsOrRampExitAction( BaseScript2 *script ):
+		BunnyHopAction( script, "BunnyToStairsOrRampExitAction", COLOR_RGB( 0, 255, 255 ) ) {}
 
 	void BeforePlanning() override {
 		BunnyHopAction::BeforePlanning();

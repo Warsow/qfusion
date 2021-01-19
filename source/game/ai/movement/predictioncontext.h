@@ -67,13 +67,16 @@ struct MovementPredictionConstants {
 
 class Bot;
 class BotMovementModule;
+class BaseScript2;
 
 class MovementPredictionContext : public MovementPredictionConstants
 {
 	friend class FallbackMovementAction;
+	friend class BaseScript2;
+	friend class BotMovementModule;
 
 	Bot *const bot;
-	BotMovementModule *const module;
+	BaseScript2 *m_script;
 public:
 	// Note: We have deliberately lowered this value
 	// to prevent fruitless prediction frames that lead to an overflow anyway
@@ -95,9 +98,6 @@ public:
 		// Use the method and not a static var (the method result should be inlined w/o any static memory access)
 		static inline HitWhileRunningTestResult Failure() { return HitWhileRunningTestResult(); }
 	};
-
-	SameFloorClusterAreasCache sameFloorClusterAreasCache;
-	NextFloorClusterAreasCache nextFloorClusterAreasCache;
 private:
 	struct PredictedMovementAction {
 		AiEntityPhysicsState entityPhysicsState;
@@ -255,10 +255,6 @@ public:
 
 	FrameEvents frameEvents;
 
-	class BaseMovementAction *SuggestSuitableAction();
-	class BaseMovementAction *SuggestDefaultAction();
-	inline class BaseMovementAction *SuggestAnyAction();
-
 	inline Vec3 NavTargetOrigin() const;
 	inline float NavTargetRadius() const;
 	inline bool IsCloseToNavTarget() const;
@@ -288,7 +284,7 @@ public:
 	inline const AiAasRouteCache *RouteCache() const;
 	inline const ArrayRange<int> TravelFlags() const;
 
-	explicit MovementPredictionContext( BotMovementModule *module );
+	explicit MovementPredictionContext( Bot *bot_, BaseScript2 *script_ );
 
 	HitWhileRunningTestResult MayHitWhileRunning();
 

@@ -13,8 +13,8 @@ protected:
 
 	virtual void OnApplicationSequenceFailed( MovementPredictionContext *context, unsigned stoppedAtFrameIndex ) {};
 public:
-	BunnyTestingMultipleLookDirsAction( BotMovementModule *module_, const char *name_, int debugColor_ )
-		: BunnyHopAction( module_, name_, debugColor_ ) {}
+	BunnyTestingMultipleLookDirsAction( BaseScript2 *script, const char *name_, int debugColor_ )
+		: BunnyHopAction( script, name_, debugColor_ ) {}
 
 	void BeforePlanning() override;
 	void OnApplicationSequenceStopped( MovementPredictionContext *context,
@@ -78,8 +78,8 @@ protected:
 								AreaAndScore *candidateAreasBegin,
 								AreaAndScore *candidateAreasEnd );
 
-	BunnyTestingSavedLookDirsAction( BotMovementModule *module_, const char *name_, int debugColor_ )
-		: BunnyTestingMultipleLookDirsAction( module_, name_, debugColor_ ) {}
+	BunnyTestingSavedLookDirsAction( BaseScript2 *script, const char *name_, int debugColor_ )
+		: BunnyTestingMultipleLookDirsAction( script, name_, debugColor_ ) {}
 };
 
 #endif

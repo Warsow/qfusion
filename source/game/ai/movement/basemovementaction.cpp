@@ -1,10 +1,11 @@
 #include "basemovementaction.h"
 #include "movementlocal.h"
+#include "basescript2.h"
 
 void BaseMovementAction::RegisterSelf() {
-	bot = module->bot;
-	this->actionNum = module->movementActions.size();
-	module->movementActions.push_back( this );
+	bot = m_script->m_module->bot;
+	this->actionNum = m_script->m_actions.size();
+	m_script->m_actions.push_back( this );
 }
 
 void BaseMovementAction::Debug( const char *format, ... ) const {
@@ -94,7 +95,7 @@ void BaseMovementAction::CheckPredictionStepResults( Context *context ) {
 	}
 
 	if( stopPredictionOnEnteringWater && newEntityPhysicsState.waterLevel > 1 ) {
-		Assert( this != &module->swimMovementAction );
+		//Assert( this != &module->swimMovementAction );
 		Debug( "A prediction step has lead to entering water, should stop planning\n" );
 		context->isCompleted = true;
 		return;

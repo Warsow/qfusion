@@ -2,6 +2,7 @@
 #include "movementlocal.h"
 #include "../combat/tacticalspotsregistry.h"
 
+/*
 bool GenericGroundMovementScript::TryDeactivate( Context *context ) {
 	// This code is useful for all children and should be called first in all overridden implementations
 
@@ -333,4 +334,4 @@ bool GenericGroundMovementScript::TestActualWalkability( int targetAreaNum, cons
 	}
 
 	return true;
-}
+}*/

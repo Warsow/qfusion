@@ -1,6 +1,7 @@
 #include "jumpoverbarrierscript.h"
 #include "movementlocal.h"
 
+/*
 bool JumpOverBarrierScript::TryDeactivate( Context *context ) {
 	assert( status == PENDING );
 
@@ -113,4 +114,4 @@ void JumpOverBarrierScript::SetupMovement( Context *context ) {
 	if( !entityPhysicsState.GroundEntity() && entityPhysicsState.Velocity()[2] < 0 ) {
 		botInput->SetSpecialButton( true );
 	}
-}
+}*/

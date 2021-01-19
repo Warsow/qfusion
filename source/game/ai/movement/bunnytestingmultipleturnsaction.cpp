@@ -9,7 +9,7 @@ const float BunnyTestingMultipleTurnsAction::kAngularSpeed[kMaxAngles] = {
 void BunnyTestingMultipleTurnsAction::PlanPredictionStep( MovementPredictionContext *context ) {
 	// This action is the first applied action as it is specialized
 	// and falls back to other bunnying actions if it cannot be applied.
-	if( !GenericCheckIsActionEnabled( context, &module->fallbackMovementAction ) ) {
+	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
 	}
 

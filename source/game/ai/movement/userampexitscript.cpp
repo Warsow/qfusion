@@ -1,6 +1,7 @@
 #include "userampexitscript.h"
 #include "movementlocal.h"
 
+/*
 bool UseRampExitScript::TryDeactivate( Context *context ) {
 	// Call the superclass method first
 	if( GenericGroundMovementScript::TryDeactivate( context ) ) {
@@ -30,7 +31,7 @@ bool UseRampExitScript::TryDeactivate( Context *context ) {
 	// The bot is neither on the ramp nor in the ramp exit area
 	status = INVALID;
 	return true;
-}
+}*/
 
 const int *TryFindBestInclinedFloorExitArea( Context *context, int rampAreaNum, int forbiddenAreaNum ) {
 	const auto *aasWorld = AiAasWorld::Instance();
@@ -119,6 +120,7 @@ const int *TryFindBestInclinedFloorExitArea( Context *context, int rampAreaNum, 
 	return &aasReach[fromReachNums[bestIndex]].areanum;
 }
 
+/*
 MovementScript *FallbackMovementAction::TryFindRampFallback( Context *context, int rampAreaNum, int forbiddenAreaNum ) {
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	const int *bestExitAreaNum = TryFindBestInclinedFloorExitArea( context, rampAreaNum, forbiddenAreaNum );
@@ -158,4 +160,4 @@ MovementScript *FallbackMovementAction::TryFindRampFallback( Context *context, i
 	auto *script = &module->useRampExitScript;
 	script->Activate( rampAreaNum, *bestExitAreaNum );
 	return script;
-}
+}*/

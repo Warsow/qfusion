@@ -1,6 +1,7 @@
 #include "landonsavedareasaction.h"
 #include "movementlocal.h"
 
+/*
 int LandOnSavedAreasAction::FindJumppadAreaNum( const edict_t *jumppadEntity ) {
 	// TODO: This can be precomputed at level start
 	const auto *aasWorld = AiAasWorld::Instance();
@@ -353,7 +354,7 @@ bool LandOnSavedAreasAction::TryLandingStepOnArea( int areaNum, Context *context
 }
 
 void LandOnSavedAreasAction::PlanPredictionStep( Context *context ) {
-	if( !GenericCheckIsActionEnabled( context, &DummyAction() ) ) {
+	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
 	}
 
@@ -362,7 +363,7 @@ void LandOnSavedAreasAction::PlanPredictionStep( Context *context ) {
 		Debug( "Cannot apply action: the saved landing areas list is empty\n" );
 		this->isDisabledForPlanning = true;
 		context->cannotApplyAction = true;
-		context->actionSuggestedByAction = &DummyAction();
+		context->actionSuggestedByAction = nullptr;
 		return;
 	}
 
@@ -521,4 +522,4 @@ void LandOnSavedAreasAction::CheckPredictionStepResults( Context *context ) {
 	// Make sure that the next area (if any) will be tested after rolling back
 	totalTestedAreas++;
 	currAreaIndex = -1;
-}
+}*/

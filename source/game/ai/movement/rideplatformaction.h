@@ -3,6 +3,7 @@
 
 #include "basemovementaction.h"
 
+/*
 class RidePlatformAction : public BaseMovementAction
 {
 	friend class BotMovementModule;
@@ -39,6 +40,6 @@ private:
 
 	void SetupIdleRidingPlatformMovement( MovementPredictionContext *context, const edict_t *platform );
 	void SetupExitPlatformMovement( MovementPredictionContext *context, const edict_t *platform );
-};
+};*/
 
 #endif

@@ -10,7 +10,7 @@ class BunnyTestingNextReachDirsAction final : public BunnyTestingSavedLookDirsAc
 
 	void SaveSuggestedLookDirs( MovementPredictionContext *context ) override;
 public:
-	explicit BunnyTestingNextReachDirsAction( BotMovementModule *module_ );
+	explicit BunnyTestingNextReachDirsAction( BaseScript2 *script );
 
 	void BeforePlanning() override;
 };

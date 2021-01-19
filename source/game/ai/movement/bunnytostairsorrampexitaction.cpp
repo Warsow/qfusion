@@ -4,7 +4,7 @@
 void BunnyToStairsOrRampExitAction::PlanPredictionStep( MovementPredictionContext *context ) {
 	// This action is the first applied action as it is specialized
 	// and falls back to other bunnying actions if it cannot be applied.
-	if( !GenericCheckIsActionEnabled( context, &module->bunnyToBestFloorClusterPointAction ) ) {
+	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
 	}
 

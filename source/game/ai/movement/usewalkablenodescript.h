@@ -3,6 +3,7 @@
 
 #include "genericgroundmovementscript.h"
 
+/*
 class UseWalkableNodeScript: public GenericGroundMovementScript {
 protected:
 	vec3_t nodeOrigin { 0, 0, 0 };
@@ -23,6 +24,6 @@ public:
 	void Activate( const vec3_t nodeOrigin_, float reachRadius_, int nodeAasAreaNum_ = 0, unsigned timeout_ = 750 );
 
 	bool TryDeactivate( MovementPredictionContext *context = nullptr ) override;
-};
+};*/
 
 #endif

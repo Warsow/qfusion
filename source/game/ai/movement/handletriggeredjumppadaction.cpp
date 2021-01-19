@@ -1,8 +1,9 @@
 #include "basemovementaction.h"
 #include "movementlocal.h"
 
+/*
 void HandleTriggeredJumppadAction::PlanPredictionStep( Context *context ) {
-	if( !GenericCheckIsActionEnabled( context, &DummyAction() ) ) {
+	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
 	}
 
@@ -11,7 +12,7 @@ void HandleTriggeredJumppadAction::PlanPredictionStep( Context *context ) {
 
 	if( jumppadMovementState->hasEnteredJumppad ) {
 		context->cannotApplyAction = true;
-		context->actionSuggestedByAction = &FlyUntilLandingAction();
+		context->actionSuggestedByAction = nullptr;
 		Debug( "The bot has already processed jumppad trigger touch in the given context state, fly until landing\n" );
 		return;
 	}
@@ -26,4 +27,4 @@ void HandleTriggeredJumppadAction::PlanPredictionStep( Context *context ) {
 	context->movementState->flyUntilLandingMovementState.Activate( startLandingAtZ );
 	// Stop prediction (jumppad triggers are not simulated by Exec() code)
 	context->isCompleted = true;
-}
+}*/

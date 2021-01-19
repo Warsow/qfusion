@@ -1,6 +1,6 @@
 #include "basemovementaction.h"
 #include "movementlocal.h"
-
+/*
 void FlyUntilLandingAction::PlanPredictionStep( Context *context ) {
 	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
@@ -9,7 +9,7 @@ void FlyUntilLandingAction::PlanPredictionStep( Context *context ) {
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	if( entityPhysicsState.GroundEntity() ) {
 		context->cannotApplyAction = true;
-		context->actionSuggestedByAction = &DummyAction();
+		context->actionSuggestedByAction = nullptr;
 		Debug( "A bot has landed on a ground in the given context state\n" );
 		return;
 	}
@@ -35,4 +35,4 @@ void FlyUntilLandingAction::PlanPredictionStep( Context *context ) {
 	botInput->canOverrideLookVec = true;
 	Debug( "Planning is completed (the action should never be predicted ahead\n" );
 	context->isCompleted = true;
-}
+}*/

@@ -3,6 +3,7 @@
 
 #include "basemovementaction.h"
 
+/*
 class MovementScript;
 
 namespace wsw::ai::movement { struct NearbyTriggersCache; }
@@ -79,5 +80,6 @@ public:
 		AI_FailWith( __FUNCTION__, "This method should never get called (PlanMovmementStep() should stop planning)\n" );
 	}
 };
+*/
 
 #endif

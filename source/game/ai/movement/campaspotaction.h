@@ -3,6 +3,7 @@
 
 #include "basemovementaction.h"
 
+/*
 class CampASpotMovementAction : public BaseMovementAction
 {
 	unsigned disabledForApplicationFrameIndex;
@@ -23,6 +24,6 @@ public:
 		BaseMovementAction::BeforePlanning();
 		disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
 	}
-};
+};*/
 
 #endif

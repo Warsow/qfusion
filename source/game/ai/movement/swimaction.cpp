@@ -1,6 +1,7 @@
 #include "basemovementaction.h"
 #include "movementlocal.h"
 
+/*
 void SwimMovementAction::PlanPredictionStep( Context *context ) {
 	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
@@ -49,4 +50,4 @@ void SwimMovementAction::CheckPredictionStepResults( Context *context ) {
 		Debug( "A movement step has lead to exiting water, should stop planning\n" );
 		return;
 	}
-}
+}*/

@@ -3,6 +3,7 @@
 
 #include "movementscript.h"
 
+/*
 class JumpOverBarrierScript: public MovementScript {
 	vec3_t start { 0, 0, 0 };
 	vec3_t top { 0, 0, 0 };
@@ -23,6 +24,6 @@ public:
 	bool TryDeactivate( MovementPredictionContext *context = nullptr ) override;
 
 	void SetupMovement( MovementPredictionContext *context ) override;
-};
+};*/
 
 #endif

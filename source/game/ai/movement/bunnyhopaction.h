@@ -53,7 +53,7 @@ protected:
 
 	void SetupCommonBunnyHopInput( MovementPredictionContext *context );
 	// TODO: Mark as virtual in base class and mark as final here to avoid a warning about hiding parent member?
-	bool GenericCheckIsActionEnabled( MovementPredictionContext *context, BaseMovementAction *suggestedAction );
+	bool GenericCheckIsActionEnabled( MovementPredictionContext *context, BaseMovementAction *suggestedAction = nullptr );
 	bool CheckCommonBunnyHopPreconditions( MovementPredictionContext *context );
 	bool SetupBunnyHopping( const Vec3 &intendedLookVec, MovementPredictionContext *context );
 	bool CanFlyAboveGroundRelaxed( const MovementPredictionContext *context ) const;
@@ -86,8 +86,8 @@ protected:
 
 	bool CheckDirectReachWalkingOrFallingShort( int fromAreaNum, int toAreaNum );
 public:
-	BunnyHopAction( BotMovementModule *module_, const char *name_, int debugColor_ = 0 )
-		: BaseMovementAction( module_, name_, debugColor_ ) {
+	BunnyHopAction( BaseScript2 *script, const char *name_, int debugColor_ = 0 )
+		: BaseMovementAction( script, name_, debugColor_ ) {
 		// Do NOT stop prediction on this! We have to check where the bot is going to land!
 		BaseMovementAction::stopPredictionOnTouchingNavEntity = false;
 	}

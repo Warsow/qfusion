@@ -4,6 +4,7 @@
 #include "movementscript.h"
 #include "../navigation/aasroutecache.h"
 
+/*
 class GenericGroundMovementScript: public MovementScript {
 protected:
 	bool allowRunning { true };
@@ -38,6 +39,6 @@ public:
 	void SetupMovement( MovementPredictionContext *context ) override;
 
 	bool TryDeactivate( MovementPredictionContext *context ) override;
-};
+};*/
 
 #endif

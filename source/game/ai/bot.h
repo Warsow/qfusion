@@ -287,14 +287,6 @@ public:
 	const BotWeightConfig &WeightConfig() const { return weightConfig; }
 	BotWeightConfig &WeightConfig() { return weightConfig; }
 
-	void OnInterceptedPredictedEvent( int ev, int parm ) {
-		movementModule.OnInterceptedPredictedEvent( ev, parm );
-	}
-
-	void OnInterceptedPMoveTouchTriggers( pmove_t *pm, const vec3_t previousOrigin ) {
-		movementModule.OnInterceptedPMoveTouchTriggers( pm, previousOrigin );
-	}
-
 	const AiEntityPhysicsState *EntityPhysicsState() const {
 		return entityPhysicsState;
 	}

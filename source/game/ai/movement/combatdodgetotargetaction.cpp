@@ -1,6 +1,7 @@
 #include "combatdodgetotargetaction.h"
 #include "movementlocal.h"
 
+/*
 void CombatDodgeSemiRandomlyToTargetAction::UpdateKeyMoveDirs( Context *context ) {
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	auto *combatMovementState = &context->movementState->keyMoveDirsState;
@@ -284,4 +285,4 @@ void CombatDodgeSemiRandomlyToTargetAction::BeforePlanning() {
 	this->isCombatDashingAllowed = bot->IsCombatDashingAllowed();
 	this->isCompatCrouchingAllowed = bot->IsCombatCrouchingAllowed();
 	this->allowFailureUsingThatAsNextAction = nullptr;
-}
+}*/

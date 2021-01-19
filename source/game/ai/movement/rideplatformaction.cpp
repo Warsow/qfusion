@@ -1,6 +1,7 @@
 #include "rideplatformaction.h"
 #include "movementlocal.h"
 
+/*
 void RidePlatformAction::PlanPredictionStep( Context *context ) {
 	auto *const defaultAction = context->SuggestDefaultAction();
 	if( !GenericCheckIsActionEnabled( context, defaultAction ) ) {
@@ -328,4 +329,4 @@ void RidePlatformAction::FindExitAreas( Context *context, const edict_t *platfor
 			break;
 		}
 	}
-}
+}*/

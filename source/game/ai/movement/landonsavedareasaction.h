@@ -3,6 +3,7 @@
 
 #include "basemovementaction.h"
 
+/*
 class LandOnSavedAreasAction : public BaseMovementAction
 {
 	friend class HandleTriggeredJumppadAction;
@@ -37,6 +38,6 @@ public:
 	void CheckPredictionStepResults( MovementPredictionContext *context ) override;
 	void BeforePlanning() override;
 	void AfterPlanning() override;
-};
+};*/
 
 #endif

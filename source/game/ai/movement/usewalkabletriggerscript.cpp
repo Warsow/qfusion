@@ -2,6 +2,7 @@
 #include "movementlocal.h"
 #include "../combat/tacticalspotsregistry.h"
 
+/*
 void UseWalkableTriggerScript::GetSteeringTarget( vec3_t target ) {
 	// Triggers do not have s.origin set.
 	// Get the bounds center
@@ -156,4 +157,4 @@ const edict_t *FallbackMovementAction::FindClosestToTargetTrigger( const Closest
 	}
 
 	return nullptr;
-}
+}*/

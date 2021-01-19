@@ -1,6 +1,7 @@
 #include "usestairsexitscript.h"
 #include "movementlocal.h"
 
+/*
 bool UseStairsExitScript::TryDeactivate( Context *context ) {
 	// Call the superclass method first
 	if( GenericGroundMovementScript::TryDeactivate( context ) ) {
@@ -32,7 +33,7 @@ bool UseStairsExitScript::TryDeactivate( Context *context ) {
 	// The bot is neither in the same stairs cluster nor in the cluster exit area
 	status = INVALID;
 	return true;
-}
+}*/
 
 const uint16_t *TryFindBestStairsExitArea( Context *context, int stairsClusterNum ) {
 	const int toAreaNum = context->NavTargetAasAreaNum();
@@ -91,6 +92,7 @@ const uint16_t *TryFindBestStairsExitArea( Context *context, int stairsClusterNu
 	return stairsBoundaryAreas[bestStairsAreaIndex];
 }
 
+/*
 MovementScript *FallbackMovementAction::TryFindStairsFallback( Context *context ) {
 	const auto *aasWorld = AiAasWorld::Instance();
 
@@ -118,4 +120,4 @@ MovementScript *FallbackMovementAction::TryFindStairsFallback( Context *context 
 	auto *script = &module->useStairsExitScript;
 	script->Activate( stairsClusterNum, *bestAreaNum );
 	return script;
-}
+}*/

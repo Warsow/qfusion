@@ -1,6 +1,7 @@
 #include "campaspotaction.h"
 #include "movementlocal.h"
 
+/*
 bool CampASpotMovementAction::TryUpdateKeyMoveDirs( Context *context ) {
 	auto *campingSpotState = &context->movementState->campingSpotState;
 	if( campingSpotState->AreKeyMoveDirsValid() ) {
@@ -179,4 +180,4 @@ void CampASpotMovementAction::OnApplicationSequenceStopped( Context *context,
 	}
 
 	disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
-}
+}*/

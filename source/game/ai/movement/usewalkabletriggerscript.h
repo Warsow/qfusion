@@ -3,6 +3,7 @@
 
 #include "genericgroundmovementscript.h"
 
+/*
 class UseWalkableTriggerScript: public GenericGroundMovementScript {
 	const edict_t *trigger { nullptr };
 
@@ -17,6 +18,6 @@ public:
 	}
 
 	bool TryDeactivate( MovementPredictionContext *context = nullptr ) override;
-};
+};*/
 
 #endif

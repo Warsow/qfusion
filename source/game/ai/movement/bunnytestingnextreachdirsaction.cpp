@@ -3,10 +3,9 @@
 #include "floorclusterareascache.h"
 #include "../manager.h"
 
-BunnyTestingNextReachDirsAction::BunnyTestingNextReachDirsAction( BotMovementModule *module_ )
-	: BunnyTestingSavedLookDirsAction( module_, NAME, COLOR_RGB( 0, 192, 0 ) ) {
+BunnyTestingNextReachDirsAction::BunnyTestingNextReachDirsAction( BaseScript2 *script )
+	: BunnyTestingSavedLookDirsAction( script, NAME, COLOR_RGB( 0, 192, 0 ) ) {
 	// The constructor cannot be defined in the header due to this bot member access
-	suggestedAction = &module->bunnyToBestVisibleReachAction;
 	maxSuggestedLookDirs = kMaxSuggestedLookDirs;
 }
 

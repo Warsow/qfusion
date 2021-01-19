@@ -4,10 +4,14 @@
 #include "environmenttracecache.h"
 #include "bestjumpablespotdetector.h"
 #include "movementscript.h"
+#include "basescript2.h"
 
 BotMovementModule::BotMovementModule( Bot *bot_ )
 	: bot( bot_ )
+	, m_sameFloorClusterAreasCache( bot_ )
+	, m_nextFloorClusterAreasCache( bot_ )
 	, weaponJumpAttemptsRateLimiter( 2 )
+	/*
 	, fallbackMovementAction( this )
 	, handleTriggeredJumppadAction( this )
 	, landOnSavedAreasAction( this )
@@ -31,8 +35,10 @@ BotMovementModule::BotMovementModule( Bot *bot_ )
 	, useWalkableTriggerScript( bot_, this )
 	, jumpToSpotScript( bot_, this )
 	, fallDownScript( bot_, this )
-	, jumpOverBarrierScript( bot_, this ) {
+	, jumpOverBarrierScript( bot_, this ) */{
 	movementState.Reset();
+
+	m_scripts.push_back( new BunnyHopScript2( this ) );
 }
 
 bool BotMovementModule::CanChangeWeapons() const {
@@ -77,14 +83,30 @@ void BotMovementModule::Frame( BotInput *input ) {
 	const edict_t *self = game.edicts + bot->EntNum();
 	movementState.TryDeactivateContainedStates( self, nullptr );
 
-	if( activeMovementScript && activeMovementScript->TryDeactivate( nullptr ) ) {
-		activeMovementScript = nullptr;
+	BaseMovementAction *action = nullptr;
+	MovementActionRecord movementActionRecord;
+	if( m_activeScript ) {
+		action = m_activeScript->getActionAndRecordForCurrGameState( &movementActionRecord );
 	}
 
-	MovementActionRecord movementActionRecord;
-	BaseMovementAction *movementAction = predictionContext.GetActionAndRecordForCurrTime( &movementActionRecord );
+	if( !action ) {
+		const auto *const oldScript = m_activeScript;
+		m_activeScript = nullptr;
+		for( BaseScript2 *script : m_scripts ) {
+			if( script != oldScript ) {
+				action = script->getActionAndRecordForCurrGameState( &movementActionRecord );
+				if( action ) {
+					m_activeScript = script;
+					break;
+				}
+			}
+		}
+	}
 
-	movementAction->ExecActionRecord( &movementActionRecord, input, nullptr );
+	// TODO: Assert action
+	if( action ) {
+		action->ExecActionRecord( &movementActionRecord, input, nullptr );
+	}
 
 	CheckGroundPlatform();
 }
@@ -109,7 +131,9 @@ void BotMovementModule::CheckGroundPlatform() {
 		return;
 	}
 
-	ridePlatformAction.TrySaveExitAreas( nullptr, self->groundentity );
+	// TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	// Let the script save exit areas!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//ridePlatformAction.TrySaveExitAreas( nullptr, self->groundentity );
 }
 
 void BotMovementModule::CheckBlockingDueToInputRotation() {
@@ -387,11 +411,9 @@ void BotMovementModule::TurnInputToSide( vec3_t sideDir, int sign, BotInput *inp
 	SetupInputForTransition( input, groundEntity, sideDir );
 }
 
-MovementPredictionContext::MovementPredictionContext( BotMovementModule *module_ )
-	: bot( module_->bot )
-	, module( module_ )
-	, sameFloorClusterAreasCache( module->bot )
-	, nextFloorClusterAreasCache( module->bot )
+MovementPredictionContext::MovementPredictionContext( Bot *bot_, BaseScript2 *script_ )
+	: bot( bot_ )
+	, m_script( script_ )
 	, movementState( nullptr )
 	, record( nullptr )
 	, oldPlayerState( nullptr )

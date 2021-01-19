@@ -3,6 +3,7 @@
 
 #include "movementscript.h"
 
+/*
 class JumpToSpotScript: public MovementScript {
 protected:
 	vec3_t targetOrigin { 0, 0, 0 };
@@ -34,6 +35,6 @@ public:
 	bool TryDeactivate( MovementPredictionContext *context = nullptr ) override;
 
 	void SetupMovement( MovementPredictionContext *context ) override;
-};
+};*/
 
 #endif

@@ -1,6 +1,7 @@
 #include "predictioncontext.h"
 #include "movementlocal.h"
 #include "../frameentitiescache.h"
+#include "basescript2.h"
 
 void MovementPredictionContext::NextReachNumAndTravelTimeToNavTarget( int *reachNum, int *travelTimeToNavTarget ) {
 	*reachNum = 0;
@@ -56,12 +57,14 @@ BaseMovementAction *MovementPredictionContext::GetCachedActionAndRecordForCurrTi
 	Assert( prevPredictedAction->timestamp + prevPredictedAction->stepMillis == nextPredictedAction->timestamp );
 
 	// Fail prediction if both previous and next predicted movement states mask mismatch the current movement state
+	// TODOOOOOOOOOOOOoo
+	/*
 	const auto &actualMovementState = module->movementState;
 	if( !actualMovementState.TestActualStatesForExpectedMask( prevPredictedAction->movementStatesMask, bot ) ) {
 		if( !actualMovementState.TestActualStatesForExpectedMask( nextPredictedAction->movementStatesMask, bot ) ) {
 			return nullptr;
 		}
-	}
+	}*/
 
 	return TryCheckAndLerpActions( prevPredictedAction, nextPredictedAction, record_ );
 }
@@ -267,17 +270,16 @@ void MovementPredictionContext::ShowBuiltPlanPath( bool useActionsColor ) const 
 	}
 }
 
+static MovementPredictionContext *currPredictionContext;
+static const CMShapeList *pmoveShapeList;
+
 static void Intercepted_PredictedEvent( int entNum, int ev, int parm ) {
-	game.edicts[entNum].bot->OnInterceptedPredictedEvent( ev, parm );
+	currPredictionContext->OnInterceptedPredictedEvent( ev, parm );
 }
 
 static void Intercepted_PMoveTouchTriggers( pmove_t *pm, const vec3_t previous_origin ) {
-	game.edicts[pm->playerState->playerNum + 1].bot->OnInterceptedPMoveTouchTriggers( pm, previous_origin );
+	currPredictionContext->OnInterceptedPMoveTouchTriggers( pm, previous_origin );
 }
-
-static MovementPredictionContext *currPredictionContext;
-
-static const CMShapeList *pmoveShapeList;
 
 static void Intercepted_Trace( trace_t *t, const vec3_t start, const vec3_t mins,
 							   const vec3_t maxs, const vec3_t end,
@@ -478,7 +480,7 @@ void MovementPredictionContext::SetupStackForStep() {
 		playerStatesStack.push_back( *oldPlayerState );
 		currPlayerState = &playerStatesStack.back();
 		// Push the actual bot movement state onto top of the stack
-		botMovementStatesStack.push_back( module->movementState );
+		botMovementStatesStack.push_back( m_script->m_module->movementState );
 
 		oldStepMillis = game.frametime;
 		totalMillisAhead = 0;
@@ -510,6 +512,7 @@ void MovementPredictionContext::SetupStackForStep() {
 	topOfStack->movementStatesMask = this->movementState->GetContainedStatesMask();
 }
 
+/*
 inline BaseMovementAction *MovementPredictionContext::SuggestAnyAction() {
 	if( BaseMovementAction *action = this->SuggestSuitableAction() ) {
 		return action;
@@ -540,8 +543,9 @@ inline BaseMovementAction *MovementPredictionContext::SuggestAnyAction() {
 	}
 
 	return &module->fallbackMovementAction;
-}
+}*/
 
+/*
 BaseMovementAction *MovementPredictionContext::SuggestDefaultAction() {
 	// Do not even try using (accelerated) bunnying for easy bots.
 	// They however will still still perform various jumps,
@@ -574,8 +578,9 @@ BaseMovementAction *MovementPredictionContext::SuggestDefaultAction() {
 		}
 	}
 	return suggestedAction;
-}
+}*/
 
+/*
 BaseMovementAction *MovementPredictionContext::SuggestSuitableAction() {
 	Assert( !this->actionSuggestedByAction );
 
@@ -641,7 +646,7 @@ BaseMovementAction *MovementPredictionContext::SuggestSuitableAction() {
 	}
 
 	return &module->scheduleWeaponJumpAction;
-}
+}*/
 
 bool MovementPredictionContext::NextPredictionStep() {
 	SetupStackForStep();
@@ -650,19 +655,14 @@ bool MovementPredictionContext::NextPredictionStep() {
 	// Actions might set their custom step value (otherwise it will be set to a default one).
 	this->predictionStepMillis = 0;
 #ifdef CHECK_ACTION_SUGGESTION_LOOPS
-	Assert( module->movementActions.size() < 32 );
+	Assert( m_script->m_actions.size() < 32 );
 	uint32_t testedActionsMask = 0;
 	wsw::StaticVector<BaseMovementAction *, 32> testedActionsList;
 #endif
 
 	// Get an initial suggested a-priori action
-	BaseMovementAction *action;
-	if( this->actionSuggestedByAction ) {
-		action = this->actionSuggestedByAction;
-		this->actionSuggestedByAction = nullptr;
-	} else {
-		action = this->SuggestSuitableAction();
-	}
+	unsigned actionNum = 0;
+	BaseMovementAction *action = m_script->m_actions[actionNum];
 
 #ifdef CHECK_ACTION_SUGGESTION_LOOPS
 	testedActionsMask |= ( 1 << action->ActionNum() );
@@ -710,35 +710,7 @@ bool MovementPredictionContext::NextPredictionStep() {
 		}
 
 		if( this->cannotApplyAction ) {
-			// If current action suggested an alternative, use it
-			// Otherwise use the generic suggestion algorithm
-			if( this->actionSuggestedByAction ) {
-				Debug( "Cannot apply %s, but it has suggested %s\n", action->Name(), this->actionSuggestedByAction->Name() );
-				action = this->actionSuggestedByAction;
-				this->actionSuggestedByAction = nullptr;
-			} else {
-				auto *rejectedAction = action;
-				action = this->SuggestAnyAction();
-				Debug( "Cannot apply %s, using %s suggested by SuggestSuitableAction()\n", rejectedAction->Name(), action->Name() );
-			}
-
-#ifdef CHECK_ACTION_SUGGESTION_LOOPS
-			if( testedActionsMask & ( 1 << action->ActionNum() ) ) {
-				Debug( "List of actions suggested (and tested) this frame #%d:\n", this->topOfStackIndex );
-				for( unsigned i = 0; i < testedActionsList.size(); ++i ) {
-					if( Q_stricmp( testedActionsList[i]->Name(), action->Name() ) ) {
-						Debug( "  %02d: %s\n", i, testedActionsList[i]->Name() );
-					} else {
-						Debug( ">>%02d: %s\n", i, testedActionsList[i]->Name() );
-					}
-				}
-
-				AI_FailWith( __FUNCTION__, "An infinite action application loop has been detected\n" );
-			}
-			testedActionsMask |= ( 1 << action->ActionNum() );
-			testedActionsList.push_back( action );
-#endif
-			// Test next action. Action switch will be handled by the logic above before calling action->PlanPredictionStep().
+			action = m_script->m_actions[++actionNum];
 			continue;
 		}
 
@@ -825,7 +797,7 @@ bool MovementPredictionContext::NextPredictionStep() {
 }
 
 void MovementPredictionContext::BuildPlan() {
-	for( auto *movementAction: module->movementActions )
+	for( auto *movementAction: m_script->m_actions )
 		movementAction->BeforePlanning();
 
 	// Intercept these calls implicitly performed by PMove()
@@ -854,9 +826,9 @@ void MovementPredictionContext::BuildPlan() {
 	const auto savedPlayerState = self->r.client->ps;
 	const auto savedPMove = self->r.client->old_pmove;
 
-	Assert( self->bot->entityPhysicsState == &module->movementState.entityPhysicsState );
+	Assert( self->bot->entityPhysicsState == &m_script->m_module->movementState.entityPhysicsState );
 	// Save current entity physics state (it will be modified even for a single prediction step)
-	const AiEntityPhysicsState currEntityPhysicsState = module->movementState.entityPhysicsState;
+	const AiEntityPhysicsState currEntityPhysicsState = m_script->m_module->movementState.entityPhysicsState;
 
 	// Remember to reset these values before each planning session
 	this->totalMillisAhead = 0;
@@ -922,11 +894,11 @@ void MovementPredictionContext::BuildPlan() {
 	Assert( !std::memcmp( &self->r.client->old_pmove, &savedPMove, sizeof( savedPMove ) ) );
 
 	// Set first predicted movement state as the current bot movement state
-	module->movementState = botMovementStatesStack[0];
+	m_script->m_module->movementState = botMovementStatesStack[0];
 	// Even the first predicted movement state usually has modified physics state, restore it to a saved value
-	module->movementState.entityPhysicsState = currEntityPhysicsState;
+	m_script->m_module->movementState.entityPhysicsState = currEntityPhysicsState;
 	// Restore the current entity physics state reference in Ai subclass
-	self->bot->entityPhysicsState = &module->movementState.entityPhysicsState;
+	self->bot->entityPhysicsState = &m_script->m_module->movementState.entityPhysicsState;
 	// These assertions helped to find an annoying bug during development
 	Assert( VectorCompare( self->s.origin, self->bot->entityPhysicsState->Origin() ) );
 	Assert( VectorCompare( self->velocity, self->bot->entityPhysicsState->Velocity() ) );
@@ -934,7 +906,7 @@ void MovementPredictionContext::BuildPlan() {
 	module_PMoveTouchTriggers = general_PMoveTouchTriggers;
 	module_PredictedEvent = general_PredictedEvent;
 
-	for( auto *movementAction: module->movementActions )
+	for( auto *movementAction: m_script->m_actions )
 		movementAction->AfterPlanning();
 
 	// We must have at least a single predicted action (maybe dummy one)
@@ -956,11 +928,11 @@ void MovementPredictionContext::NextMovementStep() {
 	// Make sure we're modify botInput/entityPhysicsState before copying to ucmd
 
 	// Corresponds to Bot::Think();
-	module->ApplyPendingTurnToLookAtPoint( botInput, this );
+	m_script->m_module->ApplyPendingTurnToLookAtPoint( botInput, this );
 	// Corresponds to module->Frame();
 	this->activeAction->ExecActionRecord( this->record, botInput, this );
 	// Corresponds to Bot::Think();
-	module->ApplyInput( botInput, this );
+	m_script->m_module->ApplyInput( botInput, this );
 
 	// ExecActionRecord() call in SimulateMockBotFrame() might fail or complete the planning execution early.
 	// Do not call PMove() in these cases

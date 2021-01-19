@@ -21,7 +21,7 @@ struct Walker : public ReachChainWalker {
 };
 
 void BunnyToBestVisibleReachAction::PlanPredictionStep( Context *context ) {
-	if( !GenericCheckIsActionEnabled( context, &module->bunnyTestingMultipleTurnsAction ) ) {
+	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
 	}
 

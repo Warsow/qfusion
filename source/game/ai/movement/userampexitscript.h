@@ -3,6 +3,7 @@
 
 #include "genericgroundmovementscript.h"
 
+/*
 class UseRampExitScript: public GenericGroundMovementScript {
 	int rampAreaNum { 0 };
 	int exitAreaNum { 0 };
@@ -22,6 +23,7 @@ public:
 
 	bool TryDeactivate( MovementPredictionContext *context = nullptr ) override;
 };
+*/
 
 const int *TryFindBestInclinedFloorExitArea( MovementPredictionContext *context,
 											 int rampAreaNum,

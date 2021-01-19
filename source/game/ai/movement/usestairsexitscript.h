@@ -3,6 +3,7 @@
 
 #include "genericgroundmovementscript.h"
 
+/*
 class UseStairsExitScript: public GenericGroundMovementScript {
 	int stairsClusterNum { 0 };
 	int exitAreaNum { 0 };
@@ -21,7 +22,7 @@ public:
 	}
 
 	bool TryDeactivate( MovementPredictionContext *context = nullptr ) override;
-};
+};*/
 
 const uint16_t *TryFindBestStairsExitArea( MovementPredictionContext *context, int stairsClusterNum );
 

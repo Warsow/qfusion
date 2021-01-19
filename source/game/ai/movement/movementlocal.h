@@ -274,25 +274,6 @@ inline unsigned MovementPredictionContext::MillisAheadForFrameStart( unsigned fr
 	return totalMillisAhead;
 }
 
-inline BaseMovementAction &BaseMovementAction::DummyAction() {
-	// We have to check the combat action since it might be disabled due to planning stack overflow.
-	if( bot->ShouldKeepXhairOnEnemy() && bot->GetSelectedEnemies().AreValid() ) {
-		if( !module->combatDodgeSemiRandomlyToTargetAction.IsDisabledForPlanning() ) {
-			return module->combatDodgeSemiRandomlyToTargetAction;
-		}
-	}
-
-	return module->fallbackMovementAction;
-}
-
-inline FlyUntilLandingAction &BaseMovementAction::FlyUntilLandingAction() {
-	return module->flyUntilLandingAction;
-}
-
-inline LandOnSavedAreasAction &BaseMovementAction::LandOnSavedAreasAction() {
-	return module->landOnSavedAreasAction;
-}
-
 inline bool BaseMovementAction::GenericCheckIsActionEnabled( MovementPredictionContext *context,
 															 BaseMovementAction *suggestedAction ) const {
 	// Put likely case first

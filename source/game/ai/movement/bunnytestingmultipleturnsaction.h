@@ -13,8 +13,8 @@ class BunnyTestingMultipleTurnsAction : public BunnyHopAction {
 
 	static const float kAngularSpeed[kMaxAngles];
 public:
-	explicit BunnyTestingMultipleTurnsAction( BotMovementModule *module_ )
-		: BunnyHopAction( module_, "BunnyTestingMultipleTurnsAction", COLOR_RGB( 255, 0, 0 ) ) {}
+	explicit BunnyTestingMultipleTurnsAction( BaseScript2 *script )
+		: BunnyHopAction( script, "BunnyTestingMultipleTurnsAction", COLOR_RGB( 255, 0, 0 ) ) {}
 
 	void PlanPredictionStep( MovementPredictionContext *context ) override;
 

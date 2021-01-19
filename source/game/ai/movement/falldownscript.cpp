@@ -1,6 +1,7 @@
 #include "falldownscript.h"
 #include "movementlocal.h"
 
+/*
 bool FallDownScript::TryDeactivate( Context *context ) {
 	assert( status == PENDING );
 
@@ -123,4 +124,4 @@ MovementScript *FallbackMovementAction::TryFindWalkOffLedgeReachFallback( Contex
 	unsigned fallingTimeMillis = (unsigned)( 1000.0f * sqrtf( 2.0f * sqrtf( squareFallingHeight ) / level.gravity ) );
 	script->Activate( nextReach.start, targetOrigin.Data(), travelTimeToLedgeMillis + fallingTimeMillis + 250, 24.0f );
 	return script;
-}
+}*/
