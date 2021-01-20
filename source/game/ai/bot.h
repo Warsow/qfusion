@@ -101,6 +101,8 @@ class Bot: public Ai {
 	friend class FallbackMovementAction;
 	friend class CorrectWeaponJumpAction;
 
+	friend class BaseScript2;
+
 	friend class CachedTravelTimesMatrix;
 
 	template <typename T> friend auto wsw::link( T *, T **, int ) -> T *;

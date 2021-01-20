@@ -24,233 +24,6 @@ void MovementPredictionContext::NextReachNumAndTravelTimeToNavTarget( int *reach
 	}
 }
 
-BaseMovementAction *MovementPredictionContext::GetCachedActionAndRecordForCurrTime( MovementActionRecord *record_ ) {
-	const int64_t realTime = game.realtime;
-	PredictedMovementAction *prevPredictedAction = nullptr;
-	PredictedMovementAction *nextPredictedAction = nullptr;
-	for( PredictedMovementAction &predictedAction: predictedMovementActions ) {
-		if( predictedAction.timestamp >= realTime ) {
-			nextPredictedAction = &predictedAction;
-			break;
-		}
-		prevPredictedAction = &predictedAction;
-	}
-
-	if( !nextPredictedAction ) {
-		Debug( "Cannot use predicted movement action: next one (its timestamp is not in the past) cannot be found\n" );
-		return nullptr;
-	}
-
-	if( !prevPredictedAction ) {
-		// If there were no activated actions, the next state must be recently computed for current level time.
-		Assert( nextPredictedAction->timestamp == realTime );
-		// These assertions have already spotted a bug
-		const auto *self = game.edicts + bot->EntNum();
-		Assert( VectorCompare( nextPredictedAction->entityPhysicsState.Origin(), self->s.origin ) );
-		Assert( VectorCompare( nextPredictedAction->entityPhysicsState.Velocity(), self->velocity ) );
-		// If there is a modified velocity, it will be copied with this record and then applied
-		*record_ = nextPredictedAction->record;
-		Debug( "Using just computed predicted movement action %s\n", nextPredictedAction->action->Name() );
-		return nextPredictedAction->action;
-	}
-
-	Assert( prevPredictedAction->timestamp + prevPredictedAction->stepMillis == nextPredictedAction->timestamp );
-
-	// Fail prediction if both previous and next predicted movement states mask mismatch the current movement state
-	// TODOOOOOOOOOOOOoo
-	/*
-	const auto &actualMovementState = module->movementState;
-	if( !actualMovementState.TestActualStatesForExpectedMask( prevPredictedAction->movementStatesMask, bot ) ) {
-		if( !actualMovementState.TestActualStatesForExpectedMask( nextPredictedAction->movementStatesMask, bot ) ) {
-			return nullptr;
-		}
-	}*/
-
-	return TryCheckAndLerpActions( prevPredictedAction, nextPredictedAction, record_ );
-}
-
-BaseMovementAction *MovementPredictionContext::TryCheckAndLerpActions( PredictedMovementAction *prevAction,
-	                                                                   PredictedMovementAction *nextAction,
-	                                                                   MovementActionRecord *record_ ) {
-	const int64_t realTime = game.realtime;
-
-	// Check whether predicted action is valid for an actual bot entity physics state
-	auto checkLerpFrac = (float)( realTime - prevAction->timestamp );
-	checkLerpFrac *= 1.0f / ( nextAction->timestamp - prevAction->timestamp );
-	Assert( checkLerpFrac > 0 && checkLerpFrac <= 1.0f );
-
-	const char *format =
-		"Prev predicted action timestamp is " PRId64 ", "
-		"next predicted action is " PRId64 ", real time is %" PRId64 "\n";
-
-	Debug( format, prevAction->timestamp, nextAction->timestamp, level.time );
-	Debug( "Should interpolate entity physics state using fraction %f\n", checkLerpFrac );
-
-	// Prevent cache invalidation on each frame if bot is being hit by a continuous fire weapon and knocked back.
-	// Perform misprediction test only on the 3rd frame after a last knockback timestamp.
-	if( level.time - bot->lastKnockbackAt <= 32 ) {
-		return LerpActionRecords( prevAction, nextAction, record_ );
-	}
-
-	if( !CheckPredictedOrigin( prevAction, nextAction, checkLerpFrac ) ) {
-		return nullptr;
-	}
-
-	if( !CheckPredictedVelocity( prevAction, nextAction, checkLerpFrac ) ) {
-		return nullptr;
-	}
-
-	if( !CheckPredictedAngles( prevAction, nextAction, checkLerpFrac ) ) {
-		return nullptr;
-	}
-
-	return LerpActionRecords( prevAction, nextAction, record_ );
-}
-
-bool MovementPredictionContext::CheckPredictedOrigin( PredictedMovementAction *prevAction,
-													  PredictedMovementAction *nextAction,
-													  float checkLerpFrac ) {
-	const auto &prevPhysicsState = prevAction->entityPhysicsState;
-	const auto &nextPhysicsState = nextAction->entityPhysicsState;
-
-	vec3_t expectedOrigin;
-	VectorLerp( prevPhysicsState.Origin(), checkLerpFrac, nextPhysicsState.Origin(), expectedOrigin );
-	float squareDistanceMismatch = DistanceSquared( bot->Origin(), expectedOrigin );
-	if( squareDistanceMismatch < 3.0f * 3.0f ) {
-		return true;
-	}
-
-	float distanceMismatch = Q_Sqrt( squareDistanceMismatch );
-	const char *format_ = "Cannot use predicted movement action: distance mismatch %f is too high for lerp frac %f\n";
-	Debug( format_, distanceMismatch, checkLerpFrac );
-	return false;
-}
-
-bool MovementPredictionContext::CheckPredictedVelocity( PredictedMovementAction *prevAction,
-														PredictedMovementAction *nextAction,
-														float checkLerpFrac ) {
-	const auto &prevPhysicsState = prevAction->entityPhysicsState;
-	const auto &nextPhysicsState = nextAction->entityPhysicsState;
-
-	float expectedSpeed = ( 1.0f - checkLerpFrac ) * prevPhysicsState.Speed() + checkLerpFrac * nextPhysicsState.Speed();
-	float actualSpeed = bot->EntityPhysicsState()->Speed();
-	float mismatch = std::abs( actualSpeed - expectedSpeed );
-
-	if( mismatch > 5.0f ) {
-		Debug( "Expected speed: %.1f, actual speed: %.1f, speed mismatch: %.1f\n", expectedSpeed, actualSpeed, mismatch );
-		Debug( "Cannot use predicted movement action: speed mismatch is too high\n" );
-		return false;
-	}
-
-	if( actualSpeed < 30.0f ) {
-		return true;
-	}
-
-	vec3_t expectedVelocity;
-	VectorLerp( prevPhysicsState.Velocity(), checkLerpFrac, nextPhysicsState.Velocity(), expectedVelocity );
-	Vec3 expectedVelocityDir( expectedVelocity );
-	expectedVelocityDir.Normalize();
-	Vec3 actualVelocityDir( bot->Velocity() );
-	actualVelocityDir.Normalize();
-
-	float cosine = expectedVelocityDir.Dot( actualVelocityDir );
-	static const float MIN_COSINE = std::cos( (float) DEG2RAD( 3.0f ) );
-	if( cosine > MIN_COSINE ) {
-		return true;
-	}
-
-	Debug( "An angle between expected and actual velocities is %f degrees\n", RAD2DEG( std::acos( cosine ) ) );
-	Debug( "Cannot use predicted movement action:  expected and actual velocity directions differ significantly\n" );
-	return false;
-}
-
-bool MovementPredictionContext::CheckPredictedAngles( PredictedMovementAction *prevAction,
-													  PredictedMovementAction *nextAction,
-													  float checkLerpFrac ) {
-	if( nextAction->record.botInput.canOverrideLookVec ) {
-		return true;
-	}
-
-	Vec3 prevStateAngles( prevAction->entityPhysicsState.Angles() );
-	Vec3 nextStateAngles( nextAction->entityPhysicsState.Angles() );
-
-	vec3_t expectedAngles;
-	for( int i : { YAW, ROLL } ) {
-		expectedAngles[i] = LerpAngle( prevStateAngles.Data()[i], nextStateAngles.Data()[i], checkLerpFrac );
-	}
-
-	if( !nextAction->record.botInput.canOverridePitch ) {
-		expectedAngles[PITCH] = LerpAngle( prevStateAngles.Data()[PITCH], nextStateAngles.Data()[PITCH], checkLerpFrac );
-	} else {
-		expectedAngles[PITCH] = game.edicts[bot->EntNum()].s.angles[PITCH];
-	}
-
-	vec3_t expectedLookDir;
-	AngleVectors( expectedAngles, expectedLookDir, nullptr, nullptr );
-	float cosine = bot->EntityPhysicsState()->ForwardDir().Dot( expectedLookDir );
-	static const float MIN_COSINE = std::cos( (float)DEG2RAD( 3.0f ) );
-	if( cosine > MIN_COSINE ) {
-		return true;
-	}
-
-	Debug( "An angle between and actual look directions is %f degrees\n", RAD2DEG( std::acos( cosine ) ) );
-	Debug( "Cannot use predicted movement action: expected and actual look directions differ significantly\n" );
-	return false;
-}
-
-BaseMovementAction *MovementPredictionContext::LerpActionRecords( PredictedMovementAction *prevAction,
-																  PredictedMovementAction *nextAction,
-																  MovementActionRecord *record_ ) {
-	const int64_t realTime = game.realtime;
-
-	// If next predicted state is likely to be completed next frame, use its input as-is (except the velocity)
-	if( nextAction->timestamp - realTime <= game.frametime ) {
-		*record_ = nextAction->record;
-		// Apply modified velocity only once for an exact timestamp
-		if( nextAction->timestamp != realTime ) {
-			record_->hasModifiedVelocity = false;
-		}
-		return nextAction->action;
-	}
-
-	const float inputLerpFrac = game.frametime / ( (float)( nextAction->timestamp - realTime ) );
-	Assert( inputLerpFrac > 0 && inputLerpFrac <= 1.0f );
-	// If next predicted time is likely to be pending next frame again, interpolate input for a single frame ahead
-	*record_ = nextAction->record;
-	// Prevent applying a modified velocity from the new state
-	record_->hasModifiedVelocity = false;
-
-	if( !record_->botInput.canOverrideLookVec ) {
-		Vec3 actualLookDir( bot->EntityPhysicsState()->ForwardDir() );
-		Vec3 intendedLookVec( record_->botInput.IntendedLookDir() );
-		VectorLerp( actualLookDir.Data(), inputLerpFrac, intendedLookVec.Data(), intendedLookVec.Data() );
-		record_->botInput.SetIntendedLookDir( intendedLookVec );
-	}
-
-	auto prevRotationMask = (unsigned)prevAction->record.botInput.allowedRotationMask;
-	auto nextRotationMask = (unsigned)nextAction->record.botInput.allowedRotationMask;
-	record_->botInput.allowedRotationMask = (BotInputRotation)( prevRotationMask & nextRotationMask );
-
-	return nextAction->action;
-}
-
-BaseMovementAction *MovementPredictionContext::GetActionAndRecordForCurrTime( MovementActionRecord *record_ ) {
-	auto *action = GetCachedActionAndRecordForCurrTime( record_ );
-	if( !action ) {
-		BuildPlan();
-#if 0
-		// Enabling this should be accompanied by setting sv_pps 62 to prevent running out of entities
-		ShowBuiltPlanPath();
-#endif
-		action = GetCachedActionAndRecordForCurrTime( record_ );
-	}
-
-#if 0
-	AITools_DrawColorLine( bot->Origin(), ( Vec3( 0, 0, 48 ) + bot->Origin() ).Data(), action->DebugColor(), 0 );
-#endif
-	return action;
-}
-
 void MovementPredictionContext::ShowBuiltPlanPath( bool useActionsColor ) const {
 	for( unsigned i = 0, j = 1; j < predictedMovementActions.size(); ++i, ++j ) {
 
@@ -428,7 +201,6 @@ void MovementPredictionContext::SetupStackForStep() {
 		Assert( botMovementStatesStack.size() == predictedMovementActions.size() );
 		Assert( playerStatesStack.size() == predictedMovementActions.size() );
 
-		Assert( defaultBotInputsCachesStack.Size() == predictedMovementActions.size() );
 		Assert( mayHitWhileRunningCachesStack.Size() == predictedMovementActions.size() );
 		Assert( environmentTestResultsStack.size() == predictedMovementActions.size() );
 
@@ -442,7 +214,6 @@ void MovementPredictionContext::SetupStackForStep() {
 			botMovementStatesStack.truncate( topOfStackIndex );
 			playerStatesStack.truncate( topOfStackIndex );
 
-			defaultBotInputsCachesStack.PopToSize( topOfStackIndex );
 			mayHitWhileRunningCachesStack.PopToSize( topOfStackIndex );
 			environmentTestResultsStack.truncate( topOfStackIndex );
 		} else {
@@ -468,7 +239,6 @@ void MovementPredictionContext::SetupStackForStep() {
 		botMovementStatesStack.clear();
 		playerStatesStack.clear();
 
-		defaultBotInputsCachesStack.PopToSize( 0 );
 		mayHitWhileRunningCachesStack.PopToSize( 0 );
 		environmentTestResultsStack.clear();
 
@@ -497,10 +267,6 @@ void MovementPredictionContext::SetupStackForStep() {
 	this->record->pendingWeapon = -1;
 
 	Assert( mayHitWhileRunningCachesStack.Size() + 1 == predictedMovementActions.size() );
-	// Check caches size, a cache size must match the stack size after addition of a single placeholder element.
-	Assert( defaultBotInputsCachesStack.Size() + 1 == predictedMovementActions.size() );
-	// Then put placeholders for non-cached yet values onto top of caches stack
-	defaultBotInputsCachesStack.PushDummyNonCachedValue();
 	// The different method is used (there is no copy/move constructors for the template type)
 	mayHitWhileRunningCachesStack.PushDummyNonCachedValue();
 	new ( environmentTestResultsStack.unsafe_grow_back() )EnvironmentTraceCache;
@@ -648,6 +414,113 @@ BaseMovementAction *MovementPredictionContext::SuggestSuitableAction() {
 	return &module->scheduleWeaponJumpAction;
 }*/
 
+bool MovementPredictionContext::TestNextAction() {
+	if( !NavTargetAasAreaNum() ) {
+		return false;
+	}
+
+	if( activeActionNum >= m_script->m_actions.size() ) {
+		return false;
+	}
+
+	activeAction = m_script->m_actions[activeActionNum];
+	bool startNewSequence = true;
+
+	topOfStackIndex = 0;
+
+	for(;; ) {
+		SetupStackForStep();
+		// Reset prediction step millis time.
+		// Actions might set their custom step value (otherwise it will be set to a default one).
+		this->predictionStepMillis = 0;
+
+		this->cannotApplyAction = false;
+		this->record->Clear();
+		if( startNewSequence ) {
+			this->activeAction->OnApplicationSequenceStarted( this );
+			startNewSequence = false;
+		}
+
+		Debug( "About to call action->PlanPredictionStep() for %s at ToS frame %d\n", activeAction->Name(), topOfStackIndex );
+		activeAction->PlanPredictionStep( this );
+
+		if( this->shouldRollback ) {
+			// Stop an action application sequence manually with a failure.
+			this->activeAction->OnApplicationSequenceStopped( this, BaseMovementAction::FAILED, (unsigned)-1 );
+			Debug( "Prediction step failed after action->PlanPredictionStep() call for %s\n", activeAction->Name() );
+			topOfStackIndex = 0;
+			predictedMovementActions.clear();
+			startNewSequence = true;
+			continue;
+		}
+
+		if( this->cannotApplyAction ) {
+			this->topOfStackIndex = 0;
+			predictedMovementActions.clear();
+			return true;
+		}
+
+		if( this->isCompleted ) {
+			constexpr const char *format = "Movement prediction is completed on %s, ToS frame %d, %d millis ahead\n";
+			Debug( format, activeAction->Name(), this->topOfStackIndex, this->totalMillisAhead );
+			// Stop an action application sequence manually with a success.
+			activeAction->OnApplicationSequenceStopped( this, BaseMovementAction::SUCCEEDED, this->topOfStackIndex );
+			if( !this->isTruncated ) {
+				SavePathElem( activeAction );
+			}
+			return false;
+		}
+
+		// If prediction step millis time has not been set, set it to a default value
+		if( !this->predictionStepMillis ) {
+			this->predictionStepMillis = DefaultFrameTime();
+			if( this->topOfStackIndex >= 4 ) {
+				this->predictionStepMillis *= ( this->topOfStackIndex < MAX_PREDICTED_STATES / 2 ) ? 3 : 6;
+			}
+		}
+
+		NextMovementStep();
+		activeAction->CheckPredictionStepResults( this );
+
+		if( this->shouldRollback ) {
+			this->activeAction->OnApplicationSequenceStopped( this, BaseMovementAction::FAILED, (unsigned)-1 );
+			topOfStackIndex = 0;
+			predictedMovementActions.clear();
+			startNewSequence = true;
+			continue;
+		}
+
+		// If movement planning is completed, there is no need to do a next step
+		if( this->isCompleted ) {
+			constexpr const char *format = "Movement prediction is completed on %s, ToS frame %d, %d millis ahead\n";
+			Debug( format, activeAction->Name(), this->topOfStackIndex, this->totalMillisAhead );
+			if( !this->isTruncated ) {
+				SavePathElem( activeAction );
+			}
+
+			// Stop action application sequence manually with a success.
+			// Prevent duplicated OnApplicationSequenceStopped() call
+			// (it might have been done in action->CheckPredictionStepResults() for this->activeAction)
+			this->activeAction->OnApplicationSequenceStopped( this, BaseMovementAction::SUCCEEDED, topOfStackIndex );
+			// Stop planning by returning false
+			return false;
+		}
+
+		// Check whether next prediction step is possible
+		if( this->CanGrowStackForNextStep() ) {
+			SavePathElem( activeAction );
+			continue;
+		}
+
+		// Disable this action for further planning (it has lead to stack overflow)
+		activeAction->isDisabledForPlanning = true;
+		topOfStackIndex = 0;
+		predictedMovementActions.clear();
+		Debug( "Stack overflow on action %s, this action will be disabled for further planning\n", activeAction->Name() );
+		return true;
+	}
+}
+
 bool MovementPredictionContext::NextPredictionStep() {
 	SetupStackForStep();
 
@@ -660,9 +533,18 @@ bool MovementPredictionContext::NextPredictionStep() {
 	wsw::StaticVector<BaseMovementAction *, 32> testedActionsList;
 #endif
 
-	// Get an initial suggested a-priori action
-	unsigned actionNum = 0;
-	BaseMovementAction *action = m_script->m_actions[actionNum];
+	BaseMovementAction *rollback = nullptr;
+
+	// Get an initial suggested a-priori action !!!!!!!!!!!!!!!!!!!!! TODO: !!!!!!!!!!!!!!!!!!!!!!!!!! What if its the action suggested by action
+	unsigned actionNum = activeAction ? activeAction->ActionNum() : 0;
+	BaseMovementAction *action = activeAction;
+	if( !activeAction ) {
+		if( this->actionSuggestedByAction ) {
+			action = this->actionSuggestedByAction;
+		} else {
+			action = m_script->m_actions[actionNum];
+		}
+	}
 
 #ifdef CHECK_ACTION_SUGGESTION_LOOPS
 	testedActionsMask |= ( 1 << action->ActionNum() );
@@ -702,6 +584,7 @@ bool MovementPredictionContext::NextPredictionStep() {
 			this->activeAction->OnApplicationSequenceStopped( this, BaseMovementAction::FAILED, (unsigned)-1 );
 			// An action can be suggested again after rolling back on the next prediction step.
 			// Force calling action->OnApplicationSequenceStarted() on the next prediction step.
+			this->actionSuggestedByAction = this->activeAction;
 			this->activeAction = nullptr;
 			Debug( "Prediction step failed after action->PlanPredictionStep() call for %s\n", action->Name() );
 			this->RollbackToSavepoint();
@@ -710,6 +593,10 @@ bool MovementPredictionContext::NextPredictionStep() {
 		}
 
 		if( this->cannotApplyAction ) {
+			if( actionNum + 1 == m_script->m_actions.size() ) {
+				predictedMovementActions.clear();
+				return false;
+			}
 			action = m_script->m_actions[++actionNum];
 			continue;
 		}
@@ -724,7 +611,7 @@ bool MovementPredictionContext::NextPredictionStep() {
 			// Note: this condition is put outside since it is valid only once per a BuildPlan() call
 			// and the method is called every prediction frame (up to hundreds of times per a bot per a game frame)
 			if( !this->isTruncated ) {
-				this->SaveActionOnStack( action );
+				this->SavePathElem( action );
 			}
 			// Stop planning by returning false
 			return false;
@@ -754,7 +641,7 @@ bool MovementPredictionContext::NextPredictionStep() {
 			constexpr const char *format = "Movement prediction is completed on %s, ToS frame %d, %d millis ahead\n";
 			Debug( format, action->Name(), this->topOfStackIndex, this->totalMillisAhead );
 			if( !this->isTruncated ) {
-				SaveActionOnStack( action );
+				SavePathElem( action );
 			}
 			// Stop action application sequence manually with a success.
 			// Prevent duplicated OnApplicationSequenceStopped() call
@@ -768,7 +655,7 @@ bool MovementPredictionContext::NextPredictionStep() {
 
 		// Check whether next prediction step is possible
 		if( this->CanGrowStackForNextStep() ) {
-			SaveActionOnStack( action );
+			SavePathElem( action );
 			// Continue planning by returning true
 			return true;
 		}
@@ -796,9 +683,10 @@ bool MovementPredictionContext::NextPredictionStep() {
 	return true;
 }
 
-void MovementPredictionContext::BuildPlan() {
-	for( auto *movementAction: m_script->m_actions )
-		movementAction->BeforePlanning();
+bool MovementPredictionContext::buildPlan() {
+	for( auto *action: m_script->m_actions ) {
+		action->BeforePlanning();
+	}
 
 	// Intercept these calls implicitly performed by PMove()
 	const auto general_PMoveTouchTriggers = module_PMoveTouchTriggers;
@@ -828,7 +716,7 @@ void MovementPredictionContext::BuildPlan() {
 
 	Assert( self->bot->entityPhysicsState == &m_script->m_module->movementState.entityPhysicsState );
 	// Save current entity physics state (it will be modified even for a single prediction step)
-	const AiEntityPhysicsState currEntityPhysicsState = m_script->m_module->movementState.entityPhysicsState;
+	const auto savedMovementState = m_script->m_module->movementState;
 
 	// Remember to reset these values before each planning session
 	this->totalMillisAhead = 0;
@@ -856,10 +744,12 @@ void MovementPredictionContext::BuildPlan() {
 	}
 #else
 	::nextStepIterationsCounter = 0;
+	this->activeActionNum = 0;
 	for(;; ) {
-		if( !NextPredictionStep() ) {
+		if( !TestNextAction() ) {
 			break;
 		}
+		this->activeActionNum++;
 		++nextStepIterationsCounter;
 		if( nextStepIterationsCounter < NEXT_STEP_INFINITE_LOOP_THRESHOLD ) {
 			continue;
@@ -893,10 +783,14 @@ void MovementPredictionContext::BuildPlan() {
 	Assert( !std::memcmp( &self->r.client->ps, &savedPlayerState, sizeof( savedPlayerState ) ) );
 	Assert( !std::memcmp( &self->r.client->old_pmove, &savedPMove, sizeof( savedPMove ) ) );
 
+	for( auto *action: m_script->m_actions ) {
+		action->AfterPlanning();
+	}
+
+	// TODO: This assumes that a plan is not empty!
+
 	// Set first predicted movement state as the current bot movement state
-	m_script->m_module->movementState = botMovementStatesStack[0];
-	// Even the first predicted movement state usually has modified physics state, restore it to a saved value
-	m_script->m_module->movementState.entityPhysicsState = currEntityPhysicsState;
+	m_script->m_module->movementState = savedMovementState;
 	// Restore the current entity physics state reference in Ai subclass
 	self->bot->entityPhysicsState = &m_script->m_module->movementState.entityPhysicsState;
 	// These assertions helped to find an annoying bug during development
@@ -906,19 +800,7 @@ void MovementPredictionContext::BuildPlan() {
 	module_PMoveTouchTriggers = general_PMoveTouchTriggers;
 	module_PredictedEvent = general_PredictedEvent;
 
-	for( auto *movementAction: m_script->m_actions )
-		movementAction->AfterPlanning();
-
-	// We must have at least a single predicted action (maybe dummy one)
-	assert( !predictedMovementActions.empty() );
-	// The first predicted action should not have any offset from the current time
-	assert( predictedMovementActions[0].timestamp == 0 );
-	for( auto &predictedAction: predictedMovementActions ) {
-		// Check whether this value contains only positive relative offset from the current time
-		assert( (uint64_t)predictedAction.timestamp < 30000 );
-		// Convert to a timestamp based on the real time
-		predictedAction.timestamp += game.realtime;
-	}
+	return !predictedMovementActions.empty();
 }
 
 void MovementPredictionContext::NextMovementStep() {
@@ -1043,90 +925,6 @@ void MovementPredictionContext::Debug( const char *format, ... ) const {
 	AI_Debugv( tag, format, va );
 	va_end( va );
 #endif
-}
-
-
-
-void MovementPredictionContext::SetDefaultBotInput() {
-	// Check for cached value first
-	if( const BotInput *cachedDefaultBotInput = defaultBotInputsCachesStack.GetCached() ) {
-		this->record->botInput = *cachedDefaultBotInput;
-		return;
-	}
-
-	const auto &entityPhysicsState = movementState->entityPhysicsState;
-	auto *botInput = &this->record->botInput;
-
-	botInput->ClearMovementDirections();
-	botInput->SetSpecialButton( false );
-	botInput->SetWalkButton( false );
-	botInput->isUcmdSet = true;
-
-	// If angles are already set (e.g. by pending look at point), do not try to set angles for following AAS reach. chain
-	if( botInput->hasAlreadyComputedAngles ) {
-		// Save cached value and return
-		defaultBotInputsCachesStack.SetCachedValue( *botInput );
-		return;
-	}
-
-	botInput->isLookDirSet = true;
-	botInput->canOverrideLookVec = false;
-	botInput->canOverridePitch = true;
-	botInput->canOverrideUcmd = false;
-
-	const int navTargetAasAreaNum = NavTargetAasAreaNum();
-	const int currAasAreaNum = CurrAasAreaNum();
-	// If a current area and a nav target area are defined
-	if( currAasAreaNum && navTargetAasAreaNum ) {
-		// If bot is not in nav target area
-		if( currAasAreaNum != navTargetAasAreaNum ) {
-			const int nextReachNum = this->NextReachNum();
-			if( nextReachNum ) {
-				const auto &nextReach = AiAasWorld::Instance()->Reachabilities()[nextReachNum];
-				if( DistanceSquared( entityPhysicsState.Origin(), nextReach.start ) < 12 * 12 ) {
-					Vec3 intendedLookVec( nextReach.end );
-					intendedLookVec -= nextReach.start;
-					intendedLookVec.NormalizeFast();
-					intendedLookVec *= 16.0f;
-					intendedLookVec += nextReach.start;
-					intendedLookVec -= entityPhysicsState.Origin();
-					if( entityPhysicsState.GroundEntity() ) {
-						intendedLookVec.Z() = 0;
-					}
-					botInput->SetIntendedLookDir( intendedLookVec );
-				} else {
-					Vec3 intendedLookVec3( nextReach.start );
-					intendedLookVec3 -= entityPhysicsState.Origin();
-					botInput->SetIntendedLookDir( intendedLookVec3 );
-				}
-				// Save a cached value and return
-				defaultBotInputsCachesStack.SetCachedValue( *botInput );
-				return;
-			}
-		} else {
-			// Look at the nav target
-			Vec3 intendedLookVec( NavTargetOrigin() );
-			intendedLookVec -= entityPhysicsState.Origin();
-			botInput->SetIntendedLookDir( intendedLookVec );
-			// Save a cached value and return
-			defaultBotInputsCachesStack.SetCachedValue( *botInput );
-			return;
-		}
-	}
-
-	// A valid reachability chain does not exist, use dummy relaxed movement
-	if( entityPhysicsState.Speed() > 1 ) {
-		// Follow the existing velocity direction
-		botInput->SetIntendedLookDir( entityPhysicsState.Velocity() );
-	} else {
-		// The existing velocity is too low to extract a direction from it, keep looking in the same direction
-		botInput->SetAlreadyComputedAngles( entityPhysicsState.Angles() );
-	}
-
-	// Allow overriding look angles for aiming (since they are set to dummy ones)
-	botInput->canOverrideLookVec = true;
-	// Save a cached value and return
-	defaultBotInputsCachesStack.SetCachedValue( *botInput );
 }
 
 void MovementPredictionContext::CheatingAccelerate( float frac ) {

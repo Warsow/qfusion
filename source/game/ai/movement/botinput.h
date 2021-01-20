@@ -2,6 +2,7 @@
 #define WSW_4de78118_59e2_4a53_bd69_65112cf15a99_H
 
 #include "../ailocal.h"
+#include "../baseai.h"
 
 enum class BotInputRotation : uint8_t {
 	NONE = 0,
@@ -15,6 +16,7 @@ enum class BotInputRotation : uint8_t {
 class alignas ( 4 )BotInput
 {
 	friend class MovementPredictionContext;
+	friend class BaseScript2;
 	// Todo: Pack since it is required to be normalized now?
 	Vec3 intendedLookDir;
 	// A copy of self->s.angles for modification
@@ -148,5 +150,62 @@ public:
 		return intendedLookDir;
 	}
 };
+
+struct MovementActionRecord {
+	BotInput botInput;
+
+private:
+	int16_t modifiedVelocity[3];
+
+public:
+	int8_t pendingWeapon : 7;
+	bool hasModifiedVelocity : 1;
+
+	MovementActionRecord()
+		: pendingWeapon( -1 ),
+		  hasModifiedVelocity( false ) {}
+
+	void Clear() {
+		botInput.Clear();
+		pendingWeapon = -1;
+		hasModifiedVelocity = false;
+	}
+
+	void SetModifiedVelocity( const Vec3 &velocity ) {
+		SetModifiedVelocity( velocity.Data() );
+	}
+
+	void SetModifiedVelocity( const vec3_t velocity ) {
+		for( int i = 0; i < 3; ++i ) {
+			int snappedVelocityComponent = (int)( velocity[i] * 16.0f );
+			if( snappedVelocityComponent > std::numeric_limits<signed short>::max() ) {
+				snappedVelocityComponent = std::numeric_limits<signed short>::max();
+			} else if( snappedVelocityComponent < std::numeric_limits<signed short>::min() ) {
+				snappedVelocityComponent = std::numeric_limits<signed short>::min();
+			}
+			modifiedVelocity[i] = (signed short)snappedVelocityComponent;
+		}
+		hasModifiedVelocity = true;
+	}
+
+	Vec3 ModifiedVelocity() const {
+		assert( hasModifiedVelocity );
+		float scale = 1.0f / 16.0f;
+		return Vec3( scale * modifiedVelocity[0], scale * modifiedVelocity[1], scale * modifiedVelocity[2] );
+	}
+};
+
+class BaseMovementAction;
+
+struct PredictedMovementAction {
+	AiEntityPhysicsState entityPhysicsState;
+	MovementActionRecord record;
+	BaseMovementAction *action { nullptr };
+	int64_t timestamp { 0 };
+	unsigned stepMillis { 0 };
+	unsigned movementStatesMask { 0 };
+};
+
+using PathElem = PredictedMovementAction;
 
 #endif

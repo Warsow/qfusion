@@ -3,6 +3,8 @@
 
 #include "movementlocal.h"
 
+class BaseMovementAction;
+
 class BaseScript2 {
 	friend class MovementPredictionContext;
 	friend class BaseMovementAction;
@@ -13,6 +15,23 @@ protected:
 
 	// TODO: This is not needed except for loop detection in dev mode
 	wsw::StaticVector<BaseMovementAction *, 5> m_actions;
+
+	[[nodiscard]]
+	auto tryCheckAndLerpActions( PathElem *prevAction, PathElem *nextAction, MovementActionRecord *record_ ) -> BaseMovementAction *;
+	[[nodiscard]]
+	auto lerpActionRecords( PathElem *prevAction, PathElem *nextAction, MovementActionRecord *record_ ) -> BaseMovementAction *;
+
+	[[nodiscard]]
+	bool checkPredictedOrigin( PathElem *prevAction, PathElem *nextAction, float frac );
+	[[nodiscard]]
+	bool checkPredictedVelocity( PathElem *prevAction, PathElem *nextAction, float frac );
+	[[nodiscard]]
+	bool checkPredictedAngles( PathElem *prevAction, PathElem *nextAction, float frac );
+
+	[[nodiscard]]
+	auto getCachedActionAndRecordForCurrTime( MovementActionRecord *record_ ) -> BaseMovementAction *;
+
+	void debug( const char *format, ... ) const;
 public:
 	explicit BaseScript2( BotMovementModule *module );
 

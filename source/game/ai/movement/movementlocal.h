@@ -153,7 +153,8 @@ inline EnvironmentTraceCache &MovementPredictionContext::TraceCache() {
 	return environmentTestResultsStack.back();
 }
 
-inline void MovementPredictionContext::SaveActionOnStack( BaseMovementAction *action ) {
+inline void MovementPredictionContext::SavePathElem( BaseMovementAction *action ) {
+	assert( action );
 	auto *topOfStack = &this->predictedMovementActions[this->topOfStackIndex];
 	// This was a source of an annoying bug! movement state has been modified during a prediction step!
 	// We expect that record state is a saved state BEFORE the step!
@@ -164,7 +165,7 @@ inline void MovementPredictionContext::SaveActionOnStack( BaseMovementAction *ac
 	topOfStack->timestamp = this->totalMillisAhead;
 
 #ifdef ENABLE_MOVEMENT_ASSERTIONS
-	constexpr auto *tag = "MovementPredictionContext::SaveActionOnStack()";
+	constexpr auto *tag = "MovementPredictionContext::SavePathElem()";
 	if( !action ) {
 		AI_FailWith( tag, "The action is null\n" );
 	}

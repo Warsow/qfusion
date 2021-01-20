@@ -9,50 +9,6 @@ class BaseMovementAction;
 #include "environmenttracecache.h"
 #include "nearbytriggerscache.h"
 
-struct MovementActionRecord {
-	BotInput botInput;
-
-private:
-	int16_t modifiedVelocity[3];
-
-public:
-	int8_t pendingWeapon : 7;
-	bool hasModifiedVelocity : 1;
-
-	inline MovementActionRecord()
-		: pendingWeapon( -1 ),
-		  hasModifiedVelocity( false ) {}
-
-	inline void Clear() {
-		botInput.Clear();
-		pendingWeapon = -1;
-		hasModifiedVelocity = false;
-	}
-
-	inline void SetModifiedVelocity( const Vec3 &velocity ) {
-		SetModifiedVelocity( velocity.Data() );
-	}
-
-	inline void SetModifiedVelocity( const vec3_t velocity ) {
-		for( int i = 0; i < 3; ++i ) {
-			int snappedVelocityComponent = (int)( velocity[i] * 16.0f );
-			if( snappedVelocityComponent > std::numeric_limits<signed short>::max() ) {
-				snappedVelocityComponent = std::numeric_limits<signed short>::max();
-			} else if( snappedVelocityComponent < std::numeric_limits<signed short>::min() ) {
-				snappedVelocityComponent = std::numeric_limits<signed short>::min();
-			}
-			modifiedVelocity[i] = (signed short)snappedVelocityComponent;
-		}
-		hasModifiedVelocity = true;
-	}
-
-	inline Vec3 ModifiedVelocity() const {
-		assert( hasModifiedVelocity );
-		float scale = 1.0f / 16.0f;
-		return Vec3( scale * modifiedVelocity[0], scale * modifiedVelocity[1], scale * modifiedVelocity[2] );
-	}
-};
-
 struct MovementPredictionConstants {
 	enum SequenceStopReason : uint8_t {
 		UNSPECIFIED, // An empty initial value, should be replaced by SWITCHED on actual use
@@ -99,21 +55,6 @@ public:
 		static inline HitWhileRunningTestResult Failure() { return HitWhileRunningTestResult(); }
 	};
 private:
-	struct PredictedMovementAction {
-		AiEntityPhysicsState entityPhysicsState;
-		MovementActionRecord record;
-		BaseMovementAction *action;
-		int64_t timestamp;
-		unsigned stepMillis;
-		unsigned movementStatesMask;
-
-		PredictedMovementAction()
-			: action(nullptr),
-			  timestamp( 0 ),
-			  stepMillis( 0 ),
-			  movementStatesMask( 0 ) {}
-	};
-
 	using PredictedPath = wsw::StaticVector<PredictedMovementAction, MAX_PREDICTED_STATES>;
 
 	PredictedPath predictedMovementActions;
@@ -185,7 +126,6 @@ private:
 		}
 	};
 
-	CachesStack<BotInput, MAX_PREDICTED_STATES> defaultBotInputsCachesStack;
 	CachesStack<HitWhileRunningTestResult, MAX_PREDICTED_STATES> mayHitWhileRunningCachesStack;
 	wsw::StaticVector<EnvironmentTraceCache, MAX_PREDICTED_STATES> environmentTestResultsStack;
 
@@ -218,6 +158,8 @@ public:
 	bool isTruncated;
 	bool cannotApplyAction;
 	bool shouldRollback;
+
+	unsigned activeActionNum = 0;
 
 	struct FrameEvents {
 		static constexpr auto MAX_TOUCHED_OTHER_TRIGGERS = 16;
@@ -288,7 +230,10 @@ public:
 
 	HitWhileRunningTestResult MayHitWhileRunning();
 
-	void BuildPlan();
+	[[nodiscard]]
+	bool buildPlan();
+
+	bool TestNextAction();
 	bool NextPredictionStep();
 	void SetupStackForStep();
 
@@ -303,7 +248,7 @@ public:
 		return this->topOfStackIndex + 1 < MAX_PREDICTED_STATES;
 	}
 
-	inline void SaveActionOnStack( BaseMovementAction *action );
+	inline void SavePathElem( BaseMovementAction *action );
 
 	// Frame index is restricted to topOfStack or topOfStack + 1
 	inline void MarkSavepoint( BaseMovementAction *markedBy, unsigned frameIndex );
@@ -317,22 +262,6 @@ public:
 
 	void SaveGoodEnoughPath( unsigned advancement, unsigned penaltyMillis );
 	void SaveLastResortPath( unsigned penaltyMillis );
-
-	class BaseMovementAction *GetCachedActionAndRecordForCurrTime( MovementActionRecord *record_ );
-
-	class BaseMovementAction *TryCheckAndLerpActions( PredictedMovementAction *prevAction,
-													  PredictedMovementAction *nextAction,
-													  MovementActionRecord *record_ );
-
-	class BaseMovementAction *LerpActionRecords( PredictedMovementAction *prevAction,
-		                                         PredictedMovementAction *nextAction,
-		                                         MovementActionRecord *record_ );
-
-	bool CheckPredictedOrigin( PredictedMovementAction *prevAction, PredictedMovementAction *nextAction, float frac );
-	bool CheckPredictedVelocity( PredictedMovementAction *prevAction, PredictedMovementAction *nextAction, float frac );
-	bool CheckPredictedAngles( PredictedMovementAction *prevAction, PredictedMovementAction *nextAction, float frac );
-
-	void SetDefaultBotInput();
 
 	void Debug( const char *format, ... ) const;
 	// We want to have a full control over movement code assertions, so use custom ones for this class
