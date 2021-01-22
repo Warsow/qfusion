@@ -9,6 +9,7 @@ class BaseScript2 {
 	friend class MovementPredictionContext;
 	friend class BaseMovementAction;
 	friend class BunnyToBestFloorClusterPointAction;
+	friend class CombatDodgeSemiRandomlyToTargetAction;
 protected:
 	BotMovementModule *const m_module;
 	MovementPredictionContext::PredictedPath *const m_cachedPath;
@@ -51,12 +52,13 @@ public:
 	explicit BunnyHopScript2( BotMovementModule *module ) : BaseScript2( module ) {}
 };
 
-/*
 class CombatScript2 : public BaseScript2 {
-	[[nodiscard]]
-	bool checkValidInCurrGameState() const override;
+	CombatDodgeSemiRandomlyToTargetAction m_combatDodgeSemiRandomlyToTargetAction { this };
+public:
+	explicit CombatScript2( BotMovementModule *module ) : BaseScript2( module ) {}
 };
 
+/*
 class PlantScript2 : public BaseScript2 {
 	[[nodiscard]]
 	bool checkValidInCurrGameState() const override;

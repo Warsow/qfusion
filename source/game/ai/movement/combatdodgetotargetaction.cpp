@@ -1,7 +1,7 @@
 #include "combatdodgetotargetaction.h"
 #include "movementlocal.h"
+#include "basescript2.h"
 
-/*
 void CombatDodgeSemiRandomlyToTargetAction::UpdateKeyMoveDirs( Context *context ) {
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	auto *combatMovementState = &context->movementState->keyMoveDirsState;
@@ -10,7 +10,7 @@ void CombatDodgeSemiRandomlyToTargetAction::UpdateKeyMoveDirs( Context *context 
 	vec3_t closestFloorPoint;
 	std::optional<Vec3> maybeTarget;
 	const float *__restrict botOrigin = entityPhysicsState.Origin();
-	if( context->sameFloorClusterAreasCache.GetClosestToTargetPoint( context, closestFloorPoint ) ) {
+	if( m_script->m_module->m_sameFloorClusterAreasCache.GetClosestToTargetPoint( context, closestFloorPoint ) ) {
 		if( Distance2DSquared( botOrigin, closestFloorPoint ) > SQUARE( 1.0f ) ) {
 			maybeTarget = Vec3( closestFloorPoint );
 		}
@@ -285,4 +285,4 @@ void CombatDodgeSemiRandomlyToTargetAction::BeforePlanning() {
 	this->isCombatDashingAllowed = bot->IsCombatDashingAllowed();
 	this->isCompatCrouchingAllowed = bot->IsCombatCrouchingAllowed();
 	this->allowFailureUsingThatAsNextAction = nullptr;
-}*/
+}

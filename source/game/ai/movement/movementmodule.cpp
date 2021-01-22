@@ -38,7 +38,8 @@ BotMovementModule::BotMovementModule( Bot *bot_ )
 	, jumpOverBarrierScript( bot_, this ) */{
 	movementState.Reset();
 
-	m_scripts.push_back( new BunnyHopScript2( this ) );
+	//m_scripts.push_back( new BunnyHopScript2( this ) );
+	m_scripts.push_back( new CombatScript2( this ) );
 }
 
 bool BotMovementModule::CanChangeWeapons() const {
