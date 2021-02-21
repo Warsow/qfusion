@@ -327,95 +327,6 @@ Entity @GT_SelectSpawnPoint( Entity @self )
 	return GENERIC_SelectBestRandomSpawnPoint( @self, "team_CTF_alphaspawn" );
 }
 
-String @GT_ScoreboardMessage( uint maxlen )
-{
-	String scoreboardMessage = "";
-	int matchState = match.getState();
-			
-	for ( int t = TEAM_ALPHA; t < GS_MAX_TEAMS; t++ )
-	{
-		Team @team = @G_GetTeam( t );
-
-		String entry = "&t " + t + " " + team.stats.score + " " + team.ping + " ";
-
-		if ( scoreboardMessage.len() + entry.len() < maxlen )
-		{
-			scoreboardMessage += entry;
-		}
-
-		for ( int i = 0; @team.ent( i ) != null; i++ )
-		{
-			Entity @ent = @team.ent( i );
-			Client @client = @ent.client;
-
-			cPlayer @player = @playerFromClient( @client );
-
-			int statusIcon;
-
-			if ( matchState == MATCH_STATE_PLAYTIME )
-			{
-				// carrying takes priority over carrier
-				// don't rearrange for cheaper checks :D
-				if ( bombState == BOMBSTATE_CARRIED && @ent == @bombCarrier )
-				{
-					statusIcon = iconCarrying;
-				}
-				else if ( player.isCarrier )
-				{
-					statusIcon = iconCarrier;
-				}
-				else
-				{
-					statusIcon = 0;
-				}
-			}
-			else if ( matchState == MATCH_STATE_WARMUP && client.isReady() )
-			{
-				statusIcon = iconReady;
-			}
-			else
-			{
-				statusIcon = 0;
-			}
-
-			int playerId = ent.isGhosting() && matchState == MATCH_STATE_PLAYTIME ? -( ent.playerNum + 1 ) : ent.playerNum;
-
-			if ( gametype.isInstagib )
-			{
-				// Name Clan Score Frags Ping R
-
-				entry = "&p " + playerId
-					+ " " + client.clanName
-					+ " " + client.stats.score
-					+ " " + client.stats.getEntry( "frags" )
-					+ " " + client.ping
-					+ " " + statusIcon
-					+ " "; // don't delete me!
-			}
-			else
-			{
-				// Name Clan Score Frags W1 W2 W3 Ping R
-
-				entry = "&p " + playerId
-					+ " " + client.clanName
-					+ " " + client.stats.score
-					+ " " + client.stats.getEntry( "frags" )
-					+ " " + player.getInventoryLabel() // W1 W2 W3
-					+ " " + client.ping
-					+ " " + statusIcon
-					+ " "; // don't delete me!
-			}
-
-			if ( scoreboardMessage.len() + entry.len() < maxlen )
-			{
-				scoreboardMessage += entry;
-			}
-		}
-	}
-
-	return scoreboardMessage;
-}
-
 void GT_updateScore( Client @client )
 {
 	cPlayer @player = @playerFromClient( @client );
@@ -861,17 +772,8 @@ void GT_InitGametype()
 		gametype.setTeamSpawnsystem( t, SPAWNSYSTEM_INSTANT, 0, 0, false );
 	}
 
-	// define the scoreboard layout
-	if ( gametype.isInstagib )
-	{
-		G_ConfigString( CS_SCB_PLAYERTAB_LAYOUT, "%n 112 %s 52 %i 42 %i 42 %l 36 %p l1" );
-		G_ConfigString( CS_SCB_PLAYERTAB_TITLES, "Name Clan Score Frags Ping S" );
-	}
-	else
-	{
-		G_ConfigString( CS_SCB_PLAYERTAB_LAYOUT, "%n 112 %s 52 %i 42 %i 42 %p l1 %p l1 %p l1 %l 36 %p l1" );
-		G_ConfigString( CS_SCB_PLAYERTAB_TITLES, "Name Clan Score Frags " + S_COLOR_WHITE + " " + S_COLOR_WHITE + " " + S_COLOR_WHITE + " Ping S" );
-	}
+	scoreboard.beginDefiningSchema();
+	scoreboard.endDefiningSchema();
 
 	// add commands
 	G_RegisterCommand( "drop" );

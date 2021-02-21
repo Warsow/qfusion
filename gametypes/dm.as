@@ -139,40 +139,6 @@ Entity @GT_SelectSpawnPoint( Entity @self )
     return GENERIC_SelectBestRandomSpawnPoint( self, "info_player_deathmatch" );
 }
 
-String @GT_ScoreboardMessage( uint maxlen )
-{
-    String scoreboardMessage = "";
-    String entry;
-    Team @team;
-    Entity @ent;
-    int i;
-
-    @team = @G_GetTeam( TEAM_PLAYERS );
-
-    // &t = team tab, team tag, team score (doesn't apply), team ping (doesn't apply)
-    entry = "&t " + int( TEAM_PLAYERS ) + " " + team.stats.score + " 0 ";
-    if ( scoreboardMessage.len() + entry.len() < maxlen )
-        scoreboardMessage += entry;
-
-    for ( i = 0; @team.ent( i ) != null; i++ )
-    {
-        @ent = @team.ent( i );
-
-		int playerID = ( ent.isGhosting() && ( match.getState() == MATCH_STATE_PLAYTIME ) ) ? -( ent.playerNum + 1 ) : ent.playerNum;
-
-        entry = "&p " + playerID + " "
-                + ent.client.clanName + " "
-                + ent.client.stats.score + " "
-                + ent.client.ping + " "
-                + ( ent.client.isReady() ? "1" : "0" ) + " ";
-
-        if ( scoreboardMessage.len() + entry.len() < maxlen )
-            scoreboardMessage += entry;
-    }
-
-    return scoreboardMessage;
-}
-
 // Some game actions trigger score events. These are events not related to killing
 // oponents, like capturing a flag
 // Warning: client can be null
@@ -412,9 +378,8 @@ void GT_InitGametype()
     for ( int team = TEAM_PLAYERS; team < GS_MAX_TEAMS; team++ )
         gametype.setTeamSpawnsystem( team, SPAWNSYSTEM_INSTANT, 0, 0, false );
 
-    // define the scoreboard layout
-    G_ConfigString( CS_SCB_PLAYERTAB_LAYOUT, "%n 112 %s 52 %i 52 %l 48 %r l1" );
-    G_ConfigString( CS_SCB_PLAYERTAB_TITLES, "Name Clan Score Ping R" );
+    scoreboard.beginDefiningSchema();
+    scoreboard.endDefiningSchema();
 
     // add commands
     G_RegisterCommand( "drop" );

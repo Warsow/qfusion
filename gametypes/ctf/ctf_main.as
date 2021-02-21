@@ -549,54 +549,6 @@ Entity @GT_SelectSpawnPoint( Entity @self )
     return GENERIC_SelectBestRandomSpawnPoint( self, "team_CTF_betaspawn" );
 }
 
-String @GT_ScoreboardMessage( uint maxlen )
-{
-    String scoreboardMessage = "";
-    String entry;
-    Team @team;
-    Entity @ent;
-    int i, t, carrierIcon;
-
-    for ( t = TEAM_ALPHA; t < GS_MAX_TEAMS; t++ )
-    {
-        @team = @G_GetTeam( t );
-
-        // &t = team tab, team tag, team score, team ping
-        entry = "&t " + t + " " + team.stats.score + " " + team.ping + " ";
-        if ( scoreboardMessage.len() + entry.len() < maxlen )
-            scoreboardMessage += entry;
-
-        for ( i = 0; @team.ent( i ) != null; i++ )
-        {
-            @ent = @team.ent( i );
-
-            if ( ( ent.effects & EF_CARRIER ) != 0 )
-                carrierIcon = ( ent.team == TEAM_BETA ) ? prcAlphaFlagIcon : prcBetaFlagIcon;
-            else if ( ent.client.inventoryCount( POWERUP_QUAD ) > 0 )
-                carrierIcon = prcShockIcon;
-            else if ( ent.client.inventoryCount( POWERUP_SHELL ) > 0 )
-                carrierIcon = prcShellIcon;
-            else
-                carrierIcon = 0;
-
-            int playerID = ( ent.isGhosting() && ( match.getState() == MATCH_STATE_PLAYTIME ) ) ? -( ent.playerNum + 1 ) : ent.playerNum;
-
-            // "Name Score Ping C R"
-            entry = "&p " + playerID + " "
-                    + ent.client.clanName + " "
-                    + ent.client.stats.score + " "
-                    + ent.client.ping + " "
-                    + carrierIcon + " "
-                    + ( ent.client.isReady() ? "1" : "0" ) + " ";
-
-            if ( scoreboardMessage.len() + entry.len() < maxlen )
-                scoreboardMessage += entry;
-        }
-    }
-
-    return scoreboardMessage;
-}
-
 // Some game actions get reported to the script as score events.
 // Warning: client can be null
 void GT_ScoreEvent( Client @client, const String &score_event, const String &args )
@@ -1070,9 +1022,8 @@ void GT_InitGametype()
     for ( int team = TEAM_PLAYERS; team < GS_MAX_TEAMS; team++ )
         gametype.setTeamSpawnsystem( team, SPAWNSYSTEM_INSTANT, 0, 0, false );
 
-    // define the scoreboard layout
-    G_ConfigString( CS_SCB_PLAYERTAB_LAYOUT, "%n 112 %s 52 %i 52 %l 48 %p l1 %r l1" );
-    G_ConfigString( CS_SCB_PLAYERTAB_TITLES, "Name Clan Score Ping C R" );
+    scoreboard.beginDefiningSchema();
+    scoreboard.endDefiningSchema();
 
     // precache images and sounds
     prcShockIcon = G_ImageIndex( "gfx/hud/icons/powerup/quad" );
