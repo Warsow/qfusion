@@ -10,6 +10,7 @@
 #include "demos.h"
 #include "gametypeoptionsmodel.h"
 #include "gametypesmodel.h"
+#include "hudlayoutmodel.h"
 #include "nativelydrawnitems.h"
 #include "playersmodel.h"
 #include "serverlistmodel.h"
@@ -249,6 +250,8 @@ private:
 	PlayersModel m_playersModel;
 
 	ActionRequestsModel m_actionRequestsModel;
+
+	HudLayoutModel m_hudEditorLayoutModel;
 
 	// A copy of last frame client properties for state change detection without intrusive changes to client code.
 	// Use a separate scope for clarity and for avoiding name conflicts.
@@ -560,6 +563,7 @@ QtUISystem::QtUISystem( int initialWidth, int initialHeight ) {
 	qmlRegisterUncreatableType<DemosResolver>( "net.warsow", 2, 6, "DemosResolver", reason );
 	qmlRegisterUncreatableType<DemoPlayer>( "net.warsow", 2, 6, "DemoPlayer", reason );
 	qmlRegisterUncreatableType<GametypeOptionsModel>( "net.warsow", 2, 6, "GametypeOptionsModel", reason );
+	qmlRegisterUncreatableType<HudLayoutModel>( "net.warsow", 2, 6, "HudLayoutModel", reason );
 	qmlRegisterType<NativelyDrawnImage>( "net.warsow", 2, 6, "NativelyDrawnImage_Native" );
 	qmlRegisterType<NativelyDrawnModel>( "net.warsow", 2, 6, "NativelyDrawnModel_Native" );
 
@@ -589,6 +593,7 @@ QtUISystem::QtUISystem( int initialWidth, int initialHeight ) {
 	context->setContextProperty( "playersModel", &m_playersModel );
 	context->setContextProperty( "actionRequestsModel", &m_actionRequestsModel );
 	context->setContextProperty( "gametypeOptionsModel", &m_gametypeOptionsModel );
+	context->setContextProperty( "hudEditorLayoutModel", &m_hudEditorLayoutModel );
 
 	m_component = new QQmlComponent( m_engine );
 
