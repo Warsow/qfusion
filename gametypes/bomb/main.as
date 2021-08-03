@@ -436,8 +436,6 @@ void GT_ScoreEvent( Client @client, const String &score_event, const String &arg
 
 		client.armor = float( newArmor );
 
-		G_CenterPrintMsg( @attacker, S_COLOR_RED + "DO NOT DAMAGE TEAMMATES!" );
-
 		// HUMILIATION
 		if ( attacker.health < 0 )
 		{
@@ -448,7 +446,7 @@ void GT_ScoreEvent( Client @client, const String &score_event, const String &arg
 
 			G_PrintMsg( null, client.name + S_COLOR_RED + " was punished for teamdamage!\n" );
 
-			G_CenterPrintMsg( attacker, S_COLOR_RED + "TEAMDAMAGE PUNISHMENT!" );
+			G_CenterPrintMsg( attacker, S_COLOR_RED + "Teamdamage punishment!" );
 
 			attacker.explosionEffect( 128 ); // :)
 		}

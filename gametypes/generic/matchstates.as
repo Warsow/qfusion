@@ -137,7 +137,7 @@ void GENERIC_SetUpMatch()
     // Countdowns should be made entirely client side, because we now can
     int soundindex = G_SoundIndex( "sounds/announcer/countdown/fight0" + (1 + (rand() & 1)) );
     G_AnnouncerSound( null, soundindex, GS_MAX_TEAMS, false, null );
-    G_CenterPrintMsg( null, "FIGHT!" );
+    G_CenterPrintMsg( null, "Fight!" );
 	
 	// now we can enable shooting
     gametype.shootingDisabled = false;
