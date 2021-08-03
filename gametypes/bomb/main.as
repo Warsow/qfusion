@@ -141,36 +141,6 @@ void setTeamProgress( int teamNum, int progress )
 	}
 }
 
-void BOMB_SetVoicecommQuickMenu( Client @client )
-{
-	String menuStr = '';
-	
-	if ( client.getEnt().team == attackingTeam )
-	{	
-		menuStr += 
-			'"Attack A!" "vsay_team attack_a" ' + 
-			'"Attack B!" "vsay_team attack_b" ';
-	}
-	else
-	{
-		menuStr += 
-			'"Defend A!" "vsay_team defend_a" ' + 
-			'"Defend B!" "vsay_team defend_b" ';	
-	}
-
-	menuStr += 
-		'"Need backup" "vsay_team needbackup" ' + 
-		'"Need offense" "vsay_team needoffense" ' + 
-		'"Need defense" "vsay_team needdefense" ' + 
-		'"On offense" "vsay_team onoffense" ' + 
-		'"On defense" "vsay_team ondefense" ' + 
-		'"Area secured" "vsay_team areasecured" ' + 
-		'"Affirmative" "vsay_team affirmative" ' + 
-		'"Negative" "vsay_team negative" ';
-
-	GENERIC_SetQuickMenu( @client, menuStr );
-}
-
 bool GT_Command( Client @client, const String &cmdString, const String &argsString, int argc )
 {
 	if ( cmdString == "drop" )
@@ -198,76 +168,70 @@ bool GT_Command( Client @client, const String &cmdString, const String &argsStri
 
 	if ( cmdString == "carrier" )
 	{
-		if ( !cvarEnableCarriers.boolean )
-		{
-			G_PrintMsg( @client.getEnt(), "Bomb carriers are disabled.\n" );
-
-			return true;
-		}
-
 		cPlayer @player = @playerFromClient( @client );
-
-		String token = argsString.getToken( 0 );
-
+		const String token = argsString.getToken( 0 );
 		if ( token.len() != 0 )
 		{
-			if ( token.toInt() == 1 )
+			const bool requestedStatus = token.toInt() != 0;
+			G_Print( "Token " + token + " \n" );
+			if ( player.setCarrier( requestedStatus ) )
 			{
-				player.isCarrier = true;
-
-				G_PrintMsg( @client.getEnt(), "You are now a bomb carrier!\n" );
-			}
-			else
-			{
-				player.isCarrier = false;
-
-				G_PrintMsg( @client.getEnt(), "You are no longer a bomb carrier.\n" );
+				if ( player.isCarrier )
+				{
+					G_PrintMsg( @client.getEnt(), "You are now a bomb carrier!\n" );
+				}
+				else
+				{
+					G_PrintMsg( @client.getEnt(), "You are no longer a bomb carrier.\n" );
+				}
 			}
 		}
 		else
 		{
-			player.isCarrier = !player.isCarrier;
-
-			if ( player.isCarrier )
-			{
-				G_PrintMsg( @client.getEnt(), "You are now a bomb carrier!\n" );
-			}
-			else
-			{
-				G_PrintMsg( @client.getEnt(), "You are no longer a bomb carrier.\n" );
-			}
+			// We've decided to disable toggling the status by default.
+			G_PrintMsg( @client.getEnt(), "Malformed command (the argument is missing)\n" );
 		}
 
 		return true;
 	}
 
-	if ( cmdString == "gametypemenu" )
+	if ( cmdString == "requestoptionsstatus" )
 	{
-		playerFromClient( @client ).showPrimarySelection();
-
+		playerFromClient( @client ).sendOptionsStatus();
 		return true;
 	}
 
-	if ( cmdString == "gametypemenu2" )
+	if ( cmdString == "primary" )
 	{
-		playerFromClient( @client ).showSecondarySelection();
-
-		return true;
-	}
-
-	if ( cmdString == "weapselect" )
-	{
-		cPlayer @player = @playerFromClient( @client );
-		
-		player.selectWeapon( argsString );
-
-		// TODO: block them from shooting for 0.5s or something instead
-
-		if ( /*match.getState() == MATCH_STATE_WARMUP ||*/ roundState == ROUNDSTATE_PRE )
+		const int value = argsString.getToken( 0 ).toInt();
+		if( value >= PRIMARY_MIN && value <= PRIMARY_MAX )
 		{
-			player.giveInventory();
+			cPlayer @player = @playerFromClient( @client );
+			if( player.selectPrimary( value ) )
+				if ( roundState == ROUNDSTATE_PRE )
+					player.giveInventory();
 		}
+		else
+		{
+			G_PrintMsg( @client.getEnt(), "Malformed command\n" );
+		}
+		return true;
+	}
 
+	if ( cmdString == "secondary" )
+	{
+		const int value = argsString.getToken( 0 ).toInt();
+		if( value >= SECONDARY_MIN && value <= SECONDARY_MAX )
+		{
+			cPlayer @player = @playerFromClient( @client );
+			if( player.selectSecondary( value ) )
+				if ( roundState == ROUNDSTATE_PRE )
+					player.giveInventory();
+		}
+		else
+		{
+			G_PrintMsg( @client.getEnt(), "Malformed command\n" );
+		}
 		return true;
 	}
 
@@ -509,10 +473,10 @@ void GT_PlayerRespawn( Entity @ent, int old_team, int new_team )
 
 		if ( !gametype.isInstagib )
 		{
-			if ( @client.getBot() == null )
-                player.showPrimarySelection();
-            else 
-                player.selectRandomBotWeapons();
+			if ( @client.getBot() != null )
+			{
+				player.selectRandomBotWeapons();
+			}
 		}
 
 		if ( matchState == MATCH_STATE_PLAYTIME )
@@ -546,8 +510,6 @@ void GT_PlayerRespawn( Entity @ent, int old_team, int new_team )
 		return;
 	}
 
-	BOMB_SetVoicecommQuickMenu( @client );
-	
 	player.giveInventory();
 	
 	ent.svflags |= SVF_FORCETEAM;
@@ -779,13 +741,28 @@ void GT_InitGametype()
 
 	G_RegisterCommand( "gametype" );
 
-	// makes no sense to have these in insta
-	// merge with the above if to save an if?
-	if ( !gametype.isInstagib )
+	G_RegisterCommand( "requestoptionsstatus" );
+
+	String carrierOption = "Be a preferred bomb carrier | OneOfList | carrier |";
+	carrierOption += "Off, gfx/hud/icons/vsay/no, On, gfx/bomb/carriericon_base";
+	G_ConfigString( CS_GAMETYPE_OPTIONS, carrierOption );
+	if( !gametype.isInstagib )
 	{
-		G_RegisterCommand( "gametypemenu" );
-		G_RegisterCommand( "gametypemenu2" );
-		G_RegisterCommand( "weapselect" );
+		G_RegisterCommand( "primary" );
+		String primaryOption = "Primary weapon | OneOfList | primary |";
+		primaryOption += " RL+EB, gfx/bomb/rleb";
+		primaryOption += ",LG+EB, gfx/bomb/lgeb";
+		primaryOption += ",RL+LG, gfx/bomb/rllg";
+		G_ConfigString( CS_GAMETYPE_OPTIONS + 1, primaryOption );
+
+		G_RegisterCommand( "secondary" );
+		String secondaryOption = "Secondary weapon | OneOfList | secondary |";
+		secondaryOption += " PG, gfx/hud/icons/weapon/plasma";
+		secondaryOption += ",RG, gfx/hud/icons/weapon/riot";
+		secondaryOption += ",MG, gfx/hud/icons/weapon/machinegun";
+		secondaryOption += ",GL, gfx/hud/icons/weapon/grenade";
+		secondaryOption += ",Blast, gfx/hud/icons/weapon/gunblade_blast";
+		G_ConfigString( CS_GAMETYPE_OPTIONS + 2, secondaryOption );
 	}
 
 	// add callvotes

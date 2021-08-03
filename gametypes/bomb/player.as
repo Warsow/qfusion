@@ -37,19 +37,21 @@ enum eSecondaries
 	SECONDARY_GB = WEAP_GUNBLADE
 }*/
 
-const uint PRIMARY_NONE = 0; // used for pending test
-const uint PRIMARY_MIN = 1;
-const uint PRIMARY_EBRL = PRIMARY_MIN;
-const uint PRIMARY_RLLG = 2;
-const uint PRIMARY_EBLG = 3;
+const int PRIMARY_NONE = -1; // used for pending test
+const int PRIMARY_MIN = 0;
+const int PRIMARY_EBRL = 0;
+const int PRIMARY_EBLG = 1;
+const int PRIMARY_RLLG = 2;
+const int PRIMARY_MAX = 2;
 
-const uint SECONDARY_NONE = 0; // used for pending test
-const uint SECONDARY_MIN = WEAP_PLASMAGUN;
-const uint SECONDARY_PG = WEAP_PLASMAGUN;
-const uint SECONDARY_RG = WEAP_RIOTGUN;
-const uint SECONDARY_MG = WEAP_MACHINEGUN;
-const uint SECONDARY_GL = WEAP_GRENADELAUNCHER;
-const uint SECONDARY_GB = WEAP_GUNBLADE;
+const int SECONDARY_NONE = -1; // used for pending test
+const int SECONDARY_MIN = 0;
+const int SECONDARY_PG = 0;
+const int SECONDARY_RG = 1;
+const int SECONDARY_MG = 2;
+const int SECONDARY_GL = 3;
+const int SECONDARY_GB = 4;
+const int SECONDARY_MAX = 4;
 
 const int AMMO_EB = 15;
 const int AMMO_RL = 15;
@@ -71,14 +73,14 @@ class cPlayer
 
 	//ePrimaries weapPrimary; FIXME enum
 	//eSecondaries weapSecondary; 
-	uint weapPrimary;
-	uint weapSecondary;
+	int weapPrimary;
+	int weapSecondary;
 
 	// fix for scoreboard/gb charge bugs
 	//ePrimaries pendingPrimary; FIXME enum
 	//eSecondaries pendingSecondary; 
-	uint pendingPrimary;
-	uint pendingSecondary;
+	int pendingPrimary;
+	int pendingSecondary;
 
 	int killsThisRound; // int to avoid mismatch and honestly, could anyone but me get 2 trillion kills
 
@@ -244,102 +246,51 @@ class cPlayer
 		this.client.selectWeapon( -1 );
 	}
 
-	String getInventoryLabel()
+	void sendOptionsStatus()
 	{
-		String label = "";
-
-		switch ( int( this.weapPrimary ) )
+		String command = "optionsstatus \" " + ( isCarrier ? "1 " : "0 " );
+		if ( !gametype.isInstagib )
 		{
-			case PRIMARY_EBRL:
-				label += getWeaponIcon( WEAP_ELECTROBOLT )
-					+ " " + getWeaponIcon( WEAP_ROCKETLAUNCHER );
-				
-				break;
-
-			case PRIMARY_RLLG:
-				label += getWeaponIcon( WEAP_ROCKETLAUNCHER )
-					+ " " + getWeaponIcon( WEAP_LASERGUN );
-				
-				break;
-
-			case PRIMARY_EBLG:
-				label += getWeaponIcon( WEAP_ELECTROBOLT )
-					+ " " + getWeaponIcon( WEAP_LASERGUN );
-				
-				break;
-
-			default:
-				assert( false, "player.as getInventoryLabel: switch hit default case" );
-
-				break;
+			command += ( this.pendingPrimary >= 0 ? this.pendingPrimary : 0 ) + " ";
+			command += ( this.pendingSecondary >= 0 ? this.pendingSecondary : 0 );
 		}
-
-		return label + " " + getWeaponIcon( this.weapSecondary );
-	}
-
-	void showPrimarySelection()
-	{
-		// this code shouldn't be reachable in insta
-		assert( !gametype.isInstagib, "player.as showPrimarySelection: insta" );
-
-		if ( this.client.team == TEAM_SPECTATOR || @this.client.getBot() != null ) 
-		{
-			return;
-		}
-        
-		String command = "mecu \"Primary weapons\""
-			+ " \"EB + RL\" \"weapselect eb; gametypemenu2\""
-			+ " \"RL + LG\" \"weapselect rl; gametypemenu2\""
-			+ " \"EB + LG\" \"weapselect lg; gametypemenu2\"";
-
-		if ( cvarEnableCarriers.boolean )
-		{
-			if ( this.isCarrier )
-			{
-				command += " \"Carrier opt-out\" \"carrier\"";
-			}
-			else
-			{
-				command += " \"Carrier opt-in\" \"carrier\"";
-			}
-		}
-
-		// TODO: add brackets around current selection?
-
+		command += "\"";
 		this.client.execGameCommand( command );
 	}
 
-	void showSecondarySelection()
+	bool setCarrier( bool requested )
 	{
-		// this code shouldn't be reachable in insta
-		assert( !gametype.isInstagib, "player.as showSecondarySelection: insta" );
-
-		if ( this.client.team == TEAM_SPECTATOR || @this.client.getBot() != null )
+		if ( this.isCarrier != requested )
 		{
-			return;
+			this.isCarrier = requested;
+			this.sendOptionsStatus();
+			return true;
 		}
-
-		// TODO: add brackets around current selection?
-
-		this.client.execGameCommand( "mecu \"Secondary weapons\""
-			+ " \"Plasmagun\" \"weapselect pg\""
-			+ " \"Riotgun\" \"weapselect rg\""
-			+ " \"Machinegun\" \"weapselect mg\""
-			+ " \"Grenade Launcher\" \"weapselect gl\""
-			+ " \"Strong Gunblade\" \"weapselect gb\""
-		);
+		return false;
 	}
 
-	//void selectPrimaryWeapon( ePrimaries weapon ) FIXME enum
-	void selectPrimaryWeapon( uint weapon )
+	bool selectPrimary( int weapon )
 	{
-		this.pendingPrimary = weapon;
+		assert( weapon >= PRIMARY_MIN && weapon <= PRIMARY_MAX, "Illegal primary weapon value" );
+		if ( this.pendingPrimary != weapon )
+		{
+			this.pendingPrimary = weapon;
+			this.sendOptionsStatus();
+			return true;
+		}
+		return false;
 	}
 
-	//void selectSecondaryWeapon( eSecondaries weapon ) FIXME enum
-	void selectSecondaryWeapon( uint weapon )
+	bool selectSecondary( int weapon )
 	{
-		this.pendingSecondary = weapon;
+		assert( weapon >= SECONDARY_MIN && weapon <= SECONDARY_MAX, "Illegal secondary weapon value" );
+		if ( this.pendingSecondary != weapon )
+		{
+			this.pendingSecondary = weapon;
+			this.sendOptionsStatus();
+			return true;
+		}
+		return false;
 	}
 
     void selectRandomBotWeapons() 
@@ -374,74 +325,6 @@ class cPlayer
             this.pendingSecondary = SECONDARY_MG;
         }
     }
-
-	void selectWeapon( String &weapon )
-	{
-		String token;
-		int len;
-
-		String error;       // string containing unrecognised tokens
-		uint errorCount = 0; // number of unrecognised tokens
-
-		// :DD
-		for ( int i = 0; ( len = ( token = weapon.getToken( i ) ).len() ) > 0; i++ )
-		{
-			if ( len != 2 )
-			{
-				continue;
-			}
-
-			token = token.toupper();
-
-			// gg Switch expressions must be integral numbers
-			// gg Case expressions must be constants
-
-			if ( token == "EB" )
-			{
-				this.selectPrimaryWeapon( PRIMARY_EBRL );
-			}
-			else if ( token == "RL" )
-			{
-				this.selectPrimaryWeapon( PRIMARY_RLLG );
-			}
-			else if ( token == "LG" )
-			{
-				this.selectPrimaryWeapon( PRIMARY_EBLG );
-			}
-			else if ( token == "PG" )
-			{
-				this.selectSecondaryWeapon( SECONDARY_PG );
-			}
-			else if ( token == "RG" )
-			{
-				this.selectSecondaryWeapon( SECONDARY_RG );
-			}
-			else if ( token == "MG" )
-			{
-				this.selectSecondaryWeapon( SECONDARY_MG );
-			}
-			else if ( token == "GL" )
-			{
-				this.selectSecondaryWeapon( SECONDARY_GL );
-			}
-			else if ( token == "GB" )
-			{
-				this.selectSecondaryWeapon( SECONDARY_GB );
-			}
-			else
-			{
-				error += " " + token;
-
-				errorCount++;
-			}
-		}
-
-		if ( errorCount != 0 )
-		{
-			// no need to add a space before error because it's already there
-			G_PrintMsg( @this.client.getEnt(), "Unrecognised token" + ( errorCount == 1 ? "" : "s" ) + ":" + error );
-		}
-	}
 }
 
 // since i am using an array of handles this must
