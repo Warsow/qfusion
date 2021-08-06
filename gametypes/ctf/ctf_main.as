@@ -737,116 +737,42 @@ void GT_ThinkRules()
 			}
         }
 
-        // always clear all before setting
-        ent.client.setHUDStat( STAT_PROGRESS_SELF, 0 );
-        ent.client.setHUDStat( STAT_PROGRESS_OTHER, 0 );
-        ent.client.setHUDStat( STAT_IMAGE_SELF, 0 );
-        ent.client.setHUDStat( STAT_IMAGE_OTHER, 0 );
-        ent.client.setHUDStat( STAT_PROGRESS_ALPHA, 0 );
-        ent.client.setHUDStat( STAT_PROGRESS_BETA, 0 );
-        ent.client.setHUDStat( STAT_IMAGE_ALPHA, 0 );
-        ent.client.setHUDStat( STAT_IMAGE_BETA, 0 );
-        ent.client.setHUDStat( STAT_MESSAGE_SELF, 0 );
-        ent.client.setHUDStat( STAT_MESSAGE_OTHER, 0 );
-        ent.client.setHUDStat( STAT_MESSAGE_ALPHA, 0 );
-        ent.client.setHUDStat( STAT_MESSAGE_BETA, 0 );
-        ent.client.setHUDStat( STAT_IMAGE_DROP_ITEM, 0 );
+		// always clear all before setting
+		ent.client.setHUDStat( STAT_PROGRESS_ALPHA, 0 );
+		ent.client.setHUDStat( STAT_PROGRESS_BETA, 0 );
+		ent.client.setHUDStat( STAT_IMAGE_ALPHA, 0 );
+		ent.client.setHUDStat( STAT_IMAGE_BETA, 0 );
 
-        if ( ent.team == TEAM_ALPHA )
-        {
-            // if our flag is being stolen
-            if ( alphaStatUnlock != 0 )
-                ent.client.setHUDStat( STAT_PROGRESS_SELF, -( alphaStatUnlock ) );
-            // we are capturing the enemy's flag
-            else if ( alphaStatCap != 0 )
-                ent.client.setHUDStat( STAT_PROGRESS_SELF, alphaStatCap );
+		if ( alphaState == 2 )
+			ent.client.setHUDStat( STAT_IMAGE_ALPHA, prcFlagIconLost );
+		else if ( alphaState == 1 )
+			ent.client.setHUDStat( STAT_IMAGE_ALPHA, prcFlagIconStolen );
+		else
+			ent.client.setHUDStat( STAT_IMAGE_ALPHA, prcFlagIcon );
 
-            // we are unlocking enemy's flag
-            if ( betaStatUnlock != 0 )
-                ent.client.setHUDStat( STAT_PROGRESS_OTHER, betaStatUnlock );
-            // the enemy is capturing our flag
-            else if ( betaStatCap != 0 )
-                ent.client.setHUDStat( STAT_PROGRESS_OTHER, -( betaStatCap ) );
+		if ( betaState == 2 )
+			ent.client.setHUDStat( STAT_IMAGE_BETA, prcFlagIconLost );
+		else if ( betaState == 1 )
+			ent.client.setHUDStat( STAT_IMAGE_BETA, prcFlagIconStolen );
+		else
+			ent.client.setHUDStat( STAT_IMAGE_BETA, prcFlagIcon );
 
-            if ( @CTF_getBaseForCarrier( ent ) != null )
-            {
-                ent.client.setHUDStat( STAT_IMAGE_OTHER, prcFlagIconCarrier );
-                ent.client.setHUDStat( STAT_IMAGE_DROP_ITEM, prcDropFlagIcon );
-            }
-            else if ( betaState == 2 )
-                ent.client.setHUDStat( STAT_IMAGE_OTHER, prcFlagIconLost );
-            else if ( betaState == 1 )
-                ent.client.setHUDStat( STAT_IMAGE_OTHER, prcFlagIconStolen );
+		// alpha flag is being unlocked
+		if ( alphaStatUnlock != 0 )
+			ent.client.setHUDStat( STAT_PROGRESS_ALPHA, -( alphaStatUnlock ) );
+		// alpha is capturing the enemy's flag
+		else if ( alphaStatCap != 0 )
+			ent.client.setHUDStat( STAT_PROGRESS_ALPHA, alphaStatCap );
 
-            if ( alphaState == 2 )
-                ent.client.setHUDStat( STAT_IMAGE_SELF, prcFlagIconLost );
-            else if ( alphaState == 1 )
-                ent.client.setHUDStat( STAT_IMAGE_SELF, prcFlagIconStolen );
-        }
-        else if ( ent.team == TEAM_BETA )
-        {
-            // if our flag is being stolen
-            if ( betaStatUnlock != 0 )
-                ent.client.setHUDStat( STAT_PROGRESS_SELF, -( betaStatUnlock ) );
-            // we are capturing the enemy's flag
-            else if ( betaStatCap != 0 )
-                ent.client.setHUDStat( STAT_PROGRESS_SELF, betaStatCap );
+		// beta flag is being unlocked
+		if ( betaStatUnlock != 0 )
+			ent.client.setHUDStat( STAT_PROGRESS_BETA, -( betaStatUnlock ) );
+		// beta is capturing the enemy's flag
+		else if ( betaStatCap != 0 )
+			ent.client.setHUDStat( STAT_PROGRESS_BETA, betaStatCap );
+	}
 
-            // we are unlocking enemy's flag
-            if ( alphaStatUnlock != 0 )
-                ent.client.setHUDStat( STAT_PROGRESS_OTHER, alphaStatUnlock );
-            // the enemy is capturing our flag
-            else if ( alphaStatCap != 0 )
-                ent.client.setHUDStat( STAT_PROGRESS_OTHER, -( alphaStatCap ) );
-
-            if ( @CTF_getBaseForCarrier( ent ) != null )
-            {
-                ent.client.setHUDStat( STAT_IMAGE_OTHER, prcFlagIconCarrier );
-                ent.client.setHUDStat( STAT_IMAGE_DROP_ITEM, prcDropFlagIcon );
-            }
-            else if ( alphaState == 2 )
-                ent.client.setHUDStat( STAT_IMAGE_OTHER, prcFlagIconLost );
-            else if ( alphaState == 1 )
-                ent.client.setHUDStat( STAT_IMAGE_OTHER, prcFlagIconStolen );
-
-            if ( betaState == 2 )
-                ent.client.setHUDStat( STAT_IMAGE_SELF, prcFlagIconLost );
-            else if ( betaState == 1 )
-                ent.client.setHUDStat( STAT_IMAGE_SELF, prcFlagIconStolen );
-        }
-        else if ( ent.client.chaseActive == false ) // don't bother with people in chasecam, they will get a copy of their chase target stat
-        {
-            if ( alphaState == 2 )
-                ent.client.setHUDStat( STAT_IMAGE_ALPHA, prcFlagIconLost );
-            else if ( alphaState == 1 )
-                ent.client.setHUDStat( STAT_IMAGE_ALPHA, prcFlagIconStolen );
-            else
-                ent.client.setHUDStat( STAT_IMAGE_ALPHA, prcFlagIcon );
-
-            if ( betaState == 2 )
-                ent.client.setHUDStat( STAT_IMAGE_BETA, prcFlagIconLost );
-            else if ( betaState == 1 )
-                ent.client.setHUDStat( STAT_IMAGE_BETA, prcFlagIconStolen );
-            else
-                ent.client.setHUDStat( STAT_IMAGE_BETA, prcFlagIcon );
-
-            // alpha flag is being unlocked
-            if ( alphaStatUnlock != 0 )
-                ent.client.setHUDStat( STAT_PROGRESS_ALPHA, -( alphaStatUnlock ) );
-            // alpha is capturing the enemy's flag
-            else if ( alphaStatCap != 0 )
-                ent.client.setHUDStat( STAT_PROGRESS_ALPHA, alphaStatCap );
-
-            // beta flag is being unlocked
-            if ( betaStatUnlock != 0 )
-                ent.client.setHUDStat( STAT_PROGRESS_BETA, -( betaStatUnlock ) );
-            // beta is capturing the enemy's flag
-            else if ( betaStatCap != 0 )
-                ent.client.setHUDStat( STAT_PROGRESS_BETA, betaStatCap );
-        }
-    }
-
-    CTF_UpdateBotsExtraGoals();
+	CTF_UpdateBotsExtraGoals();
 }
 
 // The game has detected the end of the match state, but it

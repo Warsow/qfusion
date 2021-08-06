@@ -866,32 +866,6 @@ void GT_ThinkRules()
         }
     }
 
-    G_ConfigString( CS_GENERAL, "" + alive[TEAM_ALPHA] );
-    G_ConfigString( CS_GENERAL + 1, "" + alive[TEAM_BETA] );
-
-    for ( int i = 0; i < maxClients; i++ )
-    {
-        Client @client = @G_GetClient( i );
-
-        if ( match.getState() >= MATCH_STATE_POSTMATCH || match.getState() < MATCH_STATE_PLAYTIME )
-        {
-            client.setHUDStat( STAT_MESSAGE_ALPHA, 0 );
-            client.setHUDStat( STAT_MESSAGE_BETA, 0 );
-            client.setHUDStat( STAT_IMAGE_BETA, 0 );
-        }
-        else
-        {
-            client.setHUDStat( STAT_MESSAGE_ALPHA, CS_GENERAL );
-            client.setHUDStat( STAT_MESSAGE_BETA, CS_GENERAL + 1 );
-        }
-
-        if ( client.getEnt().isGhosting()
-                || match.getState() >= MATCH_STATE_POSTMATCH )
-        {
-            client.setHUDStat( STAT_IMAGE_BETA, 0 );
-        }
-    }
-
     if ( match.getState() >= MATCH_STATE_POSTMATCH )
         return;
 

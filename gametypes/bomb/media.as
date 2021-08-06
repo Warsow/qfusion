@@ -64,15 +64,6 @@ const uint ANNOUNCEMENT_DEFUSED = 3;
 const uint ANNOUNCEMENT_HURRY   = 4;
 const uint ANNOUNCEMENT_MAX     = ANNOUNCEMENT_HURRY;
 
-/*enum eMessages FIXME enum
-{
-	MSG_ALIVE_ALPHA = CS_GENERAL,
-	MSG_ALIVE_BETA
-}*/
-
-const uint MSG_ALIVE_ALPHA = CS_GENERAL;
-const uint MSG_ALIVE_BETA = CS_GENERAL + 1;
-
 // weapon is WEAP_* from globals.h
 // i cba to write a switch statement
 int getWeaponIcon( int weapon )

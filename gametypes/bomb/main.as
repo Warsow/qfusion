@@ -116,27 +116,16 @@ void assert( const bool test, const String msg )
 
 void setTeamProgress( int teamNum, int progress )
 {
-	for ( int t = TEAM_ALPHA; t < GS_MAX_TEAMS; t++)
+	assert( teamNum == TEAM_ALPHA || teamNum == TEAM_BETA, "Illegal team" );
+	Team @team = @G_GetTeam( teamNum );
+	const int stat = teamNum == TEAM_ALPHA ? STAT_PROGRESS_ALPHA : STAT_PROGRESS_BETA;
+
+	for ( int i = 0; @team.ent( i ) != null; i++ )
 	{
-		Team @team = @G_GetTeam( t );
-
-		for ( int i = 0; @team.ent( i ) != null; i++ )
+		Entity @ent = @team.ent( i );
+		if ( !ent.isGhosting() && ent.team == teamNum )
 		{
-			Entity @ent = @team.ent( i );
-
-			if ( ent.isGhosting() )
-			{
-				continue;
-			}
-
-			if ( ent.team != teamNum )
-			{
-				continue;
-			}
-
-			Client @client = @ent.client;
-
-			client.setHUDStat( STAT_PROGRESS_SELF, progress );
+			ent.client.setHUDStat( stat, progress );
 		}
 	}
 }
@@ -557,24 +546,6 @@ void GT_ThinkRules()
 	uint aliveAlpha = playersAliveOnTeam( TEAM_ALPHA );
 	uint aliveBeta  = playersAliveOnTeam( TEAM_BETA );
 
-	G_ConfigString( MSG_ALIVE_ALPHA, "" + aliveAlpha );
-	G_ConfigString( MSG_ALIVE_BETA,  "" + aliveBeta );
-
-	for ( int i = 0; i < maxClients; i++ )
-	{
-		Client @client = @G_GetClient( i );
-
-		if ( client.state() != CS_SPAWNED )
-		{
-			continue; // don't bother if they're not ingame
-		}
-
-		client.setHUDStat( STAT_IMAGE_SELF, 0 );
-		client.setHUDStat( STAT_IMAGE_DROP_ITEM, 0 );
-		client.setHUDStat( STAT_MESSAGE_ALPHA, MSG_ALIVE_ALPHA );
-		client.setHUDStat( STAT_MESSAGE_BETA, MSG_ALIVE_BETA );
-	}
-
 	// i guess you could speed this up...
 	if ( bombState == BOMBSTATE_ARMED )
 	{
@@ -593,9 +564,6 @@ void GT_ThinkRules()
 	
 	if ( bombState == BOMBSTATE_CARRIED )
 	{
-		bombCarrier.client.setHUDStat( STAT_IMAGE_SELF, iconCarrying );
-		bombCarrier.client.setHUDStat( STAT_IMAGE_DROP_ITEM, iconDrop );
-
 		bombCarrierLastPos = bombCarrier.origin;
 		bombCarrierLastVel = bombCarrier.velocity;
 	}

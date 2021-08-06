@@ -296,18 +296,10 @@ void GT_ThinkRules()
 		client.pmoveFeatures = client.pmoveFeatures & ~PMFEAT_GUNBLADEAUTOATTACK;
 
 		// always clear all before setting
-		client.setHUDStat( STAT_PROGRESS_SELF, 0 );
-		client.setHUDStat( STAT_PROGRESS_OTHER, 0 );
-		client.setHUDStat( STAT_IMAGE_SELF, 0 );
-		client.setHUDStat( STAT_IMAGE_OTHER, 0 );
 		client.setHUDStat( STAT_PROGRESS_ALPHA, 0 );
 		client.setHUDStat( STAT_PROGRESS_BETA, 0 );
 		client.setHUDStat( STAT_IMAGE_ALPHA, 0 );
 		client.setHUDStat( STAT_IMAGE_BETA, 0 );
-		client.setHUDStat( STAT_MESSAGE_SELF, 0 );
-		client.setHUDStat( STAT_MESSAGE_OTHER, 0 );
-		client.setHUDStat( STAT_MESSAGE_ALPHA, 0 );
-		client.setHUDStat( STAT_MESSAGE_BETA, 0 );
 
 		// all stats are set to 0 each frame, so it's only needed to set a stat if it's going to get a value
 		@player = RACE_GetPlayer( client );
@@ -325,16 +317,7 @@ void GT_ThinkRules()
 		client.setHUDStat( STAT_TIME_ALPHA, -9999 );
 		client.setHUDStat( STAT_TIME_BETA, -9999 );
 
-		if ( @record != null )
-			client.setHUDStat( STAT_MESSAGE_OTHER, CS_GENERAL );
-
-		@record = localRecordsStorage.findRecordByRank( 1 );
-		if ( @record != null )
-			client.setHUDStat( STAT_MESSAGE_ALPHA, CS_GENERAL + 1 );
-
-		@record = localRecordsStorage.findRecordByRank( 2 );
-		if ( @record != null )
-			client.setHUDStat( STAT_MESSAGE_BETA, CS_GENERAL + 2 );
+		// TODO: Restore race records display
 
 		player.checkContestedRecordStatus();
 
