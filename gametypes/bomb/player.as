@@ -17,26 +17,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-/*enum ePrimaries FIXME enum
-{
-	PRIMARY_NONE, // used for pending test
-	PRIMARY_MIN,
-	PRIMARY_EBRL = PRIMARY_MIN,
-	PRIMARY_RLLG,
-	PRIMARY_EBLG
-}
-
-enum eSecondaries
-{
-	SECONDARY_NONE, // used for pending test
-	SECONDARY_MIN = WEAP_PLASMAGUN,
-	SECONDARY_PG = WEAP_PLASMAGUN,
-	SECONDARY_RG = WEAP_RIOTGUN,
-	SECONDARY_MG = WEAP_MACHINEGUN,
-	SECONDARY_GL = WEAP_GRENADELAUNCHER,
-	SECONDARY_GB = WEAP_GUNBLADE
-}*/
-
 const int PRIMARY_NONE = -1; // used for pending test
 const int PRIMARY_MIN = 0;
 const int PRIMARY_EBRL = 0;
@@ -71,16 +51,8 @@ class cPlayer
 {
 	Client @client;
 
-	//ePrimaries weapPrimary; FIXME enum
-	//eSecondaries weapSecondary; 
 	int weapPrimary;
 	int weapSecondary;
-
-	// fix for scoreboard/gb charge bugs
-	//ePrimaries pendingPrimary; FIXME enum
-	//eSecondaries pendingSecondary; 
-	int pendingPrimary;
-	int pendingSecondary;
 
 	int killsThisRound; // int to avoid mismatch and honestly, could anyone but me get 2 trillion kills
 
@@ -99,9 +71,6 @@ class cPlayer
 
 		this.weapPrimary = PRIMARY_MIN;
 		this.weapSecondary = SECONDARY_MIN;
-
-		this.pendingPrimary = PRIMARY_NONE;
-		this.pendingSecondary = SECONDARY_NONE;
 
 		this.arms = 0;
 		this.defuses = 0;
@@ -129,18 +98,6 @@ class cPlayer
 			this.client.selectWeapon( -1 );
 
 			return;
-		}
-
-		if ( this.pendingPrimary != PRIMARY_NONE )
-		{
-			this.weapPrimary = this.pendingPrimary;
-			this.pendingPrimary = PRIMARY_NONE;
-		}
-
-		if ( this.pendingSecondary != PRIMARY_NONE )
-		{
-			this.weapSecondary = this.pendingSecondary;
-			this.pendingSecondary = SECONDARY_NONE;
 		}
 
 		this.client.inventorySetCount( WEAP_GUNBLADE, 1 );
@@ -248,11 +205,11 @@ class cPlayer
 
 	void sendOptionsStatus()
 	{
-		String command = "optionsstatus \" " + ( isCarrier ? "1 " : "0 " );
+		String command = "optionsstatus \"" + ( isCarrier ? "1" : "0" );
 		if ( !gametype.isInstagib )
 		{
-			command += ( this.pendingPrimary >= 0 ? this.pendingPrimary : 0 ) + " ";
-			command += ( this.pendingSecondary >= 0 ? this.pendingSecondary : 0 );
+			command += " " + this.weapPrimary;
+			command += " " + this.weapSecondary;
 		}
 		command += "\"";
 		this.client.execGameCommand( command );
@@ -272,9 +229,9 @@ class cPlayer
 	bool selectPrimary( int weapon )
 	{
 		assert( weapon >= PRIMARY_MIN && weapon <= PRIMARY_MAX, "Illegal primary weapon value" );
-		if ( this.pendingPrimary != weapon )
+		if ( this.weapPrimary != weapon )
 		{
-			this.pendingPrimary = weapon;
+			this.weapPrimary = weapon;
 			this.sendOptionsStatus();
 			return true;
 		}
@@ -284,47 +241,47 @@ class cPlayer
 	bool selectSecondary( int weapon )
 	{
 		assert( weapon >= SECONDARY_MIN && weapon <= SECONDARY_MAX, "Illegal secondary weapon value" );
-		if ( this.pendingSecondary != weapon )
+		if ( this.weapSecondary != weapon )
 		{
-			this.pendingSecondary = weapon;
+			this.weapSecondary = weapon;
 			this.sendOptionsStatus();
 			return true;
 		}
 		return false;
 	}
 
-    void selectRandomBotWeapons() 
-    {
-        // Prefer EB + LG
-        if ( random() < 0.7f )
-        {
-            this.pendingPrimary = PRIMARY_EBLG;
-            // Choose RG to compensate lack of RL
-            if ( random() < 0.7f )
-                this.pendingSecondary = SECONDARY_RG;
-            else if ( random() < 0.7f )
-                this.pendingSecondary = SECONDARY_PG;
-            else 
-                this.pendingSecondary = SECONDARY_GL;
-        }        
-        // Otherwise prefer EB + RL
-        else if ( random() < 0.7f )
-        {
-            this.pendingPrimary = PRIMARY_EBRL;
-            // Choose PG to compensate lack of continous fire weapons
-            if ( random() < 0.7f )            
-                this.pendingSecondary = SECONDARY_PG;
-            else
-                this.pendingSecondary = SECONDARY_MG;    
-        }
-        // RL + LG
-        else    
-        {
-            this.pendingPrimary = PRIMARY_RLLG;
-            // Choose MG to compensate lack of long-range weapons 
-            this.pendingSecondary = SECONDARY_MG;
-        }
-    }
+	void selectRandomBotWeapons()
+	{
+		// Prefer EB + LG
+		if ( random() < 0.7f )
+		{
+			this.weapPrimary = PRIMARY_EBLG;
+			// Choose RG to compensate lack of RL
+			if ( random() < 0.7f )
+				this.weapSecondary = SECONDARY_RG;
+			else if ( random() < 0.7f )
+				this.weapSecondary = SECONDARY_PG;
+			else
+				this.weapSecondary = SECONDARY_GL;
+		}
+		// Otherwise prefer EB + RL
+		else if ( random() < 0.7f )
+		{
+			this.weapPrimary = PRIMARY_EBRL;
+			// Choose PG to compensate lack of continous fire weapons
+			if ( random() < 0.7f )
+				this.weapSecondary = SECONDARY_PG;
+			else
+				this.weapSecondary = SECONDARY_MG;
+		}
+		// RL + LG
+		else
+		{
+			this.weapPrimary = PRIMARY_RLLG;
+			// Choose MG to compensate lack of long-range weapons
+			this.weapSecondary = SECONDARY_MG;
+		}
+	}
 }
 
 // since i am using an array of handles this must
