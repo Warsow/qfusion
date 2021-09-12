@@ -45,19 +45,19 @@ void award_playerKilled( Entity @victim, Entity @attacker, Entity @inflictor )
 		speed = avel.length();
 		if( speed >= compSpeed )
 		{
-			attacker.client.addAward( S_COLOR_CYAN + "Meep Meep!" );
-			// victim.client.addAward( S_COLOR_CYAN + "You got Meep Meeped!" );
+			attacker.client.addAward( S_COLOR_MAGENTA + "Meep Meep!" );
+			// victim.client.addAward( S_COLOR_MAGENTA + "You got Meep Meeped!" );
 			// from headhunt.as
 			if ( attacker.client.weapon == WEAP_GUNBLADE )
-				attacker.client.addAward( S_COLOR_CYAN + "Gunblade Rush!" );
+				attacker.client.addAward( S_COLOR_ORANGE + "Gunblade Rush!" );
 		}
 	
 		vvel.z = 0.0;
 		speed = vvel.length();
 		if( speed >= compSpeed )
 		{
-			attacker.client.addAward( S_COLOR_CYAN + "Coyote wins!" );
-			// victim.client.addAward( S_COLOR_CYAN + "Meep Meep fail!" );
+			attacker.client.addAward( S_COLOR_MAGENTA + "Coyote wins!" );
+			// victim.client.addAward( S_COLOR_MAGENTA + "Meep Meep fail!" );
 		}
 	}
 
