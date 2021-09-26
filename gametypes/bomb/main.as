@@ -104,6 +104,9 @@ const String[] SITE_LETTERS = { 'A', 'B' };
 
 const int COUNTDOWN_MAX = 6; // was 4, but this gives people more time to change weapons
 
+// TODO: Add different assets
+const int hudIconBomb = 1;
+
 // this should really kill the program
 // but i'm mostly using it as an indicator that it's about to die anyway
 void assert( const bool test, const String msg )
@@ -114,18 +117,18 @@ void assert( const bool test, const String msg )
 	}
 }
 
-void setTeamProgress( int teamNum, int progress )
+void setTeamProgressAndAnim( int teamNum, int progress, int anim )
 {
 	assert( teamNum == TEAM_ALPHA || teamNum == TEAM_BETA, "Illegal team" );
 	Team @team = @G_GetTeam( teamNum );
-	const int stat = teamNum == TEAM_ALPHA ? STAT_PROGRESS_ALPHA : STAT_PROGRESS_BETA;
 
 	for ( int i = 0; @team.ent( i ) != null; i++ )
 	{
 		Entity @ent = @team.ent( i );
-		if ( !ent.isGhosting() && ent.team == teamNum )
+		if ( ent.team == teamNum )
 		{
-			ent.client.setHUDStat( stat, progress );
+			ent.client.setHUDStat( STAT_INDICATOR_3_PROGRESS, progress );
+			ent.client.setHUDStat( STAT_INDICATOR_3_ANIM, anim );
 		}
 	}
 }
@@ -536,6 +539,18 @@ void GT_ThinkRules()
 		}
 	}
 
+    // Clear the state for robustness purposes
+	for( int i = 0; i < maxClients; ++i )
+	{
+		Client @client = @G_GetClient( i );
+		client.setHUDStat( STAT_INDICATOR_1_ENABLED, 0 );
+		client.setHUDStat( STAT_INDICATOR_2_ENABLED, 0 );
+		client.setHUDStat( STAT_INDICATOR_3_ENABLED, 1 );
+		client.setHUDStat( STAT_INDICATOR_3_ANIM, HUD_INDICATOR_NO_ANIM );
+		client.setHUDStat( STAT_INDICATOR_3_ICON, hudIconBomb );
+		client.setHUDStat( STAT_INDICATOR_3_PROGRESS, 0 );
+	}
+
 	if ( match.getState() < MATCH_STATE_PLAYTIME )
 	{
 		return;
@@ -702,6 +717,9 @@ void GT_InitGametype()
 
 	scoreboard.beginDefiningSchema();
 	scoreboard.endDefiningSchema();
+
+    // TODO: Make proper different assets
+	G_ConfigString( CS_GENERAL + hudIconBomb - 1, "gfx/bomb/carriericon" );
 
 	// add commands
 	G_RegisterCommand( "drop" );

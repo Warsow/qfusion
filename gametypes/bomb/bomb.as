@@ -371,8 +371,6 @@ void bombArm(array<Entity @> @nearby)
 
 	G_CenterPrintFormatMsg( null, "Bomb planted at %s!", bombSite.letter );
 
-	setTeamProgress( attackingTeam, 0 );
-
 	bombProgress = 0;
 	bombState = BOMBSTATE_ARMED;
 
@@ -568,7 +566,7 @@ void bombThink()
 					progress = -progress;
 				}
 				
-				setTeamProgress( attackingTeam, progress );
+				setTeamProgressAndAnim( attackingTeam, progress, HUD_INDICATOR_ACTION_ANIM );
 
 				bombSprite.counterNum = bombDecal.counterNum = int( frac * 255.0f );
 			}
@@ -624,7 +622,7 @@ void bombThink()
 						progress = -progress;
 					}
 
-					setTeamProgress( defendingTeam, progress );
+					setTeamProgressAndAnim( defendingTeam, progress, HUD_INDICATOR_ACTION_ANIM );
 				}
 
 				if ( levelTime > bombNextBeep )

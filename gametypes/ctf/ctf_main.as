@@ -37,16 +37,15 @@ const float CTF_OBJECT_DEFENSE_BONUS_DISTANCE = 512.0f;
 
 // precache images and sounds
 
-int prcShockIcon;
-int prcShellIcon;
-int prcAlphaFlagIcon;
-int prcBetaFlagIcon;
-int prcFlagIcon;
-int prcFlagIconStolen;
-int prcFlagIconLost;
-int prcFlagIconCarrier;
-int prcDropFlagIcon;
+// TODO: Allow downloading HUD content
+const int hudIconFlag = 1;
+// TODO: Add lost/stolen HUD image assets
+const int hudIconFlagLost = 1;
+const int hudIconFlagStolen = 1;
 
+int prcFlagIcon;
+int prcFlagIconLost;
+int prcFlagIconStolen;
 int prcFlagIndicatorDecal;
 
 int prcAnnouncerRecovery01;
@@ -718,6 +717,11 @@ void GT_ThinkRules()
         }
     }
 
+    // Make shorthands for clarity
+    const int alertAnim  = HUD_INDICATOR_ALERT_ANIM;
+    const int actionAnim = HUD_INDICATOR_ACTION_ANIM;
+    const int noAnim     = HUD_INDICATOR_NO_ANIM;
+
     for ( int i = 0; i < maxClients; i++ )
     {
         Entity @ent = @G_GetClient( i ).getEnt();
@@ -730,49 +734,85 @@ void GT_ThinkRules()
         {
             if ( ent.health > ent.maxHealth ) {
                 ent.health -= ( frameTime * 0.001f );
-				// fix possible rounding errors
-				if( ent.health < ent.maxHealth ) {
-					ent.health = ent.maxHealth;
-				}
-			}
+                // fix possible rounding errors
+                if( ent.health < ent.maxHealth ) {
+                    ent.health = ent.maxHealth;
+                }
+            }
         }
 
-		// always clear all before setting
-		ent.client.setHUDStat( STAT_PROGRESS_ALPHA, 0 );
-		ent.client.setHUDStat( STAT_PROGRESS_BETA, 0 );
-		ent.client.setHUDStat( STAT_IMAGE_ALPHA, 0 );
-		ent.client.setHUDStat( STAT_IMAGE_BETA, 0 );
+        // always clear all before setting
+        ent.client.setHUDStat( STAT_INDICATOR_1_ENABLED, 1 );
+        ent.client.setHUDStat( STAT_INDICATOR_2_ENABLED, 1 );
+        ent.client.setHUDStat( STAT_INDICATOR_3_ENABLED, 0 );
 
-		if ( alphaState == 2 )
-			ent.client.setHUDStat( STAT_IMAGE_ALPHA, prcFlagIconLost );
-		else if ( alphaState == 1 )
-			ent.client.setHUDStat( STAT_IMAGE_ALPHA, prcFlagIconStolen );
-		else
-			ent.client.setHUDStat( STAT_IMAGE_ALPHA, prcFlagIcon );
+        ent.client.setHUDStat( STAT_INDICATOR_1_COLORTEAM, TEAM_ALPHA );
+        ent.client.setHUDStat( STAT_INDICATOR_2_COLORTEAM, TEAM_BETA );
 
-		if ( betaState == 2 )
-			ent.client.setHUDStat( STAT_IMAGE_BETA, prcFlagIconLost );
-		else if ( betaState == 1 )
-			ent.client.setHUDStat( STAT_IMAGE_BETA, prcFlagIconStolen );
-		else
-			ent.client.setHUDStat( STAT_IMAGE_BETA, prcFlagIcon );
+        ent.client.setHUDStat( STAT_INDICATOR_1_PROGRESS, 0 );
+        ent.client.setHUDStat( STAT_INDICATOR_2_PROGRESS, 0 );
 
-		// alpha flag is being unlocked
-		if ( alphaStatUnlock != 0 )
-			ent.client.setHUDStat( STAT_PROGRESS_ALPHA, -( alphaStatUnlock ) );
-		// alpha is capturing the enemy's flag
-		else if ( alphaStatCap != 0 )
-			ent.client.setHUDStat( STAT_PROGRESS_ALPHA, alphaStatCap );
+        int alphaIcon = hudIconFlag, betaIcon = hudIconFlag;
+        int alphaAnim = noAnim, betaAnim = noAnim;
 
-		// beta flag is being unlocked
-		if ( betaStatUnlock != 0 )
-			ent.client.setHUDStat( STAT_PROGRESS_BETA, -( betaStatUnlock ) );
-		// beta is capturing the enemy's flag
-		else if ( betaStatCap != 0 )
-			ent.client.setHUDStat( STAT_PROGRESS_BETA, betaStatCap );
-	}
+        // Check carried status first
 
-	CTF_UpdateBotsExtraGoals();
+        if ( alphaState == 2 )
+        {
+            alphaIcon = hudIconFlagLost;
+            alphaAnim = actionAnim;
+        }
+        else if ( alphaState == 1 )
+        {
+            alphaIcon = hudIconFlagStolen;
+            alphaAnim = actionAnim;
+        }
+
+        if ( betaState == 2 )
+        {
+            betaIcon = hudIconFlagLost;
+            betaAnim = actionAnim;
+        }
+        else if ( betaState == 1 )
+        {
+            betaIcon = hudIconFlagStolen;
+            betaAnim = actionAnim;
+        }
+
+        int alphaProgress = 0, betaProgress = 0;
+
+        if( alphaStatUnlock != 0 )
+        {
+            alphaProgress = alphaStatUnlock;
+            alphaAnim = alertAnim;
+        }
+        else if( betaStatCap != 0 )
+        {
+            alphaProgress = betaStatCap;
+            alphaAnim = alertAnim;
+        }
+
+        if( betaStatUnlock != 0 )
+        {
+            betaProgress = betaStatUnlock;
+            betaAnim = alertAnim;
+        }
+        else if( alphaStatCap != 0 )
+        {
+            betaProgress = alphaStatCap;
+            betaAnim = alertAnim;
+        }
+
+        ent.client.setHUDStat( STAT_INDICATOR_1_ICON, alphaIcon );
+        ent.client.setHUDStat( STAT_INDICATOR_1_PROGRESS, alphaProgress );
+        ent.client.setHUDStat( STAT_INDICATOR_1_ANIM, alphaAnim );
+
+        ent.client.setHUDStat( STAT_INDICATOR_2_ICON, betaIcon );
+        ent.client.setHUDStat( STAT_INDICATOR_2_PROGRESS, betaProgress );
+        ent.client.setHUDStat( STAT_INDICATOR_2_ANIM, betaAnim );
+    }
+
+    CTF_UpdateBotsExtraGoals();
 }
 
 // The game has detected the end of the match state, but it
@@ -952,15 +992,24 @@ void GT_InitGametype()
     scoreboard.endDefiningSchema();
 
     // precache images and sounds
-    prcShockIcon = G_ImageIndex( "gfx/hud/icons/powerup/quad" );
-    prcShellIcon = G_ImageIndex( "gfx/hud/icons/powerup/warshell" );
-    prcAlphaFlagIcon = G_ImageIndex( "gfx/hud/icons/flags/iconflag_alpha" );
-    prcBetaFlagIcon = G_ImageIndex( "gfx/hud/icons/flags/iconflag_beta" );
-    prcFlagIcon = G_ImageIndex( "gfx/hud/icons/flags/iconflag" );
-    prcFlagIconStolen = G_ImageIndex( "gfx/hud/icons/flags/iconflag_stolen" );
-    prcFlagIconLost = G_ImageIndex( "gfx/hud/icons/flags/iconflag_lost" );
-    prcFlagIconCarrier = G_ImageIndex( "gfx/hud/icons/flags/iconflag_carrier" );
-    prcDropFlagIcon = G_ImageIndex( "gfx/hud/icons/drop/flag" );
+    // TODO: Why precaching quad/shell
+    G_ImageIndex( "gfx/hud/icons/powerup/quad" );
+    G_ImageIndex( "gfx/hud/icons/powerup/warshell" );
+
+    // TODO: Are these icons for old scoreboard??
+    G_ImageIndex( "gfx/hud/icons/flags/iconflag_alpha" );
+    G_ImageIndex( "gfx/hud/icons/flags/iconflag_beta" );
+    G_ImageIndex( "gfx/hud/icons/flags/iconflag_carrier" );
+
+    prcFlagIcon       = G_ImageIndex( "gfx/hud/icons/flags/iconflag" );
+    // TODO: Make different assets
+    prcFlagIconStolen = G_ImageIndex( "gfx/hud/icons/flags/iconflag" );
+    prcFlagIconLost   = G_ImageIndex( "gfx/hud/icons/flags/iconflag" );
+
+    // TODO: Make different assets
+    G_ConfigString( CS_GENERAL + hudIconFlag - 1, "gfx/hud/icons/flags/iconflag" );
+    G_ConfigString( CS_GENERAL + hudIconFlagLost - 1, "gfx/hud/icons/flags/iconflag" );
+    G_ConfigString( CS_GENERAL + hudIconFlagStolen - 1, "gfx/hud/icons/flags/iconflag" );
 
     prcFlagIndicatorDecal = G_ImageIndex( "gfx/indicators/radar_decal" );
 
