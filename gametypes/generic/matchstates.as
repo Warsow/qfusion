@@ -575,12 +575,10 @@ void GENERIC_DetectTeamsAndMatchNames()
 
     for ( int teamNo = TEAM_ALPHA; teamNo <= TEAM_BETA; teamNo++ )
     {
-        Team @team;
-        String teamName, defaultTeamName;
-        bool multiPlayerTeams = ( gametype.maxPlayersPerTeam == 0 || gametype.maxPlayersPerTeam > 1 );
+        const bool multiPlayerTeams = ( gametype.maxPlayersPerTeam == 0 || gametype.maxPlayersPerTeam > 1 );
+        Team @team = @G_GetTeam( teamNo );
+        String teamName = team.defaultName;
 
-        @team = @G_GetTeam( teamNo );
-        teamName = defaultTeamName = team.defaultName;
         if ( team.numPlayers > 0 )
         {
             // use first player's clan name (with color chars intact)
@@ -607,11 +605,7 @@ void GENERIC_DetectTeamsAndMatchNames()
             }
             else
             {
-                // for individual gametypes, append clan name to player's name
-                String lastClanNameChar = "";
-                if ( clanNameColorless.len() > 0 )
-                    lastClanNameChar = clanNameColorless.substr( clanNameColorless.length() - 1, 1 );
-                teamName = (lastClanNameChar.length() > 0 ? clanName + (lastClanNameChar.isAlphaNumerical() ? "/" : "") : "") + team.ent( 0 ).client.name;
+                teamName = team.ent( 0 ).client.name;
             }
         }
 
@@ -621,7 +615,7 @@ void GENERIC_DetectTeamsAndMatchNames()
         // match name
         if ( matchNameOk )
         {
-            if ( teamName != defaultTeamName )
+            if ( teamName != team.defaultName )
             {
                 matchName += (matchName.len() > 0 ? " vs " : "") + teamName;
             }
