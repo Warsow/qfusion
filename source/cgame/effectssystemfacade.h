@@ -93,6 +93,10 @@ public:
 	void spawnWorldLaserBeam( const float *from, const float *to, float width );
 	void spawnGameDebugBeam( const float *from, const float *to, const float *color, int parm );
 
+	void touchAreaIndicator( int entNum, const float *origin, float radius, const float *color, int64_t currTime ) {
+		m_trackedEffectsSystem.touchAreaIndicator( entNum, origin, radius, color, currTime );
+	}
+
 	void spawnPlayerTeleInEffect( int entNum, const float *origin, model_s *model ) {
 		m_trackedEffectsSystem.spawnPlayerTeleInEffect( entNum, origin, model );
 	}

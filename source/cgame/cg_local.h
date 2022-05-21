@@ -731,10 +731,6 @@ inline void CG_ClearLightStyles( void ) {}
 inline void CG_RunLightStyles( void ) {}
 inline void CG_SetLightStyle( unsigned i, const wsw::StringView &s ) {}
 
-inline void CG_ClearFragmentedDecals( void ) {}
-inline void CG_AddFragmentedDecal( vec3_t origin, vec3_t dir, float orient, float radius,
-							float r, float g, float b, float a, struct shader_s *shader ) {}
-
 //
 //	cg_vweap.c - client weapon
 //

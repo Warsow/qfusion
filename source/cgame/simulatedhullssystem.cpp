@@ -224,6 +224,9 @@ SimulatedHullsSystem::~SimulatedHullsSystem() {
 	for( WaveHull *hull = m_waveHullsHead, *nextHull = nullptr; hull; hull = nextHull ) { nextHull = hull->next;
 		unlinkAndFreeWaveHull( hull );
 	}
+	for( AreaHull *hull = m_areaHullsHead, *nextHull = nullptr; hull; hull = nextHull ) { nextHull = hull->next;
+		unlinkAndFreeAreaHull( hull );
+	}
 	for( CMShapeList *shapeList: m_freeShapeLists ) {
 		CM_FreeShapeList( cl.cms, shapeList );
 	}
@@ -256,24 +259,31 @@ void SimulatedHullsSystem::unlinkAndFreeBlastHull( BlastHull *hull ) {
 	m_blastHullsAllocator.free( hull );
 }
 
-[[nodiscard]]
+void SimulatedHullsSystem::unlinkAndFreeAreaHull( AreaHull *hull ) {
+	wsw::unlink( hull, &m_areaHullsHead );
+	m_freeShapeLists.push_back( hull->shapeList );
+	hull->~AreaHull();
+	m_areaHullsAllocator.free( hull );
+}
+
 auto SimulatedHullsSystem::allocFireHull( int64_t currTime, unsigned lifetime ) -> FireHull * {
 	return allocHull<FireHull, false>( &m_fireHullsHead, &m_fireHullsAllocator, currTime, lifetime );
 }
 
-[[nodiscard]]
 auto SimulatedHullsSystem::allocBlastHull( int64_t currTime, unsigned int lifetime ) -> BlastHull * {
 	return allocHull<BlastHull, false>( &m_blastHullsHead, &m_blastHullsAllocator, currTime, lifetime );
 }
 
-[[nodiscard]]
 auto SimulatedHullsSystem::allocSmokeHull( int64_t currTime, unsigned lifetime ) -> SmokeHull * {
 	return allocHull<SmokeHull, true>( &m_smokeHullsHead, &m_smokeHullsAllocator, currTime, lifetime );
 }
 
-[[nodiscard]]
 auto SimulatedHullsSystem::allocWaveHull( int64_t currTime, unsigned lifetime ) -> WaveHull * {
 	return allocHull<WaveHull, true>( &m_waveHullsHead, &m_waveHullsAllocator, currTime, lifetime );
+}
+
+auto SimulatedHullsSystem::allocAreaHull( int64_t currTime, unsigned int lifetime ) -> AreaHull * {
+	return allocHull<AreaHull, true>( &m_areaHullsHead, &m_areaHullsAllocator, currTime, lifetime );
 }
 
 // TODO: Turn on "Favor small code" for this template
@@ -518,8 +528,8 @@ void SimulatedHullsSystem::simulateFrameAndSubmit( int64_t currTime, DrawSceneRe
 	// Limit the time step
 	const float timeDeltaSeconds = 1e-3f * (float)std::min<int64_t>( 33, currTime - m_lastTime );
 
-	wsw::StaticVector<BaseRegularSimulatedHull *, kMaxSmokeHulls + kMaxWaveHulls> activeRegularHulls;
-	wsw::StaticVector<BaseConcentricSimulatedHull *, kMaxFireHulls> activeConcentricHulls;
+	wsw::StaticVector<BaseRegularSimulatedHull *, kMaxSmokeHulls + kMaxWaveHulls + kMaxAreaHulls> activeRegularHulls;
+	wsw::StaticVector<BaseConcentricSimulatedHull *, kMaxFireHulls + kMaxBlastHulls> activeConcentricHulls;
 	for( FireHull *hull = m_fireHullsHead, *nextHull = nullptr; hull; hull = nextHull ) { nextHull = hull->next;
 		if( hull->spawnTime + hull->lifetime > currTime ) [[likely]] {
 			hull->simulate( currTime, timeDeltaSeconds, &m_rng );
@@ -550,6 +560,14 @@ void SimulatedHullsSystem::simulateFrameAndSubmit( int64_t currTime, DrawSceneRe
 			activeRegularHulls.push_back( hull );
 		} else {
 			unlinkAndFreeWaveHull( hull );
+		}
+	}
+	for( AreaHull *hull = m_areaHullsHead, *nextHull = nullptr; hull; hull = nextHull ) { nextHull = hull->next;
+		if( hull->spawnTime + hull->lifetime > currTime ) [[likely]] {
+			hull->simulate( currTime, timeDeltaSeconds, &m_rng );
+			activeRegularHulls.push_back( hull );
+		} else {
+			unlinkAndFreeAreaHull( hull );
 		}
 	}
 

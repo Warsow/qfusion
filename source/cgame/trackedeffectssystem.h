@@ -42,6 +42,8 @@ public:
 	void touchBlastTrail( int entNum, const float *origin, int64_t currTime );
 	void touchElectroTrail( int entNum, const float *origin, int64_t currTime );
 
+	void touchAreaIndicator( int entNum, const float *origin, float radius, const float *color, int64_t currTime );
+
 	void spawnPlayerTeleInEffect( int entNum, const float *origin, model_s *model ) {
 		spawnPlayerTeleEffect( entNum, origin, model, 0 );
 	}
@@ -75,6 +77,17 @@ private:
 		std::optional<AttachmentIndices> attachmentIndices;
 	};
 
+	struct AreaIndicator {
+		AreaIndicator *prev { nullptr }, *next { nullptr };
+		void *hullOpaquePtr { nullptr };
+		int64_t lastHullSpawnTime { 0 };
+		int64_t touchedAt { 0 };
+		vec3_t rgb { 1.0f, 1.0f, 1.0f };
+		vec3_t origin { 0.0f, 0.0f, 0.0f };
+		float radius { 128.0f };
+		int entNum { std::numeric_limits<int>::max() };
+	};
+
 	struct TeleEffect {
 		TeleEffect *prev { nullptr }, *next { nullptr };
 		int64_t spawnTime { 0 };
@@ -95,12 +108,14 @@ private:
 
 	struct AttachedEntityEffects {
 		ParticleTrail *particleTrails[2] { nullptr, nullptr };
+		AreaIndicator *areaIndicator { nullptr };
 	};
 
 	void makeParticleTrailLingering( ParticleTrail *trail );
 
 	void unlinkAndFree( ParticleTrail *particleTrail );
 	void unlinkAndFree( TeleEffect *teleEffect );
+	void unlinkAndFree( AreaIndicator *areaIndicator );
 
 	[[nodiscard]]
 	auto allocParticleTrail( int entNum, unsigned trailIndex,
@@ -118,10 +133,13 @@ private:
 	ParticleTrail *m_attachedTrailsHead { nullptr };
 	ParticleTrail *m_lingeringTrailsHead { nullptr };
 
+	AreaIndicator *m_areaIndicatorsHead { nullptr };
+
 	TeleEffect *m_teleEffectsHead { nullptr };
 
 	wsw::HeapBasedFreelistAllocator m_particleTrailsAllocator { sizeof( ParticleTrail ), 4 * MAX_CLIENTS };
 	wsw::HeapBasedFreelistAllocator m_teleEffectsAllocator { sizeof( TeleEffect ), 2 * MAX_CLIENTS };
+	wsw::HeapBasedFreelistAllocator m_areaIndicatorsAllocator { sizeof( AreaIndicator ), MAX_EDICTS };
 
 	AttachedEntityEffects m_attachedEntityEffects[MAX_EDICTS];
 	AttachedClientEffects m_attachedClientEffects[MAX_CLIENTS];

@@ -11,6 +11,7 @@ struct CMShapeList;
 
 class SimulatedHullsSystem {
 	friend class TransientEffectsSystem;
+	friend class TrackedEffectsSystem;
 public:
 	struct ColorChangeTimelineNode {
 		std::span<const byte_vec4_t> replacementPalette;
@@ -177,11 +178,13 @@ private:
 	using BlastHull = ConcentricSimulatedHull<3, 3>;
 	using SmokeHull = RegularSimulatedHull<2>;
 	using WaveHull  = RegularSimulatedHull<2>;
+	using AreaHull  = RegularSimulatedHull<3>;
 
 	void unlinkAndFreeFireHull( FireHull *hull );
 	void unlinkAndFreeBlastHull( BlastHull *hull );
 	void unlinkAndFreeSmokeHull( SmokeHull *hull );
 	void unlinkAndFreeWaveHull( WaveHull *hull );
+	void unlinkAndFreeAreaHull( AreaHull *hull );
 
 	template <typename Hull, bool HasShapeLists>
 	[[nodiscard]]
@@ -197,6 +200,8 @@ private:
 	auto allocSmokeHull( int64_t currTime, unsigned lifetime ) -> SmokeHull *;
 	[[nodiscard]]
 	auto allocWaveHull( int64_t currTime, unsigned lifetime ) -> WaveHull *;
+	[[nodiscard]]
+	auto allocAreaHull( int64_t currTime, unsigned lifetime ) -> AreaHull *;
 
 	void setupHullVertices( BaseRegularSimulatedHull *hull, const float *origin, const float *color,
 							float speed, float speedSpread );
@@ -230,19 +235,22 @@ private:
 	BlastHull *m_blastHullsHead { nullptr };
 	SmokeHull *m_smokeHullsHead { nullptr };
 	WaveHull *m_waveHullsHead { nullptr };
+	AreaHull *m_areaHullsHead { nullptr };
 
 	static constexpr unsigned kMaxFireHulls  = 32;
 	static constexpr unsigned kMaxBlastHulls = 32;
 	static constexpr unsigned kMaxSmokeHulls = kMaxFireHulls * 2;
 	static constexpr unsigned kMaxWaveHulls  = kMaxFireHulls;
+	static constexpr unsigned kMaxAreaHulls  = 32;
 
-	wsw::StaticVector<CMShapeList *, kMaxSmokeHulls + kMaxWaveHulls> m_freeShapeLists;
+	wsw::StaticVector<CMShapeList *, kMaxSmokeHulls + kMaxWaveHulls + kMaxAreaHulls> m_freeShapeLists;
 	CMShapeList *m_tmpShapeList { nullptr };
 
 	wsw::HeapBasedFreelistAllocator m_fireHullsAllocator { sizeof( FireHull ), kMaxFireHulls };
 	wsw::HeapBasedFreelistAllocator m_blastHullsAllocator { sizeof( BlastHull ), kMaxBlastHulls };
 	wsw::HeapBasedFreelistAllocator m_smokeHullsAllocator { sizeof( SmokeHull ), kMaxSmokeHulls };
 	wsw::HeapBasedFreelistAllocator m_waveHullsAllocator { sizeof( WaveHull ), kMaxWaveHulls };
+	wsw::HeapBasedFreelistAllocator m_areaHullsAllocator { sizeof( AreaHull ), kMaxAreaHulls };
 
 	wsw::RandomGenerator m_rng;
 	int64_t m_lastTime { 0 };

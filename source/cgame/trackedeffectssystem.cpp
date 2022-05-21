@@ -31,6 +31,9 @@ TrackedEffectsSystem::~TrackedEffectsSystem() {
 	for( ParticleTrail *trail = m_lingeringTrailsHead, *next = nullptr; trail; trail = next ) { next = trail->next;
 		unlinkAndFree( trail );
 	}
+	for( AreaIndicator *ind = m_areaIndicatorsHead, *next = nullptr; ind; ind = next ) { next = ind->next;
+		unlinkAndFree( ind );
+	}
 	for( TeleEffect *effect = m_teleEffectsHead, *next = nullptr; effect; effect = next ) { next = effect->next;
 		unlinkAndFree( effect );
 	}
@@ -58,6 +61,14 @@ void TrackedEffectsSystem::unlinkAndFree( TeleEffect *teleEffect ) {
 	teleEffect->~TeleEffect();
 	// TODO: Release bone poses
 	m_teleEffectsAllocator.free( teleEffect );
+}
+
+void TrackedEffectsSystem::unlinkAndFree( AreaIndicator *areaIndicator ) {
+	assert( areaIndicator->entNum >= 0 && areaIndicator->entNum < MAX_ENTITIES );
+	wsw::unlink( areaIndicator, &m_areaIndicatorsHead );
+	m_attachedEntityEffects[areaIndicator->entNum].areaIndicator = nullptr;
+	areaIndicator->~AreaIndicator();
+	m_areaIndicatorsAllocator.free( areaIndicator );
 }
 
 void TrackedEffectsSystem::spawnPlayerTeleEffect( int clientNum, const float *origin, model_s *model, int inOrOutIndex ) {
@@ -475,6 +486,27 @@ void TrackedEffectsSystem::makeParticleTrailLingering( ParticleTrail *particleTr
 	entityEffects->particleTrails[trailIndex] = nullptr;
 }
 
+void TrackedEffectsSystem::touchAreaIndicator( int entNum, const float *origin, float radius,
+											   const float *color, int64_t currTime ) {
+	assert( entNum >= 0 && entNum < MAX_EDICTS );
+	AttachedEntityEffects *effects = &m_attachedEntityEffects[entNum];
+	if( !effects->areaIndicator ) [[unlikely]] {
+		if( void *mem = m_areaIndicatorsAllocator.allocOrNull() ) [[likely]] {
+			auto *indicator = effects->areaIndicator = new( mem )AreaIndicator;
+			VectorCopy( origin, indicator->origin );
+			VectorCopy( color, indicator->rgb );
+			// TODO: Supply the proper origin value
+			indicator->origin[2] += 8.0f;
+			indicator->radius = 2.0f * radius;
+			indicator->entNum = entNum;
+			wsw::link( indicator, &m_areaIndicatorsHead );
+		}
+	}
+	if( effects->areaIndicator ) [[likely]] {
+		effects->areaIndicator->touchedAt = currTime;
+	}
+}
+
 void TrackedEffectsSystem::resetEntityEffects( int entNum ) {
 	const int maybeValidClientNum = entNum - 1;
 	if( (unsigned)maybeValidClientNum < (unsigned)MAX_CLIENTS ) [[unlikely]] {
@@ -508,6 +540,10 @@ void TrackedEffectsSystem::resetEntityEffects( int entNum ) {
 		makeParticleTrailLingering( effects->particleTrails[1] );
 		assert( !effects->particleTrails[1] );
 	}
+	if( effects->areaIndicator ) {
+		unlinkAndFree( effects->areaIndicator );
+		assert( !effects->areaIndicator );
+	}
 }
 
 void TrackedEffectsSystem::updateStraightLaserBeam( int ownerNum, const float *from, const float *to, int64_t currTime ) {
@@ -532,6 +568,23 @@ void TrackedEffectsSystem::updateCurvedLaserBeam( int ownerNum, std::span<const 
 	cg.polyEffectsSystem.updateCurvedBeamEffect( effects->curvedLaserBeam, colorWhite, 12.0f, 64.0f, points );
 }
 
+static const byte_vec4_t kAreaChangeIndicatorReplacementPalette[] {
+	{ 128, 0, 255, 32 },
+	{ 255, 192, 0, 32 },
+	{ 255, 0, 255, 32 },
+};
+
+static const SimulatedHullsSystem::ColorChangeTimelineNode kAreaIndicatorColorChangeTimeline[3] {
+	{
+		.replacementPalette = kAreaChangeIndicatorReplacementPalette,
+		.nodeActivationLifetimeFraction = 0.0f,
+		.dropChance = 0.0f,
+		.replacementChance = 0.03f },
+	{
+		.nodeActivationLifetimeFraction = 0.75f, .dropChance = 0.1f, .replacementChance = 0.0f
+	}
+};
+
 void TrackedEffectsSystem::simulateFrameAndSubmit( int64_t currTime, DrawSceneRequest *drawSceneRequest ) {
 	// Collect orphans
 	for( ParticleTrail *trail = m_attachedTrailsHead, *next = nullptr; trail; trail = next ) { next = trail->next;
@@ -546,6 +599,24 @@ void TrackedEffectsSystem::simulateFrameAndSubmit( int64_t currTime, DrawSceneRe
 			trail->particleFlock->timeoutAt = std::numeric_limits<int64_t>::max();
 		} else {
 			unlinkAndFree( trail );
+		}
+	}
+
+	for( AreaIndicator *ind = m_areaIndicatorsHead, *next = nullptr; ind; ind = next ) { next = ind->next;
+		if( ind->touchedAt != currTime ) {
+			unlinkAndFree( ind );
+		} else {
+			if( ind->lastHullSpawnTime + 1500 < currTime ) {
+				if( auto *hull = cg.simulatedHullsSystem.allocAreaHull( currTime, 2000 ) ) {
+					const vec4_t hullColor { ind->rgb[0], ind->rgb[1], ind->rgb[2], 0.7f };
+					hull->colorChangeTimeline = kAreaIndicatorColorChangeTimeline;
+					hull->tesselateClosestLod = true;
+					hull->leprNextLevelColors = true;
+					ind->lastHullSpawnTime = currTime;
+					ind->hullOpaquePtr = hull;
+					cg.simulatedHullsSystem.setupHullVertices( hull, ind->origin, hullColor, 200.0f, 50.0f );
+				}
+			}
 		}
 	}
 

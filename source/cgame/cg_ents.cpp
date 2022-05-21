@@ -1131,10 +1131,9 @@ static void CG_AddDecalEnt( centity_t *cent ) {
 		CG_EntAddTeamColorTransitionEffect( cent );
 	}
 
-	CG_AddFragmentedDecal( cent->ent.origin, cent->ent.origin2,
-						   cent->ent.rotation, cent->ent.radius,
-						   cent->ent.shaderRGBA[0] * ( 1.0 / 255.0 ), cent->ent.shaderRGBA[1] * ( 1.0 / 255.0 ), cent->ent.shaderRGBA[2] * ( 1.0 / 255.0 ),
-						   cent->ent.shaderRGBA[3] * ( 1.0 / 255.0 ), cent->ent.customShader );
+	vec3_t rgb;
+	VectorScale( cent->ent.shaderRGBA, ( 1.0f / 255.0f ), rgb );
+	cg.effectsSystem.touchAreaIndicator( cent->current.number, cent->ent.origin, cent->ent.radius, rgb, cg.time );
 }
 
 /*

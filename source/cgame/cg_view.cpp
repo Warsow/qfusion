@@ -1142,8 +1142,6 @@ void CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t 
 
 	CG_RunLightStyles();
 
-	CG_ClearFragmentedDecals();
-
 	if( CG_DemoCam_Update() ) {
 		CG_SetupViewDef( &cg.view, CG_DemoCam_GetViewType() );
 	} else {
