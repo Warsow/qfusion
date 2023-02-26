@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 namespace wsw::ref {
 
 static bool isLockingOccluders = false;

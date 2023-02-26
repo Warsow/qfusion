@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <algorithm>
 
 template <typename Spot, unsigned N, typename ScriptSpot>
 AiObjectiveBasedTeam::SpotsContainer<Spot, N, ScriptSpot>::SpotsContainer( const char *itemName_ )

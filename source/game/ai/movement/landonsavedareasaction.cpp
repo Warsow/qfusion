@@ -1,6 +1,8 @@
 #include "landonsavedareasaction.h"
 #include "movementlocal.h"
 
+#include <algorithm>
+
 int LandOnSavedAreasAction::FindJumppadAreaNum( const edict_t *jumppadEntity ) {
 	// TODO: This can be precomputed at level start
 	const auto *aasWorld = AiAasWorld::instance();

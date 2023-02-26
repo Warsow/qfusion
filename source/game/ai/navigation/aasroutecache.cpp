@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <cstdlib>
 #include <limits>
 #include <cmath>
+#include <algorithm>
 
 template <typename T> inline T *CastCheckingAlignment( void *ptr ) {
 	assert( !( ( (uintptr_t)ptr ) % alignof( T ) ) );

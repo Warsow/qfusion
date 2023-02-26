@@ -6,6 +6,8 @@
 #include "combat/tacticalspotsregistry.h"
 #include "../../qcommon/links.h"
 
+#include <algorithm>
+
 // Class static variable declaration
 AiManager *AiManager::instance = nullptr;
 

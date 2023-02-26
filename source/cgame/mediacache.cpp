@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../client/client.h"
 #include "mediacache.h"
 
+#include <algorithm>
+
 MediaCache::CachedSound::CachedSound( MediaCache *parent, const wsw::StringView &name )
 	: MediaCache::CachedHandle<sfx_s>( name ) {
 	parent->link( this, &parent->m_sounds );

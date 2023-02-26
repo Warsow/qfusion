@@ -7,6 +7,8 @@
 #include "../navigation/aasworld.h"
 #include "../../../gameshared/q_collision.h"
 
+#include <algorithm>
+
 PlannerNode *AiAction::newNodeForRecord( AiActionRecord *record, const WorldState &worldState, float cost ) {
 	if( !record ) {
 		Debug( "Failed to allocate an action record\n" );

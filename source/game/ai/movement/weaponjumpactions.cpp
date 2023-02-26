@@ -5,6 +5,8 @@
 #include "../navigation/aasstaticroutetable.h"
 #include "../manager.h"
 
+#include <algorithm>
+
 class WeaponJumpableSpotDetector: public BestJumpableSpotDetector {
 public:
 	SpotAndScore *spots { nullptr };

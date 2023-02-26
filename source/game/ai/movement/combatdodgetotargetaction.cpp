@@ -1,6 +1,8 @@
 #include "combatdodgetotargetaction.h"
 #include "movementlocal.h"
 
+#include <algorithm>
+
 [[nodiscard]]
 static inline auto makeMoveDir( const float *__restrict fractions, const Vec3 &__restrict forwardDir,
 								const Vec3 &__restrict rightDir ) {

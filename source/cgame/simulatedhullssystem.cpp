@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <algorithm>
 
 struct IcosphereData {
 	std::span<const vec4_t> vertices;

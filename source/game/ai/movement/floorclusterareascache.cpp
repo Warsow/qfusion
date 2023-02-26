@@ -2,6 +2,8 @@
 #include "movementlocal.h"
 #include "../combat/tacticalspotsregistry.h"
 
+#include <algorithm>
+
 bool FloorClusterAreasCache::AreaPassesCollisionTest( PredictionContext *context, int areaNum ) const {
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 

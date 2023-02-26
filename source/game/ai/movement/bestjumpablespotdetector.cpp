@@ -1,6 +1,8 @@
 #include "bestjumpablespotdetector.h"
 #include "movementlocal.h"
 
+#include <algorithm>
+
 typedef BestJumpableSpotDetector::SpotAndScore SpotAndScore;
 
 const SpotAndScore *BestJumpableSpotDetector::Exec( const vec3_t startOrigin_, unsigned *millis ) {

@@ -3,6 +3,8 @@
 #include "../navigation/aaselementsmask.h"
 #include "../groundtracecache.h"
 
+#include <algorithm>
+
 void TacticalSpotsProblemSolver::selectCandidateSpots( const SpotsQueryVector &spotsFromQuery,
 													   SpotsAndScoreVector &candidates ) {
 	const float minHeightAdvantageOverOrigin = problemParams.minHeightAdvantageOverOrigin;

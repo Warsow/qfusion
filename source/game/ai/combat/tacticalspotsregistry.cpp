@@ -1,6 +1,8 @@
 #include "tacticalspotsregistry.h"
 
 #include <memory>
+#include <algorithm>
+
 #include "../rewriteme.h"
 #include "../bot.h"
 #include "../../../qcommon/links.h"

@@ -7,6 +7,8 @@
 #include "../ascript/addon/addon_any.h"
 #include "manager.h"
 
+#include <algorithm>
+
 // We have to declare a prototype first (GCC cannot apply attributes to a definition)
 #ifndef _MSC_VER
 static void ApiError(const char *func, const char *format, ...) __attribute__((format(printf, 2, 3))) __attribute__((noreturn));

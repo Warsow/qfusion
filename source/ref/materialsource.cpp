@@ -1,5 +1,7 @@
 #include "materiallocal.h"
 
+#include <algorithm>
+
 auto MaterialSource::preparePlaceholders() -> std::optional<Placeholders> {
 	wsw::Vector<PlaceholderSpan> buffer;
 

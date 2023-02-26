@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "frontend.h"
 #include "materiallocal.h"
 
+#include <algorithm>
+
 static void R_TransformForWorld( void ) {
 	RB_LoadObjectMatrix( mat4x4_identity );
 }

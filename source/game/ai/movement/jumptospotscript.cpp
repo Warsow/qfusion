@@ -6,6 +6,8 @@
 #include "../manager.h"
 #include "../bot.h"
 
+#include <algorithm>
+
 void JumpToSpotScript::Activate( const vec3_t startOrigin_,
 								 const vec3_t targetOrigin_,
 								 unsigned timeout,

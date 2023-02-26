@@ -8,6 +8,7 @@
 #include <limits>
 #include <cmath>
 #include <cstdlib>
+#include <algorithm>
 
 /**
  * While {@code AiAasRouteCache} is fairly efficient at retrieval of cached results,

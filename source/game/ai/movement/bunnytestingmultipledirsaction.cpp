@@ -1,6 +1,8 @@
 #include "bunnytestingmultipledirsaction.h"
 #include "movementlocal.h"
 
+#include <algorithm>
+
 void BunnyTestingMultipleLookDirsAction::BeforePlanning() {
 	BunnyHopAction::BeforePlanning();
 

@@ -3,6 +3,8 @@
 #include "../bot.h"
 #include "../../../qcommon/links.h"
 
+#include <algorithm>
+
 void HazardsSelector::BeginUpdate() {
 	if( primaryHazard ) {
 		primaryHazard->DeleteSelf();
