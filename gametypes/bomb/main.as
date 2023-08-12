@@ -196,12 +196,14 @@ bool GT_Command( Client @client, const String &cmdString, const String &argsStri
 	if ( cmdString == "primary" )
 	{
 		const int value = argsString.getToken( 0 ).toInt();
-		if( value >= PRIMARY_MIN && value <= PRIMARY_MAX )
+		cPlayer @player = @playerFromClient( @client );
+		if ( player.isValidPrimary( value ) )
 		{
-			cPlayer @player = @playerFromClient( @client );
-			if( player.selectPrimary( value ) )
+			if ( player.selectPrimary( value ) )
+			{
 				if ( roundState == ROUNDSTATE_PRE )
 					player.giveInventory();
+			}
 		}
 		else
 		{
@@ -213,12 +215,14 @@ bool GT_Command( Client @client, const String &cmdString, const String &argsStri
 	if ( cmdString == "secondary" )
 	{
 		const int value = argsString.getToken( 0 ).toInt();
-		if( value >= SECONDARY_MIN && value <= SECONDARY_MAX )
+		cPlayer @player = @playerFromClient( @client );
+		if ( player.isValidSecondary( value ) )
 		{
-			cPlayer @player = @playerFromClient( @client );
-			if( player.selectSecondary( value ) )
+			if ( player.selectSecondary( value ) )
+			{
 				if ( roundState == ROUNDSTATE_PRE )
 					player.giveInventory();
+			}
 		}
 		else
 		{
@@ -729,25 +733,26 @@ void GT_InitGametype()
 
 	G_RegisterCommand( "requestoptionsstatus" );
 
-	String carrierOption = "Be a preferred bomb carrier | OneOfList | carrier |";
+	String carrierOption = "Be a preferred bomb carrier | Exactly1OfList | carrier |";
 	carrierOption += "Off, gfx/hud/icons/vsay/no, On, gfx/bomb/carriericon_base";
 	G_ConfigString( CS_GAMETYPE_OPTIONS, carrierOption );
 	if( !gametype.isInstagib )
 	{
 		G_RegisterCommand( "primary" );
-		String primaryOption = "Primary weapon | OneOfList | primary |";
-		primaryOption += " RL+EB, gfx/bomb/rleb";
-		primaryOption += ",LG+EB, gfx/bomb/lgeb";
-		primaryOption += ",RL+LG, gfx/bomb/rllg";
+		String primaryOption = "Primary weapon | Exactly2OfList | primary |";
+		primaryOption += " RL, gfx/hud/icons/weapon/rocket";
+		primaryOption += ",LG, gfx/hud/icons/weapon/laser";
+		primaryOption += ",EB, gfx/hud/icons/weapon/electro";
 		G_ConfigString( CS_GAMETYPE_OPTIONS + 1, primaryOption );
 
 		G_RegisterCommand( "secondary" );
-		String secondaryOption = "Secondary weapon | OneOfList | secondary |";
+		String secondaryOption = "Secondary weapon | Exactly1OfList | secondary |";
 		secondaryOption += " PG, gfx/hud/icons/weapon/plasma";
 		secondaryOption += ",RG, gfx/hud/icons/weapon/riot";
 		secondaryOption += ",MG, gfx/hud/icons/weapon/machinegun";
 		secondaryOption += ",GL, gfx/hud/icons/weapon/grenade";
-		secondaryOption += ",Blast, gfx/hud/icons/weapon/gunblade_blast";
+		// TODO: Unicode * - there's no such glyph in our base font
+		secondaryOption += ",GB*, gfx/hud/icons/weapon/gunblade_blast";
 		G_ConfigString( CS_GAMETYPE_OPTIONS + 2, secondaryOption );
 	}
 

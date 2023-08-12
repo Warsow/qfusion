@@ -17,12 +17,9 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-const int PRIMARY_NONE = -1; // used for pending test
-const int PRIMARY_MIN = 0;
-const int PRIMARY_EBRL = 0;
-const int PRIMARY_EBLG = 1;
-const int PRIMARY_RLLG = 2;
-const int PRIMARY_MAX = 2;
+const int PRIMARY_BIT_RL = 0x1;
+const int PRIMARY_BIT_LG = 0x2;
+const int PRIMARY_BIT_EB = 0x4;
 
 const int SECONDARY_NONE = -1; // used for pending test
 const int SECONDARY_MIN = 0;
@@ -69,7 +66,7 @@ class cPlayer
 	{
 		@this.client = @player;
 
-		this.weapPrimary = PRIMARY_MIN;
+		this.weapPrimary = PRIMARY_BIT_RL | PRIMARY_BIT_EB;
 		this.weapSecondary = SECONDARY_MIN;
 
 		this.arms = 0;
@@ -107,48 +104,23 @@ class cPlayer
 		//      primary weapon but i don't see the point
 
 		// it dies if you don't cast...
-		switch ( int( this.weapPrimary ) )
+		if( ( int( this.weapPrimary ) & PRIMARY_BIT_RL ) != 0 )
 		{
-			case PRIMARY_EBRL:
-				this.client.inventoryGiveItem( WEAP_ROCKETLAUNCHER );
-				this.client.inventoryGiveItem( WEAP_ELECTROBOLT );
-
-				this.client.inventorySetCount( AMMO_ROCKETS, AMMO_RL );
-				this.client.inventorySetCount( AMMO_BOLTS, AMMO_EB );
-
-				this.client.inventorySetCount( AMMO_WEAK_ROCKETS, 0 );
-				this.client.inventorySetCount( AMMO_WEAK_BOLTS, 0 );
-
-				break;
-
-			case PRIMARY_RLLG:
-				this.client.inventoryGiveItem( WEAP_ROCKETLAUNCHER );
-				this.client.inventoryGiveItem( WEAP_LASERGUN );
-
-				this.client.inventorySetCount( AMMO_ROCKETS, AMMO_RL );
-				this.client.inventorySetCount( AMMO_LASERS, AMMO_LG );
-
-				this.client.inventorySetCount( AMMO_WEAK_ROCKETS, 0 );
-				this.client.inventorySetCount( AMMO_WEAK_LASERS, 0 );
-
-				break;
-
-			case PRIMARY_EBLG:
-				this.client.inventoryGiveItem( WEAP_ELECTROBOLT );
-				this.client.inventoryGiveItem( WEAP_LASERGUN );
-
-				this.client.inventorySetCount( AMMO_BOLTS, AMMO_EB );
-				this.client.inventorySetCount( AMMO_LASERS, AMMO_LG );
-
-				this.client.inventorySetCount( AMMO_WEAK_BOLTS, 0 );
-				this.client.inventorySetCount( AMMO_WEAK_LASERS, 0 );
-
-				break;
-
-			default:
-				assert( false, "player.as giveInventory: bad primary weapon" );
-
-				break;
+			this.client.inventoryGiveItem( WEAP_ROCKETLAUNCHER );
+			this.client.inventorySetCount( AMMO_ROCKETS, AMMO_RL );
+			this.client.inventorySetCount( AMMO_WEAK_ROCKETS, 0 );
+		}
+		if( ( int( this.weapPrimary ) & PRIMARY_BIT_LG ) != 0 )
+		{
+			this.client.inventoryGiveItem( WEAP_LASERGUN );
+			this.client.inventorySetCount( AMMO_LASERS, AMMO_LG );
+			this.client.inventorySetCount( AMMO_WEAK_LASERS, 0 );
+		}
+		if( ( int( this.weapPrimary ) & PRIMARY_BIT_EB ) != 0 )
+		{
+			this.client.inventoryGiveItem( WEAP_ELECTROBOLT );
+			this.client.inventorySetCount( AMMO_BOLTS, AMMO_EB );
+			this.client.inventorySetCount( AMMO_WEAK_BOLTS, 0 );
 		}
 
 		switch ( int( this.weapSecondary ) )
@@ -176,7 +148,7 @@ class cPlayer
 
 				this.client.inventorySetCount( AMMO_BULLETS, AMMO_MG );
 
-				//this.client.inventorySetCount( AMMO_WEAK_BULLETS, 0 );
+				this.client.inventorySetCount( AMMO_WEAK_BULLETS, 0 );
 
 				break;
 
@@ -226,9 +198,27 @@ class cPlayer
 		return false;
 	}
 
+	bool isValidPrimary( int weapon )
+	{
+		if( ( weapon & ~( PRIMARY_BIT_RL | PRIMARY_BIT_LG | PRIMARY_BIT_EB ) ) == 0 )
+		{
+			// TODO: Is there popcnt()?
+			int setBitsCount = 0;
+			if( ( weapon & PRIMARY_BIT_RL ) != 0 )
+				setBitsCount++;
+			if( ( weapon & PRIMARY_BIT_LG ) != 0 )
+				setBitsCount++;
+			if( ( weapon & PRIMARY_BIT_EB ) != 0 )
+				setBitsCount++;
+			if ( setBitsCount == 2 )
+				return true;
+		}
+		return false;
+	}
+
 	bool selectPrimary( int weapon )
 	{
-		assert( weapon >= PRIMARY_MIN && weapon <= PRIMARY_MAX, "Illegal primary weapon value" );
+		assert( isValidPrimary( weapon ), "Illegal primary weapon value" );
 		if ( this.weapPrimary != weapon )
 		{
 			this.weapPrimary = weapon;
@@ -238,9 +228,14 @@ class cPlayer
 		return false;
 	}
 
+	bool isValidSecondary( int weapon )
+	{
+		return weapon >= SECONDARY_MIN && weapon <= SECONDARY_MAX;
+	}
+
 	bool selectSecondary( int weapon )
 	{
-		assert( weapon >= SECONDARY_MIN && weapon <= SECONDARY_MAX, "Illegal secondary weapon value" );
+		assert( isValidSecondary( weapon ), "Illegal secondary weapon value" );
 		if ( this.weapSecondary != weapon )
 		{
 			this.weapSecondary = weapon;
@@ -255,7 +250,7 @@ class cPlayer
 		// Prefer EB + LG
 		if ( random() < 0.7f )
 		{
-			this.weapPrimary = PRIMARY_EBLG;
+			this.weapPrimary = PRIMARY_BIT_LG | PRIMARY_BIT_EB;
 			// Choose RG to compensate lack of RL
 			if ( random() < 0.7f )
 				this.weapSecondary = SECONDARY_RG;
@@ -267,7 +262,7 @@ class cPlayer
 		// Otherwise prefer EB + RL
 		else if ( random() < 0.7f )
 		{
-			this.weapPrimary = PRIMARY_EBRL;
+			this.weapPrimary = PRIMARY_BIT_RL | PRIMARY_BIT_EB;
 			// Choose PG to compensate lack of continous fire weapons
 			if ( random() < 0.7f )
 				this.weapSecondary = SECONDARY_PG;
@@ -277,7 +272,7 @@ class cPlayer
 		// RL + LG
 		else
 		{
-			this.weapPrimary = PRIMARY_RLLG;
+			this.weapPrimary = PRIMARY_BIT_RL | PRIMARY_BIT_LG;
 			// Choose MG to compensate lack of long-range weapons
 			this.weapSecondary = SECONDARY_MG;
 		}
