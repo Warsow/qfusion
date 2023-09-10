@@ -105,7 +105,9 @@ const String[] SITE_LETTERS = { 'A', 'B' };
 const int COUNTDOWN_MAX = 6; // was 4, but this gives people more time to change weapons
 
 // TODO: Add different assets
-const int hudIconBomb = 1;
+const int hudIconBomb       = 1;
+const int hudStringPlanting = 2;
+const int hudStringDefusing = 3;
 
 // this should really kill the program
 // but i'm mostly using it as an indicator that it's about to die anyway
@@ -117,7 +119,7 @@ void assert( const bool test, const String msg )
 	}
 }
 
-void setTeamProgressAndAnim( int teamNum, int progress, int anim )
+void setTeamHudIndicatorExtras( int teamNum, int progress, int anim, int statusString )
 {
 	assert( teamNum == TEAM_ALPHA || teamNum == TEAM_BETA, "Illegal team" );
 	Team @team = @G_GetTeam( teamNum );
@@ -129,6 +131,8 @@ void setTeamProgressAndAnim( int teamNum, int progress, int anim )
 		{
 			ent.client.setHUDStat( STAT_INDICATOR_3_PROGRESS, progress );
 			ent.client.setHUDStat( STAT_INDICATOR_3_ANIM, anim );
+			ent.client.setHUDStat( STAT_INDICATOR_3_STATUS_STRING, statusString );
+			ent.client.setHUDStat( STAT_INDICATOR_3_ICON, 0 );
 		}
 	}
 }
@@ -553,6 +557,7 @@ void GT_ThinkRules()
 		client.setHUDStat( STAT_INDICATOR_3_ANIM, HUD_INDICATOR_NO_ANIM );
 		client.setHUDStat( STAT_INDICATOR_3_ICON, hudIconBomb );
 		client.setHUDStat( STAT_INDICATOR_3_PROGRESS, 0 );
+		client.setHUDStat( STAT_INDICATOR_3_STATUS_STRING, 0 );
 	}
 
 	if ( match.getState() < MATCH_STATE_PLAYTIME )
@@ -724,6 +729,9 @@ void GT_InitGametype()
 
     // TODO: Make proper different assets
 	G_ConfigString( CS_GENERAL + hudIconBomb - 1, "gfx/bomb/carriericon" );
+
+	G_ConfigString( CS_GENERAL + hudStringPlanting - 1, "Planting" );
+	G_ConfigString( CS_GENERAL + hudStringDefusing - 1, "Defusing" );
 
 	// add commands
 	G_RegisterCommand( "drop" );

@@ -566,7 +566,7 @@ void bombThink()
 					progress = -progress;
 				}
 				
-				setTeamProgressAndAnim( attackingTeam, progress, HUD_INDICATOR_ACTION_ANIM );
+				setTeamHudIndicatorExtras( attackingTeam, progress, HUD_INDICATOR_ACTION_ANIM, hudStringPlanting );
 
 				bombSprite.counterNum = bombDecal.counterNum = int( frac * 255.0f );
 			}
@@ -622,7 +622,7 @@ void bombThink()
 						progress = -progress;
 					}
 
-					setTeamProgressAndAnim( defendingTeam, progress, HUD_INDICATOR_ACTION_ANIM );
+					setTeamHudIndicatorExtras( defendingTeam, progress, HUD_INDICATOR_ACTION_ANIM, hudStringDefusing );
 				}
 
 				if ( levelTime > bombNextBeep )
