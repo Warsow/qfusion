@@ -195,9 +195,6 @@ fail:
 void GLimp_BeginFrame( void ) {
 }
 
-void GLimp_EndFrame( void ) {
-	SDL_GL_SwapWindow( glw_state.sdl_window );
-}
 
 bool GLimp_GetGammaRamp( size_t stride, unsigned short *psize, unsigned short *ramp ) {
 	unsigned short ramp256[3 * 256];

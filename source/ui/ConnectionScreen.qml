@@ -33,10 +33,10 @@ Item {
     Component {
         id: logoComponent
         Item {
-            Image {
+            Logo {
                 anchors.centerIn: parent
-                fillMode: Image.PreserveAspectFit
-			    source: "image://wsw/gfx/ui/loadinglogo"
+                width: parent.width
+                height: implicitHeight
             }
         }
     }

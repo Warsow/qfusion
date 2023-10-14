@@ -61,6 +61,7 @@
         <file>KeyboardPane.qml</file>
         <file>KeyboardRow.qml</file>
         <file>KeyboardSettings.qml</file>
+        <file>Logo.qml</file>
         <file>LocalGamePage.qml</file>
         <file>LocalGameDetailArrangement.qml</file>
         <file>LocalGameListDelegate.qml</file>

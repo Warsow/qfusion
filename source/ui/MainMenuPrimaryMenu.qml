@@ -2,6 +2,7 @@ import QtQuick 2.12
 import QtQuick.Controls 2.12
 import QtQuick.Controls.Material 2.12
 import QtQuick.Layouts 1.12
+import QtGraphicalEffects 1.12
 import net.warsow 2.6
 
 Item {
@@ -32,12 +33,62 @@ Item {
 	Item {
 		id: logoHolder
 		anchors.centerIn: parent
-		width: logo.width
-		height: logo.height
-		Image {
-			id: logo
-			anchors.centerIn: parent
-			source: "image://wsw/gfx/ui/loadinglogo"
+		width: logo.width + 32
+		height: logo.height + 32
+		//opacity: 1.0 - logoUnderlay.animFrac
+
+        Component {
+            id: glowComponent
+            Item {
+            Rectangle {
+                id: logoUnderlay
+                visible: false
+                anchors.centerIn: parent
+                width: root.width / 2
+                height: root.height / 2
+                opacity: 0.3
+            }
+            Glow {
+                anchors.fill: logoUnderlay
+                fast: true
+                enabled: true
+                radius: 3
+                samples: 7
+                color: "magenta"
+                source: logoUnderlay
+            }
+            }
+        }
+
+        Loader {
+            anchors.centerIn: parent
+            width: logo.width
+            height: logo.height
+            active: true
+            sourceComponent: glowComponent
+            /*
+            Timer {
+                running: true
+                interval: 10000
+                onTriggered: parent.active = true
+            }*/
+        }
+
+        /*
+        DirectionalBlur {
+            anchors.fill: logoUnderlay
+            source: logoUnderlay
+            //radius: 16
+            angle: 90
+            length: 0.5 * logoUnderlay.extraLength
+            samples: 12 + 100 * logoUnderlay.animFrac
+        }*/
+
+		Logo {
+		    id: logo
+		    anchors.centerIn: parent
+		    width: root.width
+		    height: logo.implicitHeight
 		}
 	}
 

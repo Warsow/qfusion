@@ -944,12 +944,15 @@ void QtUISystem::refresh() {
 		enterUIRenderingMode();
 		renderQml( m_menuSandbox.get() );
 		leaveUIRenderingMode();
+		//QGuiApplication::processEvents( QEventLoop::AllEvents );
 	}
 	if( m_hudSandbox && m_hudSandbox->requestsRendering() ) {
 		enterUIRenderingMode();
 		renderQml( m_hudSandbox.get() );
 		leaveUIRenderingMode();
+		//QGuiApplication::processEvents( QEventLoop::AllEvents );
 	}
+
 }
 
 QtUISystem::QtUISystem( int initialWidth, int initialHeight ) {
@@ -1692,6 +1695,8 @@ void QtUISystem::checkPropertyChanges() {
 }
 
 bool QtUISystem::handleMouseMove( int frameTime, int dx, int dy ) {
+	uiNotice() << "Handle mouse move" << dx << dy;
+
 	// Mouse handling is only available for the main menu
 	if( !m_activeMenuMask || !m_menuSandbox ) {
 		return false;

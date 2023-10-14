@@ -139,10 +139,16 @@ QVariant VID_GetMainContextHandle() {
 
 typedef Drawable (*GlxGetCurrentDrawbleFn)();
 typedef int (*GlxMakeContextCurrentFn)( Display *, GLXDrawable, GLXDrawable, GLXContext );
+typedef GLXContext (*GlxGetCurrentContextFn)();
+typedef Display *(*GlxGetCurrentDisplayFn)();
+typedef void (*GlxSwapBuffersFn)(Display *, GLXDrawable);
 
 static GlxGetCurrentDrawbleFn qglXGetCurrentDrawable;
 static GlxGetCurrentDrawbleFn qglXGetCurrentReadDrawable;
+static GlxGetCurrentDisplayFn qglXGetCurrentDisplay;
+static GlxGetCurrentContextFn qglXGetCurrentContext;
 static GlxMakeContextCurrentFn qglXMakeContextCurrent;
+static GlxSwapBuffersFn qglXSwapBuffers;
 
 static Drawable savedDrawable;
 static Drawable savedReadDrawable;
@@ -159,15 +165,38 @@ static void loadGlxStuff() {
 	LOAD_GLX_PROC( glXGetCurrentDrawable );
 	LOAD_GLX_PROC( glXGetCurrentReadDrawable );
 	LOAD_GLX_PROC( glXMakeContextCurrent );
+	LOAD_GLX_PROC( glXGetCurrentDisplay );
+	LOAD_GLX_PROC( glXGetCurrentContext );
+	LOAD_GLX_PROC( glXSwapBuffers );
 }
 
 bool GLimp_BeginUIRenderingHacks() {
 	loadGlxStuff();
 
-	savedDrawable = qglXGetCurrentDrawable();
-	savedReadDrawable = qglXGetCurrentReadDrawable();
+	SDL_SysWMinfo info;
+	SDL_GetVersion( &info.version );
+	SDL_GetWindowWMInfo( glw_state.sdl_window, &info );
+	auto display = info.info.x11.display;
+	auto window  = info.info.x11.window;
+	clNotice() << ">>>>>>>>>>>>>>>>> Begin hacks";
+	clNotice() << "Window" << window;
+	clNotice() << "Saved drawables:" << (uintptr_t)savedDrawable << (uintptr_t)savedReadDrawable;
+	clNotice() << "Actual drawables:" << (uintptr_t)qglXGetCurrentDrawable() << (uintptr_t)qglXGetCurrentReadDrawable();
+	// Fixes the Qml Glow bug
+	// TODO: Flush on restart
+	if( !savedDrawable ) {
+		savedDrawable = qglXGetCurrentDrawable();
+	}
+	if( !savedReadDrawable ) {
+		savedReadDrawable = qglXGetCurrentReadDrawable();
+	}
+	clNotice() << "SDL Display" << (uintptr_t)display << "Current display" << (uintptr_t)qglXGetCurrentDisplay();
+	clNotice() << "SDL Context" << (uintptr_t)glw_state.sdl_glcontext << "Current context" << (uintptr_t)qglXGetCurrentContext();
+	assert( savedDrawable == info.info.x11.window );
 	return true;
 }
+
+static int counter = 0;
 
 bool GLimp_EndUIRenderingHacks() {
 	loadGlxStuff();
@@ -178,7 +207,46 @@ bool GLimp_EndUIRenderingHacks() {
 	auto display = info.info.x11.display;
 
 	assert( savedDrawable && savedReadDrawable );
+	clNotice() << "================ End hacks";
+	clNotice() << "Saved drawables:" << (uintptr_t)savedDrawable << (uintptr_t)savedReadDrawable;
+	clNotice() << "Actual drawables:" << (uintptr_t)qglXGetCurrentDrawable() << (uintptr_t)qglXGetCurrentReadDrawable();
+	clNotice() << "SDL Display" << (uintptr_t)display << "Current display" << (uintptr_t)qglXGetCurrentDisplay();
+	clNotice() << "SDL Context" << (uintptr_t)glw_state.sdl_glcontext << "Current context" << (uintptr_t)qglXGetCurrentContext();
+
+	//qglXMakeContextCurrent( qglXGetCurrentDisplay(), 0, 0, 0 );
+
 	auto res = qglXMakeContextCurrent( display, savedDrawable, savedReadDrawable, (GLXContext)glw_state.sdl_glcontext );
-	savedDrawable = savedReadDrawable = 0;
+	clNotice() << "<<<<<<<<<<<<<<<< Done with hacks";
+	clNotice() << "Saved drawables:" << (uintptr_t)savedDrawable << (uintptr_t)savedReadDrawable;
+	clNotice() << "Actual drawables:" << (uintptr_t)qglXGetCurrentDrawable() << (uintptr_t)qglXGetCurrentReadDrawable();
+	clNotice() << "SDL Display" << (uintptr_t)display << "Current display" << (uintptr_t)qglXGetCurrentDisplay();
+	clNotice() << "SDL Context" << (uintptr_t)glw_state.sdl_glcontext << "Current context" << (uintptr_t)qglXGetCurrentContext();
+
+	//savedDrawable = savedReadDrawable = 0;
+	/*
+	if( counter++ > 2 ) {
+		abort();
+	}*/
 	return res;
+}
+
+void GLimp_EndFrame( void ) {
+	SDL_SysWMinfo info;
+	SDL_GetVersion( &info.version );
+	SDL_GetWindowWMInfo( glw_state.sdl_window, &info );
+	auto display = info.info.x11.display;
+	auto window  = info.info.x11.window;
+	loadGlxStuff();
+	clNotice() << "!!!!!!!!!!!!!!!! End frame";
+	clNotice() << "Saved drawables:" << (uintptr_t)savedDrawable << (uintptr_t)savedReadDrawable;
+	clNotice() << "Actual drawables:" << (uintptr_t)qglXGetCurrentDrawable() << (uintptr_t)qglXGetCurrentReadDrawable();
+	clNotice() << "SDL Display" << (uintptr_t)display << "Current display" << (uintptr_t)qglXGetCurrentDisplay();
+	clNotice() << "SDL Context" << (uintptr_t)glw_state.sdl_glcontext << "Current context" << (uintptr_t)qglXGetCurrentContext();
+	assert( !savedDrawable || savedDrawable == qglXGetCurrentDrawable() );
+	assert( !savedReadDrawable || savedReadDrawable == qglXGetCurrentReadDrawable() );
+	assert( !savedDrawable || savedDrawable == window );
+	assert( display ==  qglXGetCurrentDisplay() );
+	assert( glw_state.sdl_glcontext == qglXGetCurrentContext() );
+	SDL_GL_SwapWindow( glw_state.sdl_window );
+
 }
