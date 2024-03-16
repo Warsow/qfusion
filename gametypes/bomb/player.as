@@ -184,7 +184,7 @@ class cPlayer
 			command += " " + this.weapSecondary;
 		}
 		command += "\"";
-		this.client.execGameCommand( command );
+		this.client.execServerCommand( command );
 	}
 
 	bool setCarrier( bool requested )
