@@ -109,6 +109,15 @@ const int hudIconBomb       = 1;
 const int hudStringPlanting = 2;
 const int hudStringDefusing = 3;
 
+int scbIconAssetRL;
+int scbIconAssetLG;
+int scbIconAssetEB;
+int scbIconAssetPG;
+int scbIconAssetRG;
+int scbIconAssetMG;
+int scbIconAssetGL;
+int scbIconAssetGB;
+
 // this should really kill the program
 // but i'm mostly using it as an indicator that it's about to die anyway
 void assert( const bool test, const String msg )
@@ -133,6 +142,51 @@ void setTeamHudIndicatorExtras( int teamNum, int progress, int anim, int statusS
 			ent.client.setHUDStat( STAT_INDICATOR_3_ANIM, anim );
 			ent.client.setHUDStat( STAT_INDICATOR_3_STATUS_STRING, statusString );
 			ent.client.setHUDStat( STAT_INDICATOR_3_ICON, 0 );
+		}
+	}
+}
+
+void GT_UpdateScoreboard()
+{
+	for ( int i = 0; i < maxClients; i++ )
+	{
+		Client @client = @G_GetClient( i );
+		if( client.state() >= CS_SPAWNED )
+		{
+			cPlayer @player = playerFromClient( @client );
+			if( player.weapPrimary == ( PRIMARY_BIT_RL | PRIMARY_BIT_LG ) )
+			{
+				scoreboard.setPlayerIcon( client, 0, scbIconAssetRL );
+				scoreboard.setPlayerIcon( client, 1, scbIconAssetLG );
+			}
+			else if( player.weapPrimary == ( PRIMARY_BIT_RL | PRIMARY_BIT_EB ) )
+			{
+				scoreboard.setPlayerIcon( client, 0, scbIconAssetRL );
+				scoreboard.setPlayerIcon( client, 1, scbIconAssetEB );
+			}
+			else if( player.weapPrimary == ( PRIMARY_BIT_EB | PRIMARY_BIT_LG ) )
+			{
+				scoreboard.setPlayerIcon( client, 0, scbIconAssetEB );
+				scoreboard.setPlayerIcon( client, 1, scbIconAssetLG );
+			}
+			else
+			{
+				scoreboard.setPlayerIcon( client, 0, 0 );
+				scoreboard.setPlayerIcon( client, 1, 0 );
+			}
+
+			if( player.weapSecondary == SECONDARY_PG )
+				scoreboard.setPlayerIcon( client, 2, scbIconAssetPG );
+			else if( player.weapSecondary == SECONDARY_RG )
+				scoreboard.setPlayerIcon( client, 2, scbIconAssetRG );
+			else if( player.weapSecondary == SECONDARY_MG )
+				scoreboard.setPlayerIcon( client, 2, scbIconAssetMG );
+			else if( player.weapSecondary == SECONDARY_GL )
+				scoreboard.setPlayerIcon( client, 2, scbIconAssetGL );
+			else if( player.weapSecondary == SECONDARY_GB )
+				scoreboard.setPlayerIcon( client, 2, scbIconAssetGB );
+			else
+				scoreboard.setPlayerIcon( client, 2, 0 );
 		}
 	}
 }
@@ -725,6 +779,17 @@ void GT_InitGametype()
 	}
 
 	scoreboard.beginDefiningSchema();
+	scoreboard.registerIconColumn( "Loadouts", 3 );
+	scoreboard.registerIconColumn( "" );
+	scoreboard.registerIconColumn( "" );
+	scbIconAssetRL = scoreboard.registerAsset( "gfx/hud/icons/weapon/rocket" );
+	scbIconAssetLG = scoreboard.registerAsset( "gfx/hud/icons/weapon/laser" );
+	scbIconAssetEB = scoreboard.registerAsset( "gfx/hud/icons/weapon/electro" );
+	scbIconAssetPG = scoreboard.registerAsset( "gfx/hud/icons/weapon/plasma" );
+	scbIconAssetRG = scoreboard.registerAsset( "gfx/hud/icons/weapon/riot" );
+	scbIconAssetMG = scoreboard.registerAsset( "gfx/hud/icons/weapon/machinegun" );
+	scbIconAssetGL = scoreboard.registerAsset( "gfx/hud/icons/weapon/grenade" );
+	scbIconAssetGB = scoreboard.registerAsset( "gfx/hud/icons/weapon/gunblade_blast" );
 	scoreboard.endDefiningSchema();
 
     // TODO: Make proper different assets
