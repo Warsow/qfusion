@@ -32,7 +32,7 @@ Item {
 
     Component.onCompleted: UI.demosResolver.reload()
 
-    TextField {
+    WswTextField {
         id: queryField
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
@@ -167,7 +167,18 @@ Item {
             gametypeColumnWidth: root.gametypeColumnWidth
             timestampColumnWidth: root.timestampColumnWidth
 
+            onContainsMouseChanged: {
+                if (containsMouse) {
+                    UI.ui.playHoverSound()
+                }
+            }
+
             onClicked: {
+                if (selectedIndex >= 0) {
+                    UI.ui.playSwitchSound()
+                } else {
+                    UI.ui.playForwardSound()
+                }
                 selectedDemoName = demoName
                 selectedMapName = mapName
                 selectedFileName = fileName
@@ -279,8 +290,14 @@ Item {
                 text: "\u25B6"
                 contentItem.anchors.verticalCenterOffset: +4
 
+                onHoveredChanged: {
+                    if (hovered) {
+                        UI.ui.playHoverSound()
+                    }
+                }
                 onClicked: {
                     selectedIndex = -1
+                    UI.ui.playForwardSound()
                     UI.demoPlayer.play(selectedFileName)
                 }
             }
@@ -291,6 +308,7 @@ Item {
         if (event.key === Qt.Key_Escape) {
             if (selectedIndex >= 0) {
                 selectedIndex = -1
+                UI.ui.playBackSound()
                 event.accepted = true
                 return true
             }

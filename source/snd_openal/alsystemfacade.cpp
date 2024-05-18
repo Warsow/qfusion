@@ -68,7 +68,7 @@ ALSoundSystem::ALSoundSystem( client_state_s *client, qbufPipe_s *pipe, qthread_
 }
 
 ALSoundSystem::~ALSoundSystem() {
-	stopAllSounds( StopAndClear | StopMusic );
+	stopSounds( StopMusic );
 	// wake up the mixer
 	activate( true );
 
@@ -121,12 +121,8 @@ void ALSoundSystem::endRegistration() {
 	ENV_EndRegistration();
 }
 
-void ALSoundSystem::stopAllSounds( unsigned flags ) {
-	callMethodOverPipe( m_pipe, &m_backend, &Backend::stopAllSounds, flags );
-}
-
-void ALSoundSystem::clear() {
-	callMethodOverPipe( m_pipe, &m_backend, &Backend::clear );
+void ALSoundSystem::stopSounds( unsigned flags ) {
+	callMethodOverPipe( m_pipe, &m_backend, &Backend::stopSounds, flags );
 }
 
 auto ALSoundSystem::registerSound( const SoundSetProps &props ) -> const SoundSet * {
@@ -158,8 +154,9 @@ void ALSoundSystem::startRelativeSound( const SoundSet *sound, SoundSystem::Atta
 }
 
 void ALSoundSystem::startLocalSound( const char *name, float volume ) {
-	// TODO: Implement, send the name to backend
-	//startLocalSound( registerSound( name ), volume );
+	if( name && volume > 0.0f ) {
+		callMethodOverPipe( m_pipe, &m_backend, &Backend::startLocalSoundByName, getPathForName( wsw::StringView( name ) ), volume );
+	}
 }
 
 void ALSoundSystem::startLocalSound( const SoundSet *sound, float volume ) {

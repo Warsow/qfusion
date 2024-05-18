@@ -100,7 +100,9 @@ Item {
         anchors.fill: parent
         onClicked: root.clicked()
         onContainsMouseChanged: {
-            if (!containsMouse) {
+            if (containsMouse) {
+                UI.ui.playHoverSound()
+            } else {
                 mouseLeftTimer.start()
             }
         }

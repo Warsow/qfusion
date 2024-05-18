@@ -348,6 +348,11 @@ public:
 
 	Q_INVOKABLE QColor colorWithAlpha( const QColor &color, qreal alpha );
 
+	Q_INVOKABLE void playHoverSound();
+	Q_INVOKABLE void playSwitchSound();
+	Q_INVOKABLE void playForwardSound() override;
+	Q_INVOKABLE void playBackSound();
+
 	enum ServerListFlags {
 		ShowEmptyServers = 0x1,
 		ShowFullServers  = 0x2
@@ -447,7 +452,7 @@ private:
 
 	static inline const qreal s_fullscreenOverlayOpacity { 0.90 };
 	static inline const qreal s_mainMenuButtonWidthDp { 224.0 };
-	static inline const qreal s_mainMenuButtonTrailWidthDp { 224.0 * 1.25 };
+	static inline const qreal s_mainMenuButtonTrailWidthDp { 224.0 * 1.5 };
 	static inline const qreal s_desiredPopupWidth { 360.0 };
 
 	static inline const QString s_regularFontFamily { "Ubuntu" };
@@ -575,6 +580,9 @@ private:
 
 	qreal m_mouseXY[2] { 0.0, 0.0 };
 
+	int64_t m_oldSoundPlaybackTimestamp { 0 };
+	uintptr_t m_oldSoundPlaybackTag { 0 };
+
 	VarModificationTracker m_debugNativelyDrawnItemsChangesTracker { &v_debugNativelyDrawnItems };
 
 	static void initPersistentPart();
@@ -621,6 +629,8 @@ private:
 	static inline QJsonArray s_videoModeHeadingsList;
 	static inline QJsonArray s_videoModeWidthValuesList;
 	static inline QJsonArray s_videoModeHeightValuesList;
+
+	void playSoundUsingLimiter( /* &'static */ const char *path );
 
 	[[nodiscard]]
 	bool isShowingDemoPlaybackMenu() const { return ( m_activeMenuMask & DemoPlaybackMenu ) != 0; }
@@ -1841,6 +1851,9 @@ void QtUISystem::handleEscapeKey() {
 					}
 				}
 			}
+			if( didSpecialHandling ) {
+				playForwardSound();
+			}
 		}
 	}
 
@@ -2357,6 +2370,31 @@ auto QtUISystem::formatPing( int ping ) const -> QByteArray {
 auto QtUISystem::colorWithAlpha( const QColor &color, qreal alpha ) -> QColor {
 	assert( alpha >= 0.0 && alpha <= 1.0 );
 	return QColor::fromRgbF( color.redF(), color.greenF(), color.blueF(), alpha );
+}
+
+void QtUISystem::playHoverSound() {
+	playSoundUsingLimiter( "sounds/menu/hover" );
+}
+
+void QtUISystem::playSwitchSound() {
+	playSoundUsingLimiter( "sounds/menu/switch" );
+}
+
+void QtUISystem::playForwardSound() {
+	playSoundUsingLimiter( "sounds/menu/forward" );
+}
+
+void QtUISystem::playBackSound() {
+	playSoundUsingLimiter( "sounds/menu/back" );
+}
+
+void QtUISystem::playSoundUsingLimiter( /* &'static */ const char *path ) {
+	const auto tag  = (uintptr_t)path;
+	if( m_oldSoundPlaybackTag != tag || m_oldSoundPlaybackTimestamp + 50 < cls.realtime ) {
+		m_oldSoundPlaybackTag       = tag;
+		m_oldSoundPlaybackTimestamp = cls.realtime;
+		SoundSystem::instance()->startLocalSound( path, 0.7f );
+	}
 }
 
 void QtUISystem::startServerListUpdates( int flags ) {

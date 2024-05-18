@@ -135,6 +135,12 @@ Item {
 	}
 
 	function toggleExpandedState() {
+	    if (someOverlayButton.state === "centered") {
+	        UI.ui.playForwardSound()
+	    } else {
+	        UI.ui.playBackSound()
+	    }
+
 		for (let i = 0; i < topColumn.children.length; ++i) {
 			topColumn.children[i].toggleExpandedState()
 		}
@@ -185,6 +191,7 @@ Item {
         if (activePageTag) {
             return false
         }
+        UI.ui.playSwitchSound()
         if (selectedPageTag) {
             selectedPageTag = 0
         } else {
@@ -205,10 +212,12 @@ Item {
 
     function handleKeyUpOrDown(delta) {
         if (activePageTag) {
+            UI.ui.playForwardSound()
             activePageTag = wrapPageTag(activePageTag + delta)
             return true
         }
         if (selectedPageTag) {
+            UI.ui.playSwitchSound()
             selectedPageTag = wrapPageTag(selectedPageTag + delta)
             return true
         }

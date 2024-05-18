@@ -113,6 +113,8 @@
         <file>TeamSettingsTeamColumn.qml</file>
         <file>TeamSelectionTeamPane.qml</file>
         <file>WswCheckBox.qml</file>
+        <file>WswSlider.qml</file>
+        <file>WswTextField.qml</file>
         <file>UI.qml</file>
         <file>Hud.qml</file>
         <file>qmldir</file>

@@ -57,8 +57,10 @@ Item {
             contentToButtonsKeyNavigationTargetIndex: enableRetryButton ? 1 : 0
             onButtonClicked: {
                 if (buttonIndex === 0) {
+                    UI.ui.playBackSound()
                     UI.ui.stopReactingToDroppedConnection()
                 } else {
+                    UI.ui.playForwardSound()
                     if (UI.ui.reconnectBehaviour === UISystem.RequestPassword) {
                         UI.ui.reconnectWithPassword(dialogItem.password)
                     } else {
@@ -106,7 +108,7 @@ Item {
                     text: UI.ui.droppedConnectionMessage
                 }
 
-                TextField {
+                WswTextField {
                     id: passwordInput
                     Layout.alignment: Qt.AlignHCenter
                     visible: UI.ui.reconnectBehaviour === UISystem.RequestPassword
@@ -130,6 +132,7 @@ Item {
         target: UI.ui
         onIsReactingToDroppedConnectionChanged: {
             if (UI.ui.isReactingToDroppedConnection) {
+                UI.ui.playBackSound()
                 stackView.clear(StackView.Immediate)
                 stackView.push(dialogComponent, null, StackView.ReplaceTransition)
             } else {
@@ -141,6 +144,7 @@ Item {
 
     Keys.onPressed: {
         if (event.key === Qt.Key_Escape) {
+            UI.ui.playBackSound()
             UI.ui.stopReactingToDroppedConnection()
             UI.ui.disconnect()
         }

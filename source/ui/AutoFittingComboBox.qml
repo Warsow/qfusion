@@ -16,6 +16,17 @@ ComboBox {
     property bool wasVisible
 
     background.opacity: 0.67
+
+    onHoveredChanged: {
+        if (hovered) {
+            UI.ui.playHoverSound()
+        }
+    }
+    onPressedChanged: {
+        if (pressed) {
+            UI.ui.playSwitchSound()
+        }
+    }
     
     delegate: MenuItem {
         width: GridView.view.cellWidth
@@ -24,6 +35,16 @@ ComboBox {
         Material.foreground: root.currentIndex === index ? root.contentItem.Material.accent : root.contentItem.Material.foreground
         highlighted: root.highlightedIndex === index
         hoverEnabled: root.hoverEnabled
+        onHoveredChanged: {
+            if (hovered) {
+                UI.ui.playHoverSound()
+            }
+        }
+        onPressedChanged: {
+            if (pressed) {
+                UI.ui.playSwitchSound()
+            }
+        }
     }
     
     popup: Popup {

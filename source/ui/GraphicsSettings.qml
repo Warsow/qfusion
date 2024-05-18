@@ -65,12 +65,12 @@ Flickable {
 
         SettingsRow {
             text: "Explosions/impact wave"
-            CVarAwareCheckBox { cvarName: "cg_explosionsWave" }
+            CVarAwareCheckBox { cvarName: "cg_explosionWave" }
         }
 
         SettingsRow {
             text: "Explosions smoke"
-            CVarAwareCheckBox { cvarName: "cg_explosionsSmoke" }
+            CVarAwareCheckBox { cvarName: "cg_explosionSmoke" }
         }
 
         SettingsGroupHeaderRow { text: "Esport features" }

@@ -104,7 +104,10 @@ Item {
                 }
                 text: "Revert"
                 width: implicitWidth
-                onClicked: UI.ui.rollbackPendingCVarChanges()
+                onClicked: {
+                    UI.ui.playBackSound()
+                    UI.ui.rollbackPendingCVarChanges()
+                }
             }
 
             SlantedRightPrimaryButton {
@@ -116,7 +119,10 @@ Item {
                 }
                 width: implicitWidth
                 text: "Accept"
-                onClicked: UI.ui.commitPendingCVarChanges()
+                onClicked: {
+                    UI.ui.playForwardSound()
+                    UI.ui.commitPendingCVarChanges()
+                }
             }
         }
     }

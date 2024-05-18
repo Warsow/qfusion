@@ -55,6 +55,7 @@ PathView {
 
         onClicked: {
             if (!PathView.isCurrentItem) {
+                UI.ui.playForwardSound()
                 root.currentIndex = index
             }
         }

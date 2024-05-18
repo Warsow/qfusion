@@ -89,7 +89,10 @@ StackView {
                     textSlantDegrees: 0
                     highlighted: true
                     //Material.accent: Qt.lighter(Material.background, 1.1)
-                    onClicked: root.startHudEditorWizard()
+                    onClicked: {
+                        UI.ui.playForwardSound()
+                        root.startHudEditorWizard()
+                    }
                 }
 
                 SettingsGroupHeaderRow { text: "HUD elements" }

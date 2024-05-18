@@ -85,7 +85,14 @@ Item {
                     width: gametypePage.expectedListItemWidth
                     text: title
                     selected: index === gametypePage.selectedIndex
-                    onClicked: gametypePage.selectedIndex = index
+                    onClicked: {
+                        if (gametypePage.selectedIndex >= 0) {
+                            UI.ui.playSwitchSound()
+                        } else {
+                            UI.ui.playForwardSound()
+                        }
+                        gametypePage.selectedIndex = index
+                    }
                     // Handles external selectedIndex changes as well
                     onSelectedChanged: {
                         if (selected) {
@@ -151,7 +158,14 @@ Item {
                     width: mapPage.expectedListItemWidth
                     text: modelData["title"]
                     selected: index === mapPage.selectedIndex
-                    onClicked: mapPage.selectedIndex = index
+                    onClicked: {
+                        if (mapPage.selectedIndex >= 0) {
+                            UI.ui.playSwitchSound()
+                        } else {
+                            UI.ui.playForwardSound()
+                        }
+                        mapPage.selectedIndex = index
+                    }
                     // Handles external selectedIndex changes as well
                     onSelectedChanged: {
                         if (selected) {
@@ -245,7 +259,7 @@ Item {
                     font.letterSpacing: 0.75
                     text: "Instagib"
                 }
-                CheckBox {
+                WswCheckBox {
                     id: instaCheckBox
                     Material.theme: checked ? Material.Light : Material.Dark
                     onCheckedChanged: selectedInsta = checked
@@ -257,7 +271,7 @@ Item {
                     font.letterSpacing: 0.75
                     text: "Public"
                 }
-                CheckBox {
+                WswCheckBox {
                     id: publicCheckBox
                     Material.theme: checked ? Material.Light : Material.Dark
                     onCheckedChanged: selectedPublic = checked
@@ -316,7 +330,10 @@ Item {
             id: prevButton
             text: "back"
             visible: swipeView.currentItem.canGoPrev
-            onClicked: swipeView.currentIndex = swipeView.currentIndex - 1
+            onClicked: {
+                UI.ui.playBackSound()
+                swipeView.currentIndex = swipeView.currentIndex - 1
+            }
         }
 
         Item {
@@ -331,20 +348,7 @@ Item {
             highlighted: true
             text: swipeView.currentIndex === 2 ? "start" : "next"
             visible: swipeView.currentItem.canGoNext
-            onClicked: {
-                if (swipeView.currentIndex !== 2) {
-                    swipeView.currentIndex = swipeView.currentIndex + 1
-                } else {
-                    let flags = 0
-                    if (selectedInsta) {
-                        flags |= UISystem.LocalServerInsta
-                    }
-                    if (selectedPublic) {
-                        flags |= UISystem.LocalServerPublic
-                    }
-                    UI.ui.launchLocalServer(selectedGametypeName, selectedMapName, flags, selectedNumBots);
-                }
-            }
+            onClicked: goNext()
         }
 
         Item {
@@ -360,6 +364,7 @@ Item {
                 gametypePage.detailed = false
                 gametypePage.selectedIndex = -1
                 event.accepted = true
+                UI.ui.playBackSound()
                 return true
             }
             return false
@@ -371,9 +376,11 @@ Item {
             } else {
                 swipeView.currentIndex = 0
             }
+            UI.ui.playBackSound()
             event.accepted = true
             return true
         }
+        UI.ui.playBackSound()
         swipeView.currentIndex = 1
         event.accepted = true
         return true
@@ -392,6 +399,23 @@ Item {
         return true
     }
 
+    function goNext() {
+        console.assert(swipeView.currentItem.canGoNext)
+        UI.ui.playForwardSound()
+        if (swipeView.currentIndex !== 2) {
+            swipeView.currentIndex = swipeView.currentIndex + 1
+        } else {
+            let flags = 0
+            if (selectedInsta) {
+                flags |= UISystem.LocalServerInsta
+            }
+            if (selectedPublic) {
+                flags |= UISystem.LocalServerPublic
+            }
+            UI.ui.launchLocalServer(selectedGametypeName, selectedMapName, flags, selectedNumBots);
+        }
+    }
+
     function handleKeyEvent(event) {
         const key = event.key
         if (key === Qt.Key_Escape || key == Qt.Key_Back) {
@@ -401,7 +425,7 @@ Item {
             return handleBackEvent(event)
         }
         if (key === Qt.Key_Right && swipeView.currentItem.canGoNext) {
-            swipeView.currentIndex = swipeView.currentIndex + 1
+            goNext()
             event.accepted = true
             return
         }

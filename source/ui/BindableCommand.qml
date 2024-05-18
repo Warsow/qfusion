@@ -41,6 +41,9 @@ MouseArea {
     }
 
     onContainsMouseChanged: {
+        if (isBound && containsMouse) {
+            UI.ui.playHoverSound()
+        }
         // Don't highlight
         if (!isInEditorMode) {
             UI.keysAndBindings.onCommandItemContainsMouseChanged(commandNum, containsMouse)
@@ -49,8 +52,10 @@ MouseArea {
 
     onClicked: {
         if (isInEditorMode) {
+            UI.ui.playForwardSound()
             bindingSelected(commandNum)
         } else if (bindMarker.visible) {
+            UI.ui.playForwardSound()
             bindingRequested(commandNum)
         }
     }
@@ -75,6 +80,11 @@ MouseArea {
             left: parent.left
             leftMargin: -2
             verticalCenter: parent.verticalCenter
+        }
+        onVisibleChanged: {
+            if (visible) {
+                UI.ui.playHoverSound()
+            }
         }
         font.pointSize: 12
         font.weight: Font.Medium

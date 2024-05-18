@@ -810,9 +810,11 @@ src_t *S_AllocRawSource( int entNum, float fvol, float attenuation, cvar_t *volu
 /*
 * S_StopAllSources
 */
-void S_StopAllSources( void ) {
-	int i;
-
-	for( i = 0; i < src_count; i++ )
-		source_kill( &srclist[i] );
+void S_StopAllSources( bool retainLocal ) {
+	for( int i = 0; i < src_count; i++ ) {
+		// TODO: Perform a better distinction of local sounds
+		if( !retainLocal || srclist[i].attenuation != ATTN_NONE ) {
+			source_kill( &srclist[i] );
+		}
+	}
 }

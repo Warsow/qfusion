@@ -41,6 +41,8 @@ Item {
             height: root.height
             layer.enabled: true
             layer.effect: ElevationEffect { elevation: Hud.elementElevation }
+
+            Component.onCompleted: Hud.ui.playForwardSound()
             Component.onDestruction: Hud.destroyLayer(layer)
 
             Rectangle {
@@ -122,6 +124,7 @@ Item {
     Keys.onPressed: {
         if (Hud.ui.isShowingChatPopup || Hud.ui.isShowingTeamChatPopup) {
             if (event.key == Qt.Key_Escape || event.key == Qt.Key_Back) {
+                UI.ui.playBackSound()
                 Hud.ui.closeChatPopup()
             }
         }

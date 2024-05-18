@@ -53,7 +53,15 @@ Rectangle {
         anchors.horizontalCenter: parent.left
         anchors.verticalCenter: parent.verticalCenter
         icon.source: "qrc:/ModelLeftArrow.svg"
-        onClicked: impl.selectedIndex = impl.selectedIndex ? impl.selectedIndex - 1 : impl.models.length - 1
+        onHoveredChanged: {
+            if (hovered) {
+                UI.ui.playHoverSound()
+            }
+        }
+        onClicked: {
+            UI.ui.playSwitchSound()
+            impl.selectedIndex = impl.selectedIndex ? impl.selectedIndex - 1 : impl.models.length - 1
+        }
     }
 
     NativelyDrawnModel {
@@ -75,7 +83,15 @@ Rectangle {
         anchors.horizontalCenter: parent.right
         anchors.verticalCenter: parent.verticalCenter
         icon.source: "qrc:/ModelRightArrow.svg"
-        onClicked: impl.selectedIndex = impl.selectedIndex + 1 < impl.models.length ? impl.selectedIndex + 1 : 0
+        onHoveredChanged: {
+            if (hovered) {
+                UI.ui.playHoverSound()
+            }
+        }
+        onClicked: {
+            UI.ui.playSwitchSound()
+            impl.selectedIndex = impl.selectedIndex + 1 < impl.models.length ? impl.selectedIndex + 1 : 0
+        }
     }
 
     Label {

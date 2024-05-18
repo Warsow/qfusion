@@ -90,16 +90,22 @@ Item {
             width: parent.width - 10
             height: parent.height - 10
             onContainsMouseChanged: {
+                if (containsMouse) {
+                    UI.ui.playHoverSound()
+                }
                 if (!isInEditorMode) {
                     UI.keysAndBindings.onKeyItemContainsMouseChanged(quakeKey, mouseArea.containsMouse)
                 }
             }
             onClicked: {
                 if (isInEditorMode) {
+                    UI.ui.playForwardSound()
                     keySelected(quakeKey)
                 } else if (group) {
+                    UI.ui.playSwitchSound()
                     unbindingRequested(quakeKey)
                 } else {
+                    UI.ui.playForwardSound()
                     bindingRequested(quakeKey)
                 }
             }

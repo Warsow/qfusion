@@ -46,11 +46,15 @@ Item {
 
             onContainsMouseChanged: {
                 if (containsMouse) {
+                    UI.ui.playHoverSound()
                     levelshotGrid.positionViewAtIndex(index, GridView.Center)
                 }
             }
 
-            onClicked: root.chosenValue = modelData["name"]
+            onClicked: {
+                UI.ui.playSwitchSound()
+                root.chosenValue = modelData["name"]
+            }
 
             Image {
                 id: image

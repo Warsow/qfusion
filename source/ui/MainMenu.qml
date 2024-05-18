@@ -165,6 +165,7 @@ Item {
 	    if (event.key !== Qt.Key_Escape) {
 	        return
 	    }
+	    UI.ui.playBackSound()
 	    UI.ui.returnFromMainMenu()
 	    root.forceActiveFocus()
 	    event.accepted = true

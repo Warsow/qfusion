@@ -78,8 +78,6 @@ extern cvar_t *s_hrtf;
 #define SRCPRI_LOCAL    3   // Local sounds
 #define SRCPRI_STREAM   4   // Streams (music, cutscenes)
 
-void S_Clear( void );
-
 [[nodiscard]]
 static inline auto clampSourceGain( float givenVolume ) -> float {
 	return wsw::clamp( givenVolume, 0.0f, 1.0f );
@@ -206,7 +204,7 @@ src_t *S_AllocSource( int priority, int entnum, int channel );
 src_t *S_FindSource( int entnum, int channel );
 void S_LockSource( src_t *src );
 void S_UnlockSource( src_t *src );
-void S_StopAllSources( void );
+void S_StopAllSources( bool retainLocal );
 ALuint S_GetALSource( const src_t *src );
 src_t *S_AllocRawSource( int entNum, float fvol, float attenuation, cvar_t *volumeVar );
 void S_SetEntitySpatialization( int entnum, const vec3_t origin, const vec3_t velocity, const mat3_t axis );

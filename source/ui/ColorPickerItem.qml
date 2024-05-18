@@ -61,6 +61,8 @@ Item {
         hoverEnabled: true
         onContainsMouseChanged: {
             if (containsMouse) {
+                UI.ui.playHoverSound()
+
                 root.mouseEnter(root.layoutIndex)
 
                 haloAnim.stop()
@@ -80,7 +82,10 @@ Item {
                 stopExtraHoverAnims()
             }
         }
-        onClicked: root.clicked(root.layoutIndex)
+        onClicked: {
+            UI.ui.playSwitchSound()
+            root.clicked(root.layoutIndex)
+        }
     }
 
     Rectangle {

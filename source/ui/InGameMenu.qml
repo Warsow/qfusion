@@ -81,7 +81,10 @@ Rectangle {
                     KeyNavigation.down: loadoutsButton
                     Layout.fillWidth: true
                     displayIconPlaceholder: true
-                    onClicked: UI.ui.showMainMenu()
+                    onClicked: {
+                        UI.ui.playForwardSound()
+                        UI.ui.showMainMenu()
+                    }
                 }
                 SlantedButton {
                     id: loadoutsButton
@@ -91,7 +94,10 @@ Rectangle {
                     text: canShowLoadouts ? UI.gametypeOptionsModel.tabTitle : ""
                     Layout.fillWidth: true
                     displayIconPlaceholder: true
-                    onClicked: stackView.push(gametypeOptionsComponent)
+                    onClicked: {
+                        UI.ui.playForwardSound()
+                        stackView.push(gametypeOptionsComponent)
+                    }
                 }
                 SlantedButton {
                     id: readyButton
@@ -103,6 +109,7 @@ Rectangle {
                     Layout.fillWidth: true
                     displayIconPlaceholder: true
                     onClicked: {
+                        UI.ui.playForwardSound()
                         if (UI.ui.isReady) {
                             UI.ui.setNotReady()
                         } else {
@@ -121,6 +128,7 @@ Rectangle {
                     Layout.fillWidth: true
                     displayIconPlaceholder: true
                     onClicked: {
+                        UI.ui.playForwardSound()
                         if (UI.hudCommonDataModel.hasTwoTeams && UI.ui.canJoinAlpha && UI.ui.canJoinBeta) {
                             stackView.push(teamSelectionComponent)
                         } else {
@@ -138,6 +146,7 @@ Rectangle {
                     Layout.fillWidth: true
                     displayIconPlaceholder: true
                     onClicked: {
+                        UI.ui.playForwardSound()
                         if (UI.hudCommonDataModel.isInWarmupState) {
                             if (UI.ui.canJoinAlpha) {
                                 UI.ui.joinAlpha()
@@ -160,6 +169,7 @@ Rectangle {
                     Layout.fillWidth: true
                     displayIconPlaceholder: true
                     onClicked: {
+                        UI.ui.playForwardSound()
                         if (UI.ui.isInChallengersQueue) {
                             UI.ui.leaveChallengersQueue()
                             UI.ui.returnFromInGameMenu()
@@ -178,6 +188,7 @@ Rectangle {
                     Layout.fillWidth: true
                     displayIconPlaceholder: true
                     onClicked: {
+                        UI.ui.playForwardSound()
                         if (UI.hudCommonDataModel.isInWarmupState) {
                             UI.ui.spectate()
                             UI.ui.returnFromInGameMenu()
@@ -193,6 +204,7 @@ Rectangle {
                     Layout.fillWidth: true
                     displayIconPlaceholder: true
                     onClicked: {
+                        UI.ui.playForwardSound()
                         if (UI.hudCommonDataModel.realClientTeam === HudDataModel.TeamSpectators || UI.hudCommonDataModel.isInWarmupState) {
                             UI.ui.disconnect()
                         } else {
@@ -245,9 +257,11 @@ Rectangle {
             buttonEnabledStatuses: [true, true]
             onButtonClicked: {
                 if (buttonIndex === 0) {
+                    UI.ui.playForwardSound()
                     UI.ui.spectate()
                     UI.ui.returnFromInGameMenu()
                 } else {
+                    UI.ui.playBackSound()
                     stackView.pop()
                 }
             }
@@ -285,6 +299,7 @@ Rectangle {
             buttonEnabledStatuses: [true, true]
             onButtonClicked: {
                 if (buttonIndex === 0) {
+                    UI.ui.startForwardSound()
                     if (UI.ui.canJoinAlpha) {
                         stackView.pop()
                         stackView.push(awaitingSwitchTeamComponent, {"targetTeam" : HudDataModel.TeamAlpha})
@@ -295,6 +310,7 @@ Rectangle {
                         UI.ui.joinBeta()
                     }
                 } else {
+                    UI.ui.playBackSound()
                     stackView.pop()
                 }
             }
@@ -337,8 +353,10 @@ Rectangle {
             buttonEnabledStatuses: [true, true]
             onButtonClicked: {
                 if (buttonIndex === 0) {
+                    UI.ui.playForwardSound()
                     UI.ui.disconnect()
                 } else {
+                    UI.ui.playBackSound()
                     stackView.pop()
                 }
             }
@@ -406,6 +424,7 @@ Rectangle {
                             connectionsEnabled = false
                             stackView.pop()
                             stackView.push(awaitingJoinComponent, {"maybeTargetTeam" : HudDataModel.TeamAlpha})
+                            UI.ui.playForwardSound()
                             UI.ui.joinAlpha()
                         }
                     }
@@ -422,6 +441,7 @@ Rectangle {
                             connectionsEnabled = false
                             stackView.pop()
                             stackView.push(awaitingJoinComponent)
+                            UI.ui.playForwardSound()
                             UI.ui.join()
                         }
                     }
@@ -439,6 +459,7 @@ Rectangle {
                             connectionsEnabled = false
                             stackView.pop()
                             stackView.push(awaitingJoinComponent, {"maybeTargetTeam" : HudDataModel.TeamBeta})
+                            UI.ui.playForwardSound()
                             UI.ui.joinBeta()
                         }
                     }
@@ -643,12 +664,17 @@ Rectangle {
                         onTriggered: secondsLeft--
                     }
                 }
-                onButtonClicked: stackView.pop()
+                onButtonClicked: {
+                    UI.ui.playBackSound()
+                    stackView.pop()
+                }
             }
             Timer {
                 running: true
                 interval: 3000
-                onTriggered: stackView.pop()
+                onTriggered: {
+                    stackView.pop()
+                }
             }
         }
     }
@@ -678,6 +704,7 @@ Rectangle {
                     if (handler && handler(event)) {
                         return
                     }
+                    UI.ui.playBackSound()
                     if (stackView.depth < 2) {
                         if (tabBar.currentIndex) {
                             tabBar.currentIndex = 0

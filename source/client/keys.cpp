@@ -213,7 +213,7 @@ auto KeyBindingsSystem::KeysAndNames::getNameForKey( int key ) const -> std::opt
 
 auto KeyBindingsSystem::getBindingForKey( int key ) const -> std::optional<wsw::StringView> {
 	if( (unsigned)key < kMaxBindings ) {
-		if( const auto &b = m_bindings[key]; !b.empty() ) {
+		if( const auto &b = m_bindings[key]; b.size() > 1 ) {
 			return wsw::StringView( b.data(), b.size() - 1, wsw::StringView::ZeroTerminated );
 		}
 	}
@@ -234,7 +234,7 @@ void KeyBindingsSystem::setBinding( int key, const wsw::StringView &binding ) {
 	}
 
 	wsw::StringView oldView = wsw::StringView();
-	if( const auto &old = m_bindings[key]; !old.empty() ) {
+	if( const auto &old = m_bindings[key]; old.size() > 1 ) {
 		oldView = wsw::StringView( old.data(), old.size() - 1, wsw::StringView::ZeroTerminated );
 	}
 	if( oldView.equalsIgnoreCase( binding ) ) {

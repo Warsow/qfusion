@@ -13,6 +13,12 @@ MouseArea {
     property bool detailed
     property string text
 
+    onContainsMouseChanged: {
+        if (containsMouse) {
+            UI.ui.playHoverSound()
+        }
+    }
+
     Label {
         id: label
         text: root.text

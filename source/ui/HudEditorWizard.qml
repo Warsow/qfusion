@@ -76,6 +76,7 @@ Item {
 
             function handleNextRequest() {
                 console.assert(selectedHudEditorModel)
+                UI.ui.playForwardSound()
                 stackView.setComponent(loadPageComponent, {"selectedHudEditorModel" : selectedHudEditorModel})
             }
 
@@ -87,13 +88,19 @@ Item {
                     width: listItemWidth
                     text: "Primary"
                     selected: selectedHudEditorModel === UI.regularHudEditorModel
-                    onClicked: selectedHudEditorModel = UI.regularHudEditorModel
+                    onClicked: {
+                        UI.ui.playSwitchSound()
+                        selectedHudEditorModel = UI.regularHudEditorModel
+                    }
                 }
                 SelectableLabel {
                     width: listItemWidth
                     text: "Miniview"
                     selected: selectedHudEditorModel === UI.miniviewHudEditorModel
-                    onClicked: selectedHudEditorModel = UI.miniviewHudEditorModel
+                    onClicked: {
+                        UI.ui.playSwitchSound()
+                        selectedHudEditorModel = UI.miniviewHudEditorModel
+                    }
                 }
             }
         }
@@ -130,6 +137,7 @@ Item {
 
             function handleBackRequest() {
                 console.assert(selectedHudEditorModel)
+                UI.ui.playBackSound()
                 stackView.setComponent(flavorSelectionComponent)
             }
 
@@ -137,6 +145,7 @@ Item {
                 console.assert(selectedHudEditorModel)
                 console.assert(selectedForLoadingFileName)
                 if (selectedHudEditorModel.load(selectedForLoadingFileName)) {
+                    UI.ui.playForwardSound()
                     stackView.setComponent(hudEditorComponent, {
                         "selectedHudEditorModel" : selectedHudEditorModel,
                         "selectedForLoadingFileName" : selectedForLoadingFileName,
@@ -167,6 +176,7 @@ Item {
                             text: modelData
                             selected: loadPage.selectedIndex === index
                             onClicked: {
+                                UI.ui.playSwitchSound()
                                 selectedForLoadingFileName = modelData
                                 loadPage.selectedIndex = index
                             }
@@ -202,12 +212,14 @@ Item {
             function handleBackRequest() {
                 console.assert(selectedHudEditorModel)
                 console.assert(selectedForLoadingFileName)
+                UI.ui.playBackSound()
                 stackView.setComponent(loadPageComponent, {"selectedHudEditorModel" : selectedHudEditorModel})
             }
 
             function handleNextRequest() {
                 console.assert(selectedHudEditorModel)
                 console.assert(selectedForLoadingFileName)
+                UI.ui.playForwardSound()
                 stackView.setComponent(savePageComponent, {
                     "selectedHudEditorModel" : selectedHudEditorModel,
                     "selectedForLoadingFileName" : selectedForLoadingFileName,
@@ -269,6 +281,7 @@ Item {
             function handleBackRequest() {
                 console.assert(selectedHudEditorModel)
                 console.assert(selectedForLoadingFileName)
+                UI.ui.playBackSound()
                 stackView.setComponent(hudEditorComponent, {
                     "selectedHudEditorModel" : selectedHudEditorModel,
                     "selectedForLoadingFileName" : selectedForLoadingFileName,
@@ -279,7 +292,9 @@ Item {
                 console.assert(selectedHudEditorModel)
                 console.assert(selectedForLoadingFileName)
                 console.assert(selectedForSavingFileName)
-                if (!selectedHudEditorModel.save(selectedForSavingFileName)) {
+                if (selectedHudEditorModel.save(selectedForSavingFileName)) {
+                    UI.ui.playForwardSound()
+                } else {
                     console.warn("Failed to saved the HUD model to", selectedForSavingFileName)
                 }
                 root.exitRequested()
@@ -335,6 +350,7 @@ Item {
                                 text: modelData
                                 selected: savePage.selectedIndex === index
                                 onClicked: {
+                                    UI.ui.playSwitchSound()
                                     savePage.selectedIndex = index
                                     const existingHuds     = selectedHudEditorModel.existingHuds
                                     // Remove the no longer useful custom name by switching back to the default model
@@ -349,6 +365,7 @@ Item {
                             height: 36
                             maxHudNameLength: selectedHudEditorModel.maxHudNameLength
                             onAdditionRequested: {
+                                UI.ui.playForwardSound()
                                 const model = [...selectedHudEditorModel.existingHuds]
                                 model.push(text)
                                 selectHudToSaveList.model = model

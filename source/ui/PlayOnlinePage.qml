@@ -35,7 +35,7 @@ Item {
 
         Item { Layout.fillWidth: true }
 
-        CheckBox {
+        WswCheckBox {
             id: fullCheckBox
             Material.theme: checked ? Material.Light : Material.Dark
             text: "Show full"
@@ -46,7 +46,7 @@ Item {
                 contentItem.color = Material.foreground
             }
         }
-        CheckBox {
+        WswCheckBox {
             id: emptyCheckBox
             Material.theme: checked ? Material.Light : Material.Dark
             text: "Show empty"
@@ -168,8 +168,11 @@ Item {
                 rightBodyPartSlantDegrees: 0.5 * UI.buttonBodySlantDegrees
                 textSlantDegrees: 0
                 labelHorizontalCenterOffset: 0
-                // TODO: This should be less hacky
-                onClicked: primaryMenu.activePageTag = primaryMenu.pageLocalGame
+                onClicked: {
+                    UI.ui.playForwardSound()
+                    // TODO: This should be less hacky
+                    primaryMenu.activePageTag = primaryMenu.pageLocalGame
+                }
             }
         }
     }

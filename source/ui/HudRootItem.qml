@@ -137,15 +137,28 @@ Item {
                     hackyContainsMouse = false
                 }
             }
+            // TODO: Is it needed?
             onPositionChanged: hackyContainsMouse = true
-            onEntered: hackyContainsMouse = true
+            onEntered: {
+                Hud.ui.playHoverSound()
+                // Unset this flag in all other views
+                for (const view of Object.values(rootItem.instantiatedMiniviewHuds)) {
+                    if (view != miniviewItem) {
+                        view.hackyContainsMouse = false
+                    }
+                }
+                hackyContainsMouse = true
+            }
             onExited: hackyContainsMouse = false
 
             // It gets specified via construction args
             property alias povDataModel: actualHudField.povDataModel
             property alias isATileElement: actualHudField.isATileElement
 
-            onClicked: Hud.ui.switchToPlayerNum(Hud.commonDataModel.getMiniviewPlayerNumForIndex(miniviewIndex))
+            onClicked: {
+                Hud.ui.playForwardSound()
+                Hud.ui.switchToPlayerNum(Hud.commonDataModel.getMiniviewPlayerNumForIndex(miniviewIndex))
+            }
 
             InGameHud {
                 id: actualHudField

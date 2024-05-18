@@ -474,7 +474,7 @@ LONG WINAPI MainWndProc(
 		break;
 
 		case WM_ENTERSIZEMOVE:
-			SoundSystem::instance()->clear();
+			SoundSystem::instance()->stopSounds();
 			break;
 
 		case WM_IME_STARTCOMPOSITION:

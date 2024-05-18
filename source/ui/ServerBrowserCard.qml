@@ -55,7 +55,10 @@ Item {
                 id: addressLinkMouseArea
                 anchors.fill: parent
                 hoverEnabled: true
-                onClicked: UI.ui.connectToAddress(address)
+                onClicked: {
+                    UI.ui.playForwardSound()
+                    UI.ui.connectToAddress(address)
+                }
             }
         }
 

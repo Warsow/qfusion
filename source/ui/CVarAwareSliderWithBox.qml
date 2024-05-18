@@ -150,7 +150,7 @@ Item {
         textField.suppressSignals = false
     }
 
-    Slider {
+    WswSlider {
         id: slider
         width: root.implicitWidth - textField.width - 8
 
@@ -170,7 +170,7 @@ Item {
         }
     }
 
-    TextField {
+    WswTextField {
         id: textField
 
         anchors.verticalCenter: slider.verticalCenter

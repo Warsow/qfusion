@@ -25,6 +25,11 @@ Item {
         width: label.implicitWidth
         height: label.implicitHeight
         onClicked: root.clicked()
+        onContainsMouseChanged: {
+            if (containsMouse) {
+                UI.ui.playHoverSound()
+            }
+        }
     }
 
     Label {

@@ -17,13 +17,12 @@ public:
 	void init( bool verbose );
 	void shutdown( bool verbose );
 
-	void clear();
-	void stopAllSounds( unsigned flags );
+	void stopSounds( unsigned flags );
 
 	void processFrameUpdates();
 
-	//void freeSound( int id );
-	void loadSound( const SoundSetProps &props );
+	[[maybe_unused]]
+	auto loadSound( const SoundSetProps &props ) -> const SoundSet *;
 	[[nodiscard]]
 	auto findSoundSet( const SoundSetProps &props ) -> const SoundSet *;
 
@@ -42,6 +41,7 @@ public:
 	void setListener( int entNum, const Vec3 &origin, const Vec3 &velocity, const std::array<Vec3, 3> &axis );
 
 	void startLocalSound( const SoundSet *sound, float volume );
+	void startLocalSoundByName( const PodVector<char> &name, float volume );
 	void startFixedSound( const SoundSet *sound, const Vec3 &origin, int channel, float volume, float attenuation );
 	void startRelativeSound( const SoundSet *sound, SoundSystem::AttachmentTag attachmentTag, int entNum, int channel, float volume, float attenuation );
 	void addLoopSound( const SoundSet *sound, SoundSystem::AttachmentTag attachmentTag, int entNum, uintptr_t identifyingToken, float volume, float attenuation );

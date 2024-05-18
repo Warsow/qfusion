@@ -70,6 +70,7 @@ RowLayout {
             onMouseEnter: root.expandAt(index)
             onMouseLeave: root.shrinkBack()
             onClicked: {
+                UI.ui.playSwitchSound()
                 // We do not touch the custom color
                 impl.selectedIndex = index
                 impl.selectedColor = UI.ui.consoleColors[index]
@@ -86,6 +87,7 @@ RowLayout {
         onMouseEnter: root.expandAt(index)
         onMouseLeave: root.shrinkBack()
         onClicked: {
+            UI.ui.playHoverSound()
             // We do not touch the custom color
             impl.selectedIndex = UI.ui.consoleColors.length
             impl.selectedColor = impl.customColor
@@ -292,7 +294,7 @@ RowLayout {
                     font.weight: Font.Medium
                     style: Text.Raised
                 }
-                Slider {
+                WswSlider {
                     id: rSlider
                     Layout.fillHeight: true
                     Layout.fillWidth: true
@@ -312,7 +314,7 @@ RowLayout {
                     font.weight: Font.Medium
                     style: Text.Raised
                 }
-                Slider {
+                WswSlider {
                     id: gSlider
                     Layout.fillHeight: true
                     Layout.fillWidth: true
@@ -331,7 +333,7 @@ RowLayout {
                     font.weight: Font.Medium
                     style: Text.Raised
                 }
-                Slider {
+                WswSlider {
                     id: bSlider
                     Layout.fillHeight: true
                     Layout.fillWidth: true
@@ -352,8 +354,14 @@ RowLayout {
                     font.family: UI.ui.symbolsFontFamily
                     enabled: !!popup.selectedColor && popup.hasChanges
                     onClicked: {
+                        UI.ui.playSwitchSound()
                         root.setSelectedCustomColor(popup.selectedColor)
                         popup.close()
+                    }
+                    onHoveredChanged: {
+                        if (hovered) {
+                            UI.ui.playHoverSound()
+                        }
                     }
                 }
 
@@ -373,7 +381,15 @@ RowLayout {
                     flat: true
                     text: "\u2716"
                     font.family: UI.ui.symbolsFontFamily
-                    onClicked: popup.close()
+                    onClicked: {
+                        UI.ui.playSwitchSound();
+                        popup.close()
+                    }
+                    onHoveredChanged: {
+                        if (hovered) {
+                            UI.ui.playHoverSound()
+                        }
+                    }
                 }
             }
         }

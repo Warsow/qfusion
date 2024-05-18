@@ -27,9 +27,7 @@ public:
 	void beginRegistration() override;
 	void endRegistration() override;
 
-	void stopAllSounds( unsigned flags ) override;
-
-	void clear() override;
+	void stopSounds( unsigned flags ) override;
 
 	void updateListener( int entNum, const float *origin, const float *velocity, const mat3_t axis ) override;
 

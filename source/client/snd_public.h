@@ -118,11 +118,10 @@ public:
 	virtual void beginRegistration() = 0;
 	virtual void endRegistration() = 0;
 
-	enum StopFlags : unsigned { StopAndClear = 0x1, StopMusic = 0x2 };
+	enum StopFlags : unsigned { StopMusic = 0x1, RetainLocal = 0x2 };
 
-	virtual void stopAllSounds( unsigned flags = 0 ) = 0;
+	virtual void stopSounds( unsigned flags = 0 ) = 0;
 
-	virtual void clear() = 0;
 	virtual void updateListener( int entNum, const float *origin, const float *velocity, const mat3_t axis ) = 0;
 	virtual void activate( bool isActive ) = 0;
 

@@ -940,6 +940,7 @@ static void CG_UpdateChaseCam() {
 		if( cmd.buttons & BUTTON_ATTACK ) {
 			if( CG_SwitchChaseCamMode() ) {
 				cg.chaseSwitchTimestamp = cg.time;
+				wsw::ui::UISystem::instance()->playForwardSound();
 			}
 		}
 
@@ -952,6 +953,7 @@ static void CG_UpdateChaseCam() {
 		if( chaseStep ) {
 			if( CG_ChaseStep( chaseStep ) ) {
 				cg.chaseSwitchTimestamp = cg.time;
+				wsw::ui::UISystem::instance()->playForwardSound();
 			}
 		}
 	}

@@ -60,6 +60,7 @@ Item {
                     width: groupsPage.width
                     horizontalAlignment: Qt.AlignHCenter
                     onClicked: {
+                        UI.ui.playForwardSound()
                         activeCallvotesModel.setGroupFilter(group)
                         stackView.replace(voteSelectionComponent)
                     }
@@ -87,6 +88,7 @@ Item {
                     width: votesPage.width
                     horizontalAlignment: Qt.AlignHCenter
                     onClicked: {
+                        UI.ui.playForwardSound()
                         selectedVoteIndex = index
                         selectedVoteName = name
                         selectedVoteDesc = desc
@@ -140,7 +142,10 @@ Item {
                             enabled: currentValue != 1
                             selected: chosenValue == 1
                             text: "yes"
-                            onClicked: chosenValue = 1
+                            onClicked: {
+                                UI.ui.playSwitchSound()
+                                chosenValue = 1
+                            }
                         }
                         SelectableLabel {
                             Layout.preferredWidth: implicitWidth
@@ -148,7 +153,10 @@ Item {
                             enabled: currentValue != 0
                             selected: chosenValue == 0
                             text: "no"
-                            onClicked: chosenValue = 0
+                            onClicked: {
+                                UI.ui.playSwitchSound()
+                                chosenValue = 0
+                            }
                         }
                     }
                 }
@@ -247,7 +255,10 @@ Item {
                 spacing: UI.minAcceptRejectSpacing
                 SlantedLeftSecondaryButton {
                     text: "back"
-                    onClicked: stackView.replace(voteSelectionComponent)
+                    onClicked: {
+                        UI.ui.playBackSound()
+                        stackView.replace(voteSelectionComponent)
+                    }
                 }
                 SlantedRightPrimaryButton {
                     visible: UI.ui.isOperator && (selectedVoteFlags & CallvotesModel.Operator)
@@ -271,6 +282,7 @@ Item {
     function startVote(chosenValue, isOperatorCall) {
         UI.ui.callVote(selectedVoteName, chosenValue, isOperatorCall)
         stackView.replace(voteSelectionComponent)
+        UI.ui.playForwardSound()
         UI.ui.returnFromInGameMenu()
     }
 
@@ -278,6 +290,7 @@ Item {
         if (event.key === Qt.Key_Escape || event.key === Qt.Key_Back) {
             const stage = stackView.currentItem.stage
             if (stage == 2 || stage == 3) {
+                UI.ui.playBackSound()
                 if (stage == 2) {
                     stackView.replace(groupSelectionComponent)
                 } else {

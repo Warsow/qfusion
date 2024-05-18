@@ -81,6 +81,7 @@ Item {
                 index = 0
             }
             selectedIndex = index
+            UI.ui.playSwitchSound()
         }
     }
 }

@@ -25,15 +25,21 @@ FocusScope {
         icon.width: 16; icon.height: 16
         Material.theme: Material.Dark
         anchors.centerIn: parent
+        onHoveredChanged: {
+            if (hovered) {
+                UI.ui.playHoverSound()
+            }
+        }
         onClicked: {
+            UI.ui.playSwitchSound()
             visible = false
             textField.visible = true
             textField.width = root.width - 64
-            textField.forceActiveFocus
+            textField.forceActiveFocus()
         }
     }
 
-    TextField {
+    WswTextField {
         id: textField
         Material.theme: activeFocus ? Material.Light : Material.Dark
         visible: false
@@ -67,6 +73,11 @@ FocusScope {
         visible: textField.text.length > 0
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
+        onHoveredChanged: {
+            if (hovered) {
+                UI.ui.playHoverSound()
+            }
+        }
         onClicked: close()
     }
 }

@@ -31,6 +31,7 @@ Item {
             onClicked: {
                 if (mouse.y >= progressBar.y - 4 && mouse.y <= progressBar.y + 12) {
                     if (mouse.x >= progressBar.x && mouse.x <= progressBar.x + progressBar.width) {
+                        UI.ui.playSwitchSound()
                         UI.demoPlayer.seek((mouse.x - progressBar.x) / progressBar.width)
                     }
                 }
@@ -95,6 +96,13 @@ Item {
 
             indeterminate: UI.demoPlayer.isPaused
 
+            hoverEnabled: true
+            onHoveredChanged: {
+                if (hovered) {
+                    UI.ui.playHoverSound()
+                }
+            }
+
             from: 0.0
             to: UI.demoPlayer.duration
             value: UI.demoPlayer.progress
@@ -136,7 +144,15 @@ Item {
                 text: "\u23EF"
                 font.family: UI.ui.emojiFontFamily
                 font.pointSize: 20
-                onClicked: UI.demoPlayer.pause()
+                onHoveredChanged: {
+                    if (hovered) {
+                        UI.ui.playHoverSound()
+                    }
+                }
+                onClicked: {
+                    UI.ui.playSwitchSound()
+                    UI.demoPlayer.pause()
+                }
             }
 
             Button {
@@ -146,7 +162,15 @@ Item {
                 text: "\u23F9"
                 font.family: UI.ui.emojiFontFamily
                 font.pointSize: 20
-                onClicked: UI.demoPlayer.stop()
+                onHoveredChanged: {
+                    if (hovered) {
+                        UI.ui.playHoverSound()
+                    }
+                }
+                onClicked: {
+                    UI.ui.playSwitchSound()
+                    UI.demoPlayer.stop()
+                }
             }
         }
     }

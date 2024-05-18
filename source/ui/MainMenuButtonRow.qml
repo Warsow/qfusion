@@ -70,7 +70,9 @@ Item {
     Connections {
         target: mouseArea
         onContainsMouseChanged: {
-            if (!mouseArea.containsMouse) {
+            if (mouseArea.containsMouse) {
+                UI.ui.playHoverSound();
+            } else {
                 mouseLeftTimer.start()
             }
         }

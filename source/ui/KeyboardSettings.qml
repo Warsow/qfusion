@@ -113,7 +113,7 @@ Item {
                 font.pointSize: headingFontSize
                 font.letterSpacing: headingLetterSpacing
             }
-            CheckBox {
+            WswCheckBox {
                 id: multiBindCheckBox
                 Layout.alignment: Qt.AlignLeft
                 Layout.leftMargin: 96 // wtf?
@@ -239,10 +239,12 @@ Item {
         if (event.key === Qt.Key_Escape) {
             // Let the animation complete itself
             if (isAnimating) {
+                UI.ui.playBackSound()
                 event.accepted = true
                 return true
             }
             if (pendingKeyToBind || pendingCommandToBind >= 0) {
+                UI.ui.playBackSound()
                 pendingKeyToBind = 0
                 pendingCommandToBind = -1
                 event.accepted = true

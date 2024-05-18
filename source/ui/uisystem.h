@@ -81,6 +81,8 @@ public:
 	virtual void toggleChatPopup() = 0;
 	virtual void toggleTeamChatPopup() = 0;
 
+	virtual void playForwardSound() = 0;
+
 	// This is a workaround for the current lack of ranges support
 	template <typename ActionsRange>
 	void touchActionRequest( const wsw::StringView &tag, unsigned timeout,

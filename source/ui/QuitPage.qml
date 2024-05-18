@@ -28,6 +28,7 @@ Item {
 
         function closeSelf() {
             if (opened) {
+                UI.ui.playBackSound()
                 popup.close()
                 quitPage.backTrigger()
             }

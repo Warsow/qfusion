@@ -133,6 +133,7 @@ Item {
                                                 selectorItem.selectedIndices.shift()
                                                 selectorItem.selectedIndices.push(flatIndex)
                                                 console.assert(selectorItem.selectedIndices.length === optionSelectionLimit)
+                                                UI.ui.playSwitchSound()
                                                 UI.gametypeOptionsModel.select(option.optionRow, selectorItem.selectedIndices)
                                             }
                                         }

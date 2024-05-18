@@ -246,18 +246,11 @@ void Backend::shutdown( bool verbose ) {
 	// Note: this is followed by a separate "terminate pipe" call
 }
 
-void Backend::clear() {
-	S_Clear();
-}
-
-void Backend::stopAllSounds( unsigned flags ) {
+void Backend::stopSounds( unsigned flags ) {
 	S_StopStreams();
-	S_StopAllSources();
+	S_StopAllSources( ( flags & SoundSystem::RetainLocal ) != 0 );
 	if( flags & SoundSystem::StopMusic ) {
 		S_StopBackgroundTrack();
-	}
-	if( flags & SoundSystem::StopAndClear ) {
-		S_Clear();
 	}
 }
 
@@ -334,7 +327,7 @@ static bool assignPitchVariations( const wsw::StringView &soundSetName, SoundSet
 	return hasUpdates;
 }
 
-void Backend::loadSound( const SoundSetProps &props ) {
+auto Backend::loadSound( const SoundSetProps &props ) -> const SoundSet * {
 	[[maybe_unused]] const wsw::StringView name( getSoundSetName( props ) );
 
 	for( SoundSet *soundSet = m_registeredSoundSetsHead; soundSet; soundSet = soundSet->next ) {
@@ -361,14 +354,14 @@ void Backend::loadSound( const SoundSetProps &props ) {
 			if( hasToLoad ) {
 				forceLoading( soundSet );
 			}
-			return;
+			return soundSet;
 		}
 	}
 
 	uint8_t *const mem = m_soundSetsAllocator.allocOrNull();
 	if( !mem ) {
 		sError() << "Failed to allocate a sound set for" << name << "(too many sound sets)";
-		return;
+		return nullptr;
 	}
 
 	auto *const newSoundSet = new( mem )SoundSet { .props = props, .registrationSequence = s_registration_sequence };
@@ -392,6 +385,8 @@ void Backend::loadSound( const SoundSetProps &props ) {
 	if( !props.lazyLoading ) {
 		forceLoading( newSoundSet );
 	}
+
+	return newSoundSet;
 }
 
 auto Backend::findSoundSet( const SoundSetProps &props ) -> const SoundSet * {
@@ -665,6 +660,13 @@ void Backend::startLocalSound( const SoundSet *sound, float volume ) {
 	}
 }
 
+void Backend::startLocalSoundByName( const wsw::PodVector<char> &name, float volume ) {
+	const SoundSetProps soundSetProps { .name = SoundSetProps::Exact( wsw::StringView( name.data(), name.size() ) ) };
+	if( const SoundSet *soundSet = this->loadSound( soundSetProps ) ) {
+		startLocalSound( soundSet, volume );
+	}
+}
+
 void Backend::startFixedSound( const SoundSet *sound, const Vec3 &origin, int channel, float volume, float attenuation ) {
 	if( const std::optional<std::pair<ALuint, unsigned>> bufferAndIndex = getBufferForPlayback( sound ) ) {
 		S_StartFixedSound( sound, *bufferAndIndex, getPitchForPlayback( sound ), origin.Data(), channel, volume, attenuation );
@@ -706,8 +708,6 @@ void Backend::advanceBackgroundTrack( int value ) {
 }
 
 void Backend::activate( bool active ) {
-	S_Clear();
-
 	S_LockBackgroundTrack( !active );
 
 	// TODO: Actually stop playing sounds while not active?

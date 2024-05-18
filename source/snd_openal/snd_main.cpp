@@ -39,9 +39,8 @@ public:
 	void beginRegistration() override {}
 	void endRegistration() override {}
 
-	void stopAllSounds( unsigned ) override {}
+	void stopSounds( unsigned ) override {}
 
-	void clear() override {}
 	void updateListener( int, const float *, const float *, const mat3_t ) override {}
 	void activate( bool ) override {}
 

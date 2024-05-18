@@ -22,7 +22,15 @@ Item {
             visible: UI.ui.hasTeamChat
             Material.theme: Material.Dark
             text: isDisplayingTeamChat ? "switch to common" : "switch to team"
-            onClicked: isDisplayingTeamChat = !isDisplayingTeamChat
+            onHoveredChanged: {
+                if (hovered) {
+                    UI.ui.playHoverSound()
+                }
+            }
+            onClicked: {
+                UI.ui.playSwitchSound()
+                isDisplayingTeamChat = !isDisplayingTeamChat
+            }
         }
 
         // Unused for now
