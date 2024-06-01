@@ -408,7 +408,7 @@ void CL_GameModule_Shutdown( void );
 void CL_GameModule_ConfigString( int number, const wsw::StringView &s );
 
 bool CL_GameModule_NewSnapshot( int pendingSnapshot );
-bool CL_GameModule_RenderView();
+std::pair<bool, bool> CL_GameModule_RenderView();
 void CL_GameModule_InputFrame( int64_t inputTimestamp, int keyboardDeltaMillis, float mouseDeltaMillis );
 void CL_GameModule_ClearInputState( void );
 bool CL_GameModule_GrabsMouseMovement();

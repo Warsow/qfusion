@@ -871,6 +871,8 @@ inline void CG_ClearFragmentedDecals( void ) {}
 inline void CG_AddFragmentedDecal( vec3_t origin, vec3_t dir, float orient, float radius,
 							float r, float g, float b, float a, struct shader_s *shader ) {}
 
+void CG_ClearEffects();
+
 //
 //	cg_vweap.c - client weapon
 //

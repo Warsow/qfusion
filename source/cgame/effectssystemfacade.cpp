@@ -557,6 +557,11 @@ void EffectsSystemFacade::spawnPlasmaExplosionEffect( const float *origin, const
 void EffectsSystemFacade::clear() {
 	m_transientEffectsSystem.clear();
 	m_trackedEffectsSystem.clear();
+
+	m_solidImpactSoundsRateLimiter.clear();
+	m_liquidImpactRingsRateLimiter.clear();
+	m_solidImpactRingsRateLimiter.clear();
+	m_liquidImpactRingsRateLimiter.clear();
 }
 
 void EffectsSystemFacade::simulateFrame( int64_t currTime ) {

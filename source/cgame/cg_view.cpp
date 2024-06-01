@@ -1115,8 +1115,9 @@ static void CG_DrawCrosshair( ViewState *viewState, std::optional<float> minivie
 static void drawNamesAndBeacons( ViewState *viewState, std::optional<float> miniviewScale );
 static void CG_SCRDrawViewBlend( ViewState *viewState );
 
-bool CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t serverTime, unsigned extrapolationTime ) {
+std::pair<bool, bool> CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t serverTime, unsigned extrapolationTime ) {
 	bool hasRenderedTheMenu = false;
+	bool hasRenderedTheHud  = false;
 
 	// update time
 	cg.realTime      = realTime;
@@ -1183,10 +1184,7 @@ bool CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t 
 
 			R_DrawStretchPic( 0, 0, cgs.vidWidth, cgs.vidHeight, 0, 0, 1, 1, colorBlack, cgs.shaderWhite );
 
-			cg.effectsSystem.clear();
-			cg.particleSystem.clear();
-			cg.polyEffectsSystem.clear();
-			cg.simulatedHullsSystem.clear();
+			CG_ClearEffects();
 
 			SoundSystem::instance()->updateListener( -1, vec3_origin, vec3_origin, axis_identity );
 		} else {
@@ -1311,10 +1309,10 @@ bool CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t 
 			cg.polyEffectsSystem.simulateFrame( cg.time );
 			cg.simulatedHullsSystem.simulateFrame( cg.time );
 
-			const auto *const uiSystem             = wsw::ui::UISystem::instance();
-			const bool shouldCheckDrawingUnderMenu = uiSystem->isShowingModalMenu() || uiSystem->isShowingScoreboard();
-			const bool shouldDrawHuds              = v_showHud.get();
-			const bool shouldDraw2D                = v_draw2D.get();
+			auto *const uiSystem       = wsw::ui::UISystem::instance();
+			const bool hasModalOverlay = uiSystem->isShowingModalMenu() || uiSystem->isShowingScoreboard();
+			const bool shouldDrawHuds  = v_showHud.get();
+			const bool shouldDraw2D    = v_draw2D.get();
 			for( unsigned viewNum = 0; viewNum < numDisplayedViewStates; ++viewNum ) {
 				DrawSceneRequest *const drawSceneRequest = drawSceneRequests[viewNum];
 				ViewState *const viewState = cg.viewStates + viewStateIndices[viewNum];
@@ -1335,7 +1333,7 @@ bool CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t 
 				const bool isMiniview = viewNum != 0 || actuallyUseTiledMode;
 				if( shouldDraw2D && viewState->view.draw2D ) {
 					bool drawGfx = true;
-					if( shouldCheckDrawingUnderMenu ) {
+					if( hasModalOverlay ) {
 						drawGfx = false;
 						if( cg.chaseMode != CAM_TILED && cg.numSnapViewStates > 0 ) {
 							// Check if its a HUD-hosted miniview
@@ -1375,11 +1373,19 @@ bool CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t 
 
 				if( !isMiniview ) {
 					RF_Set2DScissor( 0, 0, cgs.vidWidth, cgs.vidHeight );
-					wsw::ui::UISystem::instance()->drawMenuPartInMainContext();
+					uiSystem->drawMenuPartInMainContext();
+					hasRenderedTheMenu = true;
 				}
 			}
 
 			EndDrawingScenes();
+
+			// Blit the HUD first in this case (this is a hack for the demo playback menu which must be on top)
+			if( actuallyUseTiledMode && !hasModalOverlay ) {
+				RF_Set2DScissor( 0, 0, cgs.vidWidth, cgs.vidHeight );
+				uiSystem->drawHudPartInMainContext();
+				hasRenderedTheHud = true;
+			}
 
 			CG_AddLocalSounds();
 
@@ -1388,12 +1394,10 @@ bool CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t 
 			const ViewState *primaryViewState = getPrimaryViewState();
 			SoundSystem::instance()->updateListener( primaryViewState->view.POVent, primaryViewState->view.origin,
 													 primaryViewState->view.velocity, primaryViewState->view.axis );
-
-			hasRenderedTheMenu = numDisplayedViewStates > 0 && !actuallyUseTiledMode;
 		}
 	}
 
-	return hasRenderedTheMenu;
+	return std::make_pair( hasRenderedTheMenu, hasRenderedTheHud );
 }
 
 void CG_LoadingString( const char *str ) {

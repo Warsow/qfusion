@@ -613,32 +613,25 @@ void DemosResolver::runQueryUsingWordMatcher( const wsw::StringView &word ) {
 }
 
 void DemoPlayer::checkUpdates() {
-	const bool wasPlaying = m_isPlaying;
-	const bool wasPaused = m_isPaused;
-	const int oldDuration = m_duration;
 	const int oldProgress = m_progress;
-
-	//m_duration = (int)( ::cls.demoPlayer.duration / 1000 );
-	m_duration = 5 * 60;
 	m_progress = (int)( ::cls.demoPlayer.time / 1000 );
-
-	m_isPlaying = ::cls.demoPlayer.playing;
-	m_isPaused = ::cls.demoPlayer.playing && ::cls.demoPlayer.paused;
-
-	if( oldDuration != m_duration ) {
-		Q_EMIT durationChanged( m_duration );
-	}
 	if( oldProgress != m_progress ) {
 		Q_EMIT progressChanged( m_progress );
 	}
+
+	const bool wasPlaying = m_isPlaying;
+	m_isPlaying = ::cls.demoPlayer.playing;
 	if( wasPlaying != m_isPlaying ) {
 		Q_EMIT isPlayingChanged( m_isPlaying );
 	}
+
+	const bool wasPaused = m_isPaused;
+	m_isPaused = ::cls.demoPlayer.playing && ::cls.demoPlayer.paused;
 	if( wasPaused != m_isPaused ) {
 		Q_EMIT isPausedChanged( m_isPaused );
 	}
 
-	if( !wasPlaying != m_isPlaying ) {
+	if( m_isPlaying && wasPlaying != m_isPlaying ) {
 		if( cls.demoPlayer.meta_data_realsize ) {
 			reloadMetadata();
 		}
@@ -646,38 +639,55 @@ void DemoPlayer::checkUpdates() {
 }
 
 void DemoPlayer::reloadMetadata() {
-	m_serverName = m_timestamp = m_mapName = m_gametype = QString();
-	m_duration = 0;
+	QString serverName, timestamp, mapName, gametype;
+	int duration = 0;
 
 	wsw::DemoMetadataReader reader( cls.demoPlayer.meta_data, cls.demoPlayer.meta_data_realsize );
 	while( reader.hasNextPair() ) {
 		if( const auto maybePair = reader.readNextPair() ) {
 			const auto [key, value] = *maybePair;
 			if( key.equalsIgnoreCase( kDemoKeyServerName ) ) {
-				m_serverName = toStyledText( value );
+				serverName = toStyledText( value );
 			} else if( key.equalsIgnoreCase( kDemoKeyTimestamp ) ) {
-				uint64_t timestamp = wsw::toNum<uint64_t>( value ).value_or( 0 );
-				m_timestamp = formatTimestamp( QDateTime::fromSecsSinceEpoch( timestamp ) );
+				uint64_t timestampValue = wsw::toNum<uint64_t>( value ).value_or( 0 );
+				timestamp = formatTimestamp( QDateTime::fromSecsSinceEpoch( timestampValue ) );
 			} else if( key.equalsIgnoreCase( kDemoKeyDuration ) ) {
-				m_duration = wsw::toNum<int>( value ).value_or( 0 );
+				duration = wsw::toNum<int>( value ).value_or( 0 );
 			} else if( key.equalsIgnoreCase( kDemoKeyMapName ) ) {
-				m_mapName = toStyledText( value );
+				mapName = toStyledText( value );
 			} else if( key.equalsIgnoreCase( kDemoKeyGametype ) ) {
-				m_gametype = toStyledText( value );
+				gametype = toStyledText( value );
 			}
 		} else {
 			break;
 		}
 	}
 
-	m_demoName = QString::fromLatin1( cls.demoPlayer.name );
-
-	Q_EMIT serverNameChanged( m_serverName );
-	Q_EMIT timestampChanged( m_timestamp );
-	Q_EMIT durationChanged( m_duration );
-	Q_EMIT mapNameChanged( m_mapName );
-	Q_EMIT gametypeChanged( m_gametype );
-	Q_EMIT demoNameChanged( m_demoName );
+	QString demoName = QString::fromLatin1( cls.demoPlayer.name );
+	if( m_demoName != demoName ) {
+		m_demoName = demoName;
+		Q_EMIT demoNameChanged( m_demoName );
+	}
+	if( m_serverName != serverName ) {
+		m_serverName = serverName;
+		Q_EMIT serverNameChanged( serverName );
+	}
+	if( m_timestamp != timestamp ) {
+		m_timestamp = timestamp;
+		Q_EMIT timestampChanged( timestamp );
+	}
+	if( m_mapName != mapName ) {
+		m_mapName = mapName;
+		Q_EMIT mapNameChanged( mapName );
+	}
+	if( m_gametype != gametype ) {
+		m_gametype = gametype;
+		Q_EMIT gametypeChanged( gametype );
+	}
+	if( m_duration != duration ) {
+		m_duration = duration;
+		Q_EMIT durationChanged( duration );
+	}
 }
 
 void DemoPlayer::play( const QByteArray &fileName ) {

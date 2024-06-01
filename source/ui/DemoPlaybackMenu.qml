@@ -9,7 +9,7 @@ Item {
     Item {
         id: pane
         width: Math.min(parent.width, 720)
-        height: 96
+        height: 112
 
         layer.enabled: true
         layer.effect: ElevationEffect { elevation: 64 }
@@ -43,8 +43,8 @@ Item {
             height: parent.height
             anchors.bottom: parent.bottom
             color: Material.background
-            opacity: 0.7
-            radius: 2
+            opacity: (UI.ui.isShowingScoreboard || UI.hudCommonDataModel.hasTiledMiniviews) ? 0.9 : 0.7
+            radius: 6
         }
 
         RowLayout {
@@ -108,7 +108,6 @@ Item {
             value: UI.demoPlayer.progress
         }
 
-
         Label {
             anchors.left: progressBar.left
             anchors.top: progressBar.bottom
@@ -136,6 +135,7 @@ Item {
         RowLayout {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: progressBar.bottom
+            anchors.topMargin: 12
 
             Button {
                 flat: true

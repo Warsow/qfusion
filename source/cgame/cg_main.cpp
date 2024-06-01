@@ -6086,6 +6086,19 @@ void CG_StartBackgroundTrack( void ) {
 	}
 }
 
+void CG_ClearEffects() {
+	// TODO: Should we reset localEffects[] stuff as well
+	for( int entNum = 0; entNum < MAX_EDICTS; ++entNum ) {
+		cg.effectsSystem.resetEntityEffects( entNum );
+	}
+
+	// TODO: calling effectsSystem.clear() should be sufficient (it is not in the current codebase state)
+	cg.effectsSystem.clear();
+	cg.particleSystem.clear();
+	cg.polyEffectsSystem.clear();
+	cg.simulatedHullsSystem.clear();
+}
+
 void CG_Reset( void ) {
 	cgs.configStrings.copyFrom( cgs.baseConfigStrings );
 
@@ -6099,11 +6112,7 @@ void CG_Reset( void ) {
 
 	wsw::ui::UISystem::instance()->resetHudFeed();
 
-	// TODO: calling effectsSystem.clear() should be sufficient (it is not in the current codebase state)
-	cg.effectsSystem.clear();
-	cg.particleSystem.clear();
-	cg.polyEffectsSystem.clear();
-	cg.simulatedHullsSystem.clear();
+	CG_ClearEffects();
 
 	// start up announcer events queue from clean
 	CG_ClearAnnouncerEvents();

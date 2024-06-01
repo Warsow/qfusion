@@ -325,6 +325,8 @@ private:
 		[[nodiscard]]
 		bool acquirePermission( int64_t timestamp, const float *origin, uintptr_t group,
 								const EventRateLimiterParams &params );
+
+		void clear() { m_entries.clear(); }
 	private:
 		wsw::RandomGenerator *const m_rng;
 

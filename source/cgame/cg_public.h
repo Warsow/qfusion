@@ -92,7 +92,7 @@ void CG_GameCommand( ViewState *viewState, const wsw::StringView &fullText );
 void CG_GetEntitySpatilization( int entNum, float *origin, float *velocity, float *axis );
 float CG_GetSensitivityScale( float sens, float zoomSens );
 bool CG_NewFrameSnap( snapshot_t *frame, snapshot_t *lerpframe );
-bool CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t serverTime, unsigned extrapolationTime );
+std::pair<bool, bool> CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t serverTime, unsigned extrapolationTime );
 void CG_InputFrame( int64_t inputTimestamp, int keyboardDeltaMillis, float mouseDeltaMillis );
 void CG_ClearInputState();
 bool CG_GrabsMouseMovement();

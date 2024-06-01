@@ -288,12 +288,12 @@ bool CL_GameModule_NewSnapshot( int pendingSnapshot ) {
 	return false;
 }
 
-bool CL_GameModule_RenderView() {
+std::pair<bool, bool> CL_GameModule_RenderView() {
 	if( cge && cls.cgameActive ) {
 		unsigned extrapolationTime = cl_extrapolate->integer && !cls.demoPlayer.playing ? cl_extrapolationTime->integer : 0;
 		return CG_RenderView( cls.frametime, cls.realFrameTime, cls.realtime, cl.serverTime, extrapolationTime );
 	}
-	return false;
+	return { false, false };
 }
 
 void CL_GameModule_InputFrame( int64_t inputTimestamp, int keyboardDeltaMillis, float mouseDeltaMillis ) {
@@ -1532,6 +1532,7 @@ void SCR_UpdateScreen( void ) {
 
 	// CGame may render the menu on its own above the primary view but beneath miniviews
 	bool hasHandledTheMenuRendering = false;
+	bool hasHandledTheHudRendering  = false;
 	if( canRenderView ) {
 		if( timedemo ) {
 			if( !cl.timedemo.startTime ) {
@@ -1542,7 +1543,7 @@ void SCR_UpdateScreen( void ) {
 
 		// frame is not valid until we load the CM data
 		if( cl.cms ) {
-			hasHandledTheMenuRendering = CL_GameModule_RenderView();
+			std::tie( hasHandledTheMenuRendering, hasHandledTheHudRendering ) = CL_GameModule_RenderView();
 		}
 	}
 
@@ -1552,8 +1553,10 @@ void SCR_UpdateScreen( void ) {
 	if( !hasHandledTheMenuRendering ) {
 		uiSystem->drawMenuPartInMainContext();
 	}
+	if( !hasHandledTheHudRendering ) {
+		uiSystem->drawHudPartInMainContext();
+	}
 
-	uiSystem->drawHudPartInMainContext();
 	uiSystem->drawCursorInMainContext();
 
 	if( canDrawConsoleNotify ) {
@@ -4870,6 +4873,9 @@ void CL_Precache_f( const CmdArgs &cmdArgs ) {
 
 	if( cls.demoPlayer.playing ) {
 		if( !cls.demoPlayer.play_jump ) {
+			CL_BeginRegistration();
+			CL_RestartMedia();
+
 			CL_LoadMap( cl.configStrings.getWorldModel()->data() );
 
 			CL_GameModule_Init();
@@ -5260,7 +5266,11 @@ void CL_AdjustServerTime( unsigned int gameMsec ) {
 		}
 	}
 
+	const auto oldServerTime = cl.serverTime;
 	cl.serverTime = cls.gametime + cl.serverTimeDelta;
+	if( oldServerTime > cl.serverTime ) {
+		CL_GameModule_Reset();
+	}
 
 	// it launches a new snapshot when the timestamp of the CURRENT snap is reached.
 	if( cl.pendingSnapNum && ( cl.serverTime >= cl.snapShots[cl.currentSnapNum & UPDATE_MASK].serverTime ) ) {

@@ -432,6 +432,9 @@ public:
 	// For wtf gametype
 	static constexpr unsigned kMaxMiniviews = 12;
 
+	Q_SIGNAL void hasTiledMiniviewsChanged( bool hasTiledMiniviews );
+	Q_PROPERTY( bool hasTiledMiniviews MEMBER m_hasTiledMiniviews NOTIFY hasTiledMiniviewsChanged );
+
 	Q_SIGNAL void miniviewLayoutChangedPass1();
 	Q_SIGNAL void miniviewLayoutChangedPass2();
 	Q_INVOKABLE QObject *getMiniviewModelForIndex( int index );
@@ -589,6 +592,8 @@ private:
 	HudPovDataModel m_miniviewDataModels[kMaxMiniviews];
 
 	int m_highlightedMiniviewIndex { -1 };
+
+	bool m_hasTiledMiniviews { false };
 
 	bool m_isInWarmupState { false };
 	bool m_isInPostmatchState { false };

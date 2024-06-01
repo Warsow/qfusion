@@ -1195,6 +1195,12 @@ void HudCommonDataModel::updateMiniviewData( int64_t currTime ) {
 		m_miniviewDataModels[modelNum].clearPlayerNum();
 	}
 
+	const bool hadTiledMiniviews = m_hasTiledMiniviews;
+	m_hasTiledMiniviews = !m_fixedPositionMinviews.empty();
+	if( m_hasTiledMiniviews != hadTiledMiniviews ) {
+		Q_EMIT hasTiledMiniviewsChanged( m_hasTiledMiniviews );
+	}
+
 	if( layoutChanged ) {
 		Q_EMIT miniviewLayoutChangedPass1();
 		Q_EMIT miniviewLayoutChangedPass2();
