@@ -3175,8 +3175,8 @@ static void CG_UpdatePlayerState() {
 			allowedAspectRatio.push_back( primaryRatio );
 		}
 
-		constexpr int horizontalSpacing = 24;
-		constexpr int verticalSpacing   = 24;
+		const int horizontalSpacing = 24 * cgs.pixelRatio;
+		const int verticalSpacing   = 24 * cgs.pixelRatio;
 
 		const int topMargin      = cgs.vidHeight / 4;
 		const int bottomMargin   = cgs.vidHeight / 8;
@@ -6168,7 +6168,7 @@ void CG_InitPersistentState() {
 }
 
 void CG_Init( const char *serverName, unsigned int playerNum,
-			  int vidWidth, int vidHeight, float pixelRatio,
+			  int vidWidth, int vidHeight, int pixelRatio,
 			  bool demoplaying, const char *demoName, bool pure,
 			  unsigned snapFrameTime, int protocol, const char *demoExtension,
 			  int sharedSeed, bool gameStart ) {

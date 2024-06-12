@@ -37,7 +37,7 @@ public:
 
 	[[nodiscard]]
 	virtual bool isLoaded() const = 0;
-	virtual void drawSelfNatively( int64_t time, int64_t timeDelta ) = 0;
+	virtual void drawSelfNatively( int64_t time, int64_t timeDelta, int pixelsPerLogicalUnit ) = 0;
 };
 
 class NativelyDrawnImage : public QQuickItem, public NativelyDrawn {
@@ -105,13 +105,13 @@ class NativelyDrawnImage : public QQuickItem, public NativelyDrawn {
 
 	void setBorderWidth( int borderWidth );
 
-	void reloadIfNeeded();
+	void reloadIfNeeded( int pixelsPerLogicalUnit );
 	void updateSourceSize( int w, int h );
 public:
 	explicit NativelyDrawnImage( QQuickItem *parent = nullptr );
 	~NativelyDrawnImage() override;
 
-	void drawSelfNatively( int64_t, int64_t ) override;
+	void drawSelfNatively( int64_t, int64_t, int ) override;
 };
 
 class NativelyDrawnModel : public QQuickItem, public NativelyDrawn {
@@ -198,7 +198,7 @@ class NativelyDrawnModel : public QQuickItem, public NativelyDrawn {
 public:
 	explicit NativelyDrawnModel( QQuickItem *parent = nullptr );
 
-	void drawSelfNatively( int64_t, int64_t ) override;
+	void drawSelfNatively( int64_t, int64_t, int ) override;
 };
 
 }

@@ -42,13 +42,6 @@ void Con_ClearNotify( void );
 void Con_ToggleConsole_f( const CmdArgs & );
 void Con_Close( void );
 
-/**
- * Returns pixel ratio that is suitable for use in the console.
- *
- * @return the pixel ratio
- */
-float Con_GetPixelRatio( void );
-
 [[nodiscard]]
 bool Con_HasKeyboardFocus();
 

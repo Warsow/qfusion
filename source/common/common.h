@@ -602,6 +602,8 @@ void    Sys_ReleaseWakeLock( void *wl );
 
 int     Sys_GetCurrentProcessId( void );
 
+int Sys_GetPixelRatio();
+
 /*
 ==============================================================
 

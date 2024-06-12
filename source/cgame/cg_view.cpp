@@ -1867,7 +1867,7 @@ static void drawCrosshair( int weapon, int fireMode, std::optional<float> minivi
 		// Note: We use a fixed downscale factor as changing image size is very expensive and everything relies on caching
 		const unsigned sizeVarValue = sizeVar->get();
 		const bool isForMiniview    = miniviewScale != std::nullopt;
-		const unsigned chosenSize   = isForMiniview ? ( 2 * sizeVarValue / 3 ) : sizeVarValue;
+		const unsigned chosenSize   = ( isForMiniview ? ( 2 * sizeVarValue / 3 ) : sizeVarValue ) * cgs.pixelRatio;
 		if( fireMode == FIRE_MODE_STRONG ) {
 			materialAndDimensions = getStrongCrosshairMaterial( name, isForMiniview, chosenSize );
 		} else {

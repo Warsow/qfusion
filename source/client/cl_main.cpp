@@ -101,6 +101,7 @@ static unsigned vid_max_height_mode_index;
 static vidmode_t *vid_modes;
 
 static cvar_t *vid_width, *vid_height;
+static cvar_t *vid_pixelRatio;
 cvar_t *vid_xpos;          // X coordinate of window position
 cvar_t *vid_ypos;          // Y coordinate of window position
 cvar_t *vid_fullscreen;
@@ -806,6 +807,13 @@ int VID_GetWindowHeight( void ) {
 	return viddef.height;
 }
 
+int VID_GetPixelRatio( void ) {
+	if( int value = vid_pixelRatio->integer; value > 0 ) {
+		return wsw::clamp( value, 1, 2 );
+	}
+	return wsw::clamp( Sys_GetPixelRatio(), 1, 2 );
+}
+
 static rserr_t VID_ChangeMode( void ) {
 	vid_fullscreen->modified = false;
 
@@ -1162,6 +1170,7 @@ void VID_Init( void ) {
 
 		vid_width = Cvar_Get( "vid_width", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
 		vid_height = Cvar_Get( "vid_height", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
+		vid_pixelRatio = Cvar_Get( "vid_pixelRatio", "0", CVAR_DEVELOPER | CVAR_LATCH_VIDEO );
 		vid_xpos = Cvar_Get( "vid_xpos", "0", CVAR_ARCHIVE );
 		vid_ypos = Cvar_Get( "vid_ypos", "0", CVAR_ARCHIVE );
 		vid_fullscreen = Cvar_Get( "vid_fullscreen", "1", CVAR_ARCHIVE );
@@ -1215,7 +1224,7 @@ qfontface_t *SCR_RegisterFont( const char *family, int style, unsigned int size 
 
 static void SCR_RegisterConsoleFont( void ) {
 	const int con_fontSystemStyle = DEFAULT_SYSTEM_FONT_STYLE;
-	const float pixelRatio = Con_GetPixelRatio();
+	const float pixelRatio = VID_GetPixelRatio();
 
 	// register system fonts
 	const char *con_fontSystemFamilyName = con_fontSystemMonoFamily->string;
@@ -5020,7 +5029,7 @@ void CL_InitMedia() {
 		SCR_EnableQuickMenu( false );
 
 		// load user interface
-		wsw::ui::UISystem::init( VID_GetWindowWidth(), VID_GetWindowHeight() );
+		wsw::ui::UISystem::init( VID_GetWindowWidth(), VID_GetWindowHeight(), VID_GetPixelRatio() );
 	}
 }
 

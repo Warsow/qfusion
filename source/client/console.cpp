@@ -669,7 +669,7 @@ void Console::drawPane( unsigned width, unsigned height ) {
 		return;
 	}
 
-	const float pixelRatio = Con_GetPixelRatio();
+	const int pixelRatio   = VID_GetPixelRatio();
 	const int sideMargin   = 8 * pixelRatio;
 	if( width < (unsigned)sideMargin ) {
 		return;
@@ -1391,7 +1391,7 @@ void Console::drawNotifications( unsigned width, unsigned height ) {
 		return;
 	}
 
-	const float pixelRatio  = Con_GetPixelRatio();
+	const int pixelRatio  = VID_GetPixelRatio();
 	const size_t fontHeight = SCR_FontHeight( cls.consoleFont );
 
 	if( const size_t totalHeight = matchingLines.size() * fontHeight; totalHeight > height ) {
@@ -2081,12 +2081,6 @@ void Con_ClearNotify( void ) {
 }
 
 void Con_CheckResize( void ) {
-}
-
-float Con_GetPixelRatio( void ) {
-	float pixelRatio = VID_GetPixelRatio();
-	clamp_low( pixelRatio, 0.5f );
-	return pixelRatio;
 }
 
 void Con_Init( void ) {

@@ -106,11 +106,11 @@ bool VID_GetDefaultMode( int *width, int *height ) {
 	return true;
 }
 
-float VID_GetPixelRatio() {
+int Sys_GetPixelRatio() {
 #if SDL_VERSION_ATLEAST( 2,0,4 )
 	float vdpi = 96.0f;
 	(void)SDL_GetDisplayDPI( 0, NULL, NULL, &vdpi );
-	return vdpi / 96.0f;
+	return (int)std::round( vdpi / 96.0f );
 #else
 #error Unsupported SDL version
 #endif

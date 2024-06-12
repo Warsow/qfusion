@@ -50,6 +50,7 @@ bool VID_AppIsActive( void );
 bool VID_AppIsMinimized( void );
 int VID_GetWindowWidth( void );
 int VID_GetWindowHeight( void );
-float VID_GetPixelRatio( void );
+// Explicitly state that we don't support fractional scaling
+int VID_GetPixelRatio( void );
 
 #endif

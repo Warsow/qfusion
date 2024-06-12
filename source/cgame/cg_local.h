@@ -494,7 +494,7 @@ typedef struct {
 	bool precacheDone;
 
 	int vidWidth, vidHeight;
-	float pixelRatio;
+	int pixelRatio;
 
 	bool demoPlaying;
 	bool demoTutorial;

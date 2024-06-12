@@ -88,7 +88,7 @@ void NativelyDrawnImage::updateSourceSize( int w, int h ) {
 	}
 }
 
-void NativelyDrawnImage::reloadIfNeeded() {
+void NativelyDrawnImage::reloadIfNeeded( int pixelsPerLogicalUnit ) {
 	if( !m_reloadRequestMask ) {
 		return;
 	}
@@ -106,11 +106,11 @@ void NativelyDrawnImage::reloadIfNeeded() {
 	options.fitSizeForCrispness = true;
 	options.useOutlineEffect    = m_useOutlineEffect;
 	options.fitSizeForCrispness = m_fitSizeForCrispness;
-	options.borderWidth         = m_borderWidth;
+	options.borderWidth         = pixelsPerLogicalUnit * m_borderWidth;
 	if( m_desiredSize.isValid() && !m_desiredSize.isEmpty() ) {
-		options.setDesiredSize( m_desiredSize.width(), m_desiredSize.height() );
+		options.setDesiredSize( pixelsPerLogicalUnit * m_desiredSize.width(), pixelsPerLogicalUnit * m_desiredSize.height() );
 		const int minSide   = wsw::min( m_desiredSize.width(), m_desiredSize.height() );
-		options.borderWidth = wsw::clamp( m_borderWidth, 0, minSide / 2 - 1 );
+		options.borderWidth = pixelsPerLogicalUnit * wsw::clamp( m_borderWidth, 0, minSide / 2 - 1 );
 	}
 
 	m_isMaterialLoaded = R_UpdateExplicitlyManaged2DMaterialImage( m_material, nameBytes, options );
@@ -123,47 +123,49 @@ void NativelyDrawnImage::reloadIfNeeded() {
 	int w = 0, h = 0;
 	if( isLoaded ) {
 		if( const auto maybeDimensions = R_GetShaderDimensions( m_material ) ) {
-			std::tie( w, h ) = *maybeDimensions;
+			w = maybeDimensions->first / pixelsPerLogicalUnit;
+			h = maybeDimensions->second / pixelsPerLogicalUnit;
 		}
 	}
 	updateSourceSize( w, h );
 }
 
-void NativelyDrawnImage::drawSelfNatively( int64_t, int64_t ) {
-	reloadIfNeeded();
+void NativelyDrawnImage::drawSelfNatively( int64_t, int64_t, int pixelsPerLogicalUnit ) {
+	reloadIfNeeded( pixelsPerLogicalUnit );
 
-	if( !isLoaded() ) {
-		return;
+	if( isLoaded() ) {
+		R_Set2DMode( true );
+
+		const float opacity = QQmlProperty::read( m_selfAsItem, "opacity" ).toFloat();
+		const vec4_t color {
+			(float)m_color.redF(), (float)m_color.greenF(), (float)m_color.blueF(), opacity * (float)m_color.alphaF()
+		};
+
+		const QPointF globalPoint( mapToGlobal( QPointF( x(), y() ) ) );
+		const auto qmlX = (int)globalPoint.x(), qmlY = (int)globalPoint.y();
+
+		// TODO: Check rounding
+		// TODO: Setup scissor if the clip rect is defined
+
+		assert( m_sourceSize.isValid() );
+
+		// Check whether the bitmap size is specified
+		if( m_desiredSize.isValid() ) {
+			const int x = pixelsPerLogicalUnit * ( qmlX + (int)width() / 2 );
+			const int y = pixelsPerLogicalUnit * ( qmlY + (int)height() / 2 );
+			const int w = pixelsPerLogicalUnit * m_sourceSize.width();
+			const int h = pixelsPerLogicalUnit * m_sourceSize.height();
+			R_DrawStretchPic( x - w / 2, y - w / 2, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color, m_material );
+		} else {
+			const int x = pixelsPerLogicalUnit * qmlX;
+			const int y = pixelsPerLogicalUnit * qmlY;
+			const int w = pixelsPerLogicalUnit * (int)width();
+			const int h = pixelsPerLogicalUnit * (int)height();
+			R_DrawStretchPic( x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color, m_material );
+		}
+
+		R_Set2DMode( false );
 	}
-
-	R_Set2DMode( true );
-
-	const float opacity = QQmlProperty::read( m_selfAsItem, "opacity" ).toFloat();
-	const vec4_t color {
-		(float)m_color.redF(), (float)m_color.greenF(), (float)m_color.blueF(), opacity * (float)m_color.alphaF()
-	};
-
-	const QPointF globalPoint( mapToGlobal( QPointF( x(), y() ) ) );
-	const auto qmlX = (int)globalPoint.x(), qmlY = (int)globalPoint.y();
-
-	// TODO: Check units
-	// TODO: Check rounding
-	// TODO: Setup scissor if the clip rect is defined
-
-	assert( m_sourceSize.isValid() );
-
-	// Check whether the bitmap size is specified
-	if( m_desiredSize.isValid() ) {
-		const int x = qmlX + (int)width() / 2;
-		const int y = qmlY + (int)height() / 2;
-		const int w = m_sourceSize.width();
-		const int h = m_sourceSize.height();
-		R_DrawStretchPic( x - w / 2, y - w / 2, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color, m_material );
-	} else {
-		R_DrawStretchPic( qmlX, qmlY, (int)width(), (int)height(), 0.0f, 0.0f, 1.0f, 1.0f, color, m_material );
-	}
-
-	R_Set2DMode( false );
 }
 
 NativelyDrawnModel::NativelyDrawnModel( QQuickItem *parent )
@@ -305,7 +307,7 @@ static inline void setByteColorFromQColor( uint8_t *byteColor, const QColor &col
 	byteColor[3] = (uint8_t)( color.alphaF() * 255.0 );
 }
 
-void NativelyDrawnModel::drawSelfNatively( int64_t, int64_t timeDelta ) {
+void NativelyDrawnModel::drawSelfNatively( int64_t, int64_t timeDelta, int pixelsPerLogicalUnit ) {
 	reloadIfNeeded();
 
 	if( !m_model ) {
@@ -318,8 +320,10 @@ void NativelyDrawnModel::drawSelfNatively( int64_t, int64_t timeDelta ) {
 	}
 
 	const QRect rect( mapRectToScene( m_selfAsItem->boundingRect() ).toRect() );
-	const int x = rect.x(), y = rect.y();
-	const int width = rect.width(), height = rect.height();
+	const int x      = pixelsPerLogicalUnit * rect.x();
+	const int y      = pixelsPerLogicalUnit * rect.y();
+	const int width  = pixelsPerLogicalUnit * rect.width();
+	const int height = pixelsPerLogicalUnit * rect.height();
 
 	R_Set2DMode( false );
 
@@ -350,7 +354,7 @@ void NativelyDrawnModel::drawSelfNatively( int64_t, int64_t timeDelta ) {
 	entity.customSkin = m_skinFile;
 	entity.frame = entity.oldframe = 1;
 	entity.renderfx = RF_NOSHADOW | RF_FORCENOLOD | RF_MINLIGHT;
-	entity.outlineHeight = (float)m_outlineHeight;
+	entity.outlineHeight = (float)( m_outlineHeight * pixelsPerLogicalUnit );
 	entity.origin[0] = (float)m_modelOrigin.x();
 	entity.origin[1] = (float)m_modelOrigin.y();
 	entity.origin[2] = (float)m_modelOrigin.z();

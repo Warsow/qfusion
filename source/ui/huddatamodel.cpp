@@ -756,8 +756,10 @@ void HudCommonDataModel::setStyledName( QByteArray *dest, const wsw::StringView 
 	*dest = toStyledText( name ).toLatin1();
 }
 
-HudCommonDataModel::HudCommonDataModel()
-	: m_regularHudChangesTracker( &v_regularHud ), m_miniviewHudChangesTracker( &v_miniviewHud ) {
+HudCommonDataModel::HudCommonDataModel( int pixelsPerLogicalUnit )
+	: m_pixelsPerLogicalUnit( pixelsPerLogicalUnit )
+	, m_regularHudChangesTracker( &v_regularHud )
+	, m_miniviewHudChangesTracker( &v_miniviewHud ) {
 	static_assert( (int)wsw::ui::HudCommonDataModel::NoAnim == (int)HUD_INDICATOR_NO_ANIM );
 	static_assert( (int)wsw::ui::HudCommonDataModel::AlertAnim == (int)HUD_INDICATOR_ALERT_ANIM );
 	static_assert( (int)wsw::ui::HudCommonDataModel::ActionAnim == (int)HUD_INDICATOR_ACTION_ANIM );
@@ -805,8 +807,15 @@ auto HudCommonDataModel::getMiniviewPlayerNumForIndex( int indexOfModel ) -> QVa
 auto HudCommonDataModel::getFixedMiniviewPositionForIndex( int indexOfModel ) const -> QVariant {
 	for( const FixedPositionMinivewEntry &entry: m_fixedPositionMinviews ) {
 		if( entry.indexOfModel == indexOfModel ) {
+			qreal scale = 1.0f;
+			if( m_pixelsPerLogicalUnit != 1 ) {
+				scale /= m_pixelsPerLogicalUnit;
+			}
 			return QRectF {
-				(qreal)entry.position.x, (qreal)entry.position.y, (qreal)entry.position.width, (qreal)entry.position.height,
+				scale * (qreal)entry.position.x,
+				scale * (qreal)entry.position.y,
+				scale * (qreal)entry.position.width,
+				scale * (qreal)entry.position.height,
 			};
 		}
 	}

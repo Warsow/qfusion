@@ -509,7 +509,7 @@ public:
 	void checkPropertyChanges( int64_t currTime );
 	void updateScoreboardData( const ReplicatedScoreboardData &scoreboardData );
 
-	HudCommonDataModel();
+	explicit HudCommonDataModel( int pixelsPerLogicalUnit );
 private:
 	[[nodiscard]]
 	auto getRegularLayoutModel() -> QObject *;
@@ -538,6 +538,8 @@ private:
 	void handleVarChanges( StringConfigVar *var, InGameHudLayoutModel *model, HudNameString *currName );
 
 	void updateMiniviewData( int64_t currTime );
+
+	const int m_pixelsPerLogicalUnit;
 
 	FragsFeedModel m_fragsFeedModel { this };
 

@@ -81,7 +81,7 @@ static bool s_winkeys_hooked;
 static bool s_alttab_disabled;
 extern int64_t sys_msg_time;
 
-static float vid_pixelRatio = 1.0f;
+static int sys_pixelRatio = 1;
 
 void Key_Event( int key, bool down, int64_t time );
 void Key_CharEvent( int key, wchar_t ch );
@@ -630,11 +630,11 @@ void VID_SetProcessDPIAware( void ) {
 
 	hdc = GetDC( NULL );
 	if( hdc ) {
-		vid_pixelRatio = ( float )GetDeviceCaps( hdc, LOGPIXELSY ) / 96.0f;
+		sys_pixelRatio = (int)std::round( GetDeviceCaps( hdc, LOGPIXELSY ) / 96.0f );
 		ReleaseDC( NULL, hdc );
 	}
 }
 
-float VID_GetPixelRatio( void ) {
-	return vid_pixelRatio;
+int Sys_GetPixelRatio( void ) {
+	return sys_pixelRatio;
 }

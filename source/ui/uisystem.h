@@ -29,7 +29,7 @@ class UISystem {
 public:
 	virtual ~UISystem() = default;
 
-	static void init( int width, int height );
+	static void init( int widthInPixels, int heightInPixels, int logicalUnitsToPixelsScale );
 	static void shutdown();
 
 	[[nodiscard]]

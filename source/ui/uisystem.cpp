@@ -85,6 +85,15 @@ static BoolConfigVar v_debugNativelyDrawnItems { "ui_debugNativelyDrawnItems"_as
 
 namespace wsw::ui {
 
+class CustomQuickRenderControl : public QQuickRenderControl {
+public:
+	// See comments in the site where it actually gets modified
+	QWindow *m_windowForDensityRetrieval { nullptr };
+	auto renderWindow( QPoint *pt ) -> QWindow * override {
+		return m_windowForDensityRetrieval;
+	}
+};
+
 class QmlSandbox : public QObject {
 	friend class QtUISystem;
 
@@ -106,7 +115,7 @@ private:
 	std::unique_ptr<QOpenGLFramebufferObject> m_framebufferObject;
 	std::unique_ptr<QOffscreenSurface> m_surface;
 	std::unique_ptr<QQuickWindow> m_window;
-	std::unique_ptr<QQuickRenderControl> m_control;
+	std::unique_ptr<CustomQuickRenderControl> m_control;
 	std::unique_ptr<QQmlEngine> m_engine;
 	std::unique_ptr<QQmlComponent> m_component;
 	QObject *m_rootObject { nullptr };
@@ -127,6 +136,7 @@ class QtUISystem : public QObject, public UISystem {
 	template <typename> friend class ::SingletonHolder;
 	friend class NativelyDrawnImage;
 	friend class NativelyDrawnModel;
+	friend class QmlSandbox;
 public:
 	void refreshProperties() override;
 	void renderInternally() override;
@@ -477,13 +487,16 @@ private:
 
 	// For tracking changes
 	wsw::PodVector<QRectF> m_oldHudOccluders;
+	// Values are in logical units
 	wsw::PodVector<QRectF> m_hudOccluders;
 
 	wsw::PodVector<NativelyDrawn *> m_nativelyDrawnItems;
 	wsw::PodVector<NativelyDrawn *> m_nativelyDrawnUnderlayHeap;
 	wsw::PodVector<NativelyDrawn *> m_nativelyDrawnOverlayHeap;
+	// Values are in pixels
 	wsw::PodVector<QRectF> m_occludersOfNativelyDrawnItems;
 
+	// Values are in pixels
 	wsw::PodVector<QPair<QRectF, qreal>> m_boundsOfDrawnHudItems;
 	// Avoid using std::vector<bool>
 	wsw::PodVector<uint8_t> m_drawnCellsMaskOfHudImage;
@@ -578,6 +591,10 @@ private:
 	bool m_hasStartedBackgroundMapLoading { false };
 	bool m_hasSucceededBackgroundMapLoading { false };
 
+	const int m_widthInPixels;
+	const int m_heightInPixels;
+	const int m_pixelsPerLogicalUnit { 0 };
+
 	qreal m_mouseXY[2] { 0.0, 0.0 };
 
 	int64_t m_oldSoundPlaybackTimestamp { 0 };
@@ -585,7 +602,7 @@ private:
 
 	VarModificationTracker m_debugNativelyDrawnItemsChangesTracker { &v_debugNativelyDrawnItems };
 
-	static void initPersistentPart();
+	static void initPersistentPart( int logicalUnitsToPixelRatio );
 	static void registerFonts();
 	static void registerFontFlavorsFromDirectory( const wsw::StringView &shortDirectoryName );
 	static void registerFont( const wsw::StringView &path );
@@ -596,7 +613,7 @@ private:
 	void registerContextProperties( QQmlContext *context, SandboxKind sandboxKind );
 
 	[[nodiscard]]
-	auto createQmlSandbox( int initialWidth, int initialHeight, SandboxKind kind ) -> std::unique_ptr<QmlSandbox>;
+	auto createQmlSandbox( int logicalWidth, int logicalHeight, SandboxKind kind ) -> std::unique_ptr<QmlSandbox>;
 
 	[[nodiscard]]
 	static auto colorForNum( int num ) -> QColor {
@@ -661,7 +678,7 @@ private:
 	[[nodiscard]]
 	auto getDroppedConnectionMessage() const -> const QString & { return m_droppedConnectionMessage; }
 
-	explicit QtUISystem( int width, int height );
+	explicit QtUISystem( int widthInPixels, int heightInPixels, int pixelsPerLogicalUnit );
 	~QtUISystem() override;
 
 	template <typename Value>
@@ -672,6 +689,8 @@ private:
 
 	void updateCVarAwareControls();
 	void updateHudOccluders();
+
+	auto mapLogicalRectToPixels( const QRectF &logicalRect ) const -> QRectF;
 
 	void setActiveMenuMask( unsigned activeMask );
 
@@ -695,9 +714,13 @@ static bool isAPrintableChar( int ch ) {
 	return ch >= 0 &&  ch <= 127 && std::isprint( (unsigned char)ch );
 }
 
-void QtUISystem::initPersistentPart() {
+void QtUISystem::initPersistentPart( int pixelsPerLogicalUnit ) {
 	if( !s_application ) {
 		QCoreApplication::setAttribute( Qt::AA_EnableHighDpiScaling );
+
+		// TODO: Sanitize the entire environment
+		qputenv( "QT_SCALE_FACTOR", QByteArray::number( pixelsPerLogicalUnit ) );
+		qputenv( "QT_AUTO_SCREEN_SCALE_FACTOR", "1" );
 
 		s_application = new QGuiApplication( s_fakeArgc, s_fakeArgv );
 		// Fix the overwritten locale, if any
@@ -922,7 +945,8 @@ QmlSandbox::~QmlSandbox() {
 }
 
 void QmlSandbox::onSceneGraphInitialized() {
-	m_framebufferObject.reset( new QOpenGLFramebufferObject( m_window->size(), QOpenGLFramebufferObject::CombinedDepthStencil ) );
+	const QSize bufferSize( m_uiSystem->m_widthInPixels, m_uiSystem->m_heightInPixels );
+	m_framebufferObject.reset( new QOpenGLFramebufferObject( bufferSize, QOpenGLFramebufferObject::CombinedDepthStencil ) );
 	m_window->setRenderTarget( m_framebufferObject.get() );
 }
 
@@ -966,8 +990,8 @@ void QmlSandbox::onComponentStatusChanged( QQmlComponent::Status status ) {
 
 static SingletonHolder<QtUISystem> uiSystemInstanceHolder;
 
-void UISystem::init( int width, int height ) {
-	uiSystemInstanceHolder.init( width, height );
+void UISystem::init( int widthInPixels, int heightInPixels, int logicalUnitsToPixelsScale ) {
+	uiSystemInstanceHolder.init( widthInPixels, heightInPixels, logicalUnitsToPixelsScale );
 	VideoPlaybackSystem::init();
 }
 
@@ -1005,8 +1029,12 @@ void QtUISystem::renderInternally() {
 	}
 }
 
-QtUISystem::QtUISystem( int initialWidth, int initialHeight ) {
-	initPersistentPart();
+QtUISystem::QtUISystem( int widthInPixels, int heightInPixels, int pixelsPerLogicalUnit )
+	: m_hudCommonDataModel( pixelsPerLogicalUnit ), m_widthInPixels( widthInPixels )
+	, m_heightInPixels( heightInPixels ), m_pixelsPerLogicalUnit( pixelsPerLogicalUnit ) {
+	assert( widthInPixels > 0 && heightInPixels > 0 && pixelsPerLogicalUnit > 0 );
+
+	initPersistentPart( pixelsPerLogicalUnit );
 
 	m_externalContext.reset( new QOpenGLContext );
 	m_externalContext->setNativeHandle( VID_GetMainContextHandle() );
@@ -1015,8 +1043,12 @@ QtUISystem::QtUISystem( int initialWidth, int initialHeight ) {
 		return;
 	}
 
-	m_menuSandbox = createQmlSandbox( initialWidth, initialHeight, MenuSandbox );
-	m_hudSandbox  = createQmlSandbox( initialWidth, initialHeight, HudSandbox );
+	const int logicalWidth  = widthInPixels / pixelsPerLogicalUnit;
+	const int logicalHeight = heightInPixels / pixelsPerLogicalUnit;
+	assert( logicalWidth > 0 && logicalHeight > 0 );
+
+	m_menuSandbox = createQmlSandbox( logicalWidth, logicalHeight, MenuSandbox );
+	m_hudSandbox  = createQmlSandbox( logicalWidth, logicalHeight, HudSandbox );
 
 	connect( &m_regularHudEditorModel, &HudEditorModel::hudUpdated, &m_hudCommonDataModel, &HudCommonDataModel::onHudUpdated );
 	connect( &m_miniviewHudEditorModel, &HudEditorModel::hudUpdated, &m_hudCommonDataModel, &HudCommonDataModel::onHudUpdated );
@@ -1032,7 +1064,7 @@ QtUISystem::~QtUISystem() {
 	NativelyDrawn::recycleResourcesInMainContext();
 }
 
-auto QtUISystem::createQmlSandbox( int initialWidth, int initialHeight, SandboxKind kind ) -> std::unique_ptr<QmlSandbox> {
+auto QtUISystem::createQmlSandbox( int logicalWidth, int logicalHeight, SandboxKind kind ) -> std::unique_ptr<QmlSandbox> {
 	std::unique_ptr<QmlSandbox> sandbox( new QmlSandbox( this ) );
 
 	QSurfaceFormat format;
@@ -1053,9 +1085,9 @@ auto QtUISystem::createQmlSandbox( int initialWidth, int initialHeight, SandboxK
 		return nullptr;
 	}
 
-	sandbox->m_control.reset( new QQuickRenderControl );
+	sandbox->m_control.reset( new CustomQuickRenderControl );
 	sandbox->m_window.reset( new QQuickWindow( sandbox->m_control.get() ) );
-	sandbox->m_window->setGeometry( 0, 0, initialWidth, initialHeight );
+	sandbox->m_window->setGeometry( 0, 0, logicalWidth, logicalHeight );
 	sandbox->m_window->setColor( Qt::transparent );
 
 	connect( sandbox->m_window.get(), &QQuickWindow::sceneGraphInitialized, sandbox.get(), &QmlSandbox::onSceneGraphInitialized );
@@ -1118,6 +1150,12 @@ auto QtUISystem::createQmlSandbox( int initialWidth, int initialHeight, SandboxK
 void QtUISystem::renderQml( QmlSandbox *sandbox ) {
 	assert( sandbox->m_hasPendingSceneChange || sandbox->m_hasPendingRedraw );
 
+	assert( !sandbox->m_control->m_windowForDensityRetrieval );
+	// Just setting QT_SCALE_FACTOR is insufficient as the Qt backend uses 1.0 as density
+	// if QQuickRenderControl::renderWindowFor() returns nullptr (it always does).
+	// See void QQuickWindowPrivate::renderSceneGraph(const QSize &size);
+	sandbox->m_control->m_windowForDensityRetrieval = sandbox->m_window.get();
+
 	if( sandbox->m_hasPendingSceneChange ) {
 		sandbox->m_control->polishItems();
 		sandbox->m_control->sync();
@@ -1132,13 +1170,11 @@ void QtUISystem::renderQml( QmlSandbox *sandbox ) {
 
 	sandbox->m_control->render();
 
-	sandbox->m_window->resetOpenGLState();
-
-	auto *const f = sandbox->m_controlContext->functions();
-	f->glFlush();
-	f->glFinish();
-
 	sandbox->m_hasValidFboContent = true;
+
+	// Note that setting it once at construction leads to malfunction of some other parts, hence we reset it asap.
+	// This is a hack, but at least we can avoid fragile patching of Qt.
+	sandbox->m_control->m_windowForDensityRetrieval = nullptr;
 }
 
 void QtUISystem::enterUIRenderingMode() {
@@ -1218,7 +1254,7 @@ void QtUISystem::drawMenuPartInMainContext() {
 
 		while( !m_nativelyDrawnUnderlayHeap.empty() ) {
 			std::pop_heap( m_nativelyDrawnUnderlayHeap.begin(), m_nativelyDrawnUnderlayHeap.end(), cmp );
-			m_nativelyDrawnUnderlayHeap.back()->drawSelfNatively( timestamp, delta );
+			m_nativelyDrawnUnderlayHeap.back()->drawSelfNatively( timestamp, delta, m_pixelsPerLogicalUnit );
 			m_nativelyDrawnUnderlayHeap.pop_back();
 		}
 
@@ -1226,16 +1262,15 @@ void QtUISystem::drawMenuPartInMainContext() {
 
 		// Don't blit initial FBO content
 		if( m_activeMenuMask || m_isShowingScoreboard ) {
-			const QSize size( m_menuSandbox->m_window->size() );
 			shader_s *const material = R_WrapMenuTextureHandleInMaterial( m_menuSandbox->m_framebufferObject->texture() );
 			R_Set2DMode( true );
-			R_DrawStretchPic( 0, 0, size.width(), size.height(), 0.0f, 1.0f, 1.0f, 0.0f, colorWhite, material );
+			R_DrawStretchPic( 0, 0, m_widthInPixels, m_heightInPixels, 0.0f, 1.0f, 1.0f, 0.0f, colorWhite, material );
 			R_Set2DMode( false );
 		}
 
 		while( !m_nativelyDrawnOverlayHeap.empty() ) {
 			std::pop_heap( m_nativelyDrawnOverlayHeap.begin(), m_nativelyDrawnOverlayHeap.end(), cmp );
-			m_nativelyDrawnOverlayHeap.back()->drawSelfNatively( timestamp, delta );
+			m_nativelyDrawnOverlayHeap.back()->drawSelfNatively( timestamp, delta, m_pixelsPerLogicalUnit );
 			m_nativelyDrawnOverlayHeap.pop_back();
 		}
 	}
@@ -1249,15 +1284,15 @@ void QtUISystem::drawHudPartInMainContext() {
 			m_boundsOfDrawnHudItems.clear();
 			Q_EMIT displayedHudItemsRetrievalRequested();
 
-			const qreal windowWidth  = m_hudSandbox->m_window->width();
-			const qreal windowHeight = m_hudSandbox->m_window->height();
+			const qreal windowWidth  = m_widthInPixels;
+			const qreal windowHeight = m_heightInPixels;
 
 			// We cannot just blit texture regions that correspond to HUD items
 			// as items may ovelap and are alpha-blended.
 			// Instead, we mark non-overlapping grid regions that are (partially or fully) occupied by HUD items.
 
-			constexpr unsigned cellWidth  = 64;
-			constexpr unsigned cellHeight = 64;
+			const unsigned cellWidth      = 64 * m_pixelsPerLogicalUnit;
+			const unsigned cellHeight     = 64 * m_pixelsPerLogicalUnit;
 			const unsigned numGridColumns = (unsigned)( std::ceil( windowWidth ) / cellWidth ) + 1;
 			const unsigned numGridRows    = (unsigned)( std::ceil( windowHeight ) / cellHeight ) + 1;
 
@@ -1383,11 +1418,15 @@ void QtUISystem::drawHudPartInMainContext() {
 void QtUISystem::drawCursorInMainContext() {
 	if( m_activeMenuMask || CG_UsesTiledView() ) {
 		R_Set2DMode( true );
-		vec4_t color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		// TODO: Check why CL_BeginRegistration()/CL_EndRegistration() never gets called
+
+		// TODO: Handle precaching of resources properly
 		auto *cursorMaterial = R_RegisterPic( "gfx/ui/cursor.tga" );
-		// TODO: Account for screen pixel density
-		R_DrawStretchPic( (int)m_mouseXY[0], (int)m_mouseXY[1], 32, 32, 0.0f, 0.0f, 1.0f, 1.0f, color, cursorMaterial );
+
+		const auto x   = (int)m_mouseXY[0] * m_pixelsPerLogicalUnit;
+		const auto y   = (int)m_mouseXY[1] * m_pixelsPerLogicalUnit;
+		const int side = 32 * m_pixelsPerLogicalUnit;
+
+		R_DrawStretchPic( x, y, side, side, 0.0f, 0.0f, 1.0f, 1.0f, colorWhite, cursorMaterial );
 		R_Set2DMode( false );
 	}
 }
@@ -1418,9 +1457,8 @@ void QtUISystem::drawBackgroundMapIfNeeded() {
 
 	refdef_t rdf;
 	memset( &rdf, 0, sizeof( rdf ) );
-	rdf.areabits = nullptr;
 
-	const auto widthAndHeight = std::make_pair( m_menuSandbox->m_window->width(), m_menuSandbox->m_window->height() );
+	const auto widthAndHeight = std::make_pair( m_widthInPixels, m_heightInPixels );
 	std::tie( rdf.x, rdf.y ) = std::make_pair( 0, 0 );
 	std::tie( rdf.width, rdf.height ) = widthAndHeight;
 
@@ -2117,12 +2155,13 @@ void QtUISystem::supplyNativelyDrawnItem( QQuickItem *item ) {
 
 void QtUISystem::supplyNativelyDrawnItemsOccluder( QQuickItem *item ) {
 	if( item->isVisible() ) {
-		m_occludersOfNativelyDrawnItems.push_back( item->mapRectToScene( item->boundingRect() ) );
+		m_occludersOfNativelyDrawnItems.push_back( mapLogicalRectToPixels( item->mapRectToScene( item->boundingRect() ) ) );
 	}
 }
 
 void QtUISystem::supplyHudOccluder( QQuickItem *item ) {
 	if( item->isVisible() ) {
+		// Keep it in logical units since it belongs to the UI internal machinery
 		m_hudOccluders.emplace_back( item->mapRectToScene( item->boundingRect() ) );
 	}
 }
@@ -2143,7 +2182,8 @@ bool QtUISystem::isHudItemOccluded( QQuickItem *item ) {
 void QtUISystem::supplyDisplayedHudItemAndMargin( QQuickItem *item, qreal margin ) {
 	assert( margin >= 0.0 );
 	if( item->isVisible() ) {
-		m_boundsOfDrawnHudItems.emplace_back( qMakePair( item->mapRectToScene( item->boundingRect() ), margin ) );
+		const QRectF &rectInPixels = mapLogicalRectToPixels( item->mapRectToScene( item->boundingRect() ) );
+		m_boundsOfDrawnHudItems.emplace_back( qMakePair( rectInPixels, m_pixelsPerLogicalUnit * margin ) );
 	}
 }
 
@@ -2254,6 +2294,14 @@ void QtUISystem::updateHudOccluders() {
 		// Force subscribers to update their visibility
 		Q_EMIT hudOccludersChanged();
 	}
+}
+
+auto QtUISystem::mapLogicalRectToPixels( const QRectF &logicalRect ) const -> QRectF {
+	const auto x = m_pixelsPerLogicalUnit * logicalRect.x();
+	const auto y = m_pixelsPerLogicalUnit * logicalRect.y();
+	const auto w = m_pixelsPerLogicalUnit * logicalRect.width();
+	const auto h = m_pixelsPerLogicalUnit * logicalRect.height();
+	return QRectF( x, y, w, h );
 }
 
 void QtUISystem::ensureObjectDestruction( QObject *object ) {
@@ -2617,17 +2665,17 @@ void QtUISystem::supplyHudMiniviewPane( int number ) {
 }
 
 void QtUISystem::supplyHudControlledMiniviewItemAndModelIndex( QQuickItem *item, int modelIndex ) {
-	const QRectF &fRect        = item->boundingRect();
+	const QRectF &fRect         = item->boundingRect();
 	const QPointF &fRealTopLeft = item->mapToGlobal( fRect.topLeft() );
 
-	const QRect iRect         = fRect.toRect();
+	const QRect  iRect         = fRect.toRect();
 	const QPoint iRealTopLeft = fRealTopLeft.toPoint();
 
 	m_miniviewItemPositions[m_numRetrievedMiniviews] = Rect {
-		.x      = iRealTopLeft.x(),
-		.y      = iRealTopLeft.y(),
-		.width  = iRect.width(),
-		.height = iRect.height(),
+		.x      = m_pixelsPerLogicalUnit * iRealTopLeft.x(),
+		.y      = m_pixelsPerLogicalUnit * iRealTopLeft.y(),
+		.width  = m_pixelsPerLogicalUnit * iRect.width(),
+		.height = m_pixelsPerLogicalUnit * iRect.height(),
 	};
 
 	const unsigned viewStateIndex = m_hudCommonDataModel.getViewStateIndexForMiniviewModelIndex( modelIndex );
