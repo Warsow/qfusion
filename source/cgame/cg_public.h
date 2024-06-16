@@ -81,6 +81,7 @@ void CG_Init( const char *serverName, unsigned int playerNum,
 			  int protocol, const char *demoExtension, int sharedSeed, bool gameStart );
 void CG_Shutdown();
 void CG_Reset();
+void CG_ClearEffects();
 
 namespace wsw { class StringView; }
 

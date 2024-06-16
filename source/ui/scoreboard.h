@@ -73,7 +73,7 @@ public:
 	};
 
 	using PlayerUpdatesList = wsw::StaticVector<PlayerUpdates, MAX_CLIENTS>;
-	using TeamUpdatesList = wsw::StaticVector<TeamUpdates, 3>;
+	using TeamUpdatesList = wsw::StaticVector<TeamUpdates, 4>;
 private:
 	[[nodiscard]]
 	bool addPlayerUpdates( const RawData &oldOne, const RawData &newOne, unsigned playerIndex, PlayerUpdatesList &dest );

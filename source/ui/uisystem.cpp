@@ -913,7 +913,6 @@ QmlSandbox::~QmlSandbox() {
 		m_rootObject = nullptr;
 	}
 	m_component.reset();
-	m_engine.reset();
 	if( m_controlContext ) {
 		const bool wasInUIRenderingMode = m_uiSystem->isInUIRenderingMode();
 		if( !wasInUIRenderingMode ) {
@@ -940,6 +939,7 @@ QmlSandbox::~QmlSandbox() {
 		assert( !m_framebufferObject );
 		assert( !m_control );
 	}
+	m_engine.reset();
 	m_surface.reset();
 	m_window.reset();
 }

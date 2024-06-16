@@ -8,8 +8,8 @@ Item {
     id: root
 
     visible: indicatorState.enabled
-    implicitWidth: collapsedHeight + extraExclusiveModeWidth
-    implicitHeight: collapsedHeight + barHeight + 1.5 * barMargin
+    implicitWidth: visible ? (collapsedHeight + extraExclusiveModeWidth) : 0
+    implicitHeight: visible ? (collapsedHeight + barHeight + 1.5 * barMargin) : 0
     
     property var commonDataModel
 
