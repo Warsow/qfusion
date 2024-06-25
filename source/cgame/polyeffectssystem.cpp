@@ -99,7 +99,7 @@ void PolyEffectsSystem::updateCurvedBeamEffect( CurvedBeam *handle, const float 
 	}
 }
 
-auto PolyEffectsSystem::CurvedBeamPoly::getStorageRequirements( const float *, const float *, float ) const
+auto PolyEffectsSystem::CurvedBeamPoly::getStorageRequirements( const float *, const float *, float, unsigned, void * ) const
 	-> std::optional<std::pair<unsigned, unsigned>> {
 	assert( points.size() > 1 );
 	return std::make_pair( (unsigned)( 4 * points.size() ), (unsigned)( 6 * points.size() ) );
@@ -109,8 +109,10 @@ auto PolyEffectsSystem::CurvedBeamPoly::getStorageRequirements( const float *, c
 auto PolyEffectsSystem::CurvedBeamPoly::fillMeshBuffers( const float *__restrict viewOrigin,
 														 const float *__restrict,
 														 float,
+														 unsigned,
 														 const Scene::DynamicLight *,
 														 std::span<const uint16_t>,
+														 void *,
 														 vec4_t *__restrict positions,
 														 vec4_t *__restrict,
 														 vec2_t *__restrict texCoords,
@@ -657,7 +659,7 @@ void PolyEffectsSystem::spawnImpactRosette( ImpactRosetteParams &&params ) {
 	wsw::link( effect, &m_impactRosetteEffectsHead );
 }
 
-auto PolyEffectsSystem::ImpactRosetteSpikesPoly::getStorageRequirements( const float *, const float *, float ) const
+auto PolyEffectsSystem::ImpactRosetteSpikesPoly::getStorageRequirements( const float *, const float *, float, unsigned, void * ) const
 	-> std::optional<std::pair<unsigned, unsigned>> {
     return std::make_pair( 4 * parentEffect->numElements, 6 * parentEffect->numElements );
 }
@@ -665,8 +667,10 @@ auto PolyEffectsSystem::ImpactRosetteSpikesPoly::getStorageRequirements( const f
 auto PolyEffectsSystem::ImpactRosetteSpikesPoly::fillMeshBuffers( const float *__restrict viewOrigin,
 																  const float *__restrict viewAxis,
 																  float,
+																  unsigned,
 																  const Scene::DynamicLight *,
 																  std::span<const uint16_t>,
+																  void *,
 																  vec4_t *__restrict positions,
 																  vec4_t *__restrict normals,
 																  vec2_t *__restrict texCoords,
@@ -742,7 +746,7 @@ auto PolyEffectsSystem::ImpactRosetteSpikesPoly::fillMeshBuffers( const float *_
 	return { numAddedVertices, numAddedIndices };
 }
 
-auto PolyEffectsSystem::ImpactRosetteFlarePoly::getStorageRequirements( const float *, const float *, float ) const
+auto PolyEffectsSystem::ImpactRosetteFlarePoly::getStorageRequirements( const float *, const float *, float, unsigned, void * ) const
 	-> std::optional<std::pair<unsigned, unsigned>> {
 	return std::make_pair( 4 * parentEffect->numElements, 6 * parentEffect->numElements );
 }
@@ -750,8 +754,10 @@ auto PolyEffectsSystem::ImpactRosetteFlarePoly::getStorageRequirements( const fl
 auto PolyEffectsSystem::ImpactRosetteFlarePoly::fillMeshBuffers( const float *__restrict viewOrigin,
 																 const float *__restrict viewAxis,
 																 float,
+																 unsigned,
 																 const Scene::DynamicLight *,
 																 std::span<const uint16_t>,
+																 void *,
 																 vec4_t *__restrict positions,
 																 vec4_t *__restrict normals,
 																 vec2_t *__restrict texCoords,
@@ -911,7 +917,7 @@ void PolyEffectsSystem::spawnSimulatedRing( SimulatedRingParams &&params ) {
 	wsw::link( effect, &m_ribbonEffectsHead );
 }
 
-auto PolyEffectsSystem::RibbonPoly::getStorageRequirements( const float *, const float *, float ) const
+auto PolyEffectsSystem::RibbonPoly::getStorageRequirements( const float *, const float *, float, unsigned, void * ) const
 	-> std::optional<std::pair<unsigned, unsigned>> {
 	assert( parentEffect->numEdges > 1 );
 	// TODO: Use strips
@@ -922,8 +928,10 @@ auto PolyEffectsSystem::RibbonPoly::getStorageRequirements( const float *, const
 auto PolyEffectsSystem::RibbonPoly::fillMeshBuffers( const float *__restrict viewOrigin,
 													 const float *__restrict viewAxis,
 													 float,
+													 unsigned,
 													 const Scene::DynamicLight *,
 													 std::span<const uint16_t>,
+													 void *,
 													 vec4_t *__restrict positions,
 													 vec4_t *__restrict normals,
 													 vec2_t *__restrict texCoords,

@@ -116,6 +116,8 @@ private:
 
 		unsigned renderFlags { 0 };
 
+		unsigned cameraId { ~0u };
+
 		int viewCluster { -1 };
 		int viewArea { -1 };
 
@@ -482,6 +484,7 @@ private:
 
 	unsigned m_occlusionCullingFrame { 0 };
 	unsigned m_drawSceneFrame { 0 };
+	unsigned m_cameraIdCounter { 0 };
 
 	wsw::StaticVector<DrawSceneRequest, 16> m_drawSceneRequestsHolder;
 

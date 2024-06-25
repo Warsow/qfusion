@@ -494,18 +494,30 @@ struct DynamicMesh {
 
 	virtual ~DynamicMesh() = default;
 
+	// The scratchpad could be used for storing important temporaries for reusing during fillMeshBuffers call
+	// without complicating state management of implementations.
+	// Check the calling code to get the actually available scratchpad size.
+	// The cameraId allows caching some properties for different dymamic meshes (which share something)
+	// during drawing from the same camera (note that a single viewport may still perfectly involve
+	// using multiple cameras during drawing it, e.g while drawing portals).
+	// In this case, management of associated storage is a burden of a dynamic mesh implementation.
 	[[nodiscard]]
 	virtual auto getStorageRequirements( const float *__restrict viewOrigin,
 										 const float *__restrict viewAxis,
-										 float cameraViewTangent ) const
+										 float cameraViewTangent,
+										 unsigned cameraId,
+										 void *__restrict scratchpad ) const
 		-> std::optional<std::pair<unsigned, unsigned>> = 0;
 
+	// The scratchpad points to the same chunk of memory as during getStorageRequirements() call.
 	[[nodiscard]]
 	virtual auto fillMeshBuffers( const float *__restrict viewOrigin,
 								  const float *__restrict viewAxis,
 								  float cameraViewTangent,
+								  unsigned cameraId,
 								  const Scene::DynamicLight *dynamicLights,
 								  std::span<const uint16_t> affectingLightIndices,
+								  void *__restrict scratchpad,
 								  vec4_t *__restrict destPositions,
 								  vec4_t *__restrict destNormals,
 								  vec2_t *__restrict destTexCoords,

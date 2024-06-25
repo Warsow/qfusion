@@ -1411,6 +1411,7 @@ struct FrontendToBackendShared {
 	vec3_t viewOrigin;
 	mat3_t viewAxis;
 	unsigned renderFlags;
+	unsigned cameraId;
 	float fovTangent;
 };
 

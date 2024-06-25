@@ -1291,12 +1291,14 @@ void R_SubmitDynamicMeshesToBackend( const FrontendToBackendShared *fsh, const e
 	uint16_t *affectingLightsStorage = nullptr;
 	const bool hasAvailableLights    = r_dynamiclight->integer && !fsh->allVisibleLightIndices.empty();
 
+	alignas( alignof( void * ) ) uint8_t scratchpad[64];
 	for( const sortedDrawSurf_t &sds: surfSpan ) {
 		const auto *__restrict mesh = (const DynamicMesh *)sds.drawSurf;
 
 		// This call is more useful if dynamic stream memory is used directly
 		// (we can flush the existing buffer if needed and write to now-free space).
-		const auto maybeMaxRequirements = mesh->getStorageRequirements( fsh->viewOrigin, fsh->viewAxis, fsh->fovTangent );
+		const auto maybeMaxRequirements = mesh->getStorageRequirements( fsh->viewOrigin, fsh->viewAxis, fsh->fovTangent,
+																		fsh->cameraId, scratchpad );
 		// Won't draw itself
 		if( !maybeMaxRequirements ) {
 			continue;
@@ -1322,7 +1324,9 @@ void R_SubmitDynamicMeshesToBackend( const FrontendToBackendShared *fsh, const e
 
 		const auto [numPolyVertices, numPolyIndices] = mesh->fillMeshBuffers( fsh->viewOrigin, fsh->viewAxis,
 																			  fsh->fovTangent,
+																			  fsh->cameraId,
 																			  fsh->dynamicLights, affectingLightIndices,
+																			  scratchpad,
 																			  positions, normals,
 																			  texCoords, colors, indices );
 

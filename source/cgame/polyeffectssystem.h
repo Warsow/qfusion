@@ -168,15 +168,17 @@ public:
 		CurvedBeamUVMode uvMode;
 
 		[[nodiscard]]
-		auto getStorageRequirements( const float *, const float *, float ) const
+		auto getStorageRequirements( const float *, const float *, float, unsigned, void * ) const
 			-> std::optional<std::pair<unsigned, unsigned>> override;
 
 		[[nodiscard]]
 		auto fillMeshBuffers( const float *__restrict viewOrigin,
 							  const float *__restrict viewAxis,
 							  float,
+							  unsigned,
 							  const Scene::DynamicLight *,
 							  std::span<const uint16_t>,
+							  void *__restrict,
 							  vec4_t *__restrict positions,
 							  vec4_t *__restrict normals,
 							  vec2_t *__restrict texCoords,
@@ -256,15 +258,17 @@ private:
 		ImpactRosetteEffect *parentEffect;
 
 		[[nodiscard]]
-		auto getStorageRequirements( const float *, const float *, float ) const
+		auto getStorageRequirements( const float *, const float *, float, unsigned, void * ) const
 			-> std::optional<std::pair<unsigned, unsigned>> override;
 
 		[[nodiscard]]
 		auto fillMeshBuffers( const float *__restrict viewOrigin,
 							  const float *__restrict viewAxis,
 							  float,
+							  unsigned,
 							  const Scene::DynamicLight *,
 							  std::span<const uint16_t>,
+							  void *__restrict,
 							  vec4_t *__restrict positions,
 							  vec4_t *__restrict normals,
 							  vec2_t *__restrict texCoords,
@@ -276,15 +280,17 @@ private:
 		ImpactRosetteEffect *parentEffect;
 
 		[[nodiscard]]
-		auto getStorageRequirements( const float *, const float *, float ) const
+		auto getStorageRequirements( const float *, const float *, float, unsigned, void * ) const
 		-> std::optional<std::pair<unsigned, unsigned>> override;
 
 		[[nodiscard]]
 		auto fillMeshBuffers( const float *__restrict viewOrigin,
 							  const float *__restrict viewAxis,
 							  float,
+							  unsigned,
 							  const Scene::DynamicLight *,
 							  std::span<const uint16_t>,
+							  void *__restrict,
 							  vec4_t *__restrict positions,
 							  vec4_t *__restrict normals,
 							  vec2_t *__restrict texCoords,
@@ -321,15 +327,17 @@ private:
 		float lifetimeFrac { 0.0f };
 
 		[[nodiscard]]
-		auto getStorageRequirements( const float *, const float *, float ) const
+		auto getStorageRequirements( const float *, const float *, float, unsigned, void * ) const
 			-> std::optional<std::pair<unsigned, unsigned>> override;
 
 		[[nodiscard]]
 		auto fillMeshBuffers( const float *__restrict viewOrigin,
 							  const float *__restrict viewAxis,
 							  float,
+							  unsigned,
 							  const Scene::DynamicLight *,
 							  std::span<const uint16_t>,
+							  void *__restrict,
 							  vec4_t *__restrict positions,
 							  vec4_t *__restrict normals,
 							  vec2_t *__restrict texCoords,

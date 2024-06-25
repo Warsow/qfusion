@@ -206,6 +206,7 @@ void Frontend::submitSortedSurfacesToBackend( StateForCamera *stateForCamera, Sc
 	fsh.visibleProgramLightIndices  = { stateForCamera->visibleProgramLightIndices, stateForCamera->numVisibleProgramLights };
 	fsh.renderFlags                 = stateForCamera->renderFlags;
 	fsh.fovTangent                  = stateForCamera->lodScaleForFov;
+	fsh.cameraId                    = stateForCamera->cameraId;
 	std::memcpy( fsh.viewAxis, stateForCamera->viewAxis, sizeof( mat3_t ) );
 	VectorCopy( stateForCamera->viewOrigin, fsh.viewOrigin );
 
@@ -445,8 +446,9 @@ auto Frontend::setupStateForCamera( CameraStateGroup stateGroup, const refdef_t 
 	m_particleDrawSurfacesBuffer[stateIndex].reserve( Scene::kMaxParticleAggregates * Scene::kMaxParticlesInAggregate );
 	stateForCamera->particleDrawSurfaces = m_particleDrawSurfacesBuffer[stateIndex].get();
 	
-	stateForCamera->refdef      = *fd;
-	stateForCamera->farClip     = getDefaultFarClip( fd );
+	stateForCamera->refdef   = *fd;
+	stateForCamera->farClip  = getDefaultFarClip( fd );
+	stateForCamera->cameraId = m_cameraIdCounter++;
 
 	stateForCamera->renderFlags = 0;
 	if( r_lightmap->integer ) {

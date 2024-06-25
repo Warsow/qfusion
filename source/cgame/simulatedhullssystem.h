@@ -14,6 +14,9 @@ struct CMShapeList;
 class SimulatedHullsSystem {
 	friend class TransientEffectsSystem;
 	friend class MeshTesselationHelper;
+
+	friend struct SolidMeshScratchpad;
+	friend struct CloudMeshScratchpad;
 public:
     static std::span<const vec4_t> getUnitIcosphere( unsigned level );
 	// TODO: Split function and fading direction?
@@ -154,9 +157,26 @@ private:
 	// Still, they share many properties.
 	struct SharedMeshData {
 		wsw::PodVector<uint32_t> *overrideColorsBuffer { nullptr };
-		// Must be reset each frame
-		std::optional<std::variant<std::pair<unsigned, unsigned>, std::monostate>> cachedOverrideColorsSpanInBuffer;
-		std::optional<std::variant<unsigned, std::monostate>> cachedChosenSolidSubdivLevel;
+
+		// We don't know what gets drawn first, the solid mesh or the cloud mesh.
+		// Some expensive computations can be performed in order-independent fashion and cached.
+		// Results are supposed to be valid for drawing from a given camera during the frame.
+		struct CacheEntry {
+			unsigned cameraId { ~0u };
+			std::optional<std::variant<std::pair<unsigned, unsigned>, std::monostate>> overrideColorsSpanInBuffer;
+			std::optional<std::variant<unsigned, std::monostate>> chosenSubdivLevel;
+		};
+
+		// Must be reset (cleaned) each client frame.
+		// The StaticVector should be preferred to be used.
+		// Switching to the dynamic one should be performed when unavoidable
+		// (the performance is going to be poor anyway due to numerous expensive draw effect calls).
+		// TODO: This should be replaced by a custom container type with configurable static buffer.
+		wsw::StaticVector<CacheEntry, 8> cacheEntriesInitial;
+		// This container does not allocate anything by default.
+		// TODO: Recycle, implement a system-shared cache of reusable pre-allocated containers.
+		wsw::PodVector<CacheEntry> cacheEntriesHeapalloc;
+
 		const vec4_t *simulatedPositions { nullptr };
 		const vec4_t *simulatedNormals { nullptr };
 		const byte_vec4_t *simulatedColors { nullptr };
@@ -182,16 +202,18 @@ private:
 		friend class SimulatedHullsSystem;
 		friend class MeshTesselationHelper;
 
-		SharedMeshData *m_shared { nullptr };
-		// Gets set in getStorageRequirements()
-		mutable unsigned m_chosenSubdivLevel { 0 };
+		mutable SharedMeshData *m_shared { nullptr };
 
 		[[nodiscard]]
 		auto calcSolidSubdivLodLevel( const float *viewOrigin, float cameraViewTangent ) const -> std::optional<unsigned>;
 
+		[[nodiscard]]
+		auto getCacheEntryByCameraId( unsigned cameraId ) const -> SharedMeshData::CacheEntry *;
+
 		void calcOverrideColors( byte_vec4_t *__restrict buffer,
 								 const float *__restrict viewOrigin,
 								 const float *__restrict viewAxis,
+								 unsigned chosenSubdivLevel,
 								 const Scene::DynamicLight *lights,
 								 std::span<const uint16_t> affectingLightIndices,
 								 bool applyViewDotFade, bool applyZFade, bool applyLights ) const;
@@ -200,27 +222,29 @@ private:
 		auto getOverrideColorsCheckingSiblingCache( byte_vec4_t *__restrict localBuffer,
 													const float *__restrict viewOrigin,
 													const float *__restrict viewAxis,
+													unsigned chosenSubdivLevel,
+													SharedMeshData::CacheEntry *cacheEntry,
 													const Scene::DynamicLight *lights,
 													std::span<const uint16_t> affectingLightIndices ) const
 														-> const byte_vec4_t *;
-
-        /*auto copyColors( const unsigned numVertices, const byte_vec4_t* colors, const float* colorRanges ) const
-        -> const byte_vec4_t *;*/
 	};
 
 	class HullSolidDynamicMesh : public HullDynamicMesh {
 		friend class SimulatedHullsSystem;
 
 		[[nodiscard]]
-		auto getStorageRequirements( const float *viewOrigin, const float *viewAxis, float cameraViewTangent ) const
-			-> std::optional<std::pair<unsigned, unsigned>> override;
+		auto getStorageRequirements( const float *viewOrigin, const float *viewAxis, float cameraViewTangent,
+									 unsigned cameraId, void *scratchpad ) const
+									 -> std::optional<std::pair<unsigned, unsigned>> override;
 
 		[[nodiscard]]
 		auto fillMeshBuffers( const float *__restrict viewOrigin,
 							  const float *__restrict viewAxis,
 							  float cameraViewTangent,
+							  unsigned cameraId,
 							  const Scene::DynamicLight *lights,
 							  std::span<const uint16_t> affectingLightIndices,
+							  void *__restrict scratchpad,
 							  vec4_t *__restrict destPositions,
 							  vec4_t *__restrict destNormals,
 							  vec2_t *__restrict destTexCoords,
@@ -240,23 +264,23 @@ private:
 		int m_tessLevelShiftForMinVertexIndex { 0 };
 		int m_tessLevelShiftForMaxVertexIndex { 0 };
 		int m_shiftFromDefaultLevelToHide { std::numeric_limits<int>::min() };
-		// These fields get updated by getStorageRequirements()
-		mutable unsigned m_minVertexNumThisFrame { 0 };
-		mutable unsigned m_vertexNumLimitThisFrame { 0 };
 		uint16_t m_phaseIndexShiftInTable { 0 };
 		uint16_t m_speedIndexShiftInTable { 0 };
 		bool m_applyRotation { false };
 
 		[[nodiscard]]
-		auto getStorageRequirements( const float *viewOrigin, const float *viewAxis, float cameraViewTangent ) const
-			-> std::optional<std::pair<unsigned, unsigned>> override;
+		auto getStorageRequirements( const float *viewOrigin, const float *viewAxis, float cameraViewTangent,
+									 unsigned cameraId, void *scratchpad ) const
+									 -> std::optional<std::pair<unsigned, unsigned>> override;
 
 		[[nodiscard]]
 		auto fillMeshBuffers( const float *__restrict viewOrigin,
 							  const float *__restrict viewAxis,
 							  float cameraViewTangent,
+							  unsigned cameraId,
 							  const Scene::DynamicLight *lights,
 							  std::span<const uint16_t> affectingLightIndices,
+							  void *__restrict scratchpad,
 							  vec4_t *__restrict destPositions,
 							  vec4_t *__restrict destNormals,
 							  vec2_t *__restrict destTexCoords,

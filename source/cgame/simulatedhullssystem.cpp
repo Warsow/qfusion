@@ -979,10 +979,11 @@ void SimulatedHullsSystem::submitToScene( int64_t currTime, DrawSceneRequest *dr
 		sharedMeshData->tesselateClosestLod  = hull->tesselateClosestLod;
 		sharedMeshData->lerpNextLevelColors  = hull->leprNextLevelColors;
 
-		sharedMeshData->cachedChosenSolidSubdivLevel     = std::nullopt;
-		sharedMeshData->cachedOverrideColorsSpanInBuffer = std::nullopt;
-		sharedMeshData->overrideColorsBuffer             = &m_frameSharedOverrideColorsBuffer;
-		sharedMeshData->hasSibling                       = solidAppearanceRules && cloudAppearanceRules;
+		sharedMeshData->cacheEntriesInitial.clear();
+		sharedMeshData->cacheEntriesHeapalloc.clear();
+
+		sharedMeshData->overrideColorsBuffer = &m_frameSharedOverrideColorsBuffer;
+		sharedMeshData->hasSibling           = solidAppearanceRules && cloudAppearanceRules;
 
 		assert( hull->subdivLevel );
 		if( solidAppearanceRules ) [[likely]] {
@@ -1114,10 +1115,11 @@ void SimulatedHullsSystem::submitToScene( int64_t currTime, DrawSceneRequest *dr
 			sharedMeshData->lerpNextLevelColors  = true;
 			sharedMeshData->nextLodTangentRatio  = 0.30f;
 
-			sharedMeshData->cachedChosenSolidSubdivLevel     = std::nullopt;
-			sharedMeshData->cachedOverrideColorsSpanInBuffer = std::nullopt;
-			sharedMeshData->overrideColorsBuffer             = &m_frameSharedOverrideColorsBuffer;
-			sharedMeshData->hasSibling                       = solidAppearanceRules && cloudAppearanceRules;
+			sharedMeshData->cacheEntriesInitial.clear();
+			sharedMeshData->cacheEntriesHeapalloc.clear();
+
+			sharedMeshData->overrideColorsBuffer = &m_frameSharedOverrideColorsBuffer;
+			sharedMeshData->hasSibling           = solidAppearanceRules && cloudAppearanceRules;
 
 			sharedMeshData->isAKeyframedHull = true;
 
@@ -1279,8 +1281,9 @@ void SimulatedHullsSystem::submitToScene( int64_t currTime, DrawSceneRequest *dr
 			sharedMeshData->tesselateClosestLod  = true;
 			sharedMeshData->lerpNextLevelColors  = true;
 
-			sharedMeshData->cachedChosenSolidSubdivLevel     = std::nullopt;
-			sharedMeshData->cachedOverrideColorsSpanInBuffer = std::nullopt;
+			sharedMeshData->cacheEntriesInitial.clear();
+			sharedMeshData->cacheEntriesHeapalloc.clear();
+
 			sharedMeshData->overrideColorsBuffer             = &m_frameSharedOverrideColorsBuffer;
 			sharedMeshData->hasSibling                       = solidAppearanceRules && cloudAppearanceRules;
 
@@ -2474,6 +2477,38 @@ auto SimulatedHullsSystem::HullDynamicMesh::calcSolidSubdivLodLevel( const float
 	return chosenSubdivLevel;
 }
 
+auto SimulatedHullsSystem::HullDynamicMesh::getCacheEntryByCameraId( unsigned cameraId ) const -> SharedMeshData::CacheEntry * {
+	for( SharedMeshData::CacheEntry &e: m_shared->cacheEntriesInitial ) {
+		if( e.cameraId == cameraId ) {
+			return std::addressof( e );
+		}
+	}
+	for( SharedMeshData::CacheEntry &e: m_shared->cacheEntriesHeapalloc ) {
+		if( e.cameraId == cameraId ) {
+			return std::addressof( e );
+		}
+	}
+	// Not found, create a new entry for this camera
+	bool useHeapAllocStorage = false;
+	if( !m_shared->cacheEntriesHeapalloc.empty() ) [[unlikely]] {
+		useHeapAllocStorage = true;
+	} else {
+		// Switch to using heapalloc storage
+		if( m_shared->cacheEntriesInitial.full() ) [[unlikely]] {
+			m_shared->cacheEntriesHeapalloc.assign( m_shared->cacheEntriesInitial.begin(), m_shared->cacheEntriesInitial.end() );
+			m_shared->cacheEntriesInitial.clear();
+			useHeapAllocStorage = true;
+		}
+	}
+	if( useHeapAllocStorage ) [[unlikely]] {
+		m_shared->cacheEntriesHeapalloc.emplace_back( SharedMeshData::CacheEntry { .cameraId = cameraId } );
+		return std::addressof( m_shared->cacheEntriesHeapalloc.back() );
+	} else {
+		m_shared->cacheEntriesInitial.emplace_back( SharedMeshData::CacheEntry { .cameraId = cameraId } );
+		return std::addressof( m_shared->cacheEntriesInitial.back() );
+	}
+}
+
 static const struct FadeFnHolder {
 	using CalcNormalsAndApplyAlphaFadeFn = void (*)( byte_vec4_t *,
 													 const vec4_t *,
@@ -2526,6 +2561,7 @@ static const struct FadeFnHolder {
 void SimulatedHullsSystem::HullDynamicMesh::calcOverrideColors( byte_vec4_t *__restrict buffer,
 																const float *__restrict viewOrigin,
 																const float *__restrict viewAxis,
+																unsigned chosenSubdivLevel,
 																const Scene::DynamicLight *lights,
 																std::span<const uint16_t> affectingLightIndices,
 																bool applyViewDotFade,
@@ -2537,7 +2573,7 @@ void SimulatedHullsSystem::HullDynamicMesh::calcOverrideColors( byte_vec4_t *__r
 
 	if( applyViewDotFade || applyZFade ) {
 		const ZFade effectiveZFade        = applyZFade ? m_shared->zFade : ZFade::NoFade;
-		const unsigned dataLevelToUse     = wsw::min( m_chosenSubdivLevel, m_shared->simulatedSubdivLevel );
+		const unsigned dataLevelToUse     = wsw::min( chosenSubdivLevel, m_shared->simulatedSubdivLevel );
 		const IcosphereData &lodDataToUse = ::basicHullsHolder.getIcosphereForLevel( dataLevelToUse );
 
 		// If tesselation is going to be performed, apply light to the base non-tesselated lod colors
@@ -2569,10 +2605,10 @@ void SimulatedHullsSystem::HullDynamicMesh::calcOverrideColors( byte_vec4_t *__r
 	if( applyLights ) {
 		unsigned numVertices;
 		// If tesselation is going to be performed, apply light to the base non-tesselated lod colors
-		if( m_chosenSubdivLevel > m_shared->simulatedSubdivLevel ) {
+		if( chosenSubdivLevel > m_shared->simulatedSubdivLevel ) {
 			numVertices = ::basicHullsHolder.getIcosphereForLevel( m_shared->simulatedSubdivLevel ).vertices.size();
 		} else {
-			numVertices = ::basicHullsHolder.getIcosphereForLevel( m_chosenSubdivLevel ).vertices.size();
+			numVertices = ::basicHullsHolder.getIcosphereForLevel( chosenSubdivLevel ).vertices.size();
 		}
 
 		// Copy alpha from these colors
@@ -2594,12 +2630,14 @@ void SimulatedHullsSystem::HullDynamicMesh::calcOverrideColors( byte_vec4_t *__r
 auto SimulatedHullsSystem::HullDynamicMesh::getOverrideColorsCheckingSiblingCache( byte_vec4_t *__restrict localBuffer,
 																				   const float *__restrict viewOrigin,
 																				   const float *__restrict viewAxis,
+																				   unsigned chosenSubdivLevel,
+																				   SharedMeshData::CacheEntry *cacheEntry,
 																				   const Scene::DynamicLight *lights,
 																				   std::span<const uint16_t>
 																				       affectingLightIndices ) const
 	-> const byte_vec4_t * {
-	if( m_shared->cachedOverrideColorsSpanInBuffer ) {
-		auto *maybeSpanAddress = std::addressof( *m_shared->cachedOverrideColorsSpanInBuffer );
+	if( cacheEntry->overrideColorsSpanInBuffer != std::nullopt ) {
+		auto *maybeSpanAddress = std::addressof( *cacheEntry->overrideColorsSpanInBuffer );
 		if( auto *span = std::get_if<std::pair<unsigned, unsigned>>( maybeSpanAddress ) ) {
 			static_assert( sizeof( byte_vec4_t ) == sizeof( uint32_t ) );
 			return (byte_vec4_t *)( m_shared->overrideColorsBuffer->data() + span->first );
@@ -2614,7 +2652,7 @@ auto SimulatedHullsSystem::HullDynamicMesh::getOverrideColorsCheckingSiblingCach
 
 	// Nothing to do, save this fact
 	if( !( actuallyApplyViewDotFade | actuallyApplyZFade | actuallyApplyLights ) ) {
-		m_shared->cachedOverrideColorsSpanInBuffer = std::monostate();
+		cacheEntry->overrideColorsSpanInBuffer = std::monostate();
 		return nullptr;
 	}
 
@@ -2630,64 +2668,88 @@ auto SimulatedHullsSystem::HullDynamicMesh::getOverrideColorsCheckingSiblingCach
 		static_assert( sizeof( byte_vec4_t ) == sizeof( uint32_t ) );
 		buffer = (byte_vec4_t *)( sharedBuffer->data() + offset );
 		// Store as a relative offset, so it's stable regardless of reallocations
-		m_shared->cachedOverrideColorsSpanInBuffer = std::make_pair<unsigned, unsigned>( offset, length );
+		cacheEntry->overrideColorsSpanInBuffer = std::make_pair<unsigned, unsigned>( offset, length );
 	}
 
-	calcOverrideColors( buffer, viewOrigin, viewAxis, lights, affectingLightIndices,
+	calcOverrideColors( buffer, viewOrigin, viewAxis, chosenSubdivLevel, lights, affectingLightIndices,
 						actuallyApplyViewDotFade, actuallyApplyZFade, actuallyApplyLights );
 
 	return buffer;
 }
 
-
+struct SolidMeshScratchpad {
+	SimulatedHullsSystem::SharedMeshData::CacheEntry *cacheEntry;
+	unsigned chosenSubdivLevel;
+};
 
 auto SimulatedHullsSystem::HullSolidDynamicMesh::getStorageRequirements( const float *viewOrigin,
 																		 const float *viewAxis,
-																		 float cameraViewTangent ) const
+																		 float cameraViewTangent,
+																		 unsigned cameraId,
+																		 void *scratchpadStorage ) const
 	-> std::optional<std::pair<unsigned, unsigned>> {
-	if( m_shared->cachedChosenSolidSubdivLevel ) {
-		auto *drawOrSkipAddress = std::addressof( *m_shared->cachedChosenSolidSubdivLevel );
+	auto *const scratchpad = (SolidMeshScratchpad *)scratchpadStorage;
+	auto *const cacheEntry = getCacheEntryByCameraId( cameraId );
+	// Save the relatively expensive lookup result for further use
+	scratchpad->cacheEntry = cacheEntry;
+
+	// Check the shared cache first
+	if( cacheEntry->chosenSubdivLevel != std::nullopt ) {
+		auto *drawOrSkipAddress = std::addressof( *cacheEntry->chosenSubdivLevel );
 		if( const auto *drawLevel = std::get_if<unsigned>( drawOrSkipAddress ) ) {
-			m_chosenSubdivLevel   = *drawLevel;
+			scratchpad->chosenSubdivLevel = *drawLevel;
 		} else {
 			return std::nullopt;
 		}
 	} else if( const std::optional<unsigned> drawLevel = calcSolidSubdivLodLevel( viewOrigin, cameraViewTangent ) ) {
-		m_chosenSubdivLevel                    = *drawLevel;
-		m_shared->cachedChosenSolidSubdivLevel = *drawLevel;
+		scratchpad->chosenSubdivLevel = *drawLevel;
+		cacheEntry->chosenSubdivLevel = *drawLevel;
 	} else {
-		m_shared->cachedChosenSolidSubdivLevel = std::monostate();
+		cacheEntry->chosenSubdivLevel = std::monostate();
 		return std::nullopt;
 	}
 
-	const IcosphereData &chosenLevelData = ::basicHullsHolder.getIcosphereForLevel( m_chosenSubdivLevel );
+	const IcosphereData &chosenLevelData = ::basicHullsHolder.getIcosphereForLevel( scratchpad->chosenSubdivLevel );
 	return std::make_pair<unsigned, unsigned>( chosenLevelData.vertices.size(), chosenLevelData.indices.size() );
 }
 
+struct CloudMeshScratchpad {
+	SimulatedHullsSystem::SharedMeshData::CacheEntry *cacheEntry;
+	unsigned chosenSubdivLevel;
+	unsigned minVertexNumForThisCamera;
+	unsigned vertexNumLimitForThisCamera;
+};
+
 auto SimulatedHullsSystem::HullCloudDynamicMesh::getStorageRequirements( const float *viewOrigin,
 																		 const float *viewAxis,
-																		 float cameraViewTangent ) const
+																		 float cameraViewTangent,
+																		 unsigned cameraId,
+																		 void *scratchpadStorage ) const
 	-> std::optional<std::pair<unsigned, unsigned>> {
-	if( m_shared->cachedChosenSolidSubdivLevel ) {
-		auto *drawOrSkipAddress = std::addressof( *m_shared->cachedChosenSolidSubdivLevel );
+	auto *const scratchpad = (CloudMeshScratchpad *)scratchpadStorage;
+	auto *const cacheEntry = getCacheEntryByCameraId( cameraId );
+	scratchpad->cacheEntry = cacheEntry;
+
+	if( cacheEntry->chosenSubdivLevel != std::nullopt ) {
+		auto *drawOrSkipAddress = std::addressof( *cacheEntry->chosenSubdivLevel );
 		if( const auto *drawLevel = std::get_if<unsigned>( drawOrSkipAddress ) ) {
-			m_chosenSubdivLevel   = *drawLevel;
+			scratchpad->chosenSubdivLevel = *drawLevel;
 		} else {
 			return std::nullopt;
 		}
 	} else if( const std::optional<unsigned> drawLevel = calcSolidSubdivLodLevel( viewOrigin, cameraViewTangent ) ) {
-		m_chosenSubdivLevel                    = *drawLevel;
-		m_shared->cachedChosenSolidSubdivLevel = *drawLevel;
+		scratchpad->chosenSubdivLevel = *drawLevel;
+		cacheEntry->chosenSubdivLevel = *drawLevel;
 	} else {
-		m_shared->cachedChosenSolidSubdivLevel = std::monostate();
+		cacheEntry->chosenSubdivLevel = std::monostate();
 		return std::nullopt;
 	}
 
 	assert( m_shiftFromDefaultLevelToHide <= 0 );
-	if( m_chosenSubdivLevel > m_shared->simulatedSubdivLevel ) {
-		m_chosenSubdivLevel = m_shared->simulatedSubdivLevel;
+	if( scratchpad->chosenSubdivLevel > m_shared->simulatedSubdivLevel ) {
+		scratchpad->chosenSubdivLevel = m_shared->simulatedSubdivLevel;
 	} else {
-		const int shiftFromDefaultLevel = (int)m_chosenSubdivLevel - (int)m_shared->simulatedSubdivLevel;
+		const int shiftFromDefaultLevel = (int)scratchpad->chosenSubdivLevel - (int)m_shared->simulatedSubdivLevel;
 		if( shiftFromDefaultLevel <= m_shiftFromDefaultLevelToHide ) {
 			return std::nullopt;
 		}
@@ -2697,20 +2759,20 @@ auto SimulatedHullsSystem::HullCloudDynamicMesh::getStorageRequirements( const f
 	assert( m_tessLevelShiftForMaxVertexIndex <= 0 );
 	assert( m_tessLevelShiftForMinVertexIndex <= m_tessLevelShiftForMaxVertexIndex );
 
-	if( const int level = (int)m_chosenSubdivLevel + this->m_tessLevelShiftForMinVertexIndex; level > 0 ) {
-		m_minVertexNumThisFrame = (unsigned)::basicHullsHolder.getIcosphereForLevel( level - 1 ).vertices.size();
+	if( const int level = (int)scratchpad->chosenSubdivLevel + this->m_tessLevelShiftForMinVertexIndex; level > 0 ) {
+		scratchpad->minVertexNumForThisCamera = (unsigned)::basicHullsHolder.getIcosphereForLevel( level - 1 ).vertices.size();
 	} else {
-		m_minVertexNumThisFrame = 0;
+		scratchpad->minVertexNumForThisCamera = 0;
 	}
 
-	if( const int level = (int)m_chosenSubdivLevel + this->m_tessLevelShiftForMaxVertexIndex; level >= 0 ) {
-		m_vertexNumLimitThisFrame = ::basicHullsHolder.getIcosphereForLevel( level ).vertices.size();
+	if( const int level = (int)scratchpad->chosenSubdivLevel + this->m_tessLevelShiftForMaxVertexIndex; level >= 0 ) {
+		scratchpad->vertexNumLimitForThisCamera = ::basicHullsHolder.getIcosphereForLevel( level ).vertices.size();
 	} else {
-		m_vertexNumLimitThisFrame = ::basicHullsHolder.getIcosphereForLevel( 0 ).vertices.size();
+		scratchpad->vertexNumLimitForThisCamera = ::basicHullsHolder.getIcosphereForLevel( 0 ).vertices.size();
 	}
 
-	assert( m_minVertexNumThisFrame < m_vertexNumLimitThisFrame );
-	const unsigned numGridVertices = m_vertexNumLimitThisFrame - m_minVertexNumThisFrame;
+	assert( scratchpad->minVertexNumForThisCamera < scratchpad->vertexNumLimitForThisCamera );
+	const unsigned numGridVertices = scratchpad->vertexNumLimitForThisCamera - scratchpad->minVertexNumForThisCamera;
 	return std::make_pair( 4 * numGridVertices, 6 * numGridVertices );
 }
 
@@ -2779,31 +2841,36 @@ static void addLayerContributionToResultColor( float rampValue, unsigned numColo
 auto SimulatedHullsSystem::HullSolidDynamicMesh::fillMeshBuffers( const float *__restrict viewOrigin,
 																  const float *__restrict viewAxis,
 																  float cameraFovTangent,
+																  unsigned cameraId,
 																  const Scene::DynamicLight *lights,
 																  std::span<const uint16_t> affectingLightIndices,
+																  void *__restrict scratchpadStorage,
 																  vec4_t *__restrict destPositions,
 																  vec4_t *__restrict destNormals,
 																  vec2_t *__restrict destTexCoords,
 																  byte_vec4_t *__restrict destColors,
 																  uint16_t *__restrict destIndices ) const
 	-> std::pair<unsigned, unsigned> {
+	auto *const scratchpad           = (const SolidMeshScratchpad *)scratchpadStorage;
+	const unsigned chosenSubdivLevel = scratchpad->chosenSubdivLevel;
+
 	assert( m_shared->simulatedSubdivLevel <= BasicHullsHolder::kMaxSubdivLevel );
-	assert( m_chosenSubdivLevel <= m_shared->simulatedSubdivLevel + 1 );
+	assert( chosenSubdivLevel <= m_shared->simulatedSubdivLevel + 1 );
 	assert( m_shared->minZLastFrame <= m_shared->maxZLastFrame );
 
 	// Keep always allocating the default buffer even if it's unused, so we can rely on it
-	const auto colorsBufferLevel = wsw::min( m_chosenSubdivLevel, m_shared->simulatedSubdivLevel );
+	const auto colorsBufferLevel = wsw::min( chosenSubdivLevel, m_shared->simulatedSubdivLevel );
 	const auto colorsBufferSize  = (unsigned)basicHullsHolder.getIcosphereForLevel( colorsBufferLevel ).vertices.size();
 	assert( colorsBufferSize && colorsBufferSize < ( 1 << 12 ) );
 	auto *const overrideColorsBuffer = (byte_vec4_t *)alloca( sizeof( byte_vec4_t ) * colorsBufferSize );
 
 	const byte_vec4_t *overrideColors;
 	if( !m_shared->isAKeyframedHull ) {
-		overrideColors = getOverrideColorsCheckingSiblingCache( overrideColorsBuffer, viewOrigin,
-																viewAxis, lights,
-																affectingLightIndices);
+		overrideColors = getOverrideColorsCheckingSiblingCache( overrideColorsBuffer, viewOrigin, viewAxis,
+																chosenSubdivLevel, scratchpad->cacheEntry,
+																lights, affectingLightIndices );
 	} else {
-		const unsigned dataLevelToUse     = wsw::min( m_chosenSubdivLevel, m_shared->simulatedSubdivLevel );
+		const unsigned dataLevelToUse     = wsw::min( chosenSubdivLevel, m_shared->simulatedSubdivLevel );
 		const IcosphereData &lodDataToUse = ::basicHullsHolder.getIcosphereForLevel( dataLevelToUse );
 		// If tesselation is going to be performed, apply light to the base non-tesselated lod colors
 		const auto numVertices = (unsigned)lodDataToUse.vertices.size();
@@ -2946,9 +3013,9 @@ auto SimulatedHullsSystem::HullSolidDynamicMesh::fillMeshBuffers( const float *_
 
 	// HACK Perform an additional tesselation of some hulls.
 	// CPU-side tesselation is the single option in the current codebase state.
-	if( m_shared->tesselateClosestLod && m_chosenSubdivLevel > m_shared->simulatedSubdivLevel ) {
-		assert( m_shared->simulatedSubdivLevel + 1 == m_chosenSubdivLevel );
-		const IcosphereData &nextLevelData = ::basicHullsHolder.getIcosphereForLevel( m_chosenSubdivLevel );
+	if( m_shared->tesselateClosestLod && chosenSubdivLevel > m_shared->simulatedSubdivLevel ) {
+		assert( m_shared->simulatedSubdivLevel + 1 == chosenSubdivLevel );
+		const IcosphereData &nextLevelData = ::basicHullsHolder.getIcosphereForLevel( chosenSubdivLevel );
 		const IcosphereData &simLevelData  = ::basicHullsHolder.getIcosphereForLevel( m_shared->simulatedSubdivLevel );
 
 		const IcosphereVertexNeighbours nextLevelNeighbours = nextLevelData.vertexNeighbours.data();
@@ -2973,7 +3040,7 @@ auto SimulatedHullsSystem::HullSolidDynamicMesh::fillMeshBuffers( const float *_
 		std::memcpy( destColors, tesselationHelper->m_tessByteColors, sizeof( destColors[0] ) * numResultVertices );
 		std::memcpy( destIndices, nextLevelData.indices.data(), sizeof( uint16_t ) * numResultIndices );
 	} else {
-		const IcosphereData &dataToUse = ::basicHullsHolder.getIcosphereForLevel( m_chosenSubdivLevel );
+		const IcosphereData &dataToUse = ::basicHullsHolder.getIcosphereForLevel( chosenSubdivLevel );
 		const byte_vec4_t *colorsToUse = overrideColors ? overrideColors : m_shared->simulatedColors;
 
 		numResultVertices = (unsigned)dataToUse.vertices.size();
@@ -3052,26 +3119,35 @@ static_assert( std::size( kRandomBytes ) == 1024 );
 auto SimulatedHullsSystem::HullCloudDynamicMesh::fillMeshBuffers( const float *__restrict viewOrigin,
 																  const float *__restrict viewAxis,
 																  float cameraFovTangent,
+																  unsigned cameraId,
 																  const Scene::DynamicLight *lights,
 																  std::span<const uint16_t> affectingLightIndices,
+																  void *__restrict scratchpadStorage,
 																  vec4_t *__restrict destPositions,
 																  vec4_t *__restrict destNormals,
 																  vec2_t *__restrict destTexCoords,
 																  byte_vec4_t *__restrict destColors,
 																  uint16_t *__restrict destIndices ) const
 -> std::pair<unsigned, unsigned> {
+	auto *const scratchpad                     = (const CloudMeshScratchpad *)scratchpadStorage;
+	const unsigned chosenSubdivLevel           = scratchpad->chosenSubdivLevel;
+	const unsigned minVertexNumForThisCamera   = scratchpad->minVertexNumForThisCamera;
+	const unsigned vertexNumLimitForThisCamera = scratchpad->vertexNumLimitForThisCamera;
+
 	assert( m_shared->simulatedSubdivLevel < BasicHullsHolder::kMaxSubdivLevel );
-	assert( m_chosenSubdivLevel <= m_shared->simulatedSubdivLevel + 1 );
+	assert( chosenSubdivLevel <= m_shared->simulatedSubdivLevel + 1 );
 	assert( m_shared->minZLastFrame <= m_shared->maxZLastFrame );
 
 	// Keep always allocating the default buffer even if it's unused, so we can rely on its availability
-	const auto colorsBufferLevel = wsw::min( m_chosenSubdivLevel, m_shared->simulatedSubdivLevel );
+	const auto colorsBufferLevel = wsw::min( chosenSubdivLevel, m_shared->simulatedSubdivLevel );
 	const auto colorsBufferSize  = (unsigned)basicHullsHolder.getIcosphereForLevel( colorsBufferLevel ).vertices.size();
 	assert( colorsBufferSize && colorsBufferSize < ( 1 << 12 ) );
 	auto *const overrideColorsBuffer = (byte_vec4_t *)alloca( sizeof( byte_vec4_t ) * colorsBufferSize );
 
 	const byte_vec4_t *overrideColors = getOverrideColorsCheckingSiblingCache( overrideColorsBuffer, viewOrigin,
-																			   viewAxis, lights, affectingLightIndices );
+																			   viewAxis, chosenSubdivLevel,
+																			   scratchpad->cacheEntry,
+																			   lights, affectingLightIndices );
 
 	const byte_vec4_t *colorsToUse = overrideColors ? overrideColors : m_shared->simulatedColors;
 
@@ -3091,11 +3167,11 @@ auto SimulatedHullsSystem::HullCloudDynamicMesh::fillMeshBuffers( const float *_
 	unsigned numOutIndices  = 0;
 
 	// We sample the random data by vertex numbers using random shifts that remain stable during the hull lifetime
-	assert( m_vertexNumLimitThisFrame + m_phaseIndexShiftInTable <= std::size( kRandomBytes ) );
-	assert( m_vertexNumLimitThisFrame + m_speedIndexShiftInTable <= std::size( kRandomBytes ) );
+	assert( vertexNumLimitForThisCamera + m_phaseIndexShiftInTable <= std::size( kRandomBytes ) );
+	assert( vertexNumLimitForThisCamera + m_speedIndexShiftInTable <= std::size( kRandomBytes ) );
 
-	unsigned vertexNum = m_minVertexNumThisFrame;
-	assert( vertexNum < m_vertexNumLimitThisFrame );
+	unsigned vertexNum = minVertexNumForThisCamera;
+	assert( vertexNum < vertexNumLimitForThisCamera );
 
 	[[maybe_unused]] vec3_t tmpLeftStorage, tmpUpStorage;
 
@@ -3170,7 +3246,7 @@ auto SimulatedHullsSystem::HullCloudDynamicMesh::fillMeshBuffers( const float *_
 
 		numOutVertices += 4;
 		numOutIndices  += 6;
-	} while( ++vertexNum < m_vertexNumLimitThisFrame );
+	} while( ++vertexNum < vertexNumLimitForThisCamera );
 
 	return { numOutVertices, numOutIndices };
 };
