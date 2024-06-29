@@ -82,7 +82,7 @@ Item {
         anchors.topMargin: stateLabelTopMargin
         font.family: Hud.ui.headingFontFamily
         font.weight: Font.Black
-        font.pointSize: 13
+        font.pointSize: 16
         font.letterSpacing: 1.75
         style: Text.Raised
         textFormat: Text.PlainText

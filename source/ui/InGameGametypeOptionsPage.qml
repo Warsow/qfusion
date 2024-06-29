@@ -38,7 +38,7 @@ Item {
             readonly property int optionNumItems: numItems
             readonly property var optionCurrent: current
 
-            Label {
+            WswLabel {
                 id: titleLabel
                 anchors.top: parent.top
                 width: root.width

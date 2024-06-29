@@ -25,7 +25,7 @@ TableView {
     property real nameCellWidth
     property real clanCellWidth
 
-    readonly property real rowHeight: 36
+    readonly property real rowHeight: 40
 
     function getCellColor(row, column, tableStyle) {
         let c = baseColor
@@ -80,7 +80,7 @@ TableView {
             color: isColumnStatusOne ? "transparent" : getCellColor(row, column, UI.scoreboard.tableStyle)
         }
 
-        Label {
+        WswLabel {
             visible: !shouldBeDisplayedAsIcon
             opacity: isColumnStatusOne ? 1.0 : valueOpacity
             anchors.fill: parent
@@ -93,8 +93,6 @@ TableView {
             font.family: ((kind !== Scoreboard.Glyph && kind !== Scoreboard.Status) || value < 256) ?
                 UI.ui.regularFontFamily : UI.ui.symbolsFontFamily
             font.weight: Font.Bold
-            font.pointSize: 12
-            font.letterSpacing: 1
             font.strikeout: isGhosting && isColumnTextual
             style: Text.Raised
         }

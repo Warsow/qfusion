@@ -15,6 +15,10 @@ RowLayout {
 
     readonly property color selectedColor: impl.selectedColor
 
+    // For embedding in SettingsRow
+    readonly property real leftPadding: 0.0
+    readonly property real rightPadding: 0.0
+
     QtObject {
         id: impl
 

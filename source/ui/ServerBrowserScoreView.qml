@@ -16,7 +16,7 @@ Item {
     property var alphaTeamScore
     property var betaTeamScore
 
-    Label {
+    WswLabel {
         visible: !!alphaTeamList
         anchors.left: parent.left
         anchors.right: alphaScoreLabel.left
@@ -34,7 +34,7 @@ Item {
         font.pointSize: 16
     }
 
-    Label {
+    WswLabel {
         id: alphaScoreLabel
         width: implicitWidth
         anchors.right: parent.horizontalCenter
@@ -47,7 +47,7 @@ Item {
         transform: Scale { xScale: 1.0; yScale: 0.9 }
     }
 
-    Label {
+    WswLabel {
         id: betaScoreLabel
         width: implicitWidth
         anchors.left: parent.horizontalCenter
@@ -60,7 +60,7 @@ Item {
         transform: Scale { xScale: 1.0; yScale: 0.9 }
     }
 
-    Label {
+    WswLabel {
         visible: !!betaTeamList
         anchors.left: betaScoreLabel.left
         anchors.right: parent.right

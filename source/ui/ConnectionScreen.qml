@@ -95,7 +95,7 @@ Item {
                     }
                 }
 
-                Label {
+                WswLabel {
                     id: descLabel
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
@@ -103,8 +103,6 @@ Item {
                     maximumLineCount: 4
                     elide: Qt.ElideRight
                     lineHeight: 1.25
-                    font.pointSize: 13
-                    font.letterSpacing: 0.5
                     text: UI.ui.droppedConnectionMessage
                 }
 

@@ -40,14 +40,13 @@ Item {
             Qt.rgba(base.r, base.g, base.b, 0.3)
         }
 
-        Label {
+        WswLabel {
             id: addressLabel
             anchors.top: parent.top
             anchors.topMargin: 8
             anchors.right: parent.right
             anchors.rightMargin: 8
             text: address
-            font.pointSize: 11
             font.weight: Font.Bold
             font.underline: true
             color: addressLinkMouseArea.containsMouse ? Material.accent : Material.foreground
@@ -62,7 +61,7 @@ Item {
             }
         }
 
-        Label {
+        WswLabel {
             id: serverNameLabel
             width: header.width - addressLabel.implicitWidth - 24
             anchors.top: parent.top
@@ -72,8 +71,6 @@ Item {
             text: serverName
             textFormat: Text.StyledText
             font.family: UI.ui.headingFontFamily
-            font.pointSize: 12
-            font.letterSpacing: 0.5
             font.weight: Font.DemiBold
             wrapMode: Text.Wrap
             maximumLineCount: 1
@@ -87,40 +84,31 @@ Item {
             anchors.leftMargin: 8
             spacing: 8
 
-            Label {
+            WswLabel {
                 text: mapName
                 textFormat: Text.StyledText
-                font.pointSize: 11
-                font.letterSpacing: 0.5
                 font.weight: Font.DemiBold
             }
-            Label {
+            WswLabel {
                 text: "-"
-                font.pointSize: 11
                 font.weight: Font.Black
             }
-            Label {
+            WswLabel {
                 text: gametype
                 textFormat: Text.StyledText
-                font.pointSize: 11
-                font.letterSpacing: 0.5
                 font.weight: Font.DemiBold
             }
-            Label {
+            WswLabel {
                 text: "-"
-                font.pointSize: 11
                 font.weight: Font.Black
             }
-            Label {
+            WswLabel {
                 text: numPlayers + "/" + maxPlayers
-                font.pointSize: 12
                 color: numPlayers !== maxPlayers ? Material.foreground : "red"
                 font.weight: Font.Black
             }
-            Label {
+            WswLabel {
                 text: "players"
-                font.pointSize: 11
-                font.letterSpacing: 0.5
                 font.weight: Font.Bold
             }
         }

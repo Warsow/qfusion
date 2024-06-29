@@ -35,7 +35,7 @@ Item {
         font.family: Hud.ui.headingFontFamily
         font.weight: Font.Black
         font.letterSpacing: 1.25
-        font.pointSize: 13
+        font.pointSize: 14
         font.capitalization: Font.AllUppercase
         textFormat: Text.PlainText
         text: povDataModel.activeWeaponName

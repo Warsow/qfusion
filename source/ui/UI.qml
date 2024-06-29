@@ -27,12 +27,21 @@ QtObject {
     readonly property var scoreboardBetaModel: __scoreboardBetaModel
     readonly property var scoreboardMixedModel: __scoreboardMixedModel
 
+    readonly property real mainMenuButtonHeight: 46.0
+    readonly property real regularSlantedButtonHeight: 42.0
     readonly property real buttonBodySlantDegrees: 20.0
     readonly property real buttonTextSlantDegrees: 15.0
     readonly property real neutralCentralButtonWidth: 144 + 16 + 8
     readonly property real acceptOrRejectButtonWidth: 128 + 16
     readonly property real minAcceptRejectSpacing: 48
     readonly property real acceptRejectRowWidthFrac: 0.5
+
+    readonly property real settingsRowHeight: 44
+    readonly property real settingsRowSpacing: 48
+
+    readonly property real labelFontSize: 12
+    readonly property real labelLetterSpacing: 0.75
+    readonly property int labelFontWeight: Font.Normal
 
     function destroyLayer(layer) {
         if (layer) {

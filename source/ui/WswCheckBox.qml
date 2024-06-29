@@ -6,9 +6,10 @@ import net.warsow 2.6
 CheckBox {
     Material.theme: checked ? Material.Light : Material.Dark
     Component.onCompleted: {
-        contentItem.font.pointSize = 11
-        contentItem.font.letterSpacing = 0.5
-        contentItem.font.weight = Font.Medium
+        contentItem.font.pointSize     = UI.labelFontSize
+        contentItem.font.letterSpacing = UI.labelLetterSpacing
+        contentItem.font.weight        = UI.labelFontWeight
+        contentItem.color              = Material.foreground
     }
     onHoveredChanged: {
         if (hovered) {

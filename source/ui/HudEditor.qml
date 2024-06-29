@@ -88,7 +88,7 @@ Item {
             Label {
                 visible: model.displayedAnchors !== (HudLayoutModel.VCenter | HudLayoutModel.HCenter)
                 anchors.centerIn: parent
-                width: parent.width
+                width: parent.width - 16
                 horizontalAlignment: Qt.AlignHCenter
                 verticalAlignment: Qt.AlignVCenter
                 maximumLineCount: 2

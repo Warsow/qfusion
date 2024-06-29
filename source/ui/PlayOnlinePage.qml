@@ -40,21 +40,12 @@ Item {
             Material.theme: checked ? Material.Light : Material.Dark
             text: "Show full"
             onCheckedChanged: applyFilter()
-            // TODO: Lift the reusable component
-            Component.onCompleted: {
-                contentItem.font.pointSize = 12
-                contentItem.color = Material.foreground
-            }
         }
         WswCheckBox {
             id: emptyCheckBox
             Material.theme: checked ? Material.Light : Material.Dark
             text: "Show empty"
             onCheckedChanged: applyFilter()
-            Component.onCompleted: {
-                contentItem.font.pointSize = 12
-                contentItem.color = Material.foreground
-            }
         }
     }
 
@@ -135,9 +126,8 @@ Item {
                 id: progressBar
                 indeterminate: true
             }
-            Label {
+            WswLabel {
                 Layout.fillWidth: true
-                font.pointSize: 12
                 horizontalAlignment: Qt.AlignHCenter
                 text: "Discovering servers\u2026"
             }
@@ -153,9 +143,8 @@ Item {
             Behavior on opacity { NumberAnimation { duration: 500 } }
             spacing: 12
             width: 320
-            Label {
+            WswLabel {
                 Layout.fillWidth: true
-                font.pointSize: 12
                 horizontalAlignment: Qt.AlignHCenter
                 text: "No servers found"
             }

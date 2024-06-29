@@ -835,6 +835,7 @@ void QtUISystem::registerFonts() {
 #endif
 
 	QFont font( "Ubuntu", 12 );
+	font.setWeight( QFont::Normal );
 	font.setStyleStrategy( (QFont::StyleStrategy)( font.styleStrategy() | QFont::NoFontMerging ) );
 	QGuiApplication::setFont( font );
 }

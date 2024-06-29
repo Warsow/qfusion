@@ -54,10 +54,9 @@ Item {
             border.width: 1
             border.color: "orange"
 
-            Label {
+            WswLabel {
                 anchors.centerIn: parent
                 wrapMode: Text.NoWrap
-                font.pointSize: 12
                 text: underlying.materialName
             }
         }

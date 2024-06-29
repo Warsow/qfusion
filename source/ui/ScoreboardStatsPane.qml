@@ -22,7 +22,7 @@ Item {
         opacity: 0.5
     }
 
-    Label {
+    WswLabel {
         id: label
         anchors.top: parent.top
         anchors.topMargin: 8
@@ -30,7 +30,6 @@ Item {
         font.family: UI.ui.headingFontFamily
         font.capitalization: Font.AllUppercase
         font.letterSpacing: 1.0
-        font.pointSize: 12
         font.weight: Font.Bold
         text: "Accuracy"
         style: Text.Raised
@@ -57,24 +56,22 @@ Item {
                         width: nameLabel.implicitWidth + 8 + valuesLabel.implicitWidth
                         height: Math.max(nameLabel.implicitHeight, valuesLabel.implicitHeight)
                         readonly property var entry: accuracyModel[rowIndex * weaponsPerRow + index]
-                        Label {
+                        WswLabel {
                             id: nameLabel
                             anchors.left: parent.left
                             anchors.baseline: parent.bottom
                             font.family: UI.ui.regularFontFamily
-                            font.pointSize: 12
                             font.weight: Font.Bold
                             font.capitalization: Font.AllUppercase
                             font.letterSpacing: 1.25
                             color: UI.hudCommonDataModel.getWeaponColor(entry["weapon"])
                             text: UI.hudCommonDataModel.getWeaponShortName(entry["weapon"])
                         }
-                        Label {
+                        WswLabel {
                             id: valuesLabel
                             anchors.right: parent.right
                             anchors.baseline: parent.bottom
                             font.family: UI.ui.numbersFontFamily
-                            font.pointSize: 12
                             font.weight: Font.Bold
                             font.capitalization: Font.AllUppercase
                             font.letterSpacing: 1.25

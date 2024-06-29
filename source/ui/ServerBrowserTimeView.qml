@@ -10,7 +10,7 @@ Item {
     property var timeSeconds
     property var timeFlags
 
-    Label {
+    WswLabel {
         id: timeLabel
         visible: height > 0
         height: (typeof(timeFlags) !== "undefined" && !timeFlags) ? implicitHeight : 0
@@ -25,7 +25,7 @@ Item {
               (timeSeconds ? (timeSeconds < 10 ? "0" + timeSeconds : timeSeconds) : "00")
     }
 
-    Label {
+    WswLabel {
         id: timeFlagsLabel
         visible: height > 0
         height: text.length > 0 ? implicitHeight : 0

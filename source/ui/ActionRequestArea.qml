@@ -38,6 +38,7 @@ ListView {
             id: contentColumn
             anchors.centerIn: parent
             width: parent.width
+            // Caution, don't use WswLabel as it depends of the UI singleton which should not be used in the HUD Qml sandbox
             Label {
                 Layout.fillWidth: true
                 Layout.leftMargin: 12

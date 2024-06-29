@@ -41,7 +41,7 @@ Item {
                 Repeater {
                     model: activeItem.columns - 1
 
-                    delegate: Label {
+                    delegate: WswLabel {
                         id: title
                         readonly property int kind: UI.scoreboard.getColumnKind(index)
                         readonly property bool isTextual: kind == Scoreboard.Nickname || kind === Scoreboard.Clan
@@ -57,10 +57,8 @@ Item {
                         horizontalAlignment: isTextual ? Qt.AlignLeft : Qt.AlignHCenter
                         text: UI.scoreboard.getColumnTitle(index)
                         font.family: UI.ui.headingFontFamily
-                        font.pointSize: 12
                         font.weight: Font.Bold
                         font.capitalization: Font.AllUppercase
-                        font.letterSpacing: 0.75
                         style: Text.Raised
                     }
                 }

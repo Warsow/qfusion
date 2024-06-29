@@ -43,7 +43,7 @@ Item {
                 color: (index + (root.alignment === Qt.AlignLeft ? 0 : 1)) % 2 ? Qt.darker(backgroundColor, 1.1) : Qt.lighter(backgroundColor, 1.2)
                 opacity: 0.3
             }
-            Label {
+            WswLabel {
                 anchors.fill: parent
                 horizontalAlignment: root.alignment
                 verticalAlignment: Qt.AlignVCenter
@@ -54,7 +54,6 @@ Item {
                 elide: root.alignment === Qt.AlignLeft ? Text.ElideRight : Text.ElideLeft
                 font.weight: Font.Bold
                 font.letterSpacing: 1.5
-                font.pointSize: 12
                 style: Text.Raised
             }
         }
@@ -96,7 +95,7 @@ Item {
         opacity: 0.3
     }
 
-    Label {
+    WswLabel {
         anchors.top: stripe.bottom
         anchors.left: parent.left
         anchors.right: parent.right
@@ -112,7 +111,6 @@ Item {
         text: "(no players)"
         font.weight: Font.Bold
         font.letterSpacing: 1.5
-        font.pointSize: 12
         style: Text.Raised
     }
 }

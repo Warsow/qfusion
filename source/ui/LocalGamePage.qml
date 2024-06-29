@@ -5,7 +5,7 @@ import QtQuick.Layouts 1.12
 import net.warsow 2.6
 
 Item {
-    Label {
+    WswLabel {
         id: titleLabel
         anchors.left: parent.left
         anchors.right: parent.right
@@ -14,12 +14,10 @@ Item {
         anchors.bottomMargin: 32
         horizontalAlignment: Qt.AlignHCenter
         font.weight: Font.Medium
-        font.pointSize: 12
-        font.letterSpacing: 1
         text: swipeView.currentItem.subpageTitle
     }
 
-    Label {
+    WswLabel {
         id: summaryLabel
         anchors.top: titleLabel.bottom
         anchors.topMargin: 20
@@ -28,8 +26,6 @@ Item {
         width: parent.width
         maximumLineCount: 1
         elide: Qt.ElideRight
-        font.pointSize: 12
-        font.letterSpacing: 1
         text: {
             if (swipeView.currentIndex === 2) {
                 "You have selected map <b>" + selectedMapName +
@@ -112,7 +108,7 @@ Item {
 
             detailComponent: ColumnLayout {
                 spacing: 12
-                Label {
+                WswLabel {
                     Layout.preferredWidth: gametypePage.expectedDetailsWidth
                     horizontalAlignment: Qt.AlignHCenter
                     font.weight: Font.Medium
@@ -126,16 +122,13 @@ Item {
                     Layout.preferredHeight: gametypePage.expectedDetailsWidth * (9 / 16.0)
                     filePath: "videos/gametypes/" + selectedGametypeName + ".mpeg"
                 }
-                Label {
+                WswLabel {
                     Layout.preferredWidth: gametypePage.expectedDetailsWidth - 16
                     Layout.alignment: Qt.AlignHCenter
                     horizontalAlignment: Qt.AlignJustify
                     maximumLineCount: 99
                     wrapMode: Text.WordWrap
                     elide: Qt.ElideRight
-                    font.weight: Font.Normal
-                    font.pointSize: 12
-                    font.letterSpacing: 1
                     text: selectedGametypeDesc || ""
                 }
             }
@@ -185,7 +178,7 @@ Item {
 
             detailComponent: ColumnLayout {
                 spacing: 8
-                Label {
+                WswLabel {
                     Layout.preferredWidth: gametypePage.expectedDetailsWidth
                     horizontalAlignment: Qt.AlignHCenter
                     font.weight: Font.Medium
@@ -194,11 +187,10 @@ Item {
                     font.letterSpacing: 2
                     text: selectedMapTitle || ""
                 }
-                Label {
+                WswLabel {
                     Layout.preferredWidth: gametypePage.expectedDetailsWidth
                     horizontalAlignment: Qt.AlignHCenter
                     font.weight: Font.Medium
-                    font.pointSize: 12
                     font.letterSpacing: 1
                     text: selectedMapName || ""
                 }
@@ -207,13 +199,12 @@ Item {
                     Layout.preferredHeight: gametypePage.expectedDetailsWidth * (9 / 16.0)
                     filePath: "videos/maps/" + selectedMapName + ".mpeg"
                 }
-                Label {
+                WswLabel {
                     Layout.fillWidth: true
                     visible: !!(selectedMapMinPlayers || selectedMapMaxPlayers)
                     horizontalAlignment: Qt.AlignHCenter
                     font.letterSpacing: 1
                     font.weight: Font.Medium
-                    font.pointSize: 12
                     text: {
                         if (selectedMapMinPlayers != selectedMapMaxPlayers) {
                             "Optimal for <b>" + selectedMapMinPlayers + "-" + selectedMapMaxPlayers + "</b> players"
@@ -247,53 +238,44 @@ Item {
                 }
             }
 
-            GridLayout {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.verticalCenter: parent.verticalCenter
-                columns: 2
-                columnSpacing: 32
+            ColumnLayout {
+                anchors.centerIn: parent
+                width: parent.width
 
-                Label {
-                    font.weight: Font.Medium
-                    font.pointSize: 12
-                    font.letterSpacing: 0.75
+                // OK, this is no longer a "Settings" row
+                SettingsRow {
                     text: "Instagib"
-                }
-                WswCheckBox {
-                    id: instaCheckBox
-                    Material.theme: checked ? Material.Light : Material.Dark
-                    onCheckedChanged: selectedInsta = checked
-                }
-
-                Label {
-                    font.weight: Font.Medium
-                    font.pointSize: 12
-                    font.letterSpacing: 0.75
-                    text: "Public"
-                }
-                WswCheckBox {
-                    id: publicCheckBox
-                    Material.theme: checked ? Material.Light : Material.Dark
-                    onCheckedChanged: selectedPublic = checked
+                    WswCheckBox {
+                        id: instaCheckBox
+                        Material.theme: checked ? Material.Light : Material.Dark
+                        onCheckedChanged: selectedInsta = checked
+                    }
                 }
 
-                Label {
+                SettingsRow {
+                    text: "Public (people are allowed to connect)"
+                    WswCheckBox {
+                        id: publicCheckBox
+                        Material.theme: checked ? Material.Light : Material.Dark
+                        onCheckedChanged: selectedPublic = checked
+                    }
+                }
+
+                SettingsRow {
                     visible: rulesPage.isNumBotsDefined
-                    font.weight: Font.Medium
-                    font.pointSize: 12
-                    font.letterSpacing: 0.75
                     text: "Number of bots"
-                }
-                SpinBox {
-                    id: numBotsSpinBox
-                    visible: rulesPage.isNumBotsDefined
-                    enabled: !rulesPage.isNumBotsFixed
-                    Layout.preferredWidth: 112
-                    Material.theme: activeFocus ? Material.Light : Material.Dark
-                    from: 0; to: 9
-                    onValueChanged: {
-                        if (selectedNumBots != value) {
-                            selectedNumBots = value
+                    SpinBox {
+                        id: numBotsSpinBox
+                        visible: rulesPage.isNumBotsDefined
+                        enabled: !rulesPage.isNumBotsFixed
+                        Material.theme: activeFocus ? Material.Light : Material.Dark
+                        from: 0; to: 9
+                        implicitWidth: 144
+                        onValueModified: {
+                            UI.ui.playSwitchSound()
+                            if (selectedNumBots != value) {
+                                selectedNumBots = value
+                            }
                         }
                     }
                 }

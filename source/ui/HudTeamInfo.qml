@@ -74,32 +74,27 @@ Item {
                     mipmap: true
                     source: weaponIconPath
                 }
-                Label {
+                HudLabel {
                     Layout.preferredWidth: 32
                     horizontalAlignment: Qt.AlignRight
                     font.family: Hud.ui.numbersFontFamily
                     font.weight: Font.ExtraBold
-                    font.pointSize: 12
-                    font.letterSpacing: 0.5
                     style: Text.Raised
                     textFormat: Text.PlainText
                     text: health
                 }
-                Label {
+                HudLabel {
                     font.family: Hud.ui.numbersFontFamily
                     font.weight: Font.ExtraBold
-                    font.pointSize: 12
                     style: Text.Raised
                     textFormat: Text.PlainText
                     text: "|"
                 }
-                Label {
+                HudLabel {
                     Layout.preferredWidth: 32
                     horizontalAlignment: Qt.AlignLeft
                     font.family: Hud.ui.numbersFontFamily
                     font.weight: Font.ExtraBold
-                    font.pointSize: 12
-                    font.letterSpacing: 0.5
                     style: Text.Raised
                     textFormat: Text.PlainText
                     text: armor
@@ -132,13 +127,11 @@ Item {
                         }
                     }
                 }
-                Label {
+                HudLabel {
                     Layout.fillWidth: true
                     Layout.preferredWidth: 1.00
                     horizontalAlignment: Qt.AlignHCenter
                     font.weight: Font.ExtraBold
-                    font.pointSize: 12
-                    font.letterSpacing: 1
                     style: Text.Raised
                     textFormat: Text.StyledText
                     text: nickname

@@ -47,7 +47,7 @@ Item {
         onEditingFinished: submitQuery(text)
     }
 
-    Label {
+    WswLabel {
         anchors.left: queryField.right
         anchors.verticalCenter: queryField.verticalCenter
         font.family: UI.ui.emojiFontFamily
@@ -55,10 +55,9 @@ Item {
         visible: !queryField.text.length
     }
 
-    Label {
+    WswLabel {
         anchors.centerIn: parent
         text: "Nothing found"
-        font.pointSize: 11
         visible: UI.demosResolver.isReady && !listView.count
     }
 
@@ -94,42 +93,37 @@ Item {
         height: visible ? implicitHeight : 0
         spacing: rowSpacing / 2
 
-        Label {
+        WswLabel {
             id: demoHeading
             Layout.fillWidth: true
             Layout.preferredWidth: demoNameWeight
             horizontalAlignment: Qt.AlignLeft
-            font.pointSize: 11
             font.weight: Font.Bold
             text: "Name"
         }
-        Label {
+        WswLabel {
             id: serverHeading
             Layout.fillWidth: true
             Layout.preferredWidth: serverNameWeight
             horizontalAlignment: Qt.AlignHCenter
-            font.pointSize: 11
             font.weight: Font.Bold
             text: "Server"
         }
-        Label {
+        WswLabel {
             Layout.preferredWidth: mapColumnWidth
             horizontalAlignment: Qt.AlignHCenter
-            font.pointSize: 11
             font.weight: Font.Bold
             text: "Map"
         }
-        Label {
+        WswLabel {
             Layout.preferredWidth: gametypeColumnWidth
             horizontalAlignment: Qt.AlignHCenter
-            font.pointSize: 11
             font.weight: Font.Bold
             text: "Gametype"
         }
-        Label {
+        WswLabel {
             Layout.preferredWidth: timestampColumnWidth
             horizontalAlignment: Qt.AlignRight
-            font.pointSize: 11
             font.weight: Font.Bold
             text: "Timestamp"
         }
@@ -217,32 +211,25 @@ Item {
                 anchors.bottomMargin: 24
                 width: parent.width
                 spacing: 8
-                Label {
+                WswLabel {
                     width: parent.width
                     horizontalAlignment: Qt.AlignHCenter
                     font.capitalization: Font.AllUppercase
-                    font.pointSize: 12
-                    font.weight: Font.Medium
-                    font.letterSpacing: 1.0
+                    font.weight: Font.Bold
                     elide: Text.ElideMiddle
                     text: selectedDemoName
                 }
-                Label {
+                WswLabel {
                     width: parent.width
                     horizontalAlignment: Qt.AlignHCenter
-                    font.pointSize: 12
-                    font.weight: Font.Medium
-                    font.letterSpacing: 0.5
                     elide: Text.ElideMiddle
                     text: selectedServerName
                 }
-                Label {
+                WswLabel {
                     visible: selectedTags && selectedTags.length > 0
                     width: parent.width
                     horizontalAlignment: Qt.AlignHCenter
-                    font.pointSize: 12
                     font.weight: Font.Normal
-                    font.letterSpacing: 1.0
                     elide: Text.ElideMiddle
                     text: "<b>Tags</b>: " + selectedTags
                 }
@@ -260,22 +247,18 @@ Item {
                 opacity: 0.5
             }
 
-            Label {
+            WswLabel {
                 anchors.top: parent.bottom
                 anchors.left: parent.left
                 anchors.topMargin: 16
-                font.pointSize: 11
-                font.weight: Font.Medium
                 text: selectedMapName + " " + selectedGametype
             }
 
-            Label {
+            WswLabel {
                 id: timestampLabel
                 anchors.top: parent.bottom
                 anchors.right: parent.right
                 anchors.topMargin: 16
-                font.pointSize: 11
-                font.weight: Font.Medium
                 text: selectedTimestamp
             }
 

@@ -11,7 +11,7 @@ Item {
 
     readonly property real listItemWidth: 300
 
-    Label {
+    WswLabel {
         id: titleLabel
         anchors.left: parent.left
         anchors.right: parent.right
@@ -20,12 +20,10 @@ Item {
         anchors.bottomMargin: 32
         horizontalAlignment: Qt.AlignHCenter
         font.weight: Font.Medium
-        font.pointSize: 12
-        font.letterSpacing: 1
         text: "Step <b>" + (stackView.currentItem.stageIndex + 1) + "/4</b> - " + stackView.currentItem.subpageTitle
     }
 
-    Label {
+    WswLabel {
         id: summaryLabel
         anchors.top: titleLabel.bottom
         anchors.topMargin: 20
@@ -34,8 +32,6 @@ Item {
         width: parent.width
         maximumLineCount: 1
         elide: Qt.ElideRight
-        font.pointSize: 12
-        font.letterSpacing: 1
         text: stackView.currentItem.summary
     }
 

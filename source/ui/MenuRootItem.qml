@@ -89,11 +89,6 @@ Item {
         visible: isBlurringBackground && !isBlurringLimitedToRect
         hoverEnabled: true
         anchors.fill: parent
-
-        Rectangle {
-            anchors.fill: parent
-            color: "#3A885500"
-        }
     }
 
     function setOrUpdatePopupMode(limitToItem) {

@@ -64,7 +64,8 @@ Item {
                 anchors.rightMargin: 12
 
                 font.weight: Font.Medium
-                font.pointSize: 12
+                font.pointSize: Hud.labelFontSize
+                font.letterSpacing: Hud.labelLetterSpacing
 
                 Component.onCompleted: forceActiveFocus()
 
@@ -96,22 +97,18 @@ Item {
 
                 delegate: RowLayout {
                     width: parent.width
-                    Label {
+                    HudLabel {
                         Layout.alignment: Qt.AlignTop
                         Layout.rightMargin: 2
-                        font.pointSize: 12
                         font.weight: Font.Black
-                        font.letterSpacing: 0.5
                         textFormat: Text.StyledText
                         style: Text.Raised
                         text: model.name + ':'
                     }
-                    Label {
+                    HudLabel {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
-                        font.pointSize: 12
                         font.weight: Font.Medium
-                        font.letterSpacing: 0.5
                         textFormat: Text.StyledText
                         clip: true
                         text: model.text

@@ -12,6 +12,10 @@ Item {
     property string cvarName: ""
     property bool applyImmediately: true
 
+    // For embedding in SettingsRow
+    readonly property real leftPadding: 0.0
+    readonly property real rightPadding: 0.0
+
     QtObject {
         id: impl
         property bool suppressSignals: true

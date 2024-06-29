@@ -27,7 +27,7 @@ Item {
         (mouseArea.containsMouse || externallyHighlighted)
 
     property bool isASpecialGlyph: (root.text.length === 1 && root.text.charCodeAt(0) > 127)
-    property real fontPointSize: 11
+    property real fontPointSize: UI.labelFontSize
 
     readonly property color highlightColor: UI.keysAndBindings.colorForGroup(root.group)
     readonly property color highlightBackground: Qt.rgba(highlightColor.r, highlightColor.g, highlightColor.b, 0.075)
@@ -118,6 +118,7 @@ Item {
             text: !root.hidden ? root.text : ""
             font.family: root.isASpecialGlyph ? UI.ui.symbolsFontFamily : UI.ui.regularFontFamily
             font.pointSize: root.fontPointSize
+            font.letterSpacing: UI.labelLetterSpacing
             font.weight: Font.Medium
             color: Material.foreground
         }

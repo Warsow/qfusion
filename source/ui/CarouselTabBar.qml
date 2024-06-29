@@ -40,9 +40,9 @@ PathView {
         checked: PathView.isCurrentItem
 
         font.weight: PathView.isCurrentItem ? Font.Black : Font.ExtraBold
-        font.pointSize: PathView.isCurrentItem ? 12.5 : 11
+        font.pointSize: PathView.isCurrentItem ? UI.labelFontSize + 1 : UI.labelFontSize
         Behavior on font.pointSize { SmoothedAnimation { duration: 250 } }
-        font.letterSpacing: PathView.isCurrentItem ? 1.75 : 1.25
+        font.letterSpacing: PathView.isCurrentItem ? 2.0 : 1.25
         Behavior on font.letterSpacing { SmoothedAnimation { duration: 250 } }
 
         Component.onCompleted: {
