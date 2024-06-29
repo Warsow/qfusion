@@ -5,7 +5,7 @@ import net.warsow 2.6
 
 InGameCallvoteScalarSelector {
     currentValue: selectedVoteCurrent
-    delegate: WswTextField {
+    delegate: UITextField {
         id: textField
         horizontalAlignment: Qt.AlignHCenter
         Material.theme: activeFocus ? Material.Light : Material.Dark

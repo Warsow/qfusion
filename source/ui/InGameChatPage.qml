@@ -86,8 +86,8 @@ Item {
             selectByMouse: false
             selectByKeyboard: false
             wrapMode: TextEdit.Wrap
-            font.letterSpacing: 1.2
-            font.pointSize: 12
+            font.letterSpacing: UI.labelLetterSpacing
+            font.pointSize: UI.labelFontSize
             Material.theme: (activeFocus || text.length > 0) ? Material.Light : Material.Dark
             placeholderText: activeFocus ? "" : "\u2026"
 

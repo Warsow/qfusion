@@ -10,15 +10,19 @@ QtObject {
     readonly property var chatProxy: __chatProxy
     readonly property var teamChatProxy: __teamChatProxy
 
-    readonly property var elementMargin: 16
-    readonly property var elementRadius: 6
-    readonly property var elementElevation: 16
-    readonly property var elementBackgroundColor: Qt.rgba(0.0, 0.0, 0.0, 0.7)
-    readonly property var miniviewItemWidth: 240
-    readonly property var miniviewItemHeight: 160
-    readonly property var miniviewBorderWidth: 4
-    readonly property var teamScoreHeight: 80
-    readonly property var valueBarWidth: 256 + 64 + 16
+    readonly property real elementMargin: 16
+    readonly property real elementRadius: 6
+    readonly property real elementElevation: 16
+    readonly property color elementBackgroundColor: Qt.rgba(0.0, 0.0, 0.0, 0.7)
+    readonly property real miniviewItemWidth: 240
+    readonly property real miniviewItemHeight: 160
+    readonly property real miniviewBorderWidth: 4
+    readonly property real teamScoreHeight: 80
+    readonly property real valueBarWidth: 256 + 64 + 32 + 16
+
+    readonly property real labelFontSize: 13
+    readonly property real labelLetterSpacing: 0.75
+    readonly property int labelFontWeight: Font.Normal
 
     function destroyLayer(layer) {
         if (layer) {

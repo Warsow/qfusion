@@ -3,7 +3,7 @@ import QtQuick.Controls 2.12
 import QtQuick.Controls.Material 2.12
 import net.warsow 2.6
 
-WswTextField {
+UITextField {
     id: root
 
     Material.theme: Material.Dark

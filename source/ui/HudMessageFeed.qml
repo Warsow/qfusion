@@ -52,14 +52,12 @@ Item {
         width: parent.width - 20
         height: contentHeight
         spacing: 3
-        delegate: Label {
+        delegate: HudLabel {
             id: listDelegate
             width: list.width
             horizontalAlignment: Qt.AlignLeft
             elide: Text.ElideRight
             maximumLineCount: 1
-            font.pointSize: 12
-            font.letterSpacing: 1
             font.weight: Font.DemiBold
             textFormat: Text.StyledText
             style: Text.Raised

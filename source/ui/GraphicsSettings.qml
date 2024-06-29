@@ -84,16 +84,12 @@ Flickable {
         }
 
         SettingsRow {
-            Layout.topMargin: 12
-            Layout.bottomMargin: 12
             enabled: drawFlatCheckBox.checked
             text: "Wall color"
             CVarAwareColorPicker { cvarName: "r_wallcolor" }
         }
 
         SettingsRow {
-            Layout.topMargin: 12
-            Layout.bottomMargin: 12
             enabled: drawFlatCheckBox.checked
             text: "Floor color"
             CVarAwareColorPicker { cvarName: "r_floorcolor" }

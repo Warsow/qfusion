@@ -17,6 +17,13 @@ ComboBox {
 
     background.opacity: 0.67
 
+    font.pointSize: UI.labelFontSize
+    font.weight: UI.labelFontWeight
+    font.letterSpacing: UI.labelLetterSpacing
+
+    Material.theme: Material.Dark
+    Material.accent: "orange"
+
     onHoveredChanged: {
         if (hovered) {
             UI.ui.playHoverSound()
@@ -35,6 +42,11 @@ ComboBox {
         Material.foreground: root.currentIndex === index ? root.contentItem.Material.accent : root.contentItem.Material.foreground
         highlighted: root.highlightedIndex === index
         hoverEnabled: root.hoverEnabled
+        Component.onCompleted: {
+            contentItem.font.pointSize     = UI.labelFontSize
+            contentItem.font.letterSpacing = UI.labelLetterSpacing
+            contentItem.font.weight        = UI.labelFontWeight
+        }
         onHoveredChanged: {
             if (hovered) {
                 UI.ui.playHoverSound()
@@ -116,7 +128,10 @@ ComboBox {
         font: root.font
     }
 
-    onModelChanged: {
+    onModelChanged: updateSize()
+    Component.onCompleted: updateSize()
+
+    function updateSize() {
         let desiredWidth = root.minimumWidth
         // https://stackoverflow.com/a/45049993
         for (let i = 0; i < model.length; i++){
@@ -124,8 +139,8 @@ ComboBox {
             desiredWidth     = Math.max(textMetrics.width, desiredWidth)
         }
         if (desiredWidth) {
-            root.implicitWidth          = 56 + desiredWidth
-            const menuItemWidth         = 48 + desiredWidth;
+            root.implicitWidth          = 72 + desiredWidth
+            const menuItemWidth         = 56 + desiredWidth;
             // TODO: Use something more sophisticated
             const numColumns            = (model.length <= 5) ? 1 : 2
             popup.width                 = numColumns * (menuItemWidth + popup.padding) + 1

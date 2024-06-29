@@ -39,7 +39,7 @@ FocusScope {
         }
     }
 
-    WswTextField {
+    UITextField {
         id: textField
         Material.theme: activeFocus ? Material.Light : Material.Dark
         visible: false
@@ -48,8 +48,8 @@ FocusScope {
         width: 0
         Behavior on width { SmoothedAnimation { duration: 100 } }
         font.weight: Font.Bold
-        font.pointSize: 12
-        font.letterSpacing: 1.25
+        font.pointSize: UI.labelFontSize
+        font.letterSpacing: UI.labelLetterSpacing
         font.capitalization: Font.AllUppercase
         maximumLength: root.maxHudNameLength
         validator: RegExpValidator { regExp: /[0-9a-zA-Z_]+/ }

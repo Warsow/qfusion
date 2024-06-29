@@ -95,20 +95,18 @@ Item {
                     }
                 }
 
-                Label {
+                UILabel {
                     id: descLabel
-                    Layout.fillWidth: true
+                    Layout.preferredWidth: UI.desiredPopupContentWidth
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
-                    maximumLineCount: 4
+                    maximumLineCount: 5
                     elide: Qt.ElideRight
                     lineHeight: 1.25
-                    font.pointSize: 13
-                    font.letterSpacing: 0.5
                     text: UI.ui.droppedConnectionMessage
                 }
 
-                WswTextField {
+                UITextField {
                     id: passwordInput
                     Layout.alignment: Qt.AlignHCenter
                     visible: UI.ui.reconnectBehaviour === UISystem.RequestPassword

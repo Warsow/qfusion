@@ -57,10 +57,10 @@ Item {
                         horizontalAlignment: isTextual ? Qt.AlignLeft : Qt.AlignHCenter
                         text: UI.scoreboard.getColumnTitle(index)
                         font.family: UI.ui.headingFontFamily
-                        font.pointSize: 12
                         font.weight: Font.Bold
                         font.capitalization: Font.AllUppercase
-                        font.letterSpacing: 0.75
+                        font.pointSize: UI.scoreboardFontSize
+                        font.letterSpacing: UI.scoreboardLetterSpacing
                         style: Text.Raised
                     }
                 }

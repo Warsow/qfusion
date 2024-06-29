@@ -20,9 +20,8 @@ ColumnLayout {
         Layout.fillWidth: true
         Layout.preferredHeight: 48
         color: Qt.rgba(colorPicker.selectedColor.r, colorPicker.selectedColor.g, colorPicker.selectedColor.b, 0.3)
-        Label {
+        UILabel {
             anchors.centerIn: parent
-            font.pointSize: 12
             font.capitalization: Font.AllUppercase
             font.weight: Font.Black
             font.letterSpacing: 1

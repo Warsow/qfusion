@@ -49,14 +49,14 @@ Item {
             mipmap: true
             opacity: isMiniview ? 0.5 : 0.85
         }
-        Label {
+        HudLabel {
             Layout.preferredWidth: implicitWidth
             Layout.preferredHeight: implicitHeight
             Layout.alignment: Qt.AlignVCenter
             text: povDataModel.nickname
             font.family: isMiniview ? Hud.ui.regularFontFamily : Hud.ui.headingFontFamily
-            font.weight: isMiniview ? Font.Medium : Font.ExtraBold
-            font.pointSize: isMiniview ? 11 : 20
+            font.weight: isMiniview ? Font.Bold : Font.ExtraBold
+            font.pointSize: isMiniview ? Hud.labelFontSize : 20
             font.letterSpacing: 1
             style: Text.Raised
             opacity: isMiniview ? 1.0 : 0.85

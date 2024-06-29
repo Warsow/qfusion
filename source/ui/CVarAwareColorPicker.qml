@@ -15,6 +15,10 @@ RowLayout {
 
     readonly property color selectedColor: impl.selectedColor
 
+    // For embedding in SettingsRow
+    readonly property real leftPadding: 0.0
+    readonly property real rightPadding: 0.0
+
     QtObject {
         id: impl
 
@@ -294,7 +298,7 @@ RowLayout {
                     font.weight: Font.Medium
                     style: Text.Raised
                 }
-                WswSlider {
+                UISlider {
                     id: rSlider
                     Layout.fillHeight: true
                     Layout.fillWidth: true
@@ -314,7 +318,7 @@ RowLayout {
                     font.weight: Font.Medium
                     style: Text.Raised
                 }
-                WswSlider {
+                UISlider {
                     id: gSlider
                     Layout.fillHeight: true
                     Layout.fillWidth: true
@@ -333,7 +337,7 @@ RowLayout {
                     font.weight: Font.Medium
                     style: Text.Raised
                 }
-                WswSlider {
+                UISlider {
                     id: bSlider
                     Layout.fillHeight: true
                     Layout.fillWidth: true

@@ -73,7 +73,7 @@ MouseArea {
         }
     }
 
-    Label {
+    UILabel {
         id: bindMarker
         visible: !isBound && containsMouse && mouseX < 16
         anchors {
@@ -86,12 +86,11 @@ MouseArea {
                 UI.ui.playHoverSound()
             }
         }
-        font.pointSize: 12
         font.weight: Font.Medium
         text: "+"
     }
 
-    Label {
+    UILabel {
         id: label
         text: root.text
         color: highlighted ? highlightColor : Material.foreground

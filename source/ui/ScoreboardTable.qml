@@ -25,7 +25,7 @@ TableView {
     property real nameCellWidth
     property real clanCellWidth
 
-    readonly property real rowHeight: 36
+    readonly property real rowHeight: 40
 
     function getCellColor(row, column, tableStyle) {
         let c = baseColor
@@ -87,14 +87,14 @@ TableView {
             verticalAlignment: Qt.AlignVCenter
             horizontalAlignment: isColumnTextual ? Qt.AlignLeft : Qt.AlignHCenter
             padding: 4
-            leftPadding: isPovNickname ? 12 : 4
+            leftPadding: isPovNickname ? 12 : 6
             text: value
             textFormat: Text.StyledText
             font.family: ((kind !== Scoreboard.Glyph && kind !== Scoreboard.Status) || value < 256) ?
                 UI.ui.regularFontFamily : UI.ui.symbolsFontFamily
             font.weight: Font.Bold
-            font.pointSize: 12
-            font.letterSpacing: 1
+            font.pointSize: UI.scoreboardFontSize
+            font.letterSpacing: UI.scoreboardLetterSpacing
             font.strikeout: isGhosting && isColumnTextual
             style: Text.Raised
         }

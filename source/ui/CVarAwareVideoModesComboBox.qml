@@ -6,9 +6,6 @@ import net.warsow 2.6
 AutoFittingComboBox {
     id: root
 
-    Material.theme: Material.Dark
-    Material.accent: "orange"
-
     model: impl.headings
 
     QtObject {

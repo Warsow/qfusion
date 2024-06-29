@@ -19,7 +19,7 @@ MouseArea {
         }
     }
 
-    Label {
+    UILabel {
         id: label
         text: root.text
         anchors.right: undefined
@@ -27,7 +27,6 @@ MouseArea {
 
         color: (root.containsMouse || root.selected) ? Material.accent : Material.foreground
         font.weight: Font.Bold
-        font.pointSize: 13
         font.letterSpacing: (root.containsMouse || root.selected) ? 1.75 : 1.25
         font.capitalization: Font.AllUppercase
 

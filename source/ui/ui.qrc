@@ -33,6 +33,7 @@
         <file>HudEditorWizard.qml</file>
         <file>HudLayoutItem.qml</file>
         <file>HudFragsFeed.qml</file>
+        <file>HudLabel.qml</file>
         <file>HudSettings.qml</file>
         <file>HudStatusMessage.qml</file>
         <file>HudInventoryBar.qml</file>
@@ -99,7 +100,6 @@
         <file>ServerBrowserSpecsList.qml</file>
         <file>ServerBrowserTimeView.qml</file>
         <file>SettingsGroupHeaderRow.qml</file>
-        <file>SettingsLabel.qml</file>
         <file>SettingsPage.qml</file>
         <file>SettingsRow.qml</file>
         <file>SimpleVideoDecoration.qml</file>
@@ -112,9 +112,11 @@
         <file>TeamsSettings.qml</file>
         <file>TeamSettingsTeamColumn.qml</file>
         <file>TeamSelectionTeamPane.qml</file>
-        <file>WswCheckBox.qml</file>
-        <file>WswSlider.qml</file>
-        <file>WswTextField.qml</file>
+        <file>UICheckBox.qml</file>
+        <file>UILabel.qml</file>
+        <file>UISlider.qml</file>
+        <file>UITextField.qml</file>
+        <file>UISpinBox.qml</file>
         <file>UI.qml</file>
         <file>Hud.qml</file>
         <file>qmldir</file>

@@ -24,14 +24,15 @@ RowLayout {
         Layout.alignment: Qt.AlignTop
         spacing: 16
 
-        Label {
+        UILabel {
             Layout.alignment: Qt.AlignHCenter
             text: "Movement"
+            font.weight: Font.Medium
             font.capitalization: Font.AllUppercase
         }
 
         Rectangle {
-            height: 3; width: movementColumn.width
+            height: 4; width: movementColumn.width
             color: movementGroupColor
         }
 
@@ -52,14 +53,15 @@ RowLayout {
         Layout.alignment: Qt.AlignTop
         spacing: 16
 
-        Label {
+        UILabel {
             Layout.alignment: Qt.AlignHCenter
             text: "Weapons"
+            font.weight: Font.Medium
             font.capitalization: Font.AllUppercase
         }
 
         Rectangle {
-            height: 3; width: weaponColumnsRow.width
+            height: 4; width: weaponColumnsRow.width
             color: weaponGroupColor
         }
 
@@ -94,14 +96,15 @@ RowLayout {
         Layout.alignment: Qt.AlignTop
         spacing: 16
 
-        Label {
+        UILabel {
             Layout.alignment: Qt.AlignHCenter
             text: "Actions"
+            font.weight: Font.Medium
             font.capitalization: Font.AllUppercase
         }
 
         Rectangle {
-            height: 3; width: actionsColumn.width
+            height: 4; width: actionsColumn.width
             color: actionGroupColor
         }
 
@@ -122,14 +125,15 @@ RowLayout {
         Layout.alignment: Qt.AlignTop
         spacing: 16
 
-        Label {
+        UILabel {
             Layout.alignment: Qt.AlignHCenter
             text: "R&S Tokens"
+            font.weight: Font.Medium
             font.capitalization: Font.AllUppercase
         }
 
         Rectangle {
-            height: 3; width: respectColumnsRow.width
+            height: 4; width: respectColumnsRow.width
             color: respectGroupColor
         }
 

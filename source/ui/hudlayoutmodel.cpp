@@ -820,11 +820,11 @@ const HudLayoutModel::EditorProps HudLayoutModel::kEditorPropsForKind[] {
 		.color = QColor::fromRgbF( 0.4, 0.8, 0.4 ), .allowInMiniviewHud = true,
 	},
 	EditorProps {
-		.name = "Miniview pane 1"_asView, .kind = MiniviewPane1, .size = QSize( 128, 128 ),
+		.name = "Miniview\npane 1"_asView, .kind = MiniviewPane1, .size = QSize( 128, 128 ),
 		.color = QColor::fromRgbF( 0.5, 1.0, 0.6 ), .allowInMiniviewHud = false,
 	},
 	EditorProps {
-		.name = "Miniview pane 2"_asView, .kind = MiniviewPane2, .size = QSize( 128, 128 ),
+		.name = "Miniview\npane 2"_asView, .kind = MiniviewPane2, .size = QSize( 128, 128 ),
 		.color = QColor::fromRgbF( 0.5, 1.0, 0.6 ), .allowInMiniviewHud = false,
 	}
 };

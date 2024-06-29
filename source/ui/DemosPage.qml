@@ -32,7 +32,7 @@ Item {
 
     Component.onCompleted: UI.demosResolver.reload()
 
-    WswTextField {
+    UITextField {
         id: queryField
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
@@ -47,7 +47,7 @@ Item {
         onEditingFinished: submitQuery(text)
     }
 
-    Label {
+    UILabel {
         anchors.left: queryField.right
         anchors.verticalCenter: queryField.verticalCenter
         font.family: UI.ui.emojiFontFamily
@@ -55,10 +55,9 @@ Item {
         visible: !queryField.text.length
     }
 
-    Label {
+    UILabel {
         anchors.centerIn: parent
         text: "Nothing found"
-        font.pointSize: 11
         visible: UI.demosResolver.isReady && !listView.count
     }
 
@@ -94,42 +93,37 @@ Item {
         height: visible ? implicitHeight : 0
         spacing: rowSpacing / 2
 
-        Label {
+        UILabel {
             id: demoHeading
             Layout.fillWidth: true
             Layout.preferredWidth: demoNameWeight
             horizontalAlignment: Qt.AlignLeft
-            font.pointSize: 11
             font.weight: Font.Bold
             text: "Name"
         }
-        Label {
+        UILabel {
             id: serverHeading
             Layout.fillWidth: true
             Layout.preferredWidth: serverNameWeight
             horizontalAlignment: Qt.AlignHCenter
-            font.pointSize: 11
             font.weight: Font.Bold
             text: "Server"
         }
-        Label {
+        UILabel {
             Layout.preferredWidth: mapColumnWidth
             horizontalAlignment: Qt.AlignHCenter
-            font.pointSize: 11
             font.weight: Font.Bold
             text: "Map"
         }
-        Label {
+        UILabel {
             Layout.preferredWidth: gametypeColumnWidth
             horizontalAlignment: Qt.AlignHCenter
-            font.pointSize: 11
             font.weight: Font.Bold
             text: "Gametype"
         }
-        Label {
+        UILabel {
             Layout.preferredWidth: timestampColumnWidth
             horizontalAlignment: Qt.AlignRight
-            font.pointSize: 11
             font.weight: Font.Bold
             text: "Timestamp"
         }
@@ -217,32 +211,25 @@ Item {
                 anchors.bottomMargin: 24
                 width: parent.width
                 spacing: 8
-                Label {
+                UILabel {
                     width: parent.width
                     horizontalAlignment: Qt.AlignHCenter
                     font.capitalization: Font.AllUppercase
-                    font.pointSize: 12
-                    font.weight: Font.Medium
-                    font.letterSpacing: 1.0
+                    font.weight: Font.Bold
                     elide: Text.ElideMiddle
                     text: selectedDemoName
                 }
-                Label {
+                UILabel {
                     width: parent.width
                     horizontalAlignment: Qt.AlignHCenter
-                    font.pointSize: 12
-                    font.weight: Font.Medium
-                    font.letterSpacing: 0.5
                     elide: Text.ElideMiddle
                     text: selectedServerName
                 }
-                Label {
+                UILabel {
                     visible: selectedTags && selectedTags.length > 0
                     width: parent.width
                     horizontalAlignment: Qt.AlignHCenter
-                    font.pointSize: 12
                     font.weight: Font.Normal
-                    font.letterSpacing: 1.0
                     elide: Text.ElideMiddle
                     text: "<b>Tags</b>: " + selectedTags
                 }
@@ -260,41 +247,31 @@ Item {
                 opacity: 0.5
             }
 
-            Label {
+            UILabel {
+                id: bottomLabel
                 anchors.top: parent.bottom
+                anchors.topMargin: 24
                 anchors.left: parent.left
-                anchors.topMargin: 16
-                font.pointSize: 11
-                font.weight: Font.Medium
-                text: selectedMapName + " " + selectedGametype
-            }
-
-            Label {
-                id: timestampLabel
-                anchors.top: parent.bottom
                 anchors.right: parent.right
-                anchors.topMargin: 16
-                font.pointSize: 11
-                font.weight: Font.Medium
-                text: selectedTimestamp
+                horizontalAlignment: Qt.AlignHCenter
+                elide: Text.ElideMiddle
+                maximumLineCount: 1
+                text: selectedMapName + " <b>-</b> " + selectedGametype + " <b>-</b> " + selectedTimestamp
             }
 
-            Button {
+            SlantedButton {
                 id: playButton
-                anchors.top: timestampLabel.bottom
-                anchors.topMargin: 4
-                anchors.right: parent.right
-                width: 56
+                anchors.top: bottomLabel.bottom
+                anchors.topMargin: 24
+                anchors.horizontalCenter: parent.horizontalCenter
+                // Shorter than usual
+                width: UI.acceptOrRejectButtonWidth
+                leftBodyPartSlantDegrees: -0.5 * UI.buttonBodySlantDegrees
+                rightBodyPartSlantDegrees: 0.5 * UI.buttonBodySlantDegrees
+                textSlantDegrees: 0.0
+                labelHorizontalCenterOffset: 0.0
                 highlighted: true
-                font.family: UI.ui.symbolsFontFamily
-                text: "\u25B6"
-                contentItem.anchors.verticalCenterOffset: +4
-
-                onHoveredChanged: {
-                    if (hovered) {
-                        UI.ui.playHoverSound()
-                    }
-                }
+                text: "Play"
                 onClicked: {
                     selectedIndex = -1
                     UI.ui.playForwardSound()

@@ -17,12 +17,8 @@ Item {
         anchors.centerIn: parent
         spacing: 12
 
-        SettingsLabel {
+        SettingsGroupHeaderRow {
             text: "Input settings"
-            Layout.topMargin: 16
-            Layout.bottomMargin: 16
-            Layout.maximumWidth: 99999
-            horizontalAlignment: Qt.AlignHCenter
         }
 
         SettingsRow {
@@ -42,12 +38,8 @@ Item {
             }
         }
 
-        SettingsLabel {
+        SettingsGroupHeaderRow {
             text: "Crosshair settings"
-            Layout.topMargin: 16
-            Layout.bottomMargin: 16
-            Layout.maximumWidth: 99999
-            horizontalAlignment: Qt.AlignHCenter
         }
 
         SettingsRow {
@@ -113,12 +105,11 @@ Item {
                 anchors.right: parent.horizontalCenter
                 anchors.rightMargin: innerPaneMargin
                 interactive: false
-                delegate: Label {
+                delegate: UILabel {
                     width: innerPaneWidth
                     height: 36
                     horizontalAlignment: Qt.AlignRight
                     verticalAlignment: Qt.AlignVCenter
-                    font.pointSize: 12
                     font.weight: Font.Bold
                     //font.capitalization: Font.AllUppercase
                     font.letterSpacing: mouseArea.containsMouse ? 2.0 : 1.25
@@ -135,7 +126,10 @@ Item {
                         width: parent.implicitWidth
                         height: parent.height
                         hoverEnabled: true
-                        onClicked: weaponsPane.selectedIndex = index
+                        onClicked: {
+                            UI.ui.playSwitchSound()
+                            weaponsPane.selectedIndex = index
+                        }
                     }
                 }
             }

@@ -32,16 +32,15 @@ Item {
         }
     }
 
-    Label {
+    UILabel {
         id: label
         width: root.width
         height: implicitHeight
         horizontalAlignment: root.horizontalAlignment
         verticalAlignment: root.verticalAlignment
         font.weight: Font.ExtraBold
-        font.pointSize: 12
         font.capitalization: Font.AllUppercase
-        font.letterSpacing: mouseArea.containsMouse ? 2.0 : 1.5
+        font.letterSpacing: mouseArea.containsMouse ? 2.5 : 1.5
         Behavior on font.letterSpacing { SmoothedAnimation { duration: 250 } }
         color: mouseArea.containsMouse || selected ? Material.accent : Material.foreground
         opacity: root.enabled ? 1.0 : 0.5

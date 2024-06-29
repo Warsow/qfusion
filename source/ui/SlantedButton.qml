@@ -13,7 +13,7 @@ Item {
     signal clicked()
 
     implicitWidth: label.implicitWidth + iconOrPlaceholder.implicitWidth + 20 + 16
-    implicitHeight: 40
+    implicitHeight: UI.regularSlantedButtonHeight
     height: implicitHeight
 
     property string text
@@ -183,11 +183,10 @@ Item {
         sourceComponent: iconPath.length > 0 ? iconComponent : placeholderComponent
     }
 
-    Label {
+    UILabel {
         id: label
 
         text: root.text
-        font.pointSize: 12
         font.weight: Font.ExtraBold
         font.letterSpacing: 1.5
         font.capitalization: Font.AllUppercase

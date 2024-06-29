@@ -22,7 +22,7 @@ Item {
         opacity: 0.5
     }
 
-    Label {
+    UILabel {
         id: label
         anchors.top: parent.top
         anchors.topMargin: 8
@@ -30,7 +30,6 @@ Item {
         font.family: UI.ui.headingFontFamily
         font.capitalization: Font.AllUppercase
         font.letterSpacing: 1.0
-        font.pointSize: 12
         font.weight: Font.Bold
         text: "Accuracy"
         style: Text.Raised
@@ -62,10 +61,10 @@ Item {
                             anchors.left: parent.left
                             anchors.baseline: parent.bottom
                             font.family: UI.ui.regularFontFamily
-                            font.pointSize: 12
                             font.weight: Font.Bold
                             font.capitalization: Font.AllUppercase
-                            font.letterSpacing: 1.25
+                            font.pointSize: UI.scoreboardFontSize
+                            font.letterSpacing: UI.scoreboardLetterSpacing
                             color: UI.hudCommonDataModel.getWeaponColor(entry["weapon"])
                             text: UI.hudCommonDataModel.getWeaponShortName(entry["weapon"])
                         }
@@ -74,10 +73,10 @@ Item {
                             anchors.right: parent.right
                             anchors.baseline: parent.bottom
                             font.family: UI.ui.numbersFontFamily
-                            font.pointSize: 12
                             font.weight: Font.Bold
                             font.capitalization: Font.AllUppercase
-                            font.letterSpacing: 1.25
+                            font.pointSize: UI.scoreboardFontSize
+                            font.letterSpacing: UI.scoreboardLetterSpacing
                             text: entry["strong"] + "%/" + entry["weak"] + "%"
                         }
                     }

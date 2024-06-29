@@ -33,14 +33,13 @@ StackView {
         Item {
             ColumnLayout {
                 anchors.centerIn: parent
-                width: 0.67 * parent.width
-                spacing: -2
+                width: 0.8 * parent.width
 
                 SettingsGroupHeaderRow { text: "View" }
 
                 SettingsRow {
                     text: "Show zoom effect"
-                    CVarAwareCheckBox { cvarName: "cg_showZoomEffect" }
+                    CVarAwareCheckBox { id: referenceCheckBox; cvarName: "cg_showZoomEffect" }
                 }
                 SettingsRow {
                     text: "Field of view while zooming"
@@ -59,7 +58,7 @@ StackView {
                     }
                 }
 
-                SettingsGroupHeaderRow { text: "HUD" }
+                SettingsGroupHeaderRow { text: "HUD layout" }
 
                 SettingsRow {
                     text: "Regular"
@@ -97,34 +96,76 @@ StackView {
 
                 SettingsGroupHeaderRow { text: "HUD elements" }
 
-                SettingsRow {
-                    text: "Show FPS counter"
-                    CVarAwareCheckBox { cvarName: "cg_showFPS" }
+                RowLayout {
+                    id: twoColumnRow
+                    Layout.preferredWidth: parent.width
+                    Layout.maximumWidth: parent.width
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: UI.settingsRowSpacing
+                    readonly property real explicitContentPartWidth: referenceCheckBox.implicitWidth -
+                        referenceCheckBox.leftPadding - referenceCheckBox.rightPadding
+
+                    Item {
+                        Layout.maximumWidth: UI.settingsRowSpacing
+                        Layout.minimumWidth: UI.settingsRowSpacing
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignTop
+                        SettingsRow {
+                            explicitContentPartWidth: twoColumnRow.explicitContentPartWidth
+                            text: "Show FPS counter"
+                            CVarAwareCheckBox { cvarName: "cg_showFPS" }
+                        }
+                        SettingsRow {
+                            explicitContentPartWidth: twoColumnRow.explicitContentPartWidth
+                            text: "Show player speed"
+                            CVarAwareCheckBox { cvarName: "cg_showSpeed" }
+                        }
+                        SettingsRow {
+                            explicitContentPartWidth: twoColumnRow.explicitContentPartWidth
+                            text: "Show minimap"
+                            CVarAwareCheckBox { cvarName: "cg_showMiniMap" }
+                        }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignTop
+                        SettingsRow {
+                            explicitContentPartWidth: twoColumnRow.explicitContentPartWidth
+                            rightToLeft: true
+                            text: "Show pressed keys"
+                            CVarAwareCheckBox { cvarName: "cg_showPressedKeys" }
+                        }
+                        SettingsRow {
+                            explicitContentPartWidth: twoColumnRow.explicitContentPartWidth
+                            rightToLeft: true
+                            text: "Show awards"
+                            CVarAwareCheckBox { cvarName: "cg_showAwards" }
+                        }
+                        SettingsRow {
+                            explicitContentPartWidth: twoColumnRow.explicitContentPartWidth
+                            rightToLeft: true
+                            text: "Show frags feed"
+                            CVarAwareCheckBox { cvarName: "cg_showFragsFeed" }
+                        }
+                        SettingsRow {
+                            explicitContentPartWidth: twoColumnRow.explicitContentPartWidth
+                            rightToLeft: true
+                            text: "Show message feed"
+                            CVarAwareCheckBox { cvarName: "cg_showMessageFeed" }
+                        }
+                    }
+                    Item {
+                        Layout.preferredWidth: UI.settingsRowSpacing
+                        Layout.minimumWidth: UI.settingsRowSpacing
+                        Layout.maximumWidth: UI.settingsRowSpacing
+                    }
                 }
-                SettingsRow {
-                    text: "Show player speed"
-                    CVarAwareCheckBox { cvarName: "cg_showSpeed" }
-                }
-                SettingsRow {
-                    text: "Show minimap"
-                    CVarAwareCheckBox { cvarName: "cg_showMiniMap" }
-                }
-                SettingsRow {
-                    text: "Show awards"
-                    CVarAwareCheckBox { cvarName: "cg_showAwards" }
-                }
-                SettingsRow {
-                    text: "Show frags feed"
-                    CVarAwareCheckBox { cvarName: "cg_showFragsFeed" }
-                }
-                SettingsRow {
-                    text: "Show message feed"
-                    CVarAwareCheckBox { cvarName: "cg_showMessageFeed" }
-                }
-                SettingsRow {
-                    text: "Show pressed keys"
-                    CVarAwareCheckBox { cvarName: "cg_showPressedKeys" }
-                }
+
+                SettingsGroupHeaderRow { text: "In-game information" }
+
                 SettingsRow {
                     text: "Show player names"
                     CVarAwareCheckBox { cvarName: "cg_showPlayerNames" }

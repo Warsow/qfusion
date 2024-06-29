@@ -38,6 +38,7 @@ ListView {
             id: contentColumn
             anchors.centerIn: parent
             width: parent.width
+            // Caution, don't use UILabel as it depends of the UI singleton which should not be used in the HUD Qml sandbox
             Label {
                 Layout.fillWidth: true
                 Layout.leftMargin: 12
@@ -46,8 +47,8 @@ ListView {
                 verticalAlignment: Qt.AlignVCenter
                 wrapMode: Text.WordWrap
                 font.weight: Font.Bold
-                font.pointSize: 14
-                font.letterSpacing: 2
+                font.pointSize: Hud.labelFontSize + 1.0
+                font.letterSpacing: Hud.labelLetterSpacing
                 textFormat: Text.StyledText
                 text: title
             }
@@ -60,8 +61,8 @@ ListView {
                 verticalAlignment: Qt.AlignVCenter
                 wrapMode: Text.WordWrap
                 font.weight: Font.Bold
-                font.pointSize: 12
-                font.letterSpacing: 2
+                font.pointSize: Hud.labelFontSize
+                font.letterSpacing: Hud.labelLetterSpacing
                 textFormat: Text.StyledText
                 text: desc
             }

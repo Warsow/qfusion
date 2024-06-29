@@ -8,50 +8,102 @@ Item {
     id: root
 
     Layout.fillWidth: true
-    property string text
-    property real spacing: 32
-    property real contentBias: 0.5
-    property real extraHeight: 0.0
+    property alias text: label.text
+    property real spacing: UI.settingsRowSpacing
+    property real explicitContentPartWidth: -1
+    property bool rightToLeft: false
 
-    implicitHeight: Math.max(label.height, contentItem.height) + extraHeight
+    implicitHeight: UI.settingsRowHeight
 
-    Label {
+    // It's more maintainable to use a helper item (even it it's redundant) rather than playing with individual center offsets
+    Item {
+        id: separator
+        width: spacing
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
+    }
+
+    UILabel {
         id: label
-        anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        width: parent.width * (1.0 - contentBias) - 0.5 * spacing
         wrapMode: Text.WordWrap
         maximumLineCount: 99
-        horizontalAlignment: Qt.AlignRight
-        font.pointSize: 11
-        font.weight: Font.Medium
-        font.letterSpacing: 0.5
-        text: root.text
         color: Material.foreground
         opacity: root.enabled ? 1.0 : 0.5
     }
 
     default property Item contentItem
+    property real _contentItemLeftPadding
+    property real _contentItemRightPadding
 
+    // TODO: This is just for the initial setup, make switching in runtime correct
     states: [
         State {
-            name: "anchored"
+            name: "anchoredLtr"
+            AnchorChanges {
+                target: label
+                anchors.left: root.left
+                anchors.right: separator.left
+            }
+            PropertyChanges {
+                target: label
+                horizontalAlignment: Qt.AlignRight
+            }
             AnchorChanges {
                 target: contentItem
-                anchors {
-                    left: root.left
-                    verticalCenter: root.verticalCenter
-                }
+                anchors.left: separator.right
+                // Note that we don't stretch it
+                anchors.right: undefined
+                anchors.verticalCenter: root.verticalCenter
+            }
+            PropertyChanges {
+                target: separator
+                anchors.horizontalCenterOffset: explicitContentPartWidth >= 0 ?
+                    +(0.5 * root.width - explicitContentPartWidth - 0.5 * spacing) : 0
             }
             PropertyChanges {
                 target: contentItem
-                anchors.leftMargin: root.spacing + (1.0 - root.contentBias) * root.width
+                anchors.leftMargin: -_contentItemLeftPadding
+                anchors.rightMargin: 0
+            }
+        },
+        State {
+            name: "anchoredRtl"
+            AnchorChanges {
+                target: label
+                anchors.left: separator.right
+                anchors.right: root.right
+            }
+            PropertyChanges {
+                target: label
+                horizontalAlignment: Qt.AlignLeft
+            }
+            AnchorChanges {
+                target: contentItem
+                // Note that we don't stretch it
+                anchors.left: undefined
+                anchors.right: separator.left
+                anchors.verticalCenter: root.verticalCenter
+            }
+            PropertyChanges {
+                target: separator
+                anchors.horizontalCenterOffset: explicitContentPartWidth >= 0 ?
+                    -(0.5 * root.width - explicitContentPartWidth - 0.5 * spacing) : 0
+            }
+            PropertyChanges {
+                target: contentItem
+                anchors.leftMargin: 0
+                anchors.rightMargin: -_contentItemRightPadding
             }
         }
     ]
 
     Component.onCompleted: {
         contentItem.parent = root
-        state = "anchored"
+        console.assert(contentItem.hasOwnProperty("leftPadding") && contentItem.hasOwnProperty("rightPadding"))
+        _contentItemLeftPadding = contentItem.leftPadding
+        _contentItemRightPadding = contentItem.rightPadding
+        state = rightToLeft ? "anchoredRtl" : "anchoredLtr"
     }
 }

@@ -54,10 +54,9 @@ Item {
             border.width: 1
             border.color: "orange"
 
-            Label {
+            UILabel {
                 anchors.centerIn: parent
                 wrapMode: Text.NoWrap
-                font.pointSize: 12
                 text: underlying.materialName
             }
         }

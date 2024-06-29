@@ -19,7 +19,7 @@ ListView {
             Item {
                 implicitWidth: root.width
                 implicitHeight: Math.max(nameLabel.height, timestampLabel.height) + 20
-                Label {
+                UILabel {
                     id: nameLabel
                     anchors.left: parent.left
                     anchors.leftMargin: 8
@@ -27,17 +27,16 @@ ListView {
                     anchors.verticalCenterOffset: 8
                     font.weight: Font.Black
                     font.letterSpacing: 1
-                    font.pointSize: 12
                     textFormat: Text.StyledText
                     style: Text.Raised
                     text: model.sectionName
                 }
-                Label {
+                UILabel {
                     id: timestampLabel
                     anchors.left: nameLabel.right
                     anchors.baseline: nameLabel.baseline
                     font.letterSpacing: 0
-                    font.pointSize: 10
+                    font.pointSize: UI.labelFontSize - 1.0
                     textFormat: Text.PlainText
                     text: " at " + model.sectionTimestamp
                     opacity: 0.7
@@ -47,7 +46,7 @@ ListView {
 
         Component {
             id: messageComponent
-            Label {
+            UILabel {
                 width: root.width
                 height: implicitHeight + 8
                 horizontalAlignment: Qt.AlignLeft
@@ -56,9 +55,6 @@ ListView {
                 rightPadding: 8
                 wrapMode: Text.WordWrap
                 textFormat: Text.StyledText
-                font.weight: Font.Normal
-                font.letterSpacing: 1.2
-                font.pointSize: 11
                 lineHeight: 1.2
                 clip: true
                 text: model.regularMessageText

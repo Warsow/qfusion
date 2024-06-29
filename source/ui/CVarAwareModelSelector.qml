@@ -94,7 +94,7 @@ Rectangle {
         }
     }
 
-    Label {
+    UILabel {
         anchors.top: parent.top
         anchors.topMargin: 8
         anchors.horizontalCenter: parent.horizontalCenter

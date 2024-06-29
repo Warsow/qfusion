@@ -20,8 +20,8 @@ Item {
     }
 
     readonly property int headingFontWeight: Font.Medium
-    readonly property int headingLetterSpacing: 1
-    readonly property int headingFontSize: 12
+    readonly property int headingLetterSpacing: UI.labelLetterSpacing + 0.5
+    readonly property int headingFontSize: UI.labelFontSize
 
     // TODO: Generalize?
     Loader {
@@ -42,7 +42,7 @@ Item {
                 easing.type: Easing.InQuad
             }
 
-            Label {
+            UILabel {
                 Layout.alignment: Qt.AlignHCenter
                 text: 'Select a key to bind the command <b><font color="orange">' +
                         UI.keysAndBindings.getCommandNameToDisplay(pendingCommandToBind) +
@@ -104,7 +104,7 @@ Item {
                 easing.type: Easing.InQuad
             }
 
-            Label {
+            UILabel {
                 Layout.alignment: Qt.AlignHCenter
                 text: 'Select a command to bind to the key <b><font color="orange">' +
                         UI.keysAndBindings.getKeyNameToDisplay(pendingKeyToBind) +
@@ -113,7 +113,7 @@ Item {
                 font.pointSize: headingFontSize
                 font.letterSpacing: headingLetterSpacing
             }
-            WswCheckBox {
+            UICheckBox {
                 id: multiBindCheckBox
                 Layout.alignment: Qt.AlignLeft
                 Layout.leftMargin: 96 // wtf?

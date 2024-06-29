@@ -22,8 +22,8 @@ FocusScope {
     property var buttonFocusStatuses: []
 
     property real contentTopMargin: 16
-    property real buttonsTopMargin: 28
-    property real columnWidth: UI.ui.desiredPopupWidth
+    property real buttonsTopMargin: 36
+    property real columnWidth: UI.desiredPopupContentWidth
 
     property bool contentToButtonsKeyNavigationTargetIndex
 
@@ -123,7 +123,7 @@ FocusScope {
         width: columnWidth
         focus: true
 
-        Label {
+        UILabel {
             id: titleLabel
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
@@ -131,6 +131,21 @@ FocusScope {
             font.letterSpacing: 1.25
             font.capitalization: Font.SmallCaps
             font.weight: Font.Medium
+        }
+
+        Rectangle {
+            visible: !!contentLoader.item
+            color: Material.foreground
+            Layout.topMargin: visible ? 16 : 0
+            Layout.alignment: Qt.AlignHCenter
+            Layout.preferredWidth: 0
+            Layout.preferredHeight: visible ? 3 : 0
+            Component.onCompleted: {
+                if (visible) {
+                    Layout.preferredWidth = 0.67 * primaryColumn.width
+                }
+            }
+            Behavior on Layout.preferredWidth { NumberAnimation { duration: 300 } }
         }
 
         Loader {

@@ -52,9 +52,9 @@ Item {
                 text: value
                 maximumLineCount: 1
                 elide: root.alignment === Qt.AlignLeft ? Text.ElideRight : Text.ElideLeft
+                font.pointSize: UI.scoreboardFontSize
+                font.letterSpacing: UI.scoreboardLetterSpacing
                 font.weight: Font.Bold
-                font.letterSpacing: 1.5
-                font.pointSize: 12
                 style: Text.Raised
             }
         }
@@ -96,7 +96,7 @@ Item {
         opacity: 0.3
     }
 
-    Label {
+    UILabel {
         anchors.top: stripe.bottom
         anchors.left: parent.left
         anchors.right: parent.right
@@ -112,7 +112,6 @@ Item {
         text: "(no players)"
         font.weight: Font.Bold
         font.letterSpacing: 1.5
-        font.pointSize: 12
         style: Text.Raised
     }
 }

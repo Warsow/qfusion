@@ -7,7 +7,7 @@ import net.warsow 2.6
 
 Rectangle {
     id: root
-    color: UI.ui.colorWithAlpha(Material.background, UI.ui.fullscreenOverlayOpacity)
+    color: UI.ui.colorWithAlpha(Material.background, UI.fullscreenOverlayOpacity)
 
     readonly property bool canShowLoadouts: UI.gametypeOptionsModel.available && UI.hudCommonDataModel.realClientTeam !== HudDataModel.TeamSpectators
 
@@ -78,6 +78,7 @@ Rectangle {
                 SlantedButton {
                     id: mainMenuButton
                     text: "Main menu"
+                    implicitHeight: UI.mainMenuButtonHeight
                     KeyNavigation.down: loadoutsButton
                     Layout.fillWidth: true
                     displayIconPlaceholder: true
@@ -88,6 +89,7 @@ Rectangle {
                 }
                 SlantedButton {
                     id: loadoutsButton
+                    implicitHeight: UI.mainMenuButtonHeight
                     KeyNavigation.up: mainMenuButton
                     KeyNavigation.down: readyButton
                     visible: canShowLoadouts
@@ -101,6 +103,7 @@ Rectangle {
                 }
                 SlantedButton {
                     id: readyButton
+                    implicitHeight: UI.mainMenuButtonHeight
                     KeyNavigation.up: loadoutsButton
                     KeyNavigation.down: joinButton
                     visible: UI.ui.canBeReady
@@ -120,6 +123,7 @@ Rectangle {
                 }
                 SlantedButton {
                     id: joinButton
+                    implicitHeight: UI.mainMenuButtonHeight
                     KeyNavigation.up: readyButton
                     KeyNavigation.down: switchTeamButton
                     highlightedWithAnim: visible
@@ -139,6 +143,7 @@ Rectangle {
                 }
                 SlantedButton {
                     id: switchTeamButton
+                    implicitHeight: UI.mainMenuButtonHeight
                     KeyNavigation.up: joinButton
                     KeyNavigation.down: queueActionButton
                     visible: !UI.ui.canJoin && (UI.ui.canJoinAlpha !== UI.ui.canJoinBeta)
@@ -162,6 +167,7 @@ Rectangle {
                 }
                 SlantedButton {
                     id: queueActionButton
+                    implicitHeight: UI.mainMenuButtonHeight
                     KeyNavigation.up: switchTeamButton
                     KeyNavigation.down: spectateButton
                     visible: UI.ui.canToggleChallengerStatus && UI.hudCommonDataModel.realClientTeam === HudDataModel.TeamSpectators
@@ -181,6 +187,7 @@ Rectangle {
                 }
                 SlantedButton {
                     id: spectateButton
+                    implicitHeight: UI.mainMenuButtonHeight
                     KeyNavigation.up: queueActionButton
                     KeyNavigation.down: disconnectButton
                     visible: UI.ui.canSpectate
@@ -199,6 +206,7 @@ Rectangle {
                 }
                 SlantedButton {
                     id: disconnectButton
+                    implicitHeight: UI.mainMenuButtonHeight
                     KeyNavigation.up: spectateButton
                     text: "Disconnect"
                     Layout.fillWidth: true
@@ -299,7 +307,7 @@ Rectangle {
             buttonEnabledStatuses: [true, true]
             onButtonClicked: {
                 if (buttonIndex === 0) {
-                    UI.ui.startForwardSound()
+                    UI.ui.playForwardSound()
                     if (UI.ui.canJoinAlpha) {
                         stackView.pop()
                         stackView.push(awaitingSwitchTeamComponent, {"targetTeam" : HudDataModel.TeamAlpha})
@@ -376,7 +384,7 @@ Rectangle {
                 anchors.centerIn: parent
                 width: parent.width
                 spacing: 24
-                Label {
+                UILabel {
                     Layout.fillWidth: true
                     horizontalAlignment: Qt.AlignHCenter
                     font.weight: Font.Medium
@@ -648,14 +656,12 @@ Rectangle {
                 buttonTexts: ["OK"]
                 buttonEnabledStatuses: [true]
                 buttonFocusStatuses: [false]
-                contentComponent: Label {
+                contentComponent: UILabel {
                     readonly property bool focusable: false
                     property int secondsLeft: 3
-                    width: UI.ui.desiredPopupWidth
+                    width: UI.desiredPopupContentWidth
                     horizontalAlignment: Qt.AlignHCenter
                     font.weight: Font.Medium
-                    font.pointSize: 12
-                    font.letterSpacing: 0.5
                     text: "Going back in " + secondsLeft + " seconds"
                     Timer {
                         running: true

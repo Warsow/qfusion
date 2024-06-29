@@ -54,32 +54,27 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             width: progressBar.width
 
-            Label {
+            UILabel {
                 font.family: UI.ui.headingFontFamily
-                font.pointSize: 11
-                font.letterSpacing: 1
                 font.weight: Font.Bold
                 font.capitalization: Font.AllUppercase
                 style: Text.Raised
                 text: UI.demoPlayer.mapName + " - " + UI.demoPlayer.gametype
             }
 
-            Label {
+            UILabel {
                 Layout.fillWidth: true
                 elide: Text.ElideMiddle
                 horizontalAlignment: Qt.AlignHCenter
                 font.family: UI.ui.headingFontFamily
-                font.pointSize: 11
                 font.capitalization: Font.AllUppercase
-                font.letterSpacing: 1
                 font.weight: Font.Bold
                 style: Text.Raised
                 text: UI.demoPlayer.demoName
             }
 
-            Label {
+            UILabel {
                 font.family: UI.ui.numbersFontFamily
-                font.pointSize: 11
                 font.letterSpacing: 1
                 font.weight: Font.Bold
                 style: Text.Raised
@@ -108,7 +103,7 @@ Item {
             value: UI.demoPlayer.progress
         }
 
-        Label {
+        UILabel {
             anchors.left: progressBar.left
             anchors.top: progressBar.bottom
             anchors.topMargin: 8
@@ -116,11 +111,10 @@ Item {
             font.family: UI.ui.numbersFontFamily
             font.weight: Font.Bold
             font.letterSpacing: 1
-            font.pointSize: 11
             style: Text.Raised
         }
 
-        Label {
+        UILabel {
             anchors.right: progressBar.right
             anchors.top: progressBar.bottom
             anchors.topMargin: 8
@@ -128,7 +122,6 @@ Item {
             font.family: UI.ui.numbersFontFamily
             font.weight: Font.Bold
             font.letterSpacing: 1
-            font.pointSize: 11
             style: Text.Raised
         }
 
@@ -168,7 +161,7 @@ Item {
                     }
                 }
                 onClicked: {
-                    UI.ui.playSwitchSound()
+                    UI.ui.playBackSound()
                     UI.demoPlayer.stop()
                 }
             }

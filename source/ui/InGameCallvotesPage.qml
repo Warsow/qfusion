@@ -202,33 +202,28 @@ Item {
 
             Component {
                 id: noArgsComponent
-                Label {
+                UILabel {
                     readonly property bool canProceed: true
                     readonly property string chosenValue: ""
                     readonly property string displayedString: ""
                     horizontalAlignment: Qt.AlignHCenter
                     verticalAlignment: Qt.AlignVCenter
-                    font.pointSize: 11
-                    font.letterSpacing: 1
                     text: "This vote has no arguments"
                 }
             }
 
-            Label {
+            UILabel {
                 Layout.preferredWidth: root.width
                 horizontalAlignment: Qt.AlignHCenter
                 font.pointSize: 16
                 font.capitalization: Font.AllUppercase
                 font.weight: Font.Medium
-                font.letterSpacing: 1.0
                 text: selectedVoteName
             }
-            Label {
+            UILabel {
                 Layout.preferredWidth: root.width
                 horizontalAlignment: Qt.AlignHCenter
                 wrapMode: Text.WordWrap
-                font.pointSize: 11
-                font.letterSpacing: 1
                 text: selectedVoteDesc
             }
 
@@ -240,13 +235,11 @@ Item {
                 Layout.fillHeight: true
             }
 
-            Label {
+            UILabel {
                 id: descLabel
                 visible: selectedVoteArgsKind !== CallvotesModel.NoArgs
                 Layout.preferredWidth: root.width
                 horizontalAlignment: Qt.AlignHCenter
-                font.pointSize: 11
-                font.letterSpacing: 0.5
                 text: argsSelectionLoader.item.displayedString
             }
 

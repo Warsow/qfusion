@@ -309,7 +309,7 @@ public:
 
 	Q_ENUM( LocalServerFlags );
 
-	Q_INVOKABLE void launchLocalServer( const QByteArray &gametype, const QByteArray &map, int flags, int numBots );
+	Q_INVOKABLE void launchLocalServer( const QByteArray &gametype, const QByteArray &map, int flags, int numBots, int skillLevel );
 
 	Q_INVOKABLE void quit();
 	Q_INVOKABLE void disconnect();
@@ -412,7 +412,6 @@ public:
 	Q_PROPERTY( QString defaultTeamAlphaModel MEMBER m_defaultTeamAlphaModel CONSTANT );
 	Q_PROPERTY( QString defaultTeamBetaModel MEMBER m_defaultTeamBetaModel CONSTANT );
 	Q_PROPERTY( QString defaultTeamPlayersModel MEMBER m_defaultTeamPlayersModel CONSTANT );
-	Q_PROPERTY( qreal desiredPopupWidth MEMBER s_desiredPopupWidth CONSTANT );
 	Q_PROPERTY( QJsonArray videoModeHeadingsList MEMBER s_videoModeHeadingsList CONSTANT );
 	Q_PROPERTY( QJsonArray videoModeWidthValuesList MEMBER s_videoModeWidthValuesList CONSTANT );
 	Q_PROPERTY( QJsonArray videoModeHeightValuesList MEMBER s_videoModeHeightValuesList CONSTANT );
@@ -421,9 +420,6 @@ public:
 	Q_PROPERTY( qreal minStrongCrosshairSize MEMBER s_minStrongCrosshairSize CONSTANT );
 	Q_PROPERTY( qreal maxStrongCrosshairSize MEMBER s_maxStrongCrosshairSize CONSTANT );
 	Q_PROPERTY( qreal crosshairSizeStep MEMBER s_crosshairSizeStep CONSTANT );
-	Q_PROPERTY( qreal fullscreenOverlayOpacity MEMBER s_fullscreenOverlayOpacity CONSTANT );
-	Q_PROPERTY( qreal mainMenuButtonWidthDp MEMBER s_mainMenuButtonWidthDp CONSTANT );
-	Q_PROPERTY( qreal mainMenuButtonTrailWidthDp MEMBER s_mainMenuButtonTrailWidthDp CONSTANT )
 	Q_PROPERTY( QString regularFontFamily MEMBER s_regularFontFamily CONSTANT );
 	Q_PROPERTY( QString headingFontFamily MEMBER s_headingFontFamily CONSTANT );
 	Q_PROPERTY( QString numbersFontFamily MEMBER s_numbersFontFamily CONSTANT );
@@ -459,11 +455,6 @@ private:
 	static inline const qreal s_minStrongCrosshairSize { kStrongCrosshairSizeProps.minSize };
 	static inline const qreal s_maxStrongCrosshairSize { kStrongCrosshairSizeProps.maxSize };
 	static inline const qreal s_crosshairSizeStep { 1.0 };
-
-	static inline const qreal s_fullscreenOverlayOpacity { 0.90 };
-	static inline const qreal s_mainMenuButtonWidthDp { 224.0 };
-	static inline const qreal s_mainMenuButtonTrailWidthDp { 224.0 * 1.5 };
-	static inline const qreal s_desiredPopupWidth { 360.0 };
 
 	static inline const QString s_regularFontFamily { "Ubuntu" };
 	static inline const QString s_headingFontFamily { "IBM Plex Sans" };
@@ -835,6 +826,7 @@ void QtUISystem::registerFonts() {
 #endif
 
 	QFont font( "Ubuntu", 12 );
+	font.setWeight( QFont::Normal );
 	font.setStyleStrategy( (QFont::StyleStrategy)( font.styleStrategy() | QFont::NoFontMerging ) );
 	QGuiApplication::setFont( font );
 }
@@ -905,6 +897,7 @@ void QtUISystem::retrieveVideoModes() {
 QmlSandbox::~QmlSandbox() {
 	// Try being explicit with regard to deinitialization order. This is mandatory for the GL context.
 	if( m_rootObject ) {
+		uiNotice() << "Deleting root object" << m_rootObject;
 		if( auto *const item = qobject_cast<QQuickItem *>( m_rootObject ) ) {
 			item->setParentItem( nullptr );
 			item->setParent( nullptr );
@@ -912,8 +905,10 @@ QmlSandbox::~QmlSandbox() {
 		delete m_rootObject;
 		m_rootObject = nullptr;
 	}
+	uiNotice() << "Resetting component";
 	m_component.reset();
 	if( m_controlContext ) {
+		uiNotice() << "Detroying GL context";
 		const bool wasInUIRenderingMode = m_uiSystem->isInUIRenderingMode();
 		if( !wasInUIRenderingMode ) {
 			m_uiSystem->enterUIRenderingMode();
@@ -939,8 +934,11 @@ QmlSandbox::~QmlSandbox() {
 		assert( !m_framebufferObject );
 		assert( !m_control );
 	}
+	uiNotice() << "Resetting engine";
 	m_engine.reset();
+	uiNotice() << "Resetting surface";
 	m_surface.reset();
+	uiNotice() << "Resetting window";
 	m_window.reset();
 }
 
@@ -996,9 +994,9 @@ void UISystem::init( int widthInPixels, int heightInPixels, int logicalUnitsToPi
 }
 
 void UISystem::shutdown() {
-	VideoPlaybackSystem::shutdown();
 	uiSystemInstanceHolder.instance()->dispatchShuttingDown();
 	uiSystemInstanceHolder.shutdown();
+	VideoPlaybackSystem::shutdown();
 }
 
 auto UISystem::instance() -> UISystem * {
@@ -2618,11 +2616,12 @@ void QtUISystem::reconnect() {
 	m_pendingReconnectBehaviour = std::nullopt;
 }
 
-void QtUISystem::launchLocalServer( const QByteArray &gametype, const QByteArray &map, int flags, int numBots ) {
+void QtUISystem::launchLocalServer( const QByteArray &gametype, const QByteArray &map, int flags, int numBots, int skillLevel ) {
 	appendSetCVarCommand( "g_gametype"_asView, gametype );
 	appendSetCVarCommand( "g_instagib"_asView, ( flags & LocalServerInsta ) ? 1 : 0 );
 	appendSetCVarCommand( "g_numbots"_asView, numBots );
 	appendSetCVarCommand( "sv_public"_asView, ( flags & LocalServerPublic ) ? 1 : 0 );
+	appendSetCVarCommand( "sv_skillLevel"_asView, skillLevel );
 
 	wsw::StaticString<256> command;
 	command << "map "_asView << map;

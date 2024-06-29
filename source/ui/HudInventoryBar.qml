@@ -15,8 +15,8 @@ Item {
 
     property var povDataModel
 
-    readonly property real cardWidth: 60
-    readonly property real cardHeight: 100
+    readonly property real cardWidth: 64
+    readonly property real cardHeight: 108
     readonly property real cardRadius: 1.2 * Hud.elementRadius
 
     Connections {
@@ -92,7 +92,7 @@ Item {
                     anchors.horizontalCenter: parent.horizontalCenter
                     font.family: Hud.ui.numbersFontFamily
                     font.weight: Font.Black
-                    font.pointSize: strongAmmoCount >= 0 ? 14 : 18
+                    font.pointSize: strongAmmoCount >= 0 ? 15 : 18
                     font.letterSpacing: 1.0
                     opacity: strongAmmoCount ? 1.0 : 0.5
                     textFormat: Text.PlainText
@@ -107,7 +107,7 @@ Item {
                     anchors.horizontalCenter: parent.horizontalCenter
                     font.family: Hud.ui.numbersFontFamily
                     font.weight: Font.Black
-                    font.pointSize: weakAmmoCount >= 0 ? 14 : 18
+                    font.pointSize: weakAmmoCount >= 0 ? 15 : 18
                     font.letterSpacing: 1.0
                     opacity: weakAmmoCount ? 1.0 : 0.5
                     textFormat: Text.PlainText

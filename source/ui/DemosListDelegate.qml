@@ -29,7 +29,6 @@ MouseArea {
     property real labelMargins: rowSpacing / 3
 
     readonly property color textColor: containsMouse || selected ? Material.accent : Material.foreground
-    readonly property real letterSpacing: 0.50
 
     transitions: Transition {
         AnchorAnimation { duration: 67 }
@@ -81,21 +80,29 @@ MouseArea {
             PropertyChanges {
                 target: demoNameLabel
                 width: demoColumnWidth
+                font.weight: Font.Medium
             }
             PropertyChanges {
                 target: serverNameLabel
                 horizontalAlignment: Qt.AlignHCenter
                 font.capitalization: Font.AllUppercase
+                font.weight: Font.Medium
             }
             PropertyChanges {
                 target: mapNameLabel
                 font.capitalization: Font.AllUppercase
                 width: mapColumnWidth
+                font.weight: Font.Medium
             }
             PropertyChanges {
                 target: gametypeLabel
                 font.capitalization: Font.AllUppercase
                 width: gametypeColumnWidth
+                font.weight: Font.Medium
+            }
+            PropertyChanges {
+                target: timestampLabel
+                font.weight: Font.Medium
             }
             PropertyChanges {
                 target: tagsLabel
@@ -143,21 +150,29 @@ MouseArea {
             PropertyChanges {
                 target: demoNameLabel
                 width: root.width - timestampLabel.implicitWidth - 24
+                font.weight: Font.Bold
             }
             PropertyChanges {
                 target: serverNameLabel
                 horizontalAlignment: Qt.AlignLeft
                 font.capitalization: Font.MixedCase
+                font.weight: Font.Normal
             }
             PropertyChanges {
                 target: mapNameLabel
                 font.capitalization: Font.MixedCase
                 width: mapNameLabel.implicitWidth
+                font.weight: Font.Normal
             }
             PropertyChanges {
                 target: gametypeLabel
                 font.capitalization: Font.MixedCase
                 width: gametypeLabel.implicitWidth
+                font.weight: Font.Normal
+            }
+            PropertyChanges {
+                target: timestampLabel
+                font.weight: Font.Bold
             }
             PropertyChanges {
                 target: tagsLabel
@@ -168,67 +183,54 @@ MouseArea {
 
     state: "linear"
 
-    Label {
+    UILabel {
         id: demoNameLabel
         anchors.margins: labelMargins
         horizontalAlignment: Qt.AlignLeft
         font.capitalization: Font.AllUppercase
         font.weight: Font.Medium
-        font.pointSize: 11
-        font.letterSpacing: letterSpacing
         elide: Text.ElideRight
         text: demoName
         color: textColor
     }
-    Label {
+    UILabel {
         id: serverNameLabel
         width: serverColumnWidth
         anchors.margins: labelMargins
         horizontalAlignment: Qt.AlignHCenter
         font.capitalization: Font.AllUppercase
         font.weight: Font.Medium
-        font.pointSize: 11
-        font.letterSpacing: letterSpacing
         elide: Text.ElideMiddle
         text: serverName
         color: textColor
     }
-    Label {
+    UILabel {
         id: mapNameLabel
         anchors.margins: labelMargins
         horizontalAlignment: Qt.AlignHCenter
         font.weight: Font.Medium
-        font.pointSize: 11
-        font.letterSpacing: letterSpacing
         text: mapName
         color: textColor
     }
-    Label {
+    UILabel {
         id: gametypeLabel
         anchors.margins: labelMargins
         horizontalAlignment: Qt.AlignHCenter
         font.weight: Font.Medium
-        font.pointSize: 11
-        font.letterSpacing: letterSpacing
         text: gametype
         color: textColor
     }
-    Label {
+    UILabel {
         id: timestampLabel
         width: timestampColumnWidth
         anchors.margins: labelMargins
         horizontalAlignment: Qt.AlignRight
         font.weight: Font.Medium
-        font.pointSize: 11
-        font.letterSpacing: letterSpacing
         text: timestamp
         color: textColor
     }
-    Label {
+    UILabel {
         id: tagsLabel
-        font.weight: Font.Medium
-        font.pointSize: 11
-        font.letterSpacing: letterSpacing
         anchors.left: parent.left
         anchors.top: serverNameLabel.bottom
         anchors.margins: labelMargins

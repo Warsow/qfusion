@@ -33,8 +33,8 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         font.family: UI.ui.headingFontFamily
         font.capitalization: Font.AllUppercase
-        font.letterSpacing: 1.0
-        font.pointSize: 12
+        font.pointSize: UI.scoreboardFontSize
+        font.letterSpacing: UI.scoreboardLetterSpacing
         font.weight: Font.Bold
         text: root.title
         style: Text.Raised
@@ -114,21 +114,21 @@ Item {
                             width: implicitWidth + 8
                             horizontalAlignment: Qt.AlignLeft
                             font.weight: Font.Bold
-                            font.pointSize: 12
-                            font.letterSpacing: 1
+                            font.pointSize: UI.scoreboardFontSize
+                            font.letterSpacing: UI.scoreboardLetterSpacing
                             style: Text.Raised
                             text: root.model[listIndex]["name"]
                             onWidthChanged: playerItem.updateWidth()
                         }
-                        Label {
+                        UILabel {
                             id: pingLabel
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
                             width: implicitWidth + 12
                             horizontalAlignment: Qt.AlignLeft
                             font.weight: Font.Bold
-                            font.pointSize: 12
-                            font.letterSpacing: 1
+                            font.pointSize: UI.scoreboardFontSize
+                            font.letterSpacing: UI.scoreboardLetterSpacing
                             style: Text.Raised
                             text: root.model[listIndex]["ping"]
                             onWidthChanged: playerItem.updateWidth()

@@ -7,7 +7,7 @@ import net.warsow 2.6
 
 Item {
 	id: root
-	height: 40
+	height: UI.mainMenuButtonHeight
 
     property bool highlighted: false
     property bool highlightedWithAnim: false
@@ -35,7 +35,7 @@ Item {
 	readonly property color highlightedColor: Material.accentColor
 
     // Can't figure out the appropriate name for the expression...
-	property real bodyWidth: (mouseArea.containsMouse || highlightAnim.highlightActive) ? UI.ui.mainMenuButtonWidthDp + 12 : UI.ui.mainMenuButtonWidthDp
+	property real bodyWidth: (mouseArea.containsMouse || highlightAnim.highlightActive) ? UI.mainMenuButtonWidth + 12 : UI.mainMenuButtonWidth
 	property real bodyHeight: (mouseArea.containsMouse || highlightAnim.highlightActive) ? root.height + 2 : root.height
 	property color bodyColor: (mouseArea.containsMouse || highlightAnim.highlightActive) || highlighted ? highlightedColor : foregroundColor
 
@@ -43,16 +43,16 @@ Item {
 	Behavior on bodyHeight { SmoothedAnimation { duration: 333 } }
 	Behavior on bodyColor { ColorAnimation { duration: highlightAnim.colorAnimDuration } }
 
-    readonly property real baseTrailElementWidth: 20
+    readonly property real baseTrailElementWidth: 24
     readonly property real trailSpacing: 4
     property real trailElementWidth: (mouseArea.containsMouse || highlightAnim.highlightActive) ? baseTrailElementWidth + 1 : baseTrailElementWidth
-	readonly property int trailElementsCount: Math.floor(UI.ui.mainMenuButtonTrailWidthDp / (baseTrailElementWidth + root.trailSpacing))
+	readonly property int trailElementsCount: Math.floor(UI.mainMenuButtonTrailWidth / (baseTrailElementWidth + root.trailSpacing))
 
     Behavior on trailElementWidth {
         NumberAnimation {
-            duration: 500
+            duration: 1000
             easing.type: Easing.OutElastic
-            easing.amplitude: 2.0
+            easing.amplitude: 3.0
         }
     }
 
@@ -189,14 +189,13 @@ Item {
 			root.expansionFrac = Math.min(1.0, Math.max(frac, 0.0))
 		}
 
-		Label {
+		UILabel {
 			anchors.left: root.leaningRight ? parent.left: undefined
 			anchors.right: root.leaningRight ? undefined: parent.right
 			anchors.verticalCenter: parent.verticalCenter
 			anchors.leftMargin: 12
 			anchors.rightMargin: 12
 			font.family: UI.ui.headingFontFamily
-			font.pointSize: 12
 			font.letterSpacing: 1.5
 			text: root.text
 			font.weight: Font.ExtraBold

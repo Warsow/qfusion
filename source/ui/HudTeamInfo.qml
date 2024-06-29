@@ -17,7 +17,7 @@ Item {
     implicitHeight: list.height + 2 * Hud.elementRadius
 
     readonly property color evenRowColor: Qt.rgba(0.0, 0.0, 0.0, 0.7)
-    readonly property color oddRowColor: Qt.rgba(0.03, 0.03, 0.03, 0.7)
+    readonly property color oddRowColor: Qt.rgba(0.08, 0.08, 0.08, 0.7)
 
     Connections {
         target: Hud.ui
@@ -65,47 +65,41 @@ Item {
                 anchors.leftMargin: 6
                 anchors.rightMargin: 6
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 8
+                spacing: 12
 
                 Image {
-                    Layout.preferredWidth: 16
-                    Layout.preferredHeight: 16
+                    Layout.preferredWidth: 20
+                    Layout.preferredHeight: 20
                     smooth: true
                     mipmap: true
                     source: weaponIconPath
                 }
-                Label {
+                HudLabel {
                     Layout.preferredWidth: 32
                     horizontalAlignment: Qt.AlignRight
                     font.family: Hud.ui.numbersFontFamily
-                    font.weight: Font.ExtraBold
-                    font.pointSize: 12
-                    font.letterSpacing: 0.5
-                    style: Text.Raised
+                    font.weight: Font.Bold
                     textFormat: Text.PlainText
                     text: health
                 }
-                Label {
+                HudLabel {
                     font.family: Hud.ui.numbersFontFamily
-                    font.weight: Font.ExtraBold
-                    font.pointSize: 12
-                    style: Text.Raised
+                    font.weight: Font.Bold
                     textFormat: Text.PlainText
                     text: "|"
                 }
-                Label {
+                HudLabel {
                     Layout.preferredWidth: 32
                     horizontalAlignment: Qt.AlignLeft
                     font.family: Hud.ui.numbersFontFamily
-                    font.weight: Font.ExtraBold
-                    font.pointSize: 12
-                    font.letterSpacing: 0.5
-                    style: Text.Raised
+                    font.weight: Font.Bold
                     textFormat: Text.PlainText
                     text: armor
                 }
                 Column {
                     Layout.preferredWidth: 32
+                    Layout.leftMargin: 4
+                    Layout.rightMargin: 4
                     spacing: 4
                     Rectangle {
                         width: 32
@@ -132,14 +126,12 @@ Item {
                         }
                     }
                 }
-                Label {
+                HudLabel {
                     Layout.fillWidth: true
                     Layout.preferredWidth: 1.00
                     horizontalAlignment: Qt.AlignHCenter
-                    font.weight: Font.ExtraBold
-                    font.pointSize: 12
-                    font.letterSpacing: 1
-                    style: Text.Raised
+                    font.weight: Font.Bold
+                    font.pointSize: Hud.labelFontSize - 0.5 // wtf? Also do all systems support fractional size?
                     textFormat: Text.StyledText
                     text: nickname
                     maximumLineCount: 1

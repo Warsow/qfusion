@@ -81,7 +81,7 @@ Item {
                 color: Qt.rgba(1.0, 1.0, 1.0, 0.33)
             }
 
-            Label {
+            UILabel {
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 4
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -90,8 +90,6 @@ Item {
                 elide: Qt.ElideMiddle
                 color: levelshotMouseArea.containsMouse ? Material.accent : Material.foreground
                 font.weight: Font.Medium
-                font.pointSize: 11
-                font.letterSpacing: 0.5
                 style: Text.Raised
                 text: modelData["name"]
             }

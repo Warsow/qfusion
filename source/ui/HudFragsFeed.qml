@@ -41,30 +41,30 @@ Item {
             Component.onCompleted: opacity = 1.0
             Component.onDestruction: Hud.ui.ensureObjectDestruction(listDelegate)
             Behavior on opacity { NumberAnimation { duration: 200 } }
-            Label {
+            HudLabel {
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignVCenter
                 horizontalAlignment: Qt.AlignRight
                 font.weight: Font.Bold
                 font.letterSpacing: 1.25
-                font.pointSize: 14
+                font.pointSize: 15
                 style: Text.Raised
                 textFormat: Text.StyledText
                 text: attacker
             }
             Image {
-                Layout.preferredWidth: 16
-                Layout.preferredHeight: 16
+                Layout.preferredWidth: 20
+                Layout.preferredHeight: 20
                 Layout.alignment: Qt.AlignVCenter
                 source: iconPath
                 smooth: true
                 mipmap: true
             }
-            Label {
+            HudLabel {
                 Layout.alignment: Qt.AlignVCenter
                 font.weight: Font.Bold
                 font.letterSpacing: 1.25
-                font.pointSize: 14
+                font.pointSize: 15
                 style: Text.Raised
                 textFormat: Text.StyledText
                 text: victim

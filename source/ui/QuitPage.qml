@@ -17,7 +17,7 @@ Item {
         dim: false
         closePolicy: Popup.CloseOnEscape
         anchors.centerIn: parent
-        width: UI.ui.desiredPopupWidth
+        width: UI.desiredPopupContentWidth
         height: width
 
         function openSelf() {

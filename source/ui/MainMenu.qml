@@ -7,29 +7,49 @@ import net.warsow 2.6
 Item {
 	id: root
 
+    property real tintAlpha: 0.05
+
     SequentialAnimation {
         running: true
         loops: Animation.Infinite
-        NumberAnimation {
-            target: radialGradient
-            property: "horizontalRadius"
-            from: parent.width
-            to: 0.33 * parent.width
-            duration: 10000
+        ParallelAnimation {
+            NumberAnimation {
+                target: radialGradient
+                property: "horizontalRadius"
+                from: parent.width
+                to: 0.33 * parent.width
+                duration: 7500
+            }
+            NumberAnimation {
+                target: root
+                property: "tintAlpha"
+                from: 0.05
+                to: 0.09
+                duration: 7500
+            }
         }
-        NumberAnimation {
-            target: radialGradient
-            property: "horizontalRadius"
-            from: 0.33 * parent.width
-            to: parent.width
-            duration: 10000
+        ParallelAnimation {
+            NumberAnimation {
+                target: radialGradient
+                property: "horizontalRadius"
+                from: 0.33 * parent.width
+                to: parent.width
+                duration: 7500
+            }
+            NumberAnimation {
+                target: root
+                property: "tintAlpha"
+                from: 0.09
+                to: 0.05
+                duration: 7500
+            }
         }
     }
 
     Rectangle {
         visible: !UI.ui.isClientDisconnected
         anchors.fill: parent
-        color: UI.ui.colorWithAlpha(Material.background, UI.ui.fullscreenOverlayOpacity)
+        color: UI.ui.colorWithAlpha(Material.background, UI.fullscreenOverlayOpacity)
     }
 
     RadialGradient {
@@ -42,12 +62,12 @@ Item {
         gradient: Gradient {
             GradientStop {
                 position: 0.00
-                color: UI.ui.colorWithAlpha(Qt.tint(Material.background, UI.ui.colorWithAlpha(Material.accent, 0.05)), 0.99)
+                color: UI.ui.colorWithAlpha(Qt.tint(Material.background, UI.ui.colorWithAlpha(Material.accent, root.tintAlpha)), 0.99)
             }
             GradientStop {
                 position: 1.00
 	            // The gradient makes it look denser so the base value is slightly lower
-                color: UI.ui.colorWithAlpha(Qt.darker(Material.backgroundColor, 1.2), UI.ui.fullscreenOverlayOpacity - 0.10)
+                color: UI.ui.colorWithAlpha(Qt.darker(Material.backgroundColor, 1.2), UI.fullscreenOverlayOpacity - 0.10)
             }
         }
     }
@@ -56,7 +76,7 @@ Item {
 		id: primaryMenu
 		anchors.centerIn: parent
 		shouldShowExpandedButtons: parent.width >= 2400 && (parent.width / parent.height) >= 2.0
-        width: parent.width + (shouldShowExpandedButtons ? 0 : 2 * (UI.ui.mainMenuButtonWidthDp + UI.ui.mainMenuButtonTrailWidthDp))
+        width: parent.width + (shouldShowExpandedButtons ? 0 : 2 * (UI.mainMenuButtonWidth + UI.mainMenuButtonTrailWidth))
         height: parent.height
 	}
 
@@ -111,7 +131,7 @@ Item {
 		anchors.top: parent.top
 		anchors.bottom: parent.bottom
 		anchors.horizontalCenter: parent.horizontalCenter
-		width: 1024
+		width: 1024 + 128
 	}
 
     Connections {

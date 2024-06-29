@@ -58,10 +58,9 @@ Item {
             border.width: 1
             border.color: "red"
 
-            Label {
+            UILabel {
                 anchors.centerIn: parent
                 wrapMode: Text.NoWrap
-                font.pointSize: 12
                 text: skinName.length > 0 ? modelName + " " + skinName : modelName
             }
         }

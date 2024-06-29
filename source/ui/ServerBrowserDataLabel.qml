@@ -3,8 +3,7 @@ import QtQuick.Controls 2.12
 import QtQuick.Controls.Material 2.12
 import net.warsow 2.6
 
-Label {
-    font.pointSize: 11
+UILabel {
     font.letterSpacing: 1
     font.weight: Font.Medium
     maximumLineCount: 1
