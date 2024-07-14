@@ -447,6 +447,7 @@ void Frontend::addCoronaLightsToSortList( StateForCamera *stateForCamera, const 
 void Frontend::addVisibleWorldSurfacesToSortList( StateForCamera *stateForCamera, Scene *scene ) {
 	auto *const worldEnt = scene->m_worldent;
 
+	// TODO: We just have to supply OutlineParamsProvider
 	const bool worldOutlines = mapConfig.forceWorldOutlines || ( stateForCamera->refdef.rdflags & RDF_WORLDOUTLINES );
 	if( worldOutlines && ( stateForCamera->viewCluster != -1 ) && r_outlines_scale->value > 0 ) {
 		// TODO: Shouldn't it affect culling?

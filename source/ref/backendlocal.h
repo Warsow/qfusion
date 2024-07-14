@@ -47,7 +47,7 @@ typedef struct {
 } rbDynamicStream_t;
 
 typedef struct {
-	const entity_t *entity;
+	const ShaderParamsProvider *shaderParamsProvider;
 	const shader_t *shader;
 	const mfog_t *fog;
 	const portalSurface_t *portalSurface;
@@ -61,8 +61,6 @@ typedef struct {
 } rbDynamicDraw_t;
 
 typedef struct r_backend_s {
-	mempool_t           *mempool;
-
 	struct {
 		int state;
 
@@ -104,9 +102,8 @@ typedef struct r_backend_s {
 	vec3_t cameraOrigin;
 	mat3_t cameraAxis;
 
-	const entity_t *currentEntity;
+	const ShaderParamsProvider *currentParamsProvider;
 	modtype_t currentModelType;
-	const mesh_vbo_t *currentMeshVBO;
 	rbBonesData_t bonesData;
 	const portalSurface_t *currentPortalSurface;
 
@@ -122,9 +119,6 @@ typedef struct r_backend_s {
 	rbDynamicStream_t dynamicStreams[RB_VBO_NUM_STREAMS];
 	rbDynamicDraw_t dynamicDraws[MAX_DYNAMIC_DRAWS];
 	int numDynamicDraws;
-
-	instancePoint_t *drawInstances;
-	int maxDrawInstances;
 
 	rbDrawElements_t drawElements;
 
@@ -152,7 +146,7 @@ typedef struct r_backend_s {
 
 	uint8_t entityColor[4];
 	uint8_t entityOutlineColor[4];
-	entity_t nullEnt;
+	//entity_t nullEnt;
 
 	const mfog_t *fog, *texFog, *colorFog;
 

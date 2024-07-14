@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../common/wswstaticvector.h"
 #include "../common/q_math.h"
 #include "../client/animatedvalues.h"
+#include "../common/freelistallocator.h"
 
 #include <optional>
 #include <span>
@@ -104,6 +105,80 @@ typedef enum {
 
 	NUM_RTYPES
 } refEntityType_t;
+
+struct TransformParamsProvider {
+	vec3_t origin {};
+	mat3_t axis {};
+	// TODO: Does lighting origin belong here?
+	vec3_t lightingOrigin {};
+	float scale { 1.0f };
+	float radius { 1.0f };
+	float rotation { 0.0f };
+};
+
+struct OutlineParamsProvider {
+	uint8_t outlineColor[4];
+	float outlineHeight;
+};
+
+struct AnimParamsProvider {
+	int oldframe;
+	float backlerp;
+};
+
+struct SkeletalParamsProvider {
+	bonepose_t *boneposes { nullptr };
+	bonepose_t *oldboneposes { nullptr };
+};
+
+struct MaterialParamsProvider {
+	int64_t shaderTime;
+	uint8_t shaderRGBA[4];
+	struct Skin *customSkin { nullptr };
+	struct shader_s *customShader { nullptr };
+};
+
+struct CommonParamsProvider {
+	refEntityType_t rtype;
+	unsigned number;
+	int flags;
+	int renderfx;
+};
+
+struct ShaderParamsProvider {
+public:
+	enum ComponentBits : unsigned {
+		Common    = 1 << 0,
+		Transform = 1 << 1,
+		Material  = 1 << 2,
+		Outline   = 1 << 3,
+		Anim      = 1 << 4,
+		Skeletal  = 1 << 5,
+	};
+
+	CommonParamsProvider *commonParams { nullptr };
+	TransformParamsProvider *transformParams { nullptr };
+	MaterialParamsProvider *materialParams { nullptr };
+	OutlineParamsProvider *outlineParams { nullptr };
+	AnimParamsProvider *animParams { nullptr };
+	// TODO: Should it just extend anim params provider
+	SkeletalParamsProvider *skeletalParams { nullptr };
+
+	// TODO: Wrap in params/flatten with params
+	// TODO: Do we really need bits for models/geometry?
+	struct model_s *model { nullptr };
+
+	unsigned presentComponentMask { 0 };
+};
+
+// These names should be final, not touching the existing partial rewrite of the codebase
+using ShaderParams = ShaderParamsProvider;
+using ShaderCommonParams = CommonParamsProvider;
+using ShaderTransformParams = TransformParamsProvider;
+using ShaderMaterialParams = MaterialParamsProvider;
+using ShaderOutlineParams = OutlineParamsProvider;
+using ShaderAnimParams = AnimParamsProvider;
+using ShaderSkeletalParams = SkeletalParamsProvider;
 
 typedef struct entity_s {
 	refEntityType_t rtype;
@@ -428,8 +503,6 @@ protected:
 class DrawSceneRequest : public Scene {
 	friend class wsw::ref::Frontend;
 
-	// TODO: Get rid of "refdef_t"
-	refdef_t m_refdef;
 public:
 	void addLight( const float *origin, float programRadius, float coronaRadius, float r, float g, float b );
 	void addLight( const float *origin, float programRadius, float coronaRadius, const float *color ) {
@@ -456,7 +529,74 @@ public:
 		}
 	}
 
+	template <unsigned ComponentMask>
+	[[nodiscard]]
+	auto allocShaderParams() -> ShaderParams * {
+		// Make sure only valid bits get supplied (zero is perfectly valid as well)
+		static_assert( !( ComponentMask & ~( ShaderParams::Common | ShaderParams::Transform |
+			ShaderParams::Material | ShaderParams::Anim | ShaderParams::Skeletal | ShaderParams::Outline ) ) );
+		// Casting raw mem like this is perfectly valid as it's trivially constructible
+		if( auto *componentsMem = (FrequentlyUsedComponents *)m_frequentlyUsedComponentsAllocator.allocOrNull() ) [[likely]] {
+			auto *enclosingParams = new( componentsMem->aggregateStorage )ShaderParams;
+			if constexpr( ComponentMask & ShaderParams::Common ) {
+				enclosingParams->commonParams = new( componentsMem->commonStorage )ShaderCommonParams;
+			}
+			if constexpr( ComponentMask & ShaderParams::Transform ) {
+				enclosingParams->transformParams = new( componentsMem->transformStorage )ShaderTransformParams;
+			}
+			if constexpr( ComponentMask & ShaderParams::Material ) {
+				enclosingParams->materialParams = new( componentsMem->materialStorage )ShaderMaterialParams;
+			}
+			if constexpr( ComponentMask & ShaderParams::Anim ) {
+				// Always succeeds, assuming we have successfully allocated enclosing params
+				enclosingParams->animParams = new( m_animParamsAllocator.allocOrNull() )ShaderAnimParams;
+			}
+			if constexpr( ComponentMask & ShaderParams::Skeletal ) {
+				// Same
+				enclosingParams->skeletalParams = new( m_skeletalParamsAllocator.allocOrNull() )ShaderSkeletalParams;
+			}
+			if constexpr( ComponentMask & ShaderParams::Outline ) {
+				// Same
+				enclosingParams->outlineParams = new( m_outlineParamsAllocator.allocOrNull() )ShaderOutlineParams;
+			}
+			enclosingParams->presentComponentMask = ComponentMask;
+			return enclosingParams;
+		}
+		return nullptr;
+	}
+
 	explicit DrawSceneRequest( const refdef_t &refdef ) : m_refdef( refdef ) {}
+
+	~DrawSceneRequest() {
+		// Prevent triggering assertions (TODO: We don't really need these allocators)
+		m_frequentlyUsedComponentsAllocator.clear();
+		m_animParamsAllocator.clear();
+		m_skeletalParamsAllocator.clear();
+		m_outlineParamsAllocator.clear();
+	}
+private:
+	// TODO: Get rid of "refdef_t"
+	refdef_t m_refdef;
+
+	// This struct does not actually have much use besides simplifying size calculations
+	// TODO: Add ASAN-poisoned fences between fields?
+	struct FrequentlyUsedComponents {
+		alignas( alignof( ShaderParams ) ) uint8_t aggregateStorage[sizeof( ShaderParams )];
+		alignas( alignof( ShaderCommonParams ) ) uint8_t commonStorage[sizeof( ShaderCommonParams )];
+		alignas( alignof( ShaderTransformParams ) ) uint8_t transformStorage[sizeof( ShaderTransformParams )];
+		alignas( alignof( ShaderMaterialParams ) ) uint8_t materialStorage[sizeof( ShaderMaterialParams )];
+	};
+
+	static constexpr unsigned kMaxParamBundles = 1024;
+
+	// Frequently used components get stored together in memory
+
+	// TODO: We don't need freelists, we can use a bitmap-based allocator
+	// and raw byte arrays instead of secondary allocators (assuming an index is managed by the bitmap allocator)
+	wsw::MemberBasedFreelistAllocator<sizeof( FrequentlyUsedComponents ), kMaxParamBundles> m_frequentlyUsedComponentsAllocator;
+	wsw::MemberBasedFreelistAllocator<sizeof( ShaderAnimParams ), kMaxParamBundles> m_animParamsAllocator;
+	wsw::MemberBasedFreelistAllocator<sizeof( ShaderSkeletalParams ), kMaxParamBundles> m_skeletalParamsAllocator;
+	wsw::MemberBasedFreelistAllocator<sizeof( ShaderOutlineParams ), kMaxParamBundles> m_outlineParamsAllocator;
 };
 
 struct QuadPoly {

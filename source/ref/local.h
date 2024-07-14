@@ -685,7 +685,7 @@ void RB_BindFrameBufferObject( RenderTargetComponents *renderTargetComponents );
 
 void RB_BindVBO( int id, int primitive );
 
-void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
+void RB_AddDynamicMesh( const ShaderParamsProvider *shaderParamsProvider, const shader_t *shader,
 						const struct mfog_s *fog, const struct portalSurface_s *portalSurface, unsigned int shadowBits,
 						const struct mesh_s *mesh, int primitive, float x_offset, float y_offset );
 void RB_FlushDynamicMeshes( void );
@@ -697,7 +697,7 @@ void RB_DrawElementsInstanced( const FrontendToBackendShared *fsh, int firstVert
 void RB_FlushTextureCache( void );
 
 // shader
-void RB_BindShader( const entity_t *e, const struct shader_s *shader, const struct mfog_s *fog );
+void RB_BindShader( const ShaderParamsProvider *spp, const struct shader_s *shader, const struct mfog_s *fog );
 void RB_SetLightstyle( const struct superLightStyle_s *lightStyle );
 void RB_SetDlightBits( unsigned int dlightBits );
 void RB_SetBonesData( int numBones, dualquat_t *dualQuats, int maxWeights );

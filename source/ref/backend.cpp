@@ -77,14 +77,14 @@ void RB_EndRegistration() {
 
 void RB_SetTime( int64_t time ) {
 	rb.time = time;
-	rb.nullEnt.shaderTime = Sys_Milliseconds();
+	//rb.nullEnt.shaderTime = Sys_Milliseconds();
 }
 
 void RB_BeginFrame() {
-	Vector4Set( rb.nullEnt.shaderRGBA, 1, 1, 1, 1 );
-	rb.nullEnt.scale = 1;
-	VectorClear( rb.nullEnt.origin );
-	Matrix3_Identity( rb.nullEnt.axis );
+	//Vector4Set( rb.nullEnt.shaderRGBA, 1, 1, 1, 1 );
+	//rb.nullEnt.scale = 1;
+	//VectorClear( rb.nullEnt.origin );
+	//Matrix3_Identity( rb.nullEnt.axis );
 
 	// start fresh each frame
 	RB_SetShaderStateMask( ~0, 0 );
@@ -575,7 +575,7 @@ void RB_BindVBO( int id, int primitive ) {
 	RB_BindElementArrayBuffer( vbo->elemId );
 }
 
-void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
+void RB_AddDynamicMesh( const ShaderParamsProvider *shaderParamsProvider, const shader_t *shader,
 						const struct mfog_s *fog, const struct portalSurface_s *portalSurface, unsigned shadowBits,
 						const struct mesh_s *mesh, int primitive, float x_offset, float y_offset ) {
 
@@ -606,13 +606,17 @@ void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
 	bool merge = false;
 	if( prev ) {
 		int prevRenderFX = 0, renderFX = 0;
-		if( prev->entity ) {
-			prevRenderFX = prev->entity->renderfx;
+		if( const ShaderParamsProvider *prevParamsProvider = prev->shaderParamsProvider ) {
+			if( const CommonParamsProvider *prevCommonParamsProvider = prevParamsProvider->commonParams ) {
+				prevRenderFX = prevCommonParamsProvider->renderfx;
+			}
 		}
-		if( entity ) {
-			renderFX = entity->renderfx;
+		if( shaderParamsProvider ) {
+			if( const CommonParamsProvider *commonParamsProvider = shaderParamsProvider->commonParams ) {
+				renderFX = commonParamsProvider->renderfx;
+			}
 		}
-		if( ( ( shader->flags & SHADER_ENTITY_MERGABLE ) || ( prev->entity == entity ) ) && ( prevRenderFX == renderFX ) &&
+		if( ( ( shader->flags & SHADER_ENTITY_MERGABLE ) || ( prev->shaderParamsProvider == shaderParamsProvider ) ) && ( prevRenderFX == renderFX ) &&
 			( prev->shader == shader ) && ( prev->fog == fog ) && ( prev->portalSurface == portalSurface ) &&
 			( ( prev->shadowBits && shadowBits ) || ( !prev->shadowBits && !shadowBits ) ) ) {
 			// don't rebind the shader to get the VBO in this case
@@ -627,7 +631,7 @@ void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
 
 	vattribmask_t vattribs;
 	if( streamId == RB_VBO_NONE ) {
-		RB_BindShader( entity, shader, fog );
+		RB_BindShader( shaderParamsProvider, shader, fog );
 		vattribs = rb.currentVAttribs;
 		streamId = ( ( vattribs & ~COMPACT_STREAM_VATTRIBS ) ? RB_VBO_STREAM : RB_VBO_STREAM_COMPACT );
 	} else {
@@ -658,7 +662,7 @@ void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
 		draw->drawElements.numElems += numElems;
 	} else {
 		draw = &rb.dynamicDraws[rb.numDynamicDraws++];
-		draw->entity = entity;
+		draw->shaderParamsProvider = shaderParamsProvider;
 		draw->shader = shader;
 		draw->fog = fog;
 		draw->portalSurface = portalSurface;
@@ -738,7 +742,7 @@ void RB_FlushDynamicMeshes() {
 	float offsetx = 0.0f, offsety = 0.0f;
 	for( int i = 0; i < numDraws; i++ ) {
 		rbDynamicDraw_t *draw = rb.dynamicDraws + i;
-		RB_BindShader( draw->entity, draw->shader, draw->fog );
+		RB_BindShader( draw->shaderParamsProvider, draw->shader, draw->fog );
 		RB_BindVBO( draw->streamId, draw->primitive );
 		RB_SetPortalSurface( draw->portalSurface );
 		RB_Scissor( draw->scissor[0], draw->scissor[1], draw->scissor[2], draw->scissor[3] );
@@ -895,7 +899,8 @@ static void RB_EnableVertexAttribs( void ) {
 }
 
 void RB_DrawElementsReal( rbDrawElements_t *de ) {
-	if( !( r_drawelements->integer || rb.currentEntity == &rb.nullEnt ) || !de ) {
+	// TODO: We don't use null params provider, do we?
+	if( !( r_drawelements->integer || /*rb.currentEntity == &rb.nullEnt*/ !rb.currentParamsProvider ) || !de ) {
 		return;
 	}
 

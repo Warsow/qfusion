@@ -276,8 +276,7 @@ static float RB_TransformFogPlanes( const mfog_t *fog, vec3_t fogNormal,
 	cplane_t *fogPlane;
 	shader_t *fogShader;
 	vec3_t viewtofog;
-	float dist, scale;
-	const entity_t *e = rb.currentEntity;
+	const ShaderParamsProvider *spp = rb.currentParamsProvider;
 
 	assert( fog );
 	assert( fogNormal && fogDist );
@@ -287,11 +286,18 @@ static float RB_TransformFogPlanes( const mfog_t *fog, vec3_t fogNormal,
 	fogShader = fog->shader;
 
 	// distance to fog
-	dist = PlaneDiff( rb.cameraOrigin, fog->visibleplane );
-	scale = e->scale;
+	float dist = PlaneDiff( rb.cameraOrigin, fog->visibleplane );
+	float scale = 1.0f;
+	const float *axis = axis_identity;
 
-	if( e->rtype == RT_MODEL ) {
-		VectorCopy( e->origin, viewtofog );
+	if( const TransformParamsProvider *tpp = spp->transformParams ) {
+		scale = tpp->scale;
+		axis  = tpp->axis;
+		if( const CommonParamsProvider *cpp = spp->commonParams; cpp && cpp->rtype == RT_MODEL ) {
+			VectorCopy( tpp->origin, viewtofog );
+		} else {
+			VectorClear( viewtofog );
+		}
 	} else {
 		VectorClear( viewtofog );
 	}
@@ -302,11 +308,11 @@ static float RB_TransformFogPlanes( const mfog_t *fog, vec3_t fogNormal,
 	// n is plane's normal, d is plane's dist, r is view origin
 	// (M*v + t)*n - d = (M*n)*v - ((d - t*n))
 	// (M*v + t - r)*n = (M*n)*v - ((r - t)*n)
-	Matrix3_TransformVector( e->axis, fogPlane->normal, fogNormal );
+	Matrix3_TransformVector( axis, fogPlane->normal, fogNormal );
 	VectorScale( fogNormal, scale, fogNormal );
 	*fogDist = ( fogPlane->dist - DotProduct( viewtofog, fogPlane->normal ) );
 
-	Matrix3_TransformVector( e->axis, rb.cameraAxis, vpnNormal );
+	Matrix3_TransformVector( axis, rb.cameraAxis, vpnNormal );
 	VectorScale( vpnNormal, scale, vpnNormal );
 	*vpnDist = ( ( rb.cameraOrigin[0] - viewtofog[0] ) * rb.cameraAxis[AXIS_FORWARD + 0] +
 				 ( rb.cameraOrigin[1] - viewtofog[1] ) * rb.cameraAxis[AXIS_FORWARD + 1] +
@@ -320,17 +326,21 @@ static float RB_TransformFogPlanes( const mfog_t *fog, vec3_t fogNormal,
 * RB_VertexTCCelshadeMatrix
 */
 void RB_VertexTCCelshadeMatrix( mat4_t matrix ) {
+	const ShaderParamsProvider *spp = rb.currentParamsProvider;
+
 	vec3_t dir;
 	mat4_t m;
-	const entity_t *e = rb.currentEntity;
 
-	if( e->model != NULL && !( rb.renderFlags & RF_SHADOWMAPVIEW ) ) {
-		R_LightForOrigin( e->lightingOrigin, dir, NULL, NULL, e->model->radius * e->scale, rb.noWorldLight );
+	if( spp->model != NULL && !( rb.renderFlags & RF_SHADOWMAPVIEW ) ) {
+		const TransformParamsProvider *tpp = spp->transformParams;
+		assert( tpp );
+
+		R_LightForOrigin( tpp->lightingOrigin, dir, NULL, NULL, spp->model->radius * tpp->scale, rb.noWorldLight );
 
 		Matrix4_Identity( m );
 
 		// rotate direction
-		Matrix3_TransformVector( e->axis, dir, &m[0] );
+		Matrix3_TransformVector( tpp->axis, dir, &m[0] );
 		VectorNormalize( &m[0] );
 
 		MakeNormalVectors( &m[0], &m[4], &m[8] );
@@ -737,21 +747,24 @@ static uint64_t RB_sRGBProgramFeatures( const shaderpass_t *pass ) {
 * RB_UpdateCommonUniforms
 */
 static void RB_UpdateCommonUniforms( int program, const shaderpass_t *pass, mat4_t texMatrix ) {
+	const ShaderParamsProvider *spp    = rb.currentParamsProvider;
+	const CommonParamsProvider *cpp    = spp->commonParams;
+	const TransformParamsProvider *tpp = spp->transformParams;
+
 	vec3_t entDist, entOrigin;
 	byte_vec4_t constColor;
 	float colorMod = 1.0f;
-	const entity_t *e = rb.currentEntity;
 	vec3_t tmp;
 	vec2_t blendMix = { 0, 0 };
 
 	// the logic here should match R_TransformForEntity
-	if( e->rtype != RT_MODEL ) {
+	if( !cpp || !tpp || cpp->rtype != RT_MODEL ) {
 		VectorClear( entOrigin );
 		VectorCopy( rb.cameraOrigin, entDist );
 	} else {
-		VectorCopy( e->origin, entOrigin );
-		VectorSubtract( rb.cameraOrigin, e->origin, tmp );
-		Matrix3_TransformVector( e->axis, tmp, entDist );
+		VectorCopy( tpp->origin, entOrigin );
+		VectorSubtract( rb.cameraOrigin, tpp->origin, tmp );
+		Matrix3_TransformVector( tpp->axis, tmp, entDist );
 	}
 
 	// calculate constant color
@@ -951,6 +964,10 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 						   GLSL_SHADER_MATERIAL_RELIEFMAPPING : GLSL_SHADER_MATERIAL_OFFSETMAPPING;
 	}
 
+	const ShaderParamsProvider *const spp    = rb.currentParamsProvider;
+	const CommonParamsProvider *const cpp    = spp->commonParams;
+	const TransformParamsProvider *const tpp = spp->transformParams;
+
 	if( rb.currentModelType == mod_brush ) {
 		// world surface
 		if( rb.superLightStyle && rb.superLightStyle->lightmapNum[0] >= 0 ) {
@@ -1000,21 +1017,19 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 			Vector4Set( ambient, 0, 0, 0, 0 );
 			Vector4Set( diffuse, 1, 1, 1, 1 );
 		} else {
-			const entity_t *e = rb.currentEntity;
-
-			if( e->flags & RF_FULLBRIGHT ) {
+			if( cpp && ( cpp->flags & RF_FULLBRIGHT ) ) {
 				Vector4Set( ambient, 1, 1, 1, 1 );
 				Vector4Set( diffuse, 1, 1, 1, 1 );
 			} else {
-				if( e->model && e->number != kWorldEntNumber ) {
+				if( spp->model && tpp && cpp && cpp->number != kWorldEntNumber ) {
 					// get weighted incoming direction of world and dynamic lights
-					R_LightForOrigin( e->lightingOrigin, temp, ambient, diffuse,
-									  e->model->radius * e->scale, rb.noWorldLight );
+					R_LightForOrigin( tpp->lightingOrigin, temp, ambient, diffuse,
+									  spp->model->radius * tpp->scale, rb.noWorldLight );
 				} else {
 					VectorSet( temp, 0.1f, 0.2f, 0.7f );
 				}
 
-				if( e->flags & RF_MINLIGHT ) {
+				if( cpp && cpp->flags & RF_MINLIGHT ) {
 					float minLight = rb.minLight;
 					float ambientL = VectorLength( ambient );
 
@@ -1028,7 +1043,9 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 				}
 
 				// rotate direction
-				Matrix3_TransformVector( e->axis, temp, lightDir );
+				if( tpp ) {
+					Matrix3_TransformVector( tpp->axis, temp, lightDir );
+				}
 			}
 		}
 	}
@@ -1054,8 +1071,7 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 		}
 
 		// dynamic lights
-		RP_UpdateDynamicLightsUniforms( fsh, program, lightStyle, rb.currentEntity->origin, rb.currentEntity->axis,
-										rb.currentDlightBits );
+		RP_UpdateDynamicLightsUniforms( fsh, program, lightStyle, tpp->origin, tpp->axis, rb.currentDlightBits );
 
 		// r_drawflat
 		if( programFeatures & GLSL_SHADER_COMMON_DRAWFLAT ) {
@@ -1187,7 +1203,9 @@ static void RB_RenderMeshGLSL_Outline( const shaderpass_t *pass, uint64_t progra
 
 	RB_UpdateCommonUniforms( program, pass, texMatrix );
 
-	RP_UpdateOutlineUniforms( program, rb.currentEntity->outlineHeight * r_outlines_scale->value );
+	// TODO: Is it guaranteed that outline params are specified?
+
+	RP_UpdateOutlineUniforms( program, rb.currentParamsProvider->outlineParams->outlineHeight * r_outlines_scale->value );
 
 	if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
 		RB_UpdateFogUniforms( program, rb.fog );
@@ -1249,7 +1267,6 @@ static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, con
 	const mfog_t *fog = rb.fog;
 	bool isWorldSurface = rb.currentModelType == mod_brush ? true : false;
 	const superLightStyle_t *lightStyle = NULL;
-	const entity_t *e = rb.currentEntity;
 	bool isLightmapped = false, isWorldVertexLight = false;
 	vec3_t lightDir;
 	vec4_t lightAmbient, lightDiffuse;
@@ -1294,26 +1311,30 @@ static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, con
 	}
 	programFeatures |= RB_FogProgramFeatures( pass, fog );
 
+	const ShaderParamsProvider *spp = rb.currentParamsProvider;
+	const CommonParamsProvider *cpp = spp->commonParams;
+	const TransformParamsProvider *tpp = spp->transformParams;
+
 	// diffuse lighting for entities
-	if( !isWorldSurface && rgbgen == RGB_GEN_LIGHTING_DIFFUSE && !( e->flags & RF_FULLBRIGHT ) ) {
+	if( !isWorldSurface && rgbgen == RGB_GEN_LIGHTING_DIFFUSE && !( cpp && ( cpp->flags & RF_FULLBRIGHT ) ) ) {
 		vec3_t temp = { 0.1f, 0.2f, 0.7f };
 		float radius = 1;
 
-		if( e->number != kWorldEntNumber && e->model != NULL ) {
-			radius = e->model->radius;
+		if( cpp->number != kWorldEntNumber && spp->model != NULL ) {
+			radius = spp->model->radius;
 		}
 
 		// get weighted incoming direction of world and dynamic lights
-		R_LightForOrigin( e->lightingOrigin, temp, lightAmbient, lightDiffuse, radius * e->scale, rb.noWorldLight );
+		R_LightForOrigin( tpp->lightingOrigin, temp, lightAmbient, lightDiffuse, radius * tpp->scale, rb.noWorldLight );
 
-		if( e->flags & RF_MINLIGHT ) {
+		if( cpp->flags & RF_MINLIGHT ) {
 			if( lightAmbient[0] <= 0.1f || lightAmbient[1] <= 0.1f || lightAmbient[2] <= 0.1f ) {
 				VectorSet( lightAmbient, 0.1f, 0.1f, 0.1f );
 			}
 		}
 
 		// rotate direction
-		Matrix3_TransformVector( e->axis, temp, lightDir );
+		Matrix3_TransformVector( tpp->axis, temp, lightDir );
 	} else {
 		VectorSet( lightDir, 0, 0, 0 );
 		Vector4Set( lightAmbient, 1, 1, 1, 1 );
@@ -1401,7 +1422,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, con
 
 		// dynamic lights
 		if( isLightmapped || isWorldVertexLight ) {
-			RP_UpdateDynamicLightsUniforms( fsh, program, lightStyle, e->origin, e->axis, rb.currentDlightBits );
+			RP_UpdateDynamicLightsUniforms( fsh, program, lightStyle, tpp->origin, tpp->axis, rb.currentDlightBits );
 		}
 
 		// r_drawflat
@@ -1759,7 +1780,7 @@ static void RB_UpdateVertexAttribs( void ) {
 	if( rb.bonesData.numBones ) {
 		vattribs |= VATTRIB_BONES_BITS;
 	}
-	if( rb.currentEntity->outlineHeight ) {
+	if( const OutlineParamsProvider *opp = rb.currentParamsProvider->outlineParams; opp && opp->outlineHeight > 0.0f ) {
 		vattribs |= VATTRIB_NORMAL_BIT;
 	}
 	if( DRAWFLAT() ) {
@@ -1774,7 +1795,8 @@ static void RB_UpdateVertexAttribs( void ) {
 /*
 * RB_BindShader
 */
-void RB_BindShader( const entity_t *e, const shader_t *shader, const mfog_t *fog ) {
+void RB_BindShader( const ShaderParamsProvider *shaderParamsProvider, const shader_t *shader, const mfog_t *fog ) {
+	/*
 	rb.currentShader = shader;
 	rb.fog = fog;
 	rb.texFog = rb.colorFog = NULL;
@@ -1793,7 +1815,7 @@ void RB_BindShader( const entity_t *e, const shader_t *shader, const mfog_t *fog
 
 	rb.currentPortalSurface = NULL;
 
-	if( !e ) {
+	if( !shaderParamsProvider ) {
 		rb.currentShaderTime = rb.nullEnt.shaderTime * 0.001;
 		rb.alphaHack = false;
 		rb.greyscale = false;
@@ -1826,7 +1848,7 @@ void RB_BindShader( const entity_t *e, const shader_t *shader, const mfog_t *fog
 		}
 	}
 
-	RB_UpdateVertexAttribs();
+	RB_UpdateVertexAttribs();*/
 }
 
 /*
@@ -2007,7 +2029,7 @@ static void RB_SetShaderState( void ) {
 	int shaderFlags = rb.currentShader->flags;
 
 	// Face culling
-	if( !gl_cull->integer || rb.currentEntity->rtype == RT_SPRITE ) {
+	if( !gl_cull->integer || ( rb.currentParamsProvider->commonParams && rb.currentParamsProvider->commonParams->rtype == RT_SPRITE ) ) {
 		RB_Cull( 0 );
 	} else if( shaderFlags & SHADER_CULL_FRONT ) {
 		RB_Cull( GL_FRONT );
@@ -2083,7 +2105,7 @@ static inline const vec_t *RB_TriangleLinesColor( void ) {
 	if( rb.currentModelType != mod_bad ) {
 		return colorRed;
 	}
-	if( rb.currentEntity && rb.currentEntity->number != kWorldEntNumber ) {
+	if( const CommonParamsProvider *cpp = rb.currentParamsProvider->commonParams; cpp && cpp->number != kWorldEntNumber ) {
 		return colorBlue;
 	}
 	return colorGreen;
@@ -2130,9 +2152,6 @@ void RB_DrawWireframeElements( const FrontendToBackendShared *fsh ) {
 	RB_RenderPass( fsh, &r_triLinesPass );
 }
 
-// TODO: Show outlines in mirrors
-#define ENTITY_OUTLINE( ent ) ( ( ( ( ent )->renderfx & RF_VIEWERMODEL ) ) ? 0 : ( ent )->outlineHeight )
-
 void RB_DrawShadedElements( const FrontendToBackendShared *fsh ) {
 	unsigned i;
 	bool addGLSLOutline = false;
@@ -2142,10 +2161,17 @@ void RB_DrawShadedElements( const FrontendToBackendShared *fsh ) {
 		return;
 	}
 
-	if( ENTITY_OUTLINE( rb.currentEntity ) && !( rb.renderFlags & RF_CLIPPLANE )
-		&& ( rb.currentShader->sort == SHADER_SORT_OPAQUE ) && ( rb.currentShader->flags & SHADER_CULL_FRONT )
-		&& !( rb.renderFlags & RF_SHADOWMAPVIEW ) ) {
-		addGLSLOutline = true;
+	const ShaderParamsProvider *spp  = rb.currentParamsProvider;
+	const CommonParamsProvider *cpp  = spp->commonParams;
+	const OutlineParamsProvider *opp = spp->outlineParams;
+
+	// TODO: Show outlines in mirrors
+	if( !( cpp->renderfx & RF_VIEWERMODEL ) && opp && opp->outlineHeight > 0.0f ) {
+		if( !( rb.renderFlags & RF_CLIPPLANE ) && !( rb.renderFlags & RF_SHADOWMAPVIEW ) ) {
+			if( ( rb.currentShader->sort == SHADER_SORT_OPAQUE ) && ( rb.currentShader->flags & SHADER_CULL_FRONT ) ) {
+				addGLSLOutline = true;
+			}
+		}
 	}
 
 	RB_SetShaderState();
