@@ -1248,6 +1248,10 @@ auto HudPovDataModel::getActiveWeaponName() const -> QByteArray {
 	return m_activeWeapon ? weaponPropsCache.getWeaponFullName( m_activeWeapon ) : QByteArray();
 }
 
+auto HudPovDataModel::getActiveWeaponColor() const -> QColor {
+	return m_activeWeapon ? weaponPropsCache.getWeaponColor( m_activeWeapon ) : QColor( Qt::black );
+}
+
 auto HudPovDataModel::getInventoryModel() -> QObject * {
 	if( !m_hasSetInventoryModelOwnership ) {
 		QQmlEngine::setObjectOwnership( &m_inventoryModel, QQmlEngine::CppOwnership );
@@ -1328,6 +1332,7 @@ void HudPovDataModel::checkPropertyChanges( int64_t currTime ) {
 	if( oldActiveWeapon != ( m_activeWeapon = CG_ActiveWeapon( m_viewStateIndex ) ) ) {
 		Q_EMIT activeWeaponIconChanged( getActiveWeaponIcon() );
 		Q_EMIT activeWeaponNameChanged( getActiveWeaponName() );
+		Q_EMIT activeWeaponColorChanged( getActiveWeaponColor() );
 	}
 
 	const auto oldActiveWeaponWeakAmmo = m_activeWeaponWeakAmmo;

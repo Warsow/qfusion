@@ -122,15 +122,15 @@ Item {
 
         console.assert(chosenNumRows > 0 && chosenNumColumns > 0)
 
-        const chosenItemWidth  = Hud.miniviewItemWidth
-        const chosenItemHeight = Hud.miniviewItemHeight
-        const spacing          = Hud.elementMargin
+        const chosenItemWidth  = Hud.miniviewItemWidth - 2 * Hud.miniviewBorderWidth
+        const chosenItemHeight = Hud.miniviewItemHeight - 2 * Hud.miniviewBorderWidth
+        const spacing          = Hud.elementMargin + Hud.miniviewBorderWidth
 
-        let accumHeight   = 0
+        let accumHeight   = Hud.miniviewBorderWidth
         let maxAccumWidth = 0
         let currViewIndex = 0
         for (let rowNum = 0; rowNum < chosenNumRows && currViewIndex < oldMiniviews.length; ++rowNum) {
-            let accumWidth = 0
+            let accumWidth = Hud.miniviewBorderWidth
             for (let columnNum = 0; columnNum < chosenNumColumns && currViewIndex < oldMiniviews.length; ++columnNum) {
                 const view  = oldMiniviews[currViewIndex]
                 currViewIndex++
@@ -151,8 +151,8 @@ Item {
             }
         }
 
-        root.implicitWidth  = maxAccumWidth
-        root.implicitHeight = accumHeight
+        root.implicitWidth  = maxAccumWidth + Hud.miniviewBorderWidth
+        root.implicitHeight = accumHeight + Hud.miniviewBorderWidth
 
         delegatedUpdateVisibility()
     }

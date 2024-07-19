@@ -261,10 +261,12 @@ public:
 	Q_PROPERTY( QByteArray activeWeaponIcon READ getActiveWeaponIcon NOTIFY activeWeaponIconChanged );
 	Q_SIGNAL void activeWeaponNameChanged( const QByteArray &activeWeaponName );
 	Q_PROPERTY( QByteArray activeWeaponName READ getActiveWeaponName NOTIFY activeWeaponNameChanged );
-	Q_SIGNAL int activeWeaponWeakAmmoChanged( int activeWeaponWeaponAmmo );
+	Q_SIGNAL void activeWeaponWeakAmmoChanged( int activeWeaponWeaponAmmo );
 	Q_PROPERTY( int activeWeaponWeakAmmo MEMBER m_activeWeaponWeakAmmo NOTIFY activeWeaponWeakAmmoChanged );
-	Q_SIGNAL int activeWeaponStrongAmmoChanged( int activeWeaponStrongAmmo );
+	Q_SIGNAL void activeWeaponStrongAmmoChanged( int activeWeaponStrongAmmo );
 	Q_PROPERTY( int activeWeaponStrongAmmo MEMBER m_activeWeaponStrongAmmo NOTIFY activeWeaponStrongAmmoChanged );
+	Q_SIGNAL void activeWeaponColorChanged( const QColor &activeWeaponColor );
+	Q_PROPERTY( QColor activeWeaponColor READ getActiveWeaponColor NOTIFY activeWeaponColorChanged );
 
 	Q_SIGNAL void healthChanged( int health );
 	Q_PROPERTY( int health MEMBER m_health NOTIFY healthChanged );
@@ -333,6 +335,8 @@ private:
 	auto getActiveWeaponIcon() const -> QByteArray;
 	[[nodiscard]]
 	auto getActiveWeaponName() const -> QByteArray;
+	[[nodiscard]]
+	auto getActiveWeaponColor() const -> QColor;
 
 	InventoryModel m_inventoryModel;
 	TeamListModel m_teamListModel;

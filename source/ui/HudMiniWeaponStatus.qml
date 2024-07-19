@@ -8,18 +8,19 @@ Item {
     id: root
     width: implicitWidth
     height: implicitHeight
-    implicitWidth: back.width
-    implicitHeight: back.height
+    implicitWidth: back.width + 2 * back.border.width
+    implicitHeight: back.height + 2 * back.border.width
 
     property var povDataModel
     property real miniviewScale
+    property int displayMode
 
     readonly property var actualScale: textMetrics.boundingRect.height / 80
 
     TextMetrics {
         id: textMetrics
         font.family: Hud.ui.numbersFontFamily
-        font.pointSize: Math.max(32 * miniviewScale, 11)
+        font.pointSize: Math.max(32 * miniviewScale, 12)
         text: "0"
     }
 
@@ -27,51 +28,132 @@ Item {
         id: back
         anchors.centerIn: parent
         radius: 12 * actualScale
-        width: 128 * actualScale
-        height: 172 * actualScale
+        border.width: 2
+        // These properties below are overridden by the "compact" state
         color: Hud.elementBackgroundColor
+        border.color: Hud.elementBackgroundColor
+        width: Hud.miniviewItemWidth * actualScale
+        height: Hud.miniviewItemHeight * actualScale
     }
 
     Image {
         id: icon
-        anchors.centerIn: parent
-        width: 56 * actualScale
-        height: 56 * actualScale
+        anchors.top: undefined
+        anchors.right: back.right
+        anchors.bottom: back.bottom
+        anchors.margins: 8 * actualScale
         smooth: true
         mipmap: true
         source: povDataModel.activeWeaponIcon
+        Behavior on width { NumberAnimation { duration: 50 } }
+        Behavior on height { NumberAnimation { duration: 50 } }
     }
 
     readonly property real strongAmmo: povDataModel.activeWeaponStrongAmmo
     readonly property real weakAmmo: povDataModel.activeWeaponWeakAmmo
+    readonly property real primaryAmmo: strongAmmo || weakAmmo
 
-    readonly property string infinity: "\u221E"
+    // Note: See HudMiniValueBar, looks like we can't rely on restoring default state (wtf?)
+    states: [
+        State {
+            name: "compact"
+            when: displayMode === Hud.DisplayMode.Compact
+            PropertyChanges {
+                target: icon
+                width: 20
+                height: 20
+            }
+            AnchorChanges {
+                target: icon
+                anchors.top: undefined
+                anchors.right: undefined
+                anchors.horizontalCenter: back.horizontalCenter
+                anchors.verticalCenter: back.verticalCenter
+                anchors.bottom: undefined
+            }
+            PropertyChanges {
+                target: back
+                width: 96 * actualScale
+                height: 96 * actualScale
+                border.color: povDataModel.activeWeaponColor
+            }
+            PropertyChanges {
+                target: primaryLabel
+                visible: false
+            }
+            PropertyChanges {
+                target: secondaryLabel
+                visible: false
+            }
+        },
+        State {
+            name: "regular"
+            when: displayMode === Hud.DisplayMode.Regular
+            PropertyChanges {
+                target: icon
+                width: 80 * actualScale
+                height: 80 * actualScale
+            }
+            PropertyChanges {
+                target: primaryLabel
+                visible: true
+                font.pointSize: (primaryAmmo >= 0 ? 32 : 40) * (1.75 * actualScale)
+                anchors.bottomMargin: (primaryAmmo >= 0 ? -4 : -20) * (1.75 * actualScale)
+            }
+            PropertyChanges {
+                target: secondaryLabel
+                visible: true
+                font.pointSize: ((strongAmmo && weakAmmo) ? (weakAmmo >= 0 ? 16 : 24) : 14) * (1.75 * actualScale)
+            }
+        },
+        State {
+            name: "extended"
+            when: displayMode === Hud.DisplayMode.Extended
+            PropertyChanges {
+                target: primaryLabel
+                visible: true
+                font.pointSize: (primaryAmmo >= 0 ? 32 : 40) * (1.25 * actualScale)
+                anchors.bottomMargin: (primaryAmmo >= 0 ? -4 : -20) * (1.25 * actualScale)
+            }
+            PropertyChanges {
+                target: secondaryLabel
+                visible: true
+                font.pointSize: ((strongAmmo && weakAmmo) ? (weakAmmo >= 0 ? 16 : 24) : 14) * (1.25 * actualScale)
+            }
+            PropertyChanges {
+                target: icon
+                width: 128 * actualScale
+                height: 128 * actualScale
+            }
+        }
+    ]
 
-    Label {
-        anchors.bottom: icon.top
-        anchors.bottomMargin: (strongAmmo >= 0 ? -6 : -16) * actualScale
-        anchors.horizontalCenter: parent.horizontalCenter
-        font.family: Hud.ui.numbersFontFamily
+    Text {
+        id: primaryLabel
         font.weight: Font.Black
         font.letterSpacing: 1.25
-        font.pointSize: (strongAmmo >= 0 ? 32 : 40) * actualScale
+        anchors.left: secondaryLabel.left
+        anchors.bottom: secondaryLabel.top
         style: Text.Raised
         textFormat: Text.PlainText
-        text: strongAmmo > 0 ? strongAmmo : (strongAmmo < 0 ? infinity : '-')
-        opacity: strongAmmo ? 1.0 : 0.5
+        color: Material.foreground
+        text: (primaryAmmo >= 0) ? primaryAmmo : Hud.infinityString
     }
 
-    Label {
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: icon.bottom
-        anchors.topMargin: (weakAmmo >= 0 ? -4 : -24) * actualScale
+    Text {
+        id: secondaryLabel
+        anchors.left: back.left
+        anchors.bottom: back.bottom
+        anchors.leftMargin: 1 + 15 * actualScale
+        anchors.bottomMargin: 1 + 7 * actualScale
         font.family: Hud.ui.numbersFontFamily
         font.weight: Font.Black
         font.letterSpacing: 1.25
-        font.pointSize: (weakAmmo >= 0 ? 32 : 40) * actualScale
         style: Text.Raised
         textFormat: Text.PlainText
-        text: weakAmmo > 0 ? weakAmmo : (weakAmmo < 0 ? infinity : '-')
-        opacity: weakAmmo ? 1.0 : 0.5
+        color: primaryAmmo ? Material.foreground : "red"
+        opacity: (strongAmmo && weakAmmo) ? 1.0 : 0.5
+        text: (strongAmmo && weakAmmo) ? ("+" + (weakAmmo > 0 ? weakAmmo : Hud.infinityString)) :
+            (strongAmmo ? "STRNG" : (weakAmmo ? "WEAK" : "OVER"))
     }
 }

@@ -97,29 +97,33 @@ Item {
                     text: armor
                 }
                 Column {
-                    Layout.preferredWidth: 32
+                    Layout.preferredWidth: Hud.tinyValueBarWidth
                     Layout.leftMargin: 4
                     Layout.rightMargin: 4
-                    spacing: 4
+                    spacing: 2 * Hud.tinyValueBarMargin
                     Rectangle {
-                        width: 32
-                        height: 5
+                        width: Hud.tinyValueBarWidth
+                        height: Hud.tinyValueBarHeight
                         color: Qt.rgba(1.0, 1.0, 1.0, 0.15)
+                        radius: Hud.tinyValueBarRadius
                         Rectangle {
                             width: parent.width * 0.01 * Math.min(Math.max(0, health), 100)
                             height: parent.height
+                            radius: Hud.tinyValueBarRadius
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
                             color: health > 100 ? "deeppink" : "green"
                         }
                     }
                     Rectangle {
-                        width: 32
-                        height: 5
+                        width: Hud.tinyValueBarWidth
+                        height: Hud.tinyValueBarHeight
                         color: Qt.rgba(1.0, 1.0, 1.0, 0.15)
+                        radius: Hud.tinyValueBarRadius
                         Rectangle {
                             width: parent.width * 0.01 * Math.min(Math.max(0, armor), 100)
                             height: parent.height
+                            radius: Hud.tinyValueBarRadius
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
                             color: "white"

@@ -15,14 +15,18 @@ Item {
     property var povDataModel
     property real miniviewScale
     property real widthLimit
+    property int displayMode
 
-    readonly property real actualScale: Math.max(12, 32 * miniviewScale) / 32.0
+    readonly property real actualScale: Math.max(10, 32 * miniviewScale) / 32.0
 
     readonly property real cardWidth: 45 * actualScale
-    readonly property real cardHeight: 58 * actualScale
-    readonly property real cardRadius: 1 + 8 * actualScale
+    readonly property real cardHeight: 54 * actualScale
+    readonly property real cardRadius: 2 + 7 * actualScale
 
     Component.onCompleted: applyLayout()
+    onDisplayModeChanged: applyLayout()
+    onMiniviewScaleChanged: applyLayout()
+    onWidthLimitChanged: applyLayout()
 
     Repeater {
         id: repeater
@@ -63,24 +67,26 @@ Item {
                 color: Hud.elementBackgroundColor
             }
 
+            // Note: Check whether using states safe wrt memory leaks in this case
+            // Actually we're reluctant to use states as there were state-related bugs (see HudMiniValueBar, HudMiniWeaponStatus)
             Rectangle {
                 anchors.centerIn: parent
-                width: delegateItem.visible ? delegateItem.width + 2 : 0
-                height: cardHeight + 2 * border.width
-                radius: cardRadius
-                color: model.color
-                border.width: Math.max(1.5, 4 * actualScale)
-                border.color: Qt.lighter(model.color, 1.1)
-                visible: active && false
+                width: delegateItem.visible ? (displayMode > Hud.DisplayMode.Compact ? delegateItem.width + 2 : Hud.tinyValueBarHeight + 1) : 0
+                height: displayMode > Hud.DisplayMode.Compact ? cardHeight + 2 * border.width : (Hud.tinyValueBarHeight + 1)
+                radius: displayMode > Hud.DisplayMode.Compact ? cardRadius : 1
+                color: displayMode > Hud.DisplayMode.Compact ? "transparent" : Hud.ui.colorWithAlpha(model.color, model.hasWeapon ? 1.0 : 0.5)
+                border.width: displayMode > Hud.DisplayMode.Compact ? Math.max(1, 4 * actualScale) : 1.5
+                border.color: displayMode > Hud.DisplayMode.Compact ? Qt.lighter(model.color, 1.1) : model.color
+                visible: displayMode === Hud.DisplayMode.Compact || active
             }
 
             Image {
                 id: icon
-                visible: delegateItem.width + 2 > icon.width
+                visible: delegateItem.width + 2 > icon.width && displayMode >= Hud.DisplayMode.Regular
                 anchors.centerIn: parent
                 width: 32 * actualScale
                 height: 32 * actualScale
-                source: model.hasWeapon ? model.iconPath : (model.iconPath + "?grayscale=true")
+                source: visible ? (model.hasWeapon ? model.iconPath : (model.iconPath + "?grayscale=true")) : ""
                 smooth: true
                 mipmap: true
             }
@@ -88,8 +94,18 @@ Item {
     }
 
     function applyLayout() {
-        const columnSpacing = 1.0
-        const rowSpacing    = 1.0
+        let columnSpacing
+        let rowSpacing
+        if (displayMode === Hud.DisplayMode.Compact) {
+            columnSpacing = 0.0
+            rowSpacing    = 1.0
+        } else if (displayMode === Hud.DisplayMode.Extended) {
+            columnSpacing = 8.0 * actualScale
+            rowSpacing    = 8.0 * actualScale
+        } else {
+            columnSpacing = cardRadius
+            rowSpacing    = cardRadius
+        }
 
         let desiredWidth        = 0.0
         let displayedItemsCount = 0

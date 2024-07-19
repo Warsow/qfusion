@@ -18,7 +18,10 @@ Item {
 
     // Miniviews can't allocate miniviews
     readonly property bool isMiniview: !miniviewAllocator
-    readonly property real scale: isMiniview ? Math.min(hudField.width / rootItem.width, hudField.height / rootItem.height) : 1.0
+
+    // Unused for the primary HUD
+    readonly property real displayMode: hudField.width <= 1.25 * Hud.miniviewItemWidth ? Hud.DisplayMode.Compact :
+        (hudField.width <= 0.25 * rootItem.width ? Hud.DisplayMode.Regular : Hud.DisplayMode.Extended)
 
     property bool arrangementReset
     property int stateIndex
@@ -285,10 +288,12 @@ Item {
                 id: miniHealthBarComponent
                 HudMiniValueBar {
                     miniviewScale: hudField.width / rootItem.width
+                    displayMode: hudField.displayMode
                     value: hudField.povDataModel.health
                     frac: hudField.healthFrac
                     color: hudField.healthColor
                     iconPath: hudField.healthIconPath
+                    debugTag: hudField.povDataModel.nickname
                 }
             }
 
@@ -296,10 +301,12 @@ Item {
                 id: miniArmorBarComponent
                 HudMiniValueBar {
                     miniviewScale: hudField.width / rootItem.width
+                    displayMode: hudField.displayMode
                     value: hudField.povDataModel.armor
                     frac: hudField.armorFrac
                     color: hudField.armorColor
                     iconPath: hudField.armorIconPath
+                    debugTag: hudField.povDataModel.nickname
                 }
             }
 
@@ -314,8 +321,10 @@ Item {
                 id: miniInventoryBarComponent
                 HudMiniInventoryBar {
                     povDataModel: hudField.povDataModel
-                    miniviewScale: hudField.width / rootItem.width
-                    widthLimit: 0.57 * hudField.width
+                    displayMode: hudField.displayMode
+                    miniviewScale: hudField.displayMode === Hud.DisplayMode.Compact ? Math.sqrt(hudField.width / rootItem.width) :
+                        Math.sqrt(hudField.width / rootItem.width)
+                    widthLimit: (hudField.displayMode === Hud.DisplayMode.Compact ? 0.50 : 0.75) * hudField.width
                 }
             }
 
@@ -330,7 +339,8 @@ Item {
                 id: miniWeaponStatusComponent
                 HudMiniWeaponStatus {
                     povDataModel: hudField.povDataModel
-                    miniviewScale: hudField.width / rootItem.width
+                    displayMode: hudField.displayMode
+                    miniviewScale: Math.sqrt(hudField.width / rootItem.width)
                 }
             }
 

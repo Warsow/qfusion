@@ -8,8 +8,8 @@ Item {
     id: root
     width: implicitWidth
     height: implicitHeight
-    implicitWidth: Hud.miniviewItemWidth + Hud.miniviewBorderWidth
-    implicitHeight: Hud.miniviewItemHeight + Hud.miniviewBorderWidth
+    implicitWidth: Hud.miniviewItemWidth
+    implicitHeight: Hud.miniviewItemHeight
     property var povDataModel
 
     Connections {
@@ -56,35 +56,33 @@ Item {
     readonly property real weakAmmo: povDataModel.activeWeaponWeakAmmo
     readonly property real primaryAmmo: strongAmmo || weakAmmo
 
-    readonly property string infinity: "\u221E"
-
     Label {
-        id: secondaryCountLabel
-        // Display as a secondary if there's strong ammo as well
-        visible: strongAmmo && weakAmmo
-        anchors.left: primaryCountLabel.left
-        anchors.bottom: primaryCountLabel.top
-        anchors.bottomMargin: weakAmmo >= 0 ? -4 : -24
-        font.family: Hud.ui.numbersFontFamily
-        font.weight: Font.Black
-        font.letterSpacing: 1.25
-        font.pointSize: weakAmmo >= 0 ? 16 : 24
-        style: Text.Raised
-        textFormat: Text.PlainText
-        text: weakAmmo > 0 ? weakAmmo : infinity
-    }
-
-    Label {
-        id: primaryCountLabel
-        anchors.left: back.left
-        anchors.bottom: back.bottom
-        anchors.leftMargin: 16
-        anchors.bottomMargin: primaryAmmo >= 0 ? 16 : 6
         font.weight: Font.Black
         font.letterSpacing: 1.25
         font.pointSize: primaryAmmo >= 0 ? 32 : 40
+        anchors.left: secondaryLabel.left
+        anchors.bottom: secondaryLabel.top
+        anchors.bottomMargin: primaryAmmo >= 0 ? -4 : -20
         style: Text.Raised
         textFormat: Text.PlainText
-        text: (primaryAmmo >= 0) ? primaryAmmo : infinity
+        text: (primaryAmmo >= 0) ? primaryAmmo : Hud.infinityString
+    }
+
+    Label {
+        id: secondaryLabel
+        anchors.left: back.left
+        anchors.bottom: back.bottom
+        anchors.leftMargin: 16
+        anchors.bottomMargin: 8
+        font.family: Hud.ui.numbersFontFamily
+        font.weight: Font.Black
+        font.letterSpacing: 1.25
+        font.pointSize: (strongAmmo && weakAmmo) ? (weakAmmo >= 0 ? 16 : 24) : 14
+        style: Text.Raised
+        textFormat: Text.PlainText
+        color: primaryAmmo ? Material.foreground : "red"
+        opacity: (strongAmmo && weakAmmo) ? 1.0 : 0.5
+        text: (strongAmmo && weakAmmo) ? ("+" + (weakAmmo > 0 ? weakAmmo : Hud.infinityString)) :
+            (strongAmmo ? "STRONG" : (weakAmmo ? "WEAK" : "OVER"))
     }
 }

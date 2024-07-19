@@ -10,6 +10,8 @@ QtObject {
     readonly property var chatProxy: __chatProxy
     readonly property var teamChatProxy: __teamChatProxy
 
+    enum DisplayMode { Compact, Regular, Extended }
+
     readonly property real elementMargin: 16
     readonly property real elementRadius: 6
     readonly property real elementElevation: 16
@@ -20,9 +22,17 @@ QtObject {
     readonly property real teamScoreHeight: 80
     readonly property real valueBarWidth: 256 + 64 + 32 + 16
 
+    readonly property real tinyValueBarWidth: 32
+    readonly property real tinyValueBarHeight: 5
+    readonly property real tinyValueBarMargin: 2
+    readonly property real tinyValueBarRadius: 1
+
     readonly property real labelFontSize: 13
     readonly property real labelLetterSpacing: 0.75
     readonly property int labelFontWeight: Font.Normal
+
+    readonly property string infinityString: "\u221E"
+    readonly property string missingString: "\u2013"
 
     function destroyLayer(layer) {
         if (layer) {

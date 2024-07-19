@@ -121,7 +121,7 @@ Item {
     Keys.onPressed: {
         if (Hud.ui.isShowingChatPopup || Hud.ui.isShowingTeamChatPopup) {
             if (event.key == Qt.Key_Escape || event.key == Qt.Key_Back) {
-                UI.ui.playBackSound()
+                Hud.ui.playBackSound()
                 Hud.ui.closeChatPopup()
             }
         }

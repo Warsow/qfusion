@@ -96,7 +96,7 @@ Item {
                     font.letterSpacing: 1.0
                     opacity: strongAmmoCount ? 1.0 : 0.5
                     textFormat: Text.PlainText
-                    text: strongAmmoCount >= 0 ? (strongAmmoCount ? strongAmmoCount : "\u2013") : "\u221E"
+                    text: strongAmmoCount >= 0 ? (strongAmmoCount ? strongAmmoCount : Hud.missingString) : Hud.infinityString
                     style: Text.Raised
                 }
 
@@ -111,7 +111,7 @@ Item {
                     font.letterSpacing: 1.0
                     opacity: weakAmmoCount ? 1.0 : 0.5
                     textFormat: Text.PlainText
-                    text: weakAmmoCount >= 0 ? (weakAmmoCount ? weakAmmoCount : "\u2013") : "\u221E"
+                    text: weakAmmoCount >= 0 ? (weakAmmoCount ? weakAmmoCount : Hud.missingString) : Hud.infinityString
                     style: Text.Raised
                 }
             }
