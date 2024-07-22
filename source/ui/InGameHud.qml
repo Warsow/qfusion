@@ -257,6 +257,8 @@ Item {
                     miniviewPane1Component
                 } else if (kind === HudLayoutModel.MiniviewPane2) {
                     miniviewPane2Component
+                } else if (kind === HudLayoutModel.PerfPane) {
+                    perfPaneComponent
                 } else {
                     undefined
                 }
@@ -459,6 +461,11 @@ Item {
                     miniviewAllocator: hudField.miniviewAllocator
                     paneNumber: 2
                 }
+            }
+
+            Component {
+                id: perfPaneComponent
+                HudPerfPane {}
             }
 
             function getQmlAnchor(anchorBit) {

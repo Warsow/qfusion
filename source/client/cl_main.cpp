@@ -133,25 +133,11 @@ static int scr_draw_loading;
 
 static cvar_t *scr_consize;
 static cvar_t *scr_conspeed;
-static cvar_t *scr_netgraph;
-static cvar_t *scr_timegraph;
-static cvar_t *scr_debuggraph;
-static cvar_t *scr_graphheight;
-static cvar_t *scr_graphscale;
-static cvar_t *scr_graphshift;
 
 static cvar_t *con_fontSystemFamily;
 static cvar_t *con_fontSystemFallbackFamily;
 static cvar_t *con_fontSystemMonoFamily;
 static cvar_t *con_fontSystemConsoleSize;
-
-typedef struct {
-	float value;
-	vec4_t color;
-} graphsamp_t;
-
-static int netgraph_current;
-static graphsamp_t values[1024];
 
 #define PLAYER_MULT 5
 
@@ -1350,75 +1336,9 @@ void SCR_DrawFillRect( int x, int y, int w, int h, const vec4_t color ) {
 	R_DrawStretchPic( x, y, w, h, 0, 0, 1, 1, color, cls.whiteShader );
 }
 
-/*
-* CL_AddNetgraph
-*
-* A new packet was just parsed
-*/
-void CL_AddNetgraph( void ) {
-	// if using the debuggraph for something else, don't
-	// add the net lines
-	if( scr_timegraph->integer ) {
-		return;
-	}
-
-	for( int i = 0; i < cls.netchan.dropped; i++ )
-		SCR_DebugGraph( 30.0f, 0.655f, 0.231f, 0.169f );
-
-	// see what the latency was on this packet
-	int ping = cls.realtime - cl.cmd_time[cls.ucmdAcknowledged & CMD_MASK];
-	ping /= 30;
-	if( ping > 30 ) {
-		ping = 30;
-	}
-	SCR_DebugGraph( ping, 1.0f, 0.75f, 0.06f );
-}
-
-void SCR_DebugGraph( float value, float r, float g, float b ) {
-	values[netgraph_current].value = value;
-	values[netgraph_current].color[0] = r;
-	values[netgraph_current].color[1] = g;
-	values[netgraph_current].color[2] = b;
-	values[netgraph_current].color[3] = 1.0f;
-
-	netgraph_current++;
-	netgraph_current &= 1023;
-}
-
-static void SCR_DrawDebugGraph( void ) {
-	//
-	// draw the graph
-	//
-	int w = viddef.width;
-	int x = 0;
-	int y = 0 + viddef.height;
-	SCR_DrawFillRect( x, y - scr_graphheight->integer,
-					  w, scr_graphheight->integer, colorBlack );
-
-	int s = ( w + 1024 - 1 ) / 1024; //scale for resolutions with width >1024
-
-	for( int a = 0; a < w; a++ ) {
-		int i = ( netgraph_current - 1 - a + 1024 ) & 1023;
-		float v = values[i].value;
-		v = v * scr_graphscale->integer + scr_graphshift->integer;
-
-		if( v < 0 ) {
-			v += scr_graphheight->integer * ( 1 + (int)( -v / scr_graphheight->integer ) );
-		}
-		int h = (int)v % scr_graphheight->integer;
-		SCR_DrawFillRect( x + w - 1 - a * s, y - h, s, h, values[i].color );
-	}
-}
-
 void SCR_InitScreen( void ) {
 	scr_consize = Cvar_Get( "scr_consize", "0.4", CVAR_ARCHIVE );
 	scr_conspeed = Cvar_Get( "scr_conspeed", "3", CVAR_ARCHIVE );
-	scr_netgraph = Cvar_Get( "netgraph", "0", 0 );
-	scr_timegraph = Cvar_Get( "timegraph", "0", 0 );
-	scr_debuggraph = Cvar_Get( "debuggraph", "0", 0 );
-	scr_graphheight = Cvar_Get( "graphheight", "32", 0 );
-	scr_graphscale = Cvar_Get( "graphscale", "1", 0 );
-	scr_graphshift = Cvar_Get( "graphshift", "0", 0 );
 
 	scr_initialized = true;
 }
@@ -1484,10 +1404,6 @@ void SCR_ShutDownConsoleMedia( void ) {
 	SCR_ShutdownFonts();
 }
 
-static void SCR_RenderView( bool timedemo ) {
-
-}
-
 void SCR_UpdateScreen( void ) {
 	assert( !cls.disable_screen && scr_initialized && con_initialized && cls.mediaInitialized );
 
@@ -1497,8 +1413,9 @@ void SCR_UpdateScreen( void ) {
 
 	bool canRenderView = false;
 	bool canDrawConsole = false;
-	bool canDrawDebugGraph = false;
 	bool canDrawConsoleNotify = false;
+
+	auto *const uiSystem = wsw::ui::UISystem::instance();
 
 	if( scr_draw_loading == 2 ) {
 		// loading plaque over APP_STARTUP_COLOR screen
@@ -1512,20 +1429,14 @@ void SCR_UpdateScreen( void ) {
 	} else if( cls.state == CA_ACTIVE ) {
 		canRenderView = true;
 
-		if( scr_timegraph->integer ) {
-			SCR_DebugGraph( cls.frametime * 0.3f, 1, 1, 1 );
-		}
-
-		if( scr_debuggraph->integer || scr_timegraph->integer || scr_netgraph->integer ) {
-			canDrawDebugGraph = true;
-		}
+		assert( cls.frametime > 0 );
+		uiSystem->addToFpsTimeline( cls.frametime );
 
 		canDrawConsole = true;
 		canDrawConsoleNotify = true;
 	}
 
 	// Perform UI refresh (that may include binding UI GL context and unbinding it) first
-	auto *const uiSystem = wsw::ui::UISystem::instance();
 	uiSystem->refreshProperties();
 	uiSystem->renderInternally();
 
@@ -1570,10 +1481,6 @@ void SCR_UpdateScreen( void ) {
 
 	if( canDrawConsoleNotify ) {
 		Con_DrawNotify( viddef.width, viddef.height );
-	}
-
-	if( canDrawDebugGraph ) {
-		SCR_DrawDebugGraph();
 	}
 
 	if( canDrawConsole ) {
@@ -3434,6 +3341,16 @@ static void CL_ParseFrame( msg_t *msg ) {
 
 			cl.serverTimeDeltas[cl.receivedSnapNum & MASK_TIMEDELTAS_BACKUP] = delta;
 		}
+
+		float ping = 0;
+		for( unsigned i = 0; i < MAX_CLIENTS; ++i ) {
+			if( snap->scoreboardData.getPlayerNum( i ) == (unsigned)cl.playernum ) {
+				ping = snap->scoreboardData.getPlayerShort( i, snap->scoreboardData.pingSlot );
+			}
+		}
+		auto *const uiSystem = wsw::ui::UISystem::instance();
+		uiSystem->addToPingTimeline( ping );
+		uiSystem->addToPacketlossTimeline( cls.netchan.dropped != 0 );
 	}
 }
 
@@ -3789,8 +3706,6 @@ void CL_ParseServerMessage( msg_t *msg ) {
 		Com_Printf( "%3" PRIi64 ":CMD %i %s\n", (int64_t)( msg->readcount ), -1, "EOF" );
 	}
 	SHOWNET( msg, "END OF MESSAGE" );
-
-	CL_AddNetgraph();
 
 	//
 	// if recording demos, copy the message out

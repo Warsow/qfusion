@@ -792,7 +792,7 @@ const HudLayoutModel::EditorProps HudLayoutModel::kEditorPropsForKind[] {
 		.color = QColor::fromRgbF( 0.7, 1.0, 0.3 ), .allowInMiniviewHud = false,
 	},
 	EditorProps {
-		.name = "Team info"_asView, .kind = TeamInfo, .size = QSize( 256, 128 ),
+		.name = "Team info"_asView, .kind = TeamInfo, .size = QSize( 192, 128 ),
 		.color = QColor::fromRgbF( 0.0, 0.3, 0.7 ), .allowInMiniviewHud = false,
 	},
 	EditorProps {
@@ -804,7 +804,7 @@ const HudLayoutModel::EditorProps HudLayoutModel::kEditorPropsForKind[] {
 		.color = QColor::fromRgbF( 0.0, 0.7, 0.7 ), .allowInMiniviewHud = false,
 	},
 	EditorProps {
-		.name = "Awards area"_asView, .kind = AwardsArea, .size = QSize( 256, 64 ),
+		.name = "Awards area"_asView, .kind = AwardsArea, .size = QSize( 192, 64 ),
 		.color = QColor::fromRgbF( 0.0, 0.7, 0.9 ), .allowInMiniviewHud = true,
 	},
 	EditorProps {
@@ -826,6 +826,10 @@ const HudLayoutModel::EditorProps HudLayoutModel::kEditorPropsForKind[] {
 	EditorProps {
 		.name = "Miniview\npane 2"_asView, .kind = MiniviewPane2, .size = QSize( 128, 128 ),
 		.color = QColor::fromRgbF( 0.5, 1.0, 0.6 ), .allowInMiniviewHud = false,
+	},
+	EditorProps {
+		.name = "Perf pane"_asView, .kind = PerfPane, .size = QSize( 128, 72 ),
+		.color = QColor::fromRgbF( 0.7, 0.7, 0.5 ), .allowInMiniviewHud = false,
 	}
 };
 
@@ -1219,6 +1223,7 @@ auto HudLayoutModel::getFlagsForKind( Kind kind ) -> Flags {
 		case PovNickname: return ChasePovOnly;
 		case MiniviewPane1: return NoFlags;
 		case MiniviewPane2: return NoFlags;
+		case PerfPane: return NoFlags;
 		default: wsw::failWithLogicError( "unreachable" );
 	}
 }
@@ -1243,6 +1248,7 @@ auto HudLayoutModel::getShownItemBitsForKind( Kind kind ) -> ShownItemBits {
 		// TODO: Should there be some specific bit for miniviews?
 		case MiniviewPane1: return NoShownItemBits;
 		case MiniviewPane2: return NoShownItemBits;
+		case PerfPane: return NoShownItemBits;
 		default: wsw::failWithLogicError( "unreachable" );
 	}
 }

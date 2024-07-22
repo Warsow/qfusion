@@ -421,6 +421,8 @@ void Scoreboard::endUpdating() {
 		m_replicatedData.setPlayerGhosting( playerIndex, isPlayerGhosting[playerNum] );
 	}
 
+	m_replicatedData.pingSlot = m_pingSlot;
+
 	// Now all player rows are sorted by scores in a desired order.
 	// All players are in the same list of rows.
 	// This means that any list made of elements picked from this list

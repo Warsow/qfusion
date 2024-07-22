@@ -543,6 +543,8 @@ public:
 	uint32_t packedPlayerSpecificData[kMaxPlayers];
 	// The challengers queue. Entity numbers are written (this means valid entries are non-zero and start from 1).
 	uint8_t challengersQueue[kMaxPlayers];
+	// Let the low-level client code access it without parsing high-level schema
+	uint8_t pingSlot;
 
 	using wsw::ScoreboardShared::kMaxShortSlots;
 

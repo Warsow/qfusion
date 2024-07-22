@@ -240,6 +240,20 @@ public:
 	bool operator!=( const ObjectiveIndicatorState &that ) const { return m_underlying != that.m_underlying; }
 };
 
+struct PerfDataRow {
+	Q_GADGET
+public:
+	Q_PROPERTY( qreal actualMin MEMBER m_actualMin );
+	Q_PROPERTY( qreal actualMax MEMBER m_actualMax );
+	Q_PROPERTY( qreal average MEMBER m_average );
+	Q_PROPERTY( QVector<qreal> samples MEMBER m_samples );
+
+	qreal m_actualMin { 0.0 };
+	qreal m_actualMax { 0.0 };
+	qreal m_average { 0.0 };
+	QVector<qreal> m_samples;
+};
+
 // Just an namespace for the enum
 class HudDataModel : public QObject {
 	Q_OBJECT
@@ -408,6 +422,13 @@ public:
 	Q_SIGNAL void indicator3StateChanged( const QVariant &indicator3State );
 	Q_PROPERTY( QVariant indicator3State READ getIndicator3State NOTIFY indicator3StateChanged );
 
+	Q_SIGNAL void frametimeDataRowChanged( const QVariant &frametimeDataRow );
+	Q_PROPERTY( QVariant frametimeDataRow READ getFrametimeDataRow NOTIFY frametimeDataRowChanged );
+	Q_SIGNAL void pingDataRowChanged( const QVariant &pingDataRow );
+	Q_PROPERTY( QVariant pingDataRow READ getPingDataRow NOTIFY pingDataRowChanged );
+	Q_SIGNAL void packetlossDataRowChanged( const QVariant &packetlossDataRow );
+	Q_PROPERTY( QVariant packetlossDataRow READ getPacketlossDataRow NOTIFY packetlossDataRowChanged );
+
 	Q_SIGNAL void hasTwoTeamsChanged( bool hasTwoTeams );
 	Q_PROPERTY( bool hasTwoTeams MEMBER m_hasTwoTeams NOTIFY hasTwoTeamsChanged );
 
@@ -497,6 +518,13 @@ public:
 	[[nodiscard]]
 	Q_INVOKABLE QByteArray getIndicatorStatusString( int stringNum ) const;
 
+	[[nodiscard]]
+	auto getFrametimeDataRow() const -> QVariant { return QVariant::fromValue( m_frametimeDataRow.curr ); }
+	[[nodiscard]]
+	auto getPingDataRow() const -> QVariant { return QVariant::fromValue( m_pingDataRow.curr ); }
+	[[nodiscard]]
+	auto getPacketlossDataRow() const -> QVariant { return QVariant::fromValue( m_packetlossDataRow.curr ); }
+
 	Q_SLOT void onHudUpdated( const QByteArray &name, HudLayoutModel::Flavor flavor );
 
 	void resetHudFeed();
@@ -509,6 +537,10 @@ public:
 	void addToMessageFeed( unsigned playerNum, const wsw::StringView &message, int64_t timestamp );
 	void addAward( unsigned playerNum, const wsw::StringView &award, int64_t timestamp );
 	void addStatusMessage( unsigned playerNum, const wsw::StringView &message, int64_t timestamp );
+
+	void addToFpsTimelime( float fps );
+	void addToPingTimelime( float ping );
+	void addToPacketlossTimeline( bool hadPacketloss );
 
 	void checkPropertyChanges( int64_t currTime );
 	void updateScoreboardData( const ReplicatedScoreboardData &scoreboardData );
@@ -564,6 +596,18 @@ private:
 	std::optional<int> m_pendingIndividualAlphaPlayerNum, m_pendingIndividualBetaPlayerNum;
 
 	ObjectiveIndicatorState m_indicatorStates[3];
+
+	// Acutually, this is not only for tracking, but should help to reuse objects and reduce allocations
+	struct TrackedPerfDataRow {
+		PerfDataRow prev, curr;
+		TrackedPerfDataRow();
+		[[nodiscard]]
+		bool update( float valueToAdd );
+	};
+
+	TrackedPerfDataRow m_frametimeDataRow;
+	TrackedPerfDataRow m_pingDataRow;
+	TrackedPerfDataRow m_packetlossDataRow;
 
 	int m_rawAlphaColor { 0 }, m_rawBetaColor { 0 };
 	QColor m_alphaColor { toQColor( m_rawAlphaColor ) };

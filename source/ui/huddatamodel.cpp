@@ -904,6 +904,50 @@ void HudCommonDataModel::addStatusMessage( unsigned playerNum, const wsw::String
 	}
 }
 
+HudCommonDataModel::TrackedPerfDataRow::TrackedPerfDataRow() {
+	curr.m_samples.fill( 0.0, 16 );
+	prev = curr;
+}
+
+bool HudCommonDataModel::TrackedPerfDataRow::update( float valueToAdd ) {
+	curr.m_samples.removeLast();
+	curr.m_samples.prepend( (qreal)valueToAdd );
+	if( curr.m_samples != prev.m_samples ) {
+		qreal average  = 0.0;
+		qreal minValue = std::numeric_limits<qreal>::max();
+		qreal maxValue = std::numeric_limits<qreal>::lowest();
+		for( const qreal value: curr.m_samples ) {
+			minValue = wsw::min( minValue, value );
+			maxValue = wsw::max( maxValue, value );
+			average += value;
+		}
+		curr.m_actualMax = maxValue;
+		curr.m_actualMin = minValue;
+		curr.m_average   = average / (qreal)curr.m_samples.size();
+		prev = curr;
+		return true;
+	}
+	return false;
+}
+
+void HudCommonDataModel::addToFpsTimelime( float fps ) {
+	if( m_frametimeDataRow.update( fps ) ) {
+		Q_EMIT frametimeDataRowChanged( getFrametimeDataRow() );
+	}
+}
+
+void HudCommonDataModel::addToPingTimelime( float ping ) {
+	if( m_pingDataRow.update( ping ) ) {
+		Q_EMIT pingDataRowChanged( getPingDataRow() );
+	}
+}
+
+void HudCommonDataModel::addToPacketlossTimeline( bool hadPacketloss ) {
+	if( m_packetlossDataRow.update( hadPacketloss ? 1.0f : 0.0f ) ) {
+		Q_EMIT packetlossDataRowChanged( getPacketlossDataRow() );
+	}
+}
+
 // TODO: Should it be shared for regular/miniview models?
 static const wsw::StringView kDefaultHudName( "default"_asView );
 

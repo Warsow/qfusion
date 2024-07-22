@@ -111,6 +111,10 @@ public:
 
 	virtual void addStatusMessage( unsigned playerNum, const wsw::StringView &message ) = 0;
 
+	virtual void addToFpsTimeline( float ) = 0;
+	virtual void addToPingTimeline( float ) = 0;
+	virtual void addToPacketlossTimeline( bool hadPacketloss ) = 0;
+
 	virtual void notifyOfDroppedConnection( const wsw::StringView &message, ReconnectBehaviour reconnectBehaviour, ConnectionDropStage dropStage ) = 0;
 
 	virtual void dispatchShuttingDown() = 0;

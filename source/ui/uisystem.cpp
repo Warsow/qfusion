@@ -205,6 +205,10 @@ public:
 
 	void addStatusMessage( unsigned playerNum, const wsw::StringView &message ) override;
 
+	void addToFpsTimeline( float ) override;
+	void addToPingTimeline( float ) override;
+	void addToPacketlossTimeline( bool ) override;
+
 	void notifyOfDroppedConnection( const wsw::StringView &message, ReconnectBehaviour rectonnectBehaviour, ConnectionDropStage dropStage );
 
 	Q_INVOKABLE void stopReactingToDroppedConnection() { m_pendingReconnectBehaviour = std::nullopt; }
@@ -2565,6 +2569,18 @@ void QtUISystem::addStatusMessage( unsigned playerNum, const wsw::StringView &me
 	} else {
 		m_hudCommonDataModel.addStatusMessage( playerNum, message, getFrameTimestamp() );
 	}
+}
+
+void QtUISystem::addToFpsTimeline( float fps ) {
+	m_hudCommonDataModel.addToFpsTimelime( fps );
+}
+
+void QtUISystem::addToPingTimeline( float ping ) {
+	m_hudCommonDataModel.addToPingTimelime( ping );
+};
+
+void QtUISystem::addToPacketlossTimeline( bool hadPacketloss ) {
+	m_hudCommonDataModel.addToPacketlossTimeline( hadPacketloss );
 }
 
 static const QString kConnectionFailedTitle( "Connection failed" );

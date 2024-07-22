@@ -51,6 +51,7 @@ public:
 		PovNickname,
 		MiniviewPane1,
 		MiniviewPane2,
+		PerfPane,
 	};
 	Q_ENUM( Kind );
 
