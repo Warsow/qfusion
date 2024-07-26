@@ -52,9 +52,6 @@ cvar_t *timescale;
 cvar_t *dedicated;
 cvar_t *versioncvar;
 
-//static cvar_t *fixedtime;
-static cvar_t *com_introPlayed3;
-
 static UnsignedConfigVar v_fixedTime( "fixedtime"_asView, { .byDefault = 0, .flags = CVAR_CHEAT } );
 
 cvar_t *logconsole;
@@ -419,8 +416,6 @@ void Qcommon_Init( int argc, char **argv ) {
 	logconsole_flush =  Cvar_Get( "logconsole_flush", "0", CVAR_ARCHIVE );
 	logconsole_timestamp =  Cvar_Get( "logconsole_timestamp", "0", CVAR_ARCHIVE );
 
-	com_introPlayed3 =   Cvar_Get( "com_introPlayed3", "0", CVAR_ARCHIVE );
-
 	Cvar_Get( "gamename", APPLICATION, CVAR_READONLY );
 	versioncvar = Cvar_Get( "version", APP_VERSION_STR " " CPUSTRING " " __DATE__ " " BUILDSTRING, CVAR_SERVERINFO | CVAR_READONLY );
 
@@ -449,16 +444,7 @@ void Qcommon_Init( int argc, char **argv ) {
 	svCmdSystem->executeBufferCommands();
 #endif
 
-	// if the user didn't give any commands, run default action
-	if( otherArgs.empty() ) {
-		if( !dedicated->integer ) {
-			// only play the introduction sequence once
-			if( !com_introPlayed3->integer ) {
-				Cvar_ForceSet( com_introPlayed3->name, "1" );
-				// TODO: Actually play the intro
-			}
-		}
-	} else {
+	if( !otherArgs.empty() ) {
 		// add + commands from command line
 		primaryCmdSystem->appendLateCommands( otherArgs );
 		// the user asked for something explicit

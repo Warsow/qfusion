@@ -32,7 +32,7 @@ RowLayout {
         }
 
         Rectangle {
-            height: 4; width: movementColumn.width
+            height: UI.boldLineHeight; width: movementColumn.width
             color: movementGroupColor
         }
 
@@ -61,7 +61,7 @@ RowLayout {
         }
 
         Rectangle {
-            height: 4; width: weaponColumnsRow.width
+            height: UI.boldLineHeight; width: weaponColumnsRow.width
             color: weaponGroupColor
         }
 
@@ -104,7 +104,7 @@ RowLayout {
         }
 
         Rectangle {
-            height: 4; width: actionsColumn.width
+            height: UI.boldLineHeight; width: actionsColumn.width
             color: actionGroupColor
         }
 
@@ -133,7 +133,7 @@ RowLayout {
         }
 
         Rectangle {
-            height: 4; width: respectColumnsRow.width
+            height: UI.boldLineHeight; width: respectColumnsRow.width
             color: respectGroupColor
         }
 

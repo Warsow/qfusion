@@ -64,6 +64,7 @@
         <file>InGameGametypeOptionsPage.qml</file>
         <file>InGameHud.qml</file>
         <file>InGameMenu.qml</file>
+        <file>IntroScreen.qml</file>
         <file>KeyboardAndMouse.qml</file>
         <file>KeyboardKey.qml</file>
         <file>KeyboardPane.qml</file>

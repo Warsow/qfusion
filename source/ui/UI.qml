@@ -56,6 +56,8 @@ QtObject {
     readonly property real mainMenuButtonWidth: 224.0
     readonly property real mainMenuButtonTrailWidth: 1.5 * 224.0
 
+    readonly property real boldLineHeight: 3.0
+
     function destroyLayer(layer) {
         if (layer) {
             layer.enabled = false

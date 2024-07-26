@@ -139,7 +139,7 @@ FocusScope {
             Layout.topMargin: visible ? 16 : 0
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredWidth: 0
-            Layout.preferredHeight: visible ? 3 : 0
+            Layout.preferredHeight: visible ? UI.boldLineHeight : 0
             Component.onCompleted: {
                 if (visible) {
                     Layout.preferredWidth = 0.67 * primaryColumn.width

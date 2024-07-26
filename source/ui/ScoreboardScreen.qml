@@ -5,10 +5,8 @@ import QtQuick.Controls.Material.impl 2.12
 import QtQuick.Layouts 1.12
 import net.warsow 2.6
 
-Rectangle {
+Item {
     id: root
-
-    color: UI.ui.colorWithAlpha(Material.background, UI.fullscreenOverlayOpacity - 0.05)
 
     readonly property real baseCellWidth: 64
     readonly property real clanCellWidth: 96

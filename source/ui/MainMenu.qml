@@ -7,70 +7,7 @@ import net.warsow 2.6
 Item {
 	id: root
 
-    property real tintAlpha: 0.05
-
-    SequentialAnimation {
-        running: true
-        loops: Animation.Infinite
-        ParallelAnimation {
-            NumberAnimation {
-                target: radialGradient
-                property: "horizontalRadius"
-                from: parent.width
-                to: 0.33 * parent.width
-                duration: 7500
-            }
-            NumberAnimation {
-                target: root
-                property: "tintAlpha"
-                from: 0.05
-                to: 0.09
-                duration: 7500
-            }
-        }
-        ParallelAnimation {
-            NumberAnimation {
-                target: radialGradient
-                property: "horizontalRadius"
-                from: 0.33 * parent.width
-                to: parent.width
-                duration: 7500
-            }
-            NumberAnimation {
-                target: root
-                property: "tintAlpha"
-                from: 0.09
-                to: 0.05
-                duration: 7500
-            }
-        }
-    }
-
-    Rectangle {
-        visible: !UI.ui.isClientDisconnected
-        anchors.fill: parent
-        color: UI.ui.colorWithAlpha(Material.background, UI.fullscreenOverlayOpacity)
-    }
-
-    RadialGradient {
-        id: radialGradient
-        visible: UI.ui.isClientDisconnected
-        anchors.fill: parent
-        horizontalRadius: parent.width
-        // Stretches it vertically making it almost a column in the expanded state
-        verticalRadius: parent.height * (1.0 + 3.0 * primaryMenu.expansionFrac)
-        gradient: Gradient {
-            GradientStop {
-                position: 0.00
-                color: UI.ui.colorWithAlpha(Qt.tint(Material.background, UI.ui.colorWithAlpha(Material.accent, root.tintAlpha)), 0.99)
-            }
-            GradientStop {
-                position: 1.00
-	            // The gradient makes it look denser so the base value is slightly lower
-                color: UI.ui.colorWithAlpha(Qt.darker(Material.backgroundColor, 1.2), UI.fullscreenOverlayOpacity - 0.10)
-            }
-        }
-    }
+    property alias expansionFrac: primaryMenu.expansionFrac
 
 	MainMenuPrimaryMenu {
 		id: primaryMenu

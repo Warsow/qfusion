@@ -229,6 +229,8 @@ public:
 	Q_PROPERTY( bool isShowingConnectionScreen READ isShowingConnectionScreen NOTIFY isShowingConnectionScreenChanged );
 	Q_PROPERTY( bool isShowingInGameMenu READ isShowingInGameMenu NOTIFY isShowingInGameMenuChanged );
 	Q_PROPERTY( bool isShowingDemoPlaybackMenu READ isShowingDemoPlaybackMenu NOTIFY isShowingDemoPlaybackMenuChanged );
+	Q_PROPERTY( bool isShowingIntroScreen READ isShowingIntroScreen NOTIFY isShowingIntroScreenChanged );
+
 	Q_PROPERTY( bool isDebuggingNativelyDrawnItems READ isDebuggingNativelyDrawnItems NOTIFY isDebuggingNativelyDrawnItemsChanged );
 
 	Q_PROPERTY( bool isShowingScoreboard READ isShowingScoreboard NOTIFY isShowingScoreboardChanged );
@@ -298,6 +300,7 @@ public:
 	Q_INVOKABLE void showMainMenu();
 	Q_INVOKABLE void returnFromInGameMenu();
 	Q_INVOKABLE void returnFromMainMenu();
+	Q_INVOKABLE void finishIntro();
 
 	Q_INVOKABLE void closeChatPopup();
 
@@ -442,6 +445,8 @@ signals:
 	Q_SIGNAL void isShowingMainMenuChanged( bool isShowingMainMenu );
 	Q_SIGNAL void isShowingConnectionScreenChanged( bool isShowingConnectionScreen );
 	Q_SIGNAL void isShowingInGameMenuChanged( bool isShowingInGameMenu );
+	Q_SIGNAL void isShowingIntroScreenChanged( bool isShowingIntroScreen );
+
 	Q_SIGNAL void isShowingDemoPlaybackMenuChanged( bool isShowingDemoMenu );
 	Q_SIGNAL void isDebuggingNativelyDrawnItemsChanged( bool isDebuggingNativelyDrawnItems );
 	Q_SIGNAL void hasPendingCVarChangesChanged( bool hasPendingCVarChanges );
@@ -473,6 +478,11 @@ private:
 #else
 	static inline const QString s_emojiFontFamily { "Segoe UI Emoji" };
 #endif
+
+	// &'static so the value is preserved upon restarts
+	static inline bool s_hasFinishedIntro { false };
+	bool m_hasPendingIntroFinish { false };
+	bool m_hasCheckedFirstFrame { false };
 
 	int64_t m_lastDrawMenuPartTimestamp { 0 };
 
@@ -547,10 +557,11 @@ private:
 	bool m_isOperator { false };
 
 	enum ActiveMenuMask : unsigned {
-		MainMenu             = 0x1,
-		ConnectionScreen     = 0x2,
-		InGameMenu           = 0x4,
-		DemoPlaybackMenu     = 0x8
+		MainMenu             = 1 << 0,
+		ConnectionScreen     = 1 << 1,
+		InGameMenu           = 1 << 2,
+		DemoPlaybackMenu     = 1 << 3,
+		IntroScreen          = 1 << 4,
 	};
 
 	unsigned m_activeMenuMask { 0 };
@@ -651,6 +662,8 @@ private:
 	bool isShowingConnectionScreen() const { return ( m_activeMenuMask & ConnectionScreen ) != 0; }
 	[[nodiscard]]
 	bool isShowingInGameMenu() const { return ( m_activeMenuMask & InGameMenu ) != 0; }
+	[[nodiscard]]
+	bool isShowingIntroScreen() const { return ( m_activeMenuMask & IntroScreen ) != 0; }
 
 	[[nodiscard]]
 	bool isShowingActionRequests() const { return m_isShowingActionRequests; }
@@ -1441,7 +1454,7 @@ void QtUISystem::drawBackgroundMapIfNeeded() {
 		return;
 	}
 
-	if( !( m_activeMenuMask & MainMenu ) ) {
+	if( !( m_activeMenuMask & ( MainMenu | IntroScreen ) ) ) {
 		return;
 	}
 
@@ -1495,6 +1508,10 @@ void QtUISystem::returnFromMainMenu() {
 	}
 }
 
+void QtUISystem::finishIntro() {
+	m_hasPendingIntroFinish = true;
+}
+
 void QtUISystem::closeChatPopup() {
 	const bool wasShowingChatPopup = m_isShowingChatPopup;
 	const bool wasShowingTeamChatPopup = m_isShowingTeamChatPopup;
@@ -1523,6 +1540,7 @@ void QtUISystem::setActiveMenuMask( unsigned activeMask ) {
 	const bool wasShowingConnectionScreen = isShowingConnectionScreen();
 	const bool wasShowingInGameMenu = isShowingInGameMenu();
 	const bool wasShowingDemoPlaybackMenu = isShowingDemoPlaybackMenu();
+	const bool wasShowingIntroScreen = isShowingIntroScreen();
 
 	m_activeMenuMask = activeMask;
 
@@ -1530,6 +1548,7 @@ void QtUISystem::setActiveMenuMask( unsigned activeMask ) {
 	const bool _isShowingConnectionScreen = isShowingConnectionScreen();
 	const bool _isShowingInGameMenu = isShowingInGameMenu();
 	const bool _isShowingDemoPlaybackMenu = isShowingDemoPlaybackMenu();
+	const bool _isShowingIntroScreen = isShowingIntroScreen();
 
 	if( wasShowingMainMenu != _isShowingMainMenu ) {
 		Q_EMIT isShowingMainMenuChanged( _isShowingMainMenu );
@@ -1542,6 +1561,9 @@ void QtUISystem::setActiveMenuMask( unsigned activeMask ) {
 	}
 	if( wasShowingDemoPlaybackMenu != _isShowingDemoPlaybackMenu ) {
 		Q_EMIT isShowingDemoPlaybackMenuChanged( _isShowingDemoPlaybackMenu );
+	}
+	if( wasShowingIntroScreen != _isShowingIntroScreen ) {
+		Q_EMIT isShowingIntroScreenChanged( _isShowingIntroScreen );
 	}
 
 	if( m_activeMenuMask && !oldActiveMask ) {
@@ -1558,6 +1580,12 @@ void QtUISystem::refreshProperties() {
 	const bool isPlayingADemo = cls.demoPlayer.playing;
 	m_isPlayingADemo = isPlayingADemo;
 
+	if( !s_hasFinishedIntro ) {
+		if( actualClientState > CA_DISCONNECTED || m_pendingReconnectBehaviour != std::nullopt ) {
+			m_hasPendingIntroFinish = true;
+		}
+	}
+
 	bool checkMaskChanges = false;
 	if( m_clientState != lastClientState ) {
 		checkMaskChanges = true;
@@ -1567,11 +1595,24 @@ void QtUISystem::refreshProperties() {
 		checkMaskChanges = true;
 	}
 
+	if( m_hasPendingIntroFinish ) {
+		s_hasFinishedIntro = true;
+		m_hasPendingIntroFinish = false;
+		checkMaskChanges = true;
+	}
+
+	if( m_hasCheckedFirstFrame ) {
+		m_hasCheckedFirstFrame = false;
+		checkMaskChanges = true;
+	}
+
 	if( checkMaskChanges ) {
 		const bool wasShowingScoreboard = m_isShowingScoreboard;
 		const bool wasShowingChatPopup = m_isShowingChatPopup;
 		const bool wasShowingTeamChatPopup = m_isShowingTeamChatPopup;
-		if( m_pendingReconnectBehaviour ) {
+		if( !s_hasFinishedIntro ) {
+			setActiveMenuMask( IntroScreen );
+		} else if( m_pendingReconnectBehaviour ) {
 			m_reconnectBehaviour = m_pendingReconnectBehaviour;
 			setActiveMenuMask( ConnectionScreen );
 			m_droppedConnectionTitle   = m_pendingDroppedConnectionTitle;
@@ -2489,7 +2530,7 @@ void QtUISystem::setScoreboardShown( bool shown ) {
 }
 
 bool QtUISystem::suggestsUsingVSync() const {
-	return ( m_activeMenuMask & ( MainMenu | InGameMenu | ConnectionScreen ) ) != 0;
+	return ( m_activeMenuMask & ( MainMenu | InGameMenu | ConnectionScreen | IntroScreen ) ) != 0;
 }
 
 void QtUISystem::toggleChatPopup() {
@@ -2634,7 +2675,7 @@ void QtUISystem::launchLocalServer( const QByteArray &gametype, const QByteArray
 
 bool QtUISystem::isShowingModalMenu() const {
 	if( m_menuSandbox ) {
-		return ( m_activeMenuMask & ( InGameMenu | MainMenu ) ) != 0;
+		return ( m_activeMenuMask & ( InGameMenu | MainMenu | IntroScreen ) ) != 0;
 	}
 	return false;
 }
