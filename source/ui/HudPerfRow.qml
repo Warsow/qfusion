@@ -30,7 +30,23 @@ Item {
     onFixedVisualMinChanged: updateYValues()
     onFixedVisualMaxChanged: updateYValues()
     onUseFixedLevelIfSteadyChanged: updateYValues()
+    onMinVisualFracChanged: updateYValues()
+    onMaxVisualFracChanged: updateYValues()
+    onSteadyVisualFracChanged: updateYValues()
     onDisplayLowerBarChanged: updateYValues()
+
+    Component.onCompleted: {
+        updateXValues()
+        updateYValues()
+    }
+    onWidthChanged: {
+        updateXValues()
+        updateYValues()
+    }
+    onHeightChanged: {
+        updateXValues()
+        updateYValues()
+    }
 
     HudLabel {
         id: titleLabel
@@ -97,11 +113,15 @@ Item {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.margins: 8
+        Component.onCompleted: {
+            updateXValues()
+            updateYValues()
+        }
         onWidthChanged: {
             updateXValues()
             updateYValues()
         }
-        Component.onCompleted: {
+        onHeightChanged: {
             updateXValues()
             updateYValues()
         }
@@ -121,7 +141,12 @@ Item {
             strokeColor: "transparent"
             Behavior on strokeColor { ColorAnimation { duration: 250 } }
             strokeWidth: 2
-            PathLine {}
+            startX: 0
+            startY: shape.height
+            PathLine {
+                x: shape.width
+                y: shape.height
+            }
         }
     }
 
@@ -166,11 +191,7 @@ Item {
                 // Calc flipped Y
                 path.pathElements[i - 1].y = shape.height * (1.0 - frac)
             }
-            lowerBarPath.strokeColor       = UI.ui.colorWithAlpha(root.strokeColor, 0.2)
-            lowerBarPath.startX            = 0
-            lowerBarPath.startY            = shape.height * (1.0 - minVisualFrac)
-            lowerBarPath.pathElements[0].x = shape.width
-            lowerBarPath.pathElements[0].y = shape.height * (1.0 - minVisualFrac)
+            lowerBarPath.strokeColor = Hud.ui.colorWithAlpha(root.strokeColor, 0.2)
         } else {
             const frac = 1.0 - steadyVisualFrac
             path.startY = frac * shape.height

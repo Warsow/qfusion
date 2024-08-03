@@ -9,13 +9,17 @@ Item {
     width: implicitWidth
     height: implicitHeight
     implicitWidth: Hud.miniviewItemWidth
-    implicitHeight: Hud.miniviewItemHeight
+    implicitHeight: (showFps && showNet) ? Hud.miniviewItemHeight : ((showFps || showNet) ? Hud.teamScoreHeight : 0.0)
+
+    readonly property bool showFps: !!(Hud.commonDataModel.activeItemsMask & HudLayoutModel.ShowFps)
+    readonly property bool showNet: !!(Hud.commonDataModel.activeItemsMask & HudLayoutModel.ShowNet)
 
     Connections {
         target: Hud.ui
         onDisplayedHudItemsRetrievalRequested: {
-            // TODO: Check if it's really displayed
-            Hud.ui.supplyDisplayedHudItemAndMargin(root, 1.0)
+            if (Hud.commonDataModel.activeItemsMask) {
+                Hud.ui.supplyDisplayedHudItemAndMargin(root, 1.0)
+            }
         }
     }
 
@@ -33,13 +37,14 @@ Item {
         height: root.height - 2 * Hud.elementMargin
         spacing: 8
         HudPerfRow {
+            visible: root.showFps
             Layout.fillWidth: true
             Layout.fillHeight: true
             title: "FPS"
             altTitle: "FRME<br>TIME"
             primaryValueText: Math.round(1000 / Hud.commonDataModel.frametimeDataRow.average)
             fixedVisualMin: 0.0
-            maxVisualFrac: 0.9
+            maxVisualFrac: showNet ? 0.9 : 1.0
             useFixedLevelIfSteady: true
             displayLowerBar: true
             rowData: Hud.commonDataModel.frametimeDataRow
@@ -47,6 +52,7 @@ Item {
             valueFormatter: v => '' + Math.round(v)
         }
         HudPerfRow {
+            visible: root.showNet
             Layout.fillWidth: true
             Layout.fillHeight: true
             title: "PING"

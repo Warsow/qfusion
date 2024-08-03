@@ -120,6 +120,11 @@ StackView {
                         }
                         SettingsRow {
                             explicitContentPartWidth: twoColumnRow.explicitContentPartWidth
+                            text: "Show ping/packetloss"
+                            CVarAwareCheckBox { cvarName: "cg_showNet" }
+                        }
+                        SettingsRow {
+                            explicitContentPartWidth: twoColumnRow.explicitContentPartWidth
                             text: "Show player speed"
                             CVarAwareCheckBox { cvarName: "cg_showSpeed" }
                         }

@@ -1248,7 +1248,7 @@ auto HudLayoutModel::getShownItemBitsForKind( Kind kind ) -> ShownItemBits {
 		// TODO: Should there be some specific bit for miniviews?
 		case MiniviewPane1: return NoShownItemBits;
 		case MiniviewPane2: return NoShownItemBits;
-		case PerfPane: return NoShownItemBits;
+		case PerfPane: return (ShownItemBits)( ShowFps | ShowNet );
 		default: wsw::failWithLogicError( "unreachable" );
 	}
 }

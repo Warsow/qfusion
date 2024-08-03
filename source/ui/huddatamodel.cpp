@@ -1065,6 +1065,12 @@ void HudCommonDataModel::checkPropertyChanges( int64_t currTime ) {
 	if( isCVarSet( "cg_showAwards" ) ) {
 		newActiveItemsMask |= (int)HudLayoutModel::ShowAwards;
 	}
+	if( isCVarSet( "cg_showFPS" ) ) {
+		newActiveItemsMask |= (int)HudLayoutModel::ShowFps;
+	}
+	if( isCVarSet( "cg_showNet" ) ) {
+		newActiveItemsMask |= (int)HudLayoutModel::ShowNet;
+	}
 	if( m_activeItemsMask != newActiveItemsMask ) {
 		m_activeItemsMask = newActiveItemsMask;
 		Q_EMIT activeItemsMaskChanged( newActiveItemsMask );

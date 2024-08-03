@@ -68,12 +68,15 @@ public:
 
 	// We have to use bits instead of direct strings due to Qml GC issues
 	enum ShownItemBits {
-		NoShownItemBits = 0x0,
-		ShowTeamInfo    = 0x1,
-		ShowFragsFeed   = 0x2,
-		ShowMessageFeed = 0x4,
-		ShowAwards      = 0x8,
+		NoShownItemBits = 0,
+		ShowTeamInfo    = 1 << 0,
+		ShowFragsFeed   = 1 << 1,
+		ShowMessageFeed = 1 << 2,
+		ShowAwards      = 1 << 3,
+		ShowFps         = 1 << 4,
+		ShowNet         = 1 << 5,
 	};
+	Q_ENUM( ShownItemBits );
 
 	enum Flavor {
 		Regular = 1,

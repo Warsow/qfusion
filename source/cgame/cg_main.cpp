@@ -121,6 +121,7 @@ BoolConfigVar v_showHud( "cg_showHud"_asView, { .byDefault = true } );
 BoolConfigVar v_showViewBlends( "cg_showViewBlends"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } );
 IntConfigVar v_showTeamInfo( "cg_showTeamInfo"_asView, { .byDefault = 1, .flags = CVAR_ARCHIVE } );
 BoolConfigVar v_showFps( "cg_showFps"_asView, { .byDefault = false, .flags = CVAR_ARCHIVE } );
+BoolConfigVar v_showNet( "cg_showNet"_asView, { .byDefault = false, .flags = CVAR_ARCHIVE } );
 BoolConfigVar v_showZoomEffect( "cg_showZoomEffect"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } );
 BoolConfigVar v_showPressedKeys( "cg_showPressedKeys"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } );
 BoolConfigVar v_showSpeed( "cg_showSpeed"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } );
