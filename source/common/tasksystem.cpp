@@ -19,6 +19,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "tasksystem.h"
+#include "wswpodvector.h"
+#include "wswalgorithm.h"
 
 #include <atomic>
 #include <cassert>
@@ -35,23 +37,33 @@ struct TaskSystemImpl {
 	~TaskSystemImpl();
 
 	struct TaskEntry {
-		enum Status : unsigned { Pending, Busy, Completed };
-		unsigned status { Pending };
-		unsigned offsetOfCallable { 0 };
-		unsigned offsetOfDependencies { 0 };
-		unsigned countOfDependencies { 0 };
+		enum Status : uint8_t { Pending, Busy, Completed };
+
+		Status status { Pending };
+		TaskSystem::DependencyAddressMode polledDependenciesAddressMode { TaskSystem::RangeOfEntryIndices };
+		TaskSystem::DependencyAddressMode pushedDependentsAddressMode { TaskSystem::RangeOfEntries };
 		TaskSystem::Affinity affinity { TaskSystem::AnyThread };
+
+		// Let it crash if not set (~0u is a special value)
+		unsigned offsetOfCallable { ~0u / 2 };
+
+		unsigned startOfPolledDependencies { 0 }, endOfPolledDependencies { 0 };
+		unsigned startOfPushedDependents { 0 }, endOfPushedDependents { 0 };
+
+		unsigned numSatisfiedPushDependencies { 0 }, numTotalPushDependencies { 0 };
+
+		unsigned instanceArg { 0 };
 	};
 
 	// In bytes
-	static constexpr size_t kCapacityOfMemOfCallables = 1 * 1024 * 1024;
-	static constexpr size_t kMaxTaskEntries           = std::numeric_limits<int16_t>::max();
+	static constexpr size_t kCapacityOfMemOfCallables = 256 * 1024;
+	static constexpr size_t kMaxTaskEntries           = TaskSystem::kMaxTaskEntries;
 	// Let us assume the average number of dependencies to be 16
-	static constexpr size_t kMaxDependencyEntries     = 16 * kMaxTaskEntries;
+	static constexpr size_t kMaxDependencyIndices     = 16 * kMaxTaskEntries;
 
 	// Sanity checks
-	static_assert( sizeof( TaskEntry ) * kMaxTaskEntries < 1 * 1024 * 1024 );
-	static_assert( sizeof( uint16_t ) * kMaxDependencyEntries < 1 * 1024 * 1024 );
+	static_assert( sizeof( TaskEntry ) * kMaxTaskEntries < 2 * 1024 * 1024 );
+	static_assert( sizeof( uint16_t ) * kMaxDependencyIndices < 1024 * 1024 );
 
 	// Note: All entries which get submitted between TaskSystem::startExecution() and TaskSystem::awaitCompletion()
 	// stay in the same region of memory without relocation.
@@ -62,12 +74,18 @@ struct TaskSystemImpl {
 	std::unique_ptr<uint8_t[]> memOfCallables { new uint8_t[kCapacityOfMemOfCallables] };
 	// Using a raw memory chunk for task entries (they aren't trivially constructible, hence they get created on demand)
 	std::unique_ptr<uint8_t[]> memOfTaskEntries { new uint8_t[sizeof( TaskEntry ) * kMaxTaskEntries] };
-	std::unique_ptr<uint16_t[]> dependencyEntries { new uint16_t[kMaxDependencyEntries] };
+	std::unique_ptr<uint16_t[]> dependencyIndices {new uint16_t[kMaxDependencyIndices] };
 
 	// In bytes
 	unsigned sizeOfUsedMemOfCallables { 0 };
 	unsigned numTaskEntriesSoFar { 0 };
 	unsigned numDependencyEntriesSoFar { 0 };
+
+	unsigned savedSizeOfUsedMemOfCallables { 0 };
+	unsigned savedNumTaskEntriesSoFar { 0 };
+	unsigned savedNumDependencyEntriesSoFar { 0 };
+
+	wsw::PodVector<uint16_t> tmpOffsetsOfCallables;
 
 	std::barrier<decltype( []() noexcept {} )> barrier;
 
@@ -114,29 +132,25 @@ auto TaskSystem::getNumberOfWorkers() const -> unsigned {
 	return m_impl->threads.size() + 1;
 }
 
-void TaskSystem::acquireTapeMutex( TaskSystemImpl *impl ) {
+void TaskSystem::beginTapeModification( TaskSystemImpl *impl ) {
 	impl->globalMutex.lock();
+	impl->savedSizeOfUsedMemOfCallables  = impl->sizeOfUsedMemOfCallables;
+	impl->savedNumTaskEntriesSoFar       = impl->numTaskEntriesSoFar;
+	impl->savedNumDependencyEntriesSoFar = impl->numDependencyEntriesSoFar;
 }
 
-void TaskSystem::releaseTapeMutex( TaskSystemImpl *impl ) {
+void TaskSystem::endTapeModification( TaskSystemImpl *impl, bool succeeded ) {
+	if( !succeeded ) [[unlikely]] {
+		// Callables must be constructed in a nonthrowing fashion, hence we just reset the offset
+		impl->sizeOfUsedMemOfCallables  = impl->savedSizeOfUsedMemOfCallables;
+		impl->numTaskEntriesSoFar       = impl->savedNumTaskEntriesSoFar;
+		impl->numDependencyEntriesSoFar = impl->savedNumDependencyEntriesSoFar;
+	}
 	impl->globalMutex.unlock();
 }
 
-auto TaskSystem::addEntryAndAllocCallableMem( Affinity affinity, const TaskHandle *dependenciesBegin,
-											  const TaskHandle *dependenciesEnd, size_t alignment, size_t size )
-											  -> std::pair<void *, TaskHandle> {
-	assert( dependenciesBegin <= dependenciesEnd );
+auto TaskSystem::allocMemForCallable( size_t alignment, size_t size ) -> std::pair<void *, unsigned> {
 	assert( alignment && size );
-
-	// May happen in runtime. This has to be handled.
-
-	if( m_impl->numTaskEntriesSoFar + 1 >= TaskSystemImpl::kMaxTaskEntries ) [[unlikely]] {
-		throw std::runtime_error( "Too many task entries" );
-	}
-	const size_t newNumDependencyEntries = m_impl->numDependencyEntriesSoFar + ( dependenciesEnd - dependenciesBegin );
-	if( newNumDependencyEntries > (size_t)TaskSystemImpl::kMaxTaskEntries ) [[unlikely]] {
-		throw std::runtime_error( "Too many dependencies" );
-	}
 
 	uintptr_t alignmentBytes   = 0;
 	uintptr_t actualTopAddress = (uintptr_t)m_impl->memOfCallables.get() + m_impl->sizeOfUsedMemOfCallables;
@@ -151,6 +165,7 @@ auto TaskSystem::addEntryAndAllocCallableMem( Affinity affinity, const TaskHandl
 		}
 	}
 
+	// May happen in runtime. This has to be handled.
 	if( m_impl->sizeOfUsedMemOfCallables + size + alignmentBytes > TaskSystemImpl::kCapacityOfMemOfCallables ) {
 		throw std::runtime_error( "The storage of callables has been exhausted" );
 	}
@@ -158,27 +173,137 @@ auto TaskSystem::addEntryAndAllocCallableMem( Affinity affinity, const TaskHandl
 	const unsigned offsetOfCallable = m_impl->sizeOfUsedMemOfCallables + alignmentBytes;
 	m_impl->sizeOfUsedMemOfCallables += size + alignmentBytes;
 
-	const auto offsetOfDependencies = (unsigned)m_impl->numDependencyEntriesSoFar;
-	const auto countOfDependencies  = (unsigned)( dependenciesEnd - dependenciesBegin );
-	if( countOfDependencies ) [[likely]] {
-		for( const TaskHandle *dependency = dependenciesBegin; dependency < dependenciesEnd; ++dependency ) {
-			assert( dependency->m_opaque <= m_impl->numTaskEntriesSoFar );
-			m_impl->dependencyEntries.get()[m_impl->numDependencyEntriesSoFar++] = dependency->m_opaque - 1;
-		}
+	void *const memForCallable = m_impl->memOfCallables.get() + offsetOfCallable;
+	assert( ( (uintptr_t)memForCallable % alignment ) == 0 );
+	return { memForCallable, offsetOfCallable };
+}
+
+auto TaskSystem::addEntry( Affinity affinity, unsigned offsetOfCallable ) -> TaskHandle {
+	// May happen in runtime. This has to be handled.
+	if( m_impl->numTaskEntriesSoFar + 1 >= TaskSystemImpl::kMaxTaskEntries ) [[unlikely]] {
+		throw std::runtime_error( "Too many task entries" );
 	}
 
 	void *taskEntryMem = m_impl->memOfTaskEntries.get() + sizeof( TaskSystemImpl::TaskEntry ) * m_impl->numTaskEntriesSoFar;
 	m_impl->numTaskEntriesSoFar++;
 	new( taskEntryMem )TaskSystemImpl::TaskEntry {
-		.offsetOfCallable     = offsetOfCallable,
-		.offsetOfDependencies = offsetOfDependencies,
-		.countOfDependencies  = countOfDependencies,
-		.affinity             = affinity,
+		.affinity         = affinity,
+		.offsetOfCallable = offsetOfCallable,
 	};
 
 	TaskHandle resultHandle;
 	resultHandle.m_opaque = m_impl->numTaskEntriesSoFar;
-	return { (void *)( m_impl->memOfCallables.get() + offsetOfCallable ), resultHandle };
+	return resultHandle;
+}
+
+void TaskSystem::addPolledDependenciesToEntry( TaskHandle taskHandle, const TaskHandle *depsBegin, const TaskHandle *depsEnd ) {
+	assert( depsBegin <= depsEnd );
+
+	// May happen in runtime. This has to be handled.
+	const size_t newNumDependencyEntries = m_impl->numDependencyEntriesSoFar + ( depsEnd - depsBegin );
+	if( newNumDependencyEntries > (size_t)TaskSystemImpl::kMaxDependencyIndices ) [[unlikely]] {
+		throw std::runtime_error( "Too many dependencies" );
+	}
+
+	const auto offsetOfDependencies = (unsigned)m_impl->numDependencyEntriesSoFar;
+	for( const TaskHandle *dependency = depsBegin; dependency < depsEnd; ++dependency ) {
+		assert( dependency->m_opaque <= m_impl->numTaskEntriesSoFar );
+		// TODO: Simplify this, lift it out of the loop
+		m_impl->dependencyIndices.get()[m_impl->numDependencyEntriesSoFar++] = dependency->m_opaque - 1;
+	}
+
+	auto *const entry = (TaskSystemImpl::TaskEntry *)m_impl->memOfTaskEntries.get() + ( taskHandle.m_opaque - 1 );
+	entry->startOfPolledDependencies     = offsetOfDependencies;
+	entry->endOfPolledDependencies       = offsetOfDependencies + ( depsEnd - depsBegin );
+	entry->polledDependenciesAddressMode = DependencyAddressMode::RangeOfEntryIndices;
+}
+
+void TaskSystem::addPushedDependentsToEntry( TaskHandle taskHandle, unsigned taskRangeBegin, unsigned taskRangeEnd ) {
+	assert( taskRangeBegin <= taskRangeEnd );
+
+	auto *const taskMemBase = (TaskSystemImpl::TaskEntry *)m_impl->memOfTaskEntries.get();
+
+	auto *const entry = taskMemBase + ( taskHandle.m_opaque - 1 );
+	entry->startOfPushedDependents     = taskRangeBegin;
+	entry->endOfPushedDependents       = taskRangeEnd;
+	entry->pushedDependentsAddressMode = DependencyAddressMode::RangeOfEntries;
+
+	// Add an expected push dependency to each task in the range
+	for( unsigned taskIndex = taskRangeBegin; taskIndex < taskRangeEnd; ++taskIndex ) {
+		taskMemBase[taskIndex].numTotalPushDependencies++;
+	}
+}
+
+[[nodiscard]]
+auto TaskSystem::addParallelAndJoinEntries( Affinity affinity, unsigned offsetOfCallable, unsigned numTasks )
+	-> std::pair<std::pair<unsigned, unsigned>, TaskHandle> {
+	// May happen in runtime. This has to be handled.
+	if( m_impl->numTaskEntriesSoFar + numTasks + 1 >= TaskSystemImpl::kMaxTaskEntries ) [[unlikely]] {
+		throw std::runtime_error( "Too many task entries" );
+	}
+
+	const unsigned parRangeBegin = m_impl->numTaskEntriesSoFar;
+	const unsigned parRangeEnd   = m_impl->numTaskEntriesSoFar + numTasks;
+
+	auto *const taskMemBase = (TaskSystemImpl::TaskEntry *)m_impl->memOfTaskEntries.get();
+	for( unsigned parIndex = parRangeBegin; parIndex < parRangeEnd; ++parIndex ) {
+		new( taskMemBase + parIndex )TaskSystemImpl::TaskEntry {
+			.pushedDependentsAddressMode = DependencyAddressMode::RangeOfEntries,
+			.affinity                    = affinity,
+			.offsetOfCallable            = offsetOfCallable,
+			.startOfPushedDependents     = parRangeEnd,
+			.endOfPushedDependents       = parRangeEnd + 1,
+		};
+	}
+
+	new( taskMemBase + parRangeEnd )TaskSystemImpl::TaskEntry {
+		.affinity                 = affinity,
+		.offsetOfCallable         = ~0u,
+		.numTotalPushDependencies = numTasks,
+	};
+
+	m_impl->numTaskEntriesSoFar += numTasks + 1;
+
+	TaskHandle resultHandle;
+	resultHandle.m_opaque = m_impl->numTaskEntriesSoFar;
+	return { { parRangeBegin, parRangeEnd }, resultHandle };
+}
+
+void TaskSystem::setupIotaInstanceArgs( std::pair<unsigned, unsigned> taskRange, unsigned startValue ) {
+	const auto [taskRangeBegin, taskRangeEnd] = taskRange;
+	assert( taskRangeBegin < taskRangeEnd && taskRangeEnd <= m_impl->numTaskEntriesSoFar );
+
+	for( unsigned taskIndex = taskRangeBegin; taskIndex < taskRangeEnd; ++taskIndex ) {
+		auto *entry = (TaskSystemImpl::TaskEntry *)m_impl->memOfTaskEntries.get() + taskIndex;
+		entry->instanceArg = startValue + ( taskIndex - taskRangeBegin );
+	}
+}
+
+void TaskSystem::setupRangeInstanceArgs( std::pair<unsigned, unsigned> taskRange, unsigned startValue,
+										 unsigned subrangeLength, unsigned totalWorkload ) {
+	const auto [taskRangeBegin, taskRangeEnd] = taskRange;
+	assert( taskRangeBegin < taskRangeEnd && taskRangeEnd <= m_impl->numTaskEntriesSoFar );
+	assert( taskRangeEnd - taskRangeBegin <= totalWorkload );
+
+	[[maybe_unused]] unsigned workloadLeft = totalWorkload;
+
+	unsigned workloadStart = startValue;
+	for( unsigned taskIndex = taskRangeBegin; taskIndex < taskRangeEnd; ++taskIndex ) {
+		unsigned workloadEnd = workloadStart + subrangeLength;
+		if( workloadEnd > totalWorkload + startValue ) [[unlikely]] {
+			assert( taskIndex + 1 == taskRangeEnd );
+			workloadEnd = totalWorkload + startValue;
+		}
+
+		auto *entry = (TaskSystemImpl::TaskEntry *)m_impl->memOfTaskEntries.get() + taskIndex;
+		assert( workloadStart < workloadEnd && workloadEnd <= 0xFFFFu );
+		entry->instanceArg = ( workloadStart << 16 ) | workloadEnd;
+
+		workloadLeft -= ( workloadEnd - workloadStart );
+		workloadStart = workloadEnd;
+	}
+
+	assert( workloadLeft == 0 );
 }
 
 void TaskSystem::clear() {
@@ -186,11 +311,47 @@ void TaskSystem::clear() {
 
 	auto *const taskEntries = (TaskSystemImpl::TaskEntry *)m_impl->memOfTaskEntries.get();
 
+	// Callables may be shared for multiple task entries.
+	// Tracking references to callables is way too bothersome.
+	// Just prevent duplicated destructor calls which lead to crashing.
+	m_impl->tmpOffsetsOfCallables.clear();
+
+	// These are optimizations to the naive implementation.
+	unsigned offsetOfLastDestroyedCallable     = ~0u;
+	unsigned maxOffsetOfDestroyedCallableSoFar = 0;
+
 	// Callables aren't trivially destructible
+	// TODO: They can perfectly be in some cases (track this status)
 	for( unsigned taskIndex = 0; taskIndex < m_impl->numTaskEntriesSoFar; ++taskIndex ) {
-		auto *callable = (CallableStorage *)( m_impl->memOfCallables.get() + taskEntries[taskIndex].offsetOfCallable );
-		callable->~CallableStorage();
+		const unsigned offsetOfCallable = taskEntries[taskIndex].offsetOfCallable;
+		if( offsetOfCallable != ~0u ) {
+			bool shouldDestroyIt = false;
+			// If the list of processed offsets definitely does not contain the current offset
+			if( maxOffsetOfDestroyedCallableSoFar < offsetOfCallable ) {
+				maxOffsetOfDestroyedCallableSoFar = offsetOfCallable;
+				shouldDestroyIt = true;
+			} else {
+				// If it is not the last destroyed callable (this is an optimization for sequence of tasks with the same callable)
+				if( offsetOfLastDestroyedCallable != offsetOfCallable ) [[unlikely]] {
+					// Perform a generic check using the slow path
+					if( !wsw::contains( m_impl->tmpOffsetsOfCallables, offsetOfCallable ) ) {
+						shouldDestroyIt = true;
+					}
+				}
+			}
+
+			if( shouldDestroyIt ) {
+				assert( !wsw::contains( m_impl->tmpOffsetsOfCallables, offsetOfCallable ) );
+				m_impl->tmpOffsetsOfCallables.push_back( offsetOfCallable );
+				offsetOfLastDestroyedCallable = offsetOfCallable;
+
+				assert( offsetOfCallable < m_impl->sizeOfUsedMemOfCallables );
+				auto *callable = (TapeCallable *)( m_impl->memOfCallables.get() + offsetOfCallable );
+				callable->~TapeCallable();
+			}
+		}
 	}
+
 	m_impl->sizeOfUsedMemOfCallables  = 0;
 
 	// Make sure we can just set count to zero for task entries
@@ -221,6 +382,8 @@ void TaskSystem::startExecution() {
 }
 
 bool TaskSystem::awaitCompletion() {
+	assert( m_impl->isExecuting );
+
 	// Run the part of workload in this thread as well
 	bool succeeded = threadExecTasks( m_impl, ~0u );
 
@@ -281,7 +444,26 @@ bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned thre
 
 				if( pendingCompletionIndex != kIndexUnset ) {
 					TaskSystemImpl::TaskEntry &entry = entries[pendingCompletionIndex];
-					// Safe under mutex
+					if( entry.startOfPushedDependents < entry.endOfPushedDependents ) {
+						unsigned dependentIndex = entry.startOfPushedDependents;
+						if( entry.pushedDependentsAddressMode == DependencyAddressMode::RangeOfEntries ) {
+							// Safe under mutex
+							do {
+								auto &dependentEntry = entries[dependentIndex];
+								dependentEntry.numSatisfiedPushDependencies++;
+								assert( dependentEntry.numSatisfiedPushDependencies <= dependentEntry.numTotalPushDependencies );
+							} while( ++dependentIndex < entry.endOfPushedDependents );
+						} else {
+							const auto *dependencyIndices = impl->dependencyIndices.get();
+							do {
+								auto &dependentEntry = entries[dependencyIndices[dependentIndex]];
+								dependentEntry.numSatisfiedPushDependencies++;
+								assert( dependentEntry.numSatisfiedPushDependencies <= dependentEntry.numTotalPushDependencies );
+							} while( ++dependentIndex < entry.endOfPushedDependents );
+						}
+					}
+					// Mark self as completed in all cases.
+					// Safe under mutex.
 					entry.status = TaskSystemImpl::TaskEntry::Completed;
 					pendingCompletionIndex = kIndexUnset;
 				}
@@ -298,14 +480,34 @@ bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned thre
 							isInNonPendingSpan = false;
 						}
 						if( entry.affinity == AnyThread || threadNumber == ~0u ) {
-							// TODO: These checks can be optimized by tracking indices/masks of already completed dependencies
 							bool hasSatisfiedDependencies = true;
-							unsigned dependencyIndex      = entry.offsetOfDependencies;
-							for(; dependencyIndex < entry.countOfDependencies; ++dependencyIndex ) {
+							// TODO: These checks can be optimized by tracking indices/masks of already completed dependencies
+							if( entry.startOfPolledDependencies < entry.endOfPolledDependencies ) {
+								unsigned dependencyIndex = entry.startOfPolledDependencies;
+								if( entry.polledDependenciesAddressMode == DependencyAddressMode::RangeOfEntries ) {
+									do {
+										// Safe under mutex
+										if( entries[dependencyIndex].status != TaskSystemImpl::TaskEntry::Completed ) {
+											hasSatisfiedDependencies = false;
+											break;
+										}
+									} while( ++dependencyIndex < entry.endOfPolledDependencies );
+								} else {
+									const auto *dependencIndices = impl->dependencyIndices.get();
+									do {
+										auto &dependentEntry = entries[dependencIndices[dependencyIndex]];
+										if( dependentEntry.status != TaskSystemImpl::TaskEntry::Completed ) {
+											hasSatisfiedDependencies = false;
+											break;
+										}
+									} while( ++dependencyIndex < entry.endOfPolledDependencies );
+								}
+							}
+							if( hasSatisfiedDependencies ) {
 								// Safe under mutex
-								if( entries[dependencyIndex].status == TaskSystemImpl::TaskEntry::Completed ) {
+								if( entry.numSatisfiedPushDependencies != entry.numTotalPushDependencies ) {
+									assert( entry.numSatisfiedPushDependencies < entry.numTotalPushDependencies );
 									hasSatisfiedDependencies = false;
-									break;
 								}
 							}
 							if( hasSatisfiedDependencies ) {
@@ -320,9 +522,13 @@ bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned thre
 			} while( false );
 
 			if( chosenIndex != kIndexUnset ) {
-				auto *callable = (CallableStorage *)( impl->memOfCallables.get() + entries[chosenIndex].offsetOfCallable );
-				const unsigned workerIndex = threadNumber + 1;
-				callable->call( workerIndex );
+				const unsigned offsetOfCallable = entries[chosenIndex].offsetOfCallable;
+				// If it's not an auxiliary entry without actual callable
+				if( offsetOfCallable != ~0u ) [[likely]] {
+					auto *callable = (TapeCallable *)( impl->memOfCallables.get() + offsetOfCallable );
+					const unsigned workerIndex = threadNumber + 1;
+					callable->call( workerIndex, entries[chosenIndex].instanceArg );
+				}
 				// Postpone completion so we don't have to lock twice
 				pendingCompletionIndex = chosenIndex;
 			} else {

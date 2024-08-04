@@ -552,14 +552,18 @@ class FinePropagationBuilder : public PropagationTableBuilder {
 		for( unsigned i = 0; i < taskSystem.getNumberOfWorkers(); ++i ) {
 			threadStatesForWorkers.emplace_back( std::make_shared<FinePropagationThreadState>( this, m_euclideanDistanceTable.get(), &m_graphBuilder ) );
 		}
+		const int numLeafs = m_graphBuilder.NumLeafs();
+		// TODO: Let the task system manage it automatically?
+		unsigned subrangeLength = 4;
+		if( ( numLeafs / subrangeLength ) + 16 >= TaskSystem::kMaxTaskEntries ) {
+			subrangeLength = ( numLeafs / TaskSystem::kMaxTaskEntries ) + 1;
+		}
+		auto fn = [=,&threadStatesForWorkers]( unsigned workerIndex, unsigned leafNumsBegin, unsigned leafNumsEnd ) {
+			threadStatesForWorkers[workerIndex]->DoForRangeOfLeafs( leafNumsBegin, leafNumsEnd );
+		};
 		// Start early to test dynamic submission
 		taskSystem.startExecution();
-		const int numLeafs = m_graphBuilder.NumLeafs();
-		for( int leafNum = 1; leafNum < numLeafs; ++leafNum ) {
-			(void)taskSystem.add( [=,&threadStatesForWorkers]( unsigned workerIndex ) {
-				threadStatesForWorkers[workerIndex]->DoForRangeOfLeafs( leafNum, leafNum + 1 );
-			}, {});
-		}
+		(void)taskSystem.addForSubrangesInRange( { 1u, (unsigned)numLeafs }, subrangeLength, {}, std::move( fn ) );
 		return taskSystem.awaitCompletion();
 	}
 public:
@@ -578,14 +582,18 @@ class CoarsePropagationBuilder : public PropagationTableBuilder {
 		for( unsigned i = 0; i < taskSystem.getNumberOfWorkers(); ++i ) {
 			threadStatesForWorkers.emplace_back( std::make_shared<CoarsePropagationThreadState>( this, &m_graphBuilder ) );
 		}
+		const int numLeafs = m_graphBuilder.NumLeafs();
+		// TODO: Let the task system manage it automatically?
+		unsigned subrangeLength = 4;
+		if( ( numLeafs / subrangeLength ) + 16 >= TaskSystem::kMaxTaskEntries ) {
+			subrangeLength = ( numLeafs / TaskSystem::kMaxTaskEntries ) + 1;
+		}
+		auto fn = [=,&threadStatesForWorkers]( unsigned workerIndex, unsigned leafNumsBegin, unsigned leafNumsEnd ) {
+			threadStatesForWorkers[workerIndex]->DoForRangeOfLeafs( leafNumsBegin, leafNumsEnd );
+		};
 		// Start early to test dynamic submission
 		taskSystem.startExecution();
-		const int numLeafs = m_graphBuilder.NumLeafs();
-		for( int leafNum = 1; leafNum < numLeafs; ++leafNum ) {
-			(void)taskSystem.add( [=,&threadStatesForWorkers]( unsigned workerIndex ) {
-				threadStatesForWorkers[workerIndex]->DoForRangeOfLeafs( leafNum, leafNum + 1 );
-			}, {});
-		}
+		(void)taskSystem.addForSubrangesInRange( {1u, (unsigned)numLeafs }, subrangeLength, {}, std::move( fn ) );
 		return taskSystem.awaitCompletion();
 	}
 public:

@@ -320,14 +320,19 @@ bool LeafPropsCache::ComputeNewState( bool fastAndCoarse ) {
 		for( unsigned i = 0, numWorkers = taskSystem.getNumberOfWorkers(); i < numWorkers; ++i ) {
 			samplersForWorkers.emplace_back( LeafPropsSampler( fastAndCoarse ) );
 		}
+		// TODO: Let the task system manage it automatically?
+		unsigned subrangeLength = 4;
+		if( ( actualNumLeafs / subrangeLength ) + 16 >= TaskSystem::kMaxTaskEntries ) {
+			subrangeLength = ( actualNumLeafs / TaskSystem::kMaxTaskEntries ) + 1;
+		}
+		auto fn = [=,&samplersForWorkers,this]( unsigned workerIndex, unsigned beginLeafIndex, unsigned endLeafIndex ) {
+			for( unsigned leafIndex = beginLeafIndex; leafIndex < endLeafIndex; ++leafIndex ) {
+				leafProps[leafIndex] = ComputeLeafProps( &samplersForWorkers[workerIndex], (int)leafIndex, fastAndCoarse );
+			}
+		};
 		// Start early to test dynamic submission
 		taskSystem.startExecution();
-		for( int i = 1; i < actualNumLeafs; ++i ) {
-			// Just add independent tasks for every leaf
-			(void)taskSystem.add( [=,&samplersForWorkers,this]( unsigned workerIndex ) {
-				leafProps[i] = ComputeLeafProps( &samplersForWorkers[workerIndex], i, fastAndCoarse );
-			}, {});
-		}
+		(void)taskSystem.addForSubrangesInRange( { 1u, (unsigned)actualNumLeafs }, subrangeLength, {}, std::move( fn ) );
 		return taskSystem.awaitCompletion();
 	} catch( ... ) {
 		return false;
