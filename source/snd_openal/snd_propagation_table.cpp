@@ -552,13 +552,15 @@ class FinePropagationBuilder : public PropagationTableBuilder {
 		for( unsigned i = 0; i < taskSystem.getNumberOfWorkers(); ++i ) {
 			threadStatesForWorkers.emplace_back( std::make_shared<FinePropagationThreadState>( this, m_euclideanDistanceTable.get(), &m_graphBuilder ) );
 		}
+		// Start early to test dynamic submission
+		taskSystem.startExecution();
 		const int numLeafs = m_graphBuilder.NumLeafs();
 		for( int leafNum = 1; leafNum < numLeafs; ++leafNum ) {
 			(void)taskSystem.add( [=,&threadStatesForWorkers]( unsigned workerIndex ) {
 				threadStatesForWorkers[workerIndex]->DoForRangeOfLeafs( leafNum, leafNum + 1 );
-			});
+			}, {});
 		}
-		return taskSystem.exec();
+		return taskSystem.awaitCompletion();
 	}
 public:
 	explicit FinePropagationBuilder( int actualNumLeafs_ )
@@ -576,13 +578,15 @@ class CoarsePropagationBuilder : public PropagationTableBuilder {
 		for( unsigned i = 0; i < taskSystem.getNumberOfWorkers(); ++i ) {
 			threadStatesForWorkers.emplace_back( std::make_shared<CoarsePropagationThreadState>( this, &m_graphBuilder ) );
 		}
+		// Start early to test dynamic submission
+		taskSystem.startExecution();
 		const int numLeafs = m_graphBuilder.NumLeafs();
 		for( int leafNum = 1; leafNum < numLeafs; ++leafNum ) {
 			(void)taskSystem.add( [=,&threadStatesForWorkers]( unsigned workerIndex ) {
 				threadStatesForWorkers[workerIndex]->DoForRangeOfLeafs( leafNum, leafNum + 1 );
-			});
+			}, {});
 		}
-		return taskSystem.exec();
+		return taskSystem.awaitCompletion();
 	}
 public:
 	explicit CoarsePropagationBuilder( int actualNumLeafs_ )

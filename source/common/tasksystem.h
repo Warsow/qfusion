@@ -47,7 +47,13 @@ public:
 
 	template <typename Callable>
 	[[nodiscard]]
-	auto add( Callable &&callable, Affinity affinity = AnyThread ) -> TaskHandle {
+	auto add( Callable &&callable, std::initializer_list<TaskHandle> dependencies, Affinity affinity = AnyThread ) -> TaskHandle {
+		return add( std::forward<Callable>( callable ), dependencies.begin(), dependencies.end(), affinity );
+	}
+
+	template <typename Callable>
+	[[nodiscard]]
+	auto add( Callable &&callable, const TaskHandle *dependenciesBegin, const TaskHandle *dependenciesEnd, Affinity affinity = AnyThread ) -> TaskHandle {
 		// This is a specialized replacement for std::function which should not have place in this omnipresent header
 		struct CallableStorageImpl final : public CallableStorage {
 			CallableStorageImpl() = default;
@@ -77,23 +83,39 @@ public:
 			bool m_hasValue { false };
 		};
 
+		// TODO: Use some kind of generalized scope guard
+		struct Unlock {
+			explicit Unlock( TaskSystemImpl *impl ) : m_impl( impl ) {}
+			~Unlock() { releaseLock( m_impl ); }
+			TaskSystemImpl *m_impl;
+		};
+
+		acquireLock( m_impl );
+
+		[[maybe_unused]] volatile Unlock lock { m_impl };
 		constexpr size_t alignment = alignof( CallableStorageImpl );
 		constexpr size_t size      = sizeof( CallableStorageImpl );
-		auto [mem, taskHandle]     = addEntryAndAllocCallableMem( affinity, alignment, size );
+		auto [mem, taskHandle]     = addEntryAndAllocCallableMem( affinity, dependenciesBegin, dependenciesEnd, alignment, size );
 		assert( ( (uintptr_t)mem % alignment ) == 0 );
 		new( mem )CallableStorageImpl( std::forward<Callable>( callable ) );
+
 		return taskHandle;
 	}
 
-	void scheduleInOrder( TaskHandle former, TaskHandle latter );
-
-	void clear();
-	[[nodiscard]] bool exec();
+	void startExecution();
+	[[nodiscard]] bool awaitCompletion();
 private:
 	enum CompletionStatus : unsigned { CompletionPending, CompletionSuccess, CompletionFailure };
 
+	void clear();
+	void awakeWorkers();
+
 	[[nodiscard]]
-	auto addEntryAndAllocCallableMem( Affinity affinity, size_t alignment, size_t size ) -> std::pair<void *, TaskHandle>;
+	auto addEntryAndAllocCallableMem( Affinity affinity, const TaskHandle *dependenciesBegin, const TaskHandle *dependenciesEnd,
+									  size_t alignment, size_t size ) -> std::pair<void *, TaskHandle>;
+
+	static void acquireLock( struct TaskSystemImpl * );
+	static void releaseLock( struct TaskSystemImpl * );
 
 	static void threadLoopFunc( struct TaskSystemImpl *impl, unsigned threadNumber );
 	[[nodiscard]]

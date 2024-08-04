@@ -34,43 +34,43 @@ struct TaskSystemImpl {
 	explicit TaskSystemImpl( unsigned numExtraThreads );
 	~TaskSystemImpl();
 
-	struct InlineDependentsArray {
-		uint16_t values[11];
-		uint16_t count {0};
-	};
-
 	struct TaskEntry {
 		enum Status : unsigned { Pending, Busy, Completed };
-		unsigned numSatisfiedDependencies { 0 };
 		unsigned status { Pending };
-		unsigned numDependencies { 0 };
 		unsigned offsetOfCallable { 0 };
+		unsigned offsetOfDependencies { 0 };
+		unsigned countOfDependencies { 0 };
 		TaskSystem::Affinity affinity { TaskSystem::AnyThread };
-		std::variant<std::monostate, InlineDependentsArray, std::vector<uint16_t>> dependents {};
-
-		[[nodiscard]]
-		auto getDependents() const -> std::span<const uint16_t> {
-			if( auto *inlineDependents = std::get_if<InlineDependentsArray>( &this->dependents ) ) {
-				return { inlineDependents->values, inlineDependents->count };
-			} else if( auto *dependentsVector = std::get_if<std::vector<uint16_t>>( &this->dependents ) ) {
-				return *dependentsVector;
-			} else {
-				return {};
-			}
-		}
 	};
+
+	// In bytes
+	static constexpr size_t kCapacityOfMemOfCallables = 1 * 1024 * 1024;
+	static constexpr size_t kMaxTaskEntries           = std::numeric_limits<int16_t>::max();
+	// Let us assume the average number of dependencies to be 16
+	static constexpr size_t kMaxDependencyEntries     = 16 * kMaxTaskEntries;
+
+	// Sanity checks
+	static_assert( sizeof( TaskEntry ) * kMaxTaskEntries < 1 * 1024 * 1024 );
+	static_assert( sizeof( uint16_t ) * kMaxDependencyEntries < 1 * 1024 * 1024 );
+
+	// Note: All entries which get submitted between TaskSystem::startExecution() and TaskSystem::awaitCompletion()
+	// stay in the same region of memory without relocation.
 
 	// A separate storage for large callables.
 	// Callables and task entries may reside in the same buffer, but it (as a late addition) complicates existing code.
 	// Preventing use of std::function<> in public API is primary reason of using custom allocation of callables.
-	uint8_t *memOfCallables { nullptr };
+	std::unique_ptr<uint8_t[]> memOfCallables { new uint8_t[kCapacityOfMemOfCallables] };
+	// Using a raw memory chunk for task entries (they aren't trivially constructible, hence they get created on demand)
+	std::unique_ptr<uint8_t[]> memOfTaskEntries { new uint8_t[sizeof( TaskEntry ) * kMaxTaskEntries] };
+	std::unique_ptr<uint16_t[]> dependencyEntries { new uint16_t[kMaxDependencyEntries] };
+
 	// In bytes
 	unsigned sizeOfUsedMemOfCallables { 0 };
-	unsigned capacityOfMemOfCallables { 0 };
+	unsigned numTaskEntriesSoFar { 0 };
+	unsigned numDependencyEntriesSoFar { 0 };
 
 	std::barrier<decltype( []() noexcept {} )> barrier;
 
-	std::vector<TaskEntry> entries;
 	std::vector<std::jthread> threads;
 	std::deque<std::atomic_flag> signalingFlags;
 	std::deque<std::atomic<unsigned>> completionStatuses;
@@ -78,8 +78,7 @@ struct TaskSystemImpl {
 	std::mutex globalMutex;
 	std::atomic<bool> isExecuting { false };
 	std::atomic<bool> isShuttingDown { false };
-	std::vector<std::vector<uint16_t>> boxedDependentsCache;
-	bool hasBoxedDependents { false };
+	std::atomic<bool> awaitsCompletion { false };
 };
 
 TaskSystemImpl::TaskSystemImpl( unsigned numExtraThreads ) : barrier( numExtraThreads + 1 ) {
@@ -90,17 +89,11 @@ TaskSystemImpl::TaskSystemImpl( unsigned numExtraThreads ) : barrier( numExtraTh
 	for( unsigned threadNumber = 0; threadNumber < numExtraThreads; ++threadNumber ) {
 		threads.emplace_back( std::jthread( TaskSystem::threadLoopFunc, this, threadNumber ) );
 	}
-
-	sizeOfUsedMemOfCallables = 0;
-	capacityOfMemOfCallables = 8192;
-	memOfCallables           = (uint8_t*)std::malloc( capacityOfMemOfCallables );
-	if( !memOfCallables ) [[unlikely]] {
-		throw std::bad_alloc();
-	}
 }
 
 TaskSystemImpl::~TaskSystemImpl() {
-	std::free( memOfCallables );
+	// Make sure the parent system properly calls clear()
+	assert( sizeOfUsedMemOfCallables == 0 );
 }
 
 TaskSystem::TaskSystem( CtorArgs &&args ) {
@@ -109,14 +102,11 @@ TaskSystem::TaskSystem( CtorArgs &&args ) {
 
 TaskSystem::~TaskSystem() {
 	m_impl->isShuttingDown.store( true, std::memory_order_seq_cst );
-	// Awake all threads
-	for( std::atomic_flag &flag: m_impl->signalingFlags ) {
-		flag.test_and_set();
-		flag.notify_one();
-	}
+	awakeWorkers();
 	for( std::jthread &thread: m_impl->threads ) {
 		thread.join();
 	}
+	clear();
 	delete m_impl;
 }
 
@@ -124,13 +114,32 @@ auto TaskSystem::getNumberOfWorkers() const -> unsigned {
 	return m_impl->threads.size() + 1;
 }
 
-auto TaskSystem::addEntryAndAllocCallableMem( Affinity affinity, size_t alignment, size_t size ) -> std::pair<void *, TaskHandle> {
-	assert( !m_impl->isExecuting );
-	assert( m_impl->entries.size() < std::numeric_limits<uint16_t>::max() );
+void TaskSystem::acquireLock( TaskSystemImpl *impl ) {
+	impl->globalMutex.lock();
+}
+
+void TaskSystem::releaseLock( TaskSystemImpl *impl ) {
+	impl->globalMutex.unlock();
+}
+
+auto TaskSystem::addEntryAndAllocCallableMem( Affinity affinity, const TaskHandle *dependenciesBegin,
+											  const TaskHandle *dependenciesEnd, size_t alignment, size_t size )
+											  -> std::pair<void *, TaskHandle> {
+	assert( dependenciesBegin <= dependenciesEnd );
 	assert( alignment && size );
 
+	// May happen in runtime. This has to be handled.
+
+	if( m_impl->numTaskEntriesSoFar + 1 >= TaskSystemImpl::kMaxTaskEntries ) [[unlikely]] {
+		throw std::runtime_error( "Too many task entries" );
+	}
+	const size_t newNumDependencyEntries = m_impl->numDependencyEntriesSoFar + ( dependenciesEnd - dependenciesBegin );
+	if( newNumDependencyEntries > (size_t)TaskSystemImpl::kMaxTaskEntries ) [[unlikely]] {
+		throw std::runtime_error( "Too many dependencies" );
+	}
+
 	uintptr_t alignmentBytes   = 0;
-	uintptr_t actualTopAddress = (uintptr_t)m_impl->memOfCallables + m_impl->sizeOfUsedMemOfCallables;
+	uintptr_t actualTopAddress = (uintptr_t)m_impl->memOfCallables.get() + m_impl->sizeOfUsedMemOfCallables;
 	if( !( alignment & ( alignment - 1 ) ) ) [[likely]] {
 		// TODO: Can be branchless
 		if( auto rem = actualTopAddress & ( alignment - 1 ) ) {
@@ -142,139 +151,101 @@ auto TaskSystem::addEntryAndAllocCallableMem( Affinity affinity, size_t alignmen
 		}
 	}
 
-	const size_t requiredMemSize = size + alignmentBytes;
-	if( m_impl->sizeOfUsedMemOfCallables + requiredMemSize > m_impl->capacityOfMemOfCallables ) [[unlikely]] {
-		// We cannot use realloc() as callables are not guaranteed to be trivially relocatable
-		// TODO: Check growth policy
-		const size_t newCapacity = ( 3 * ( m_impl->sizeOfUsedMemOfCallables + requiredMemSize ) ) / 2;
-		auto *const newMem       = (uint8_t *)std::malloc( newCapacity );
-		if( !newMem ) [[unlikely]] {
-			throw std::bad_alloc();
-		}
-		for( TaskSystemImpl::TaskEntry &entry: m_impl->entries ) {
-			auto *oldStorage = ( CallableStorage *)( m_impl->memOfCallables + entry.offsetOfCallable );
-			oldStorage->moveSelfTo( newMem + entry.offsetOfCallable );
-		}
-		std::free( m_impl->memOfCallables );
-		m_impl->memOfCallables           = newMem;
-		m_impl->capacityOfMemOfCallables = newCapacity;
+	if( m_impl->sizeOfUsedMemOfCallables + size + alignmentBytes > TaskSystemImpl::kCapacityOfMemOfCallables ) {
+		throw std::runtime_error( "The storage of callables has been exhausted" );
 	}
 
 	const unsigned offsetOfCallable = m_impl->sizeOfUsedMemOfCallables + alignmentBytes;
-	m_impl->sizeOfUsedMemOfCallables += requiredMemSize;
+	m_impl->sizeOfUsedMemOfCallables += size + alignmentBytes;
 
-	m_impl->entries.emplace_back( TaskSystemImpl::TaskEntry {
-		.offsetOfCallable = offsetOfCallable,
-		.affinity         = affinity,
-	});
+	const auto offsetOfDependencies = (unsigned)m_impl->numDependencyEntriesSoFar;
+	const auto countOfDependencies  = (unsigned)( dependenciesEnd - dependenciesBegin );
+	if( countOfDependencies ) [[likely]] {
+		for( const TaskHandle *dependency = dependenciesBegin; dependency < dependenciesEnd; ++dependency ) {
+			assert( dependency->m_opaque <= m_impl->numTaskEntriesSoFar );
+			m_impl->dependencyEntries.get()[m_impl->numDependencyEntriesSoFar++] = dependency->m_opaque - 1;
+		}
+	}
+
+	void *taskEntryMem = m_impl->memOfTaskEntries.get() + sizeof( TaskSystemImpl::TaskEntry ) * m_impl->numTaskEntriesSoFar;
+	m_impl->numTaskEntriesSoFar++;
+	new( taskEntryMem )TaskSystemImpl::TaskEntry {
+		.offsetOfCallable     = offsetOfCallable,
+		.offsetOfDependencies = offsetOfDependencies,
+		.countOfDependencies  = countOfDependencies,
+		.affinity             = affinity,
+	};
 
 	TaskHandle resultHandle;
-	resultHandle.m_opaque = m_impl->entries.size();
-	return { (void *)( m_impl->memOfCallables + offsetOfCallable ), resultHandle };
-}
-
-void TaskSystem::scheduleInOrder( TaskHandle former, TaskHandle latter ) {
-	assert( former.m_opaque > 0 && former.m_opaque <= (uintptr_t)std::numeric_limits<uint16_t>::max() + 1 );
-	assert( latter.m_opaque > 0 && latter.m_opaque <= (uintptr_t)std::numeric_limits<uint16_t>::max() + 1 );
-	assert( former.m_opaque != latter.m_opaque );
-
-	TaskSystemImpl::TaskEntry &entry = m_impl->entries[former.m_opaque - 1];
-	const auto latterIndex           = (uint16_t)( latter.m_opaque - 1 );
-
-	if( auto *const inlineDependents = std::get_if<TaskSystemImpl::InlineDependentsArray>( &entry.dependents ) ) {
-		if( inlineDependents->count < std::size( inlineDependents->values ) ) {
-			inlineDependents->values[inlineDependents->count++] = latterIndex;
-		} else {
-			std::vector<uint16_t> boxed;
-			if( !m_impl->boxedDependentsCache.empty() ) {
-				boxed = std::move( m_impl->boxedDependentsCache.back() );
-				m_impl->boxedDependentsCache.pop_back();
-				boxed.clear();
-			}
-			boxed.assign( inlineDependents->values, inlineDependents->values + inlineDependents->count );
-			boxed.push_back( latterIndex );
-			entry.dependents           = std::move( boxed );
-			m_impl->hasBoxedDependents = true;
-		}
-	} else if( auto *const dependentsVector = std::get_if<std::vector<uint16_t>>( &entry.dependents ) ) {
-		dependentsVector->push_back( latterIndex );
-	} else {
-		TaskSystemImpl::InlineDependentsArray dependents;
-		dependents.values[0] = latterIndex;
-		dependents.count     = 1;
-		entry.dependents     = dependents;
-	}
+	resultHandle.m_opaque = m_impl->numTaskEntriesSoFar;
+	return { (void *)( m_impl->memOfCallables.get() + offsetOfCallable ), resultHandle };
 }
 
 void TaskSystem::clear() {
 	assert( !m_impl->isExecuting );
-	if( m_impl->hasBoxedDependents ) {
-		for( TaskSystemImpl::TaskEntry &entry: m_impl->entries ) {
-			if( auto *boxed = std::get_if<std::vector<uint16_t>>( &entry.dependents ) ) {
-				m_impl->boxedDependentsCache.emplace_back( std::move( *boxed ) );
-			}
-			( ( CallableStorage *)( m_impl->memOfCallables + entry.offsetOfCallable ) )->~CallableStorage();
-		}
-		m_impl->hasBoxedDependents = false;
-	} else {
-		for( TaskSystemImpl::TaskEntry &entry: m_impl->entries ) {
-			( ( CallableStorage *)( m_impl->memOfCallables + entry.offsetOfCallable ) )->~CallableStorage();
-		}
+
+	auto *const taskEntries = (TaskSystemImpl::TaskEntry *)m_impl->memOfTaskEntries.get();
+
+	// Callables aren't trivially destructible
+	for( unsigned taskIndex = 0; taskIndex < m_impl->numTaskEntriesSoFar; ++taskIndex ) {
+		auto *callable = (CallableStorage *)( m_impl->memOfCallables.get() + taskEntries[taskIndex].offsetOfCallable );
+		callable->~CallableStorage();
 	}
-	m_impl->entries.clear();
-	m_impl->sizeOfUsedMemOfCallables = 0;
+	m_impl->sizeOfUsedMemOfCallables  = 0;
+
+	// Make sure we can just set count to zero for task entries
+	static_assert( std::is_trivially_destructible_v<TaskSystemImpl::TaskEntry> );
+	m_impl->numTaskEntriesSoFar       = 0;
+	m_impl->numDependencyEntriesSoFar = 0;
 }
 
-bool TaskSystem::exec() {
-	assert( !m_impl->isExecuting );
-	assert( m_impl->entries.size() <= std::numeric_limits<uint16_t>::max() );
-
-	bool succeeded = true;
-	if( !m_impl->entries.empty() ) {
-		m_impl->isExecuting   = true;
-		m_impl->startScanFrom = 0;
-
-		// TODO: Validate the graph
-
-		for( TaskSystemImpl::TaskEntry &entry: m_impl->entries ) {
-			for( uint16_t dependentIndex: entry.getDependents() ) {
-				assert( m_impl->entries[dependentIndex].numSatisfiedDependencies == 0 );
-			}
-			for( uint16_t dependentIndex: entry.getDependents() ) {
-				m_impl->entries[dependentIndex].numDependencies++;
-			}
-		}
-
-		std::fill( m_impl->completionStatuses.begin(), m_impl->completionStatuses.end(), CompletionPending );
-
-		// Awake all threads
-		// TODO: Is there something smarter
-		for( std::atomic_flag &flag: m_impl->signalingFlags ) {
-			flag.test_and_set();
-			flag.notify_one();
-		}
-
-		// Run in this thread as well
-		succeeded = threadExecTasks( m_impl, ~0u );
-
-		m_impl->barrier.arrive_and_wait();
-
-		if( succeeded ) {
-			auto it = m_impl->completionStatuses.begin();
-			for(; it != m_impl->completionStatuses.end(); ++it ) {
-				const unsigned status = (*it).load( std::memory_order_relaxed );
-				assert( status != CompletionPending );
-				if( status != CompletionSuccess ) {
-					succeeded = false;
-					break;
-				}
-			}
-		}
-
-		m_impl->isExecuting.store( false, std::memory_order_seq_cst );
-
-		clear();
+void TaskSystem::awakeWorkers() {
+	// Awake all threads
+	// TODO: Is there something smarter
+	for( std::atomic_flag &flag: m_impl->signalingFlags ) {
+		flag.test_and_set();
+		flag.notify_one();
 	}
+}
+
+void TaskSystem::startExecution() {
+	assert( !m_impl->isExecuting );
+	clear();
+
+	std::fill( m_impl->completionStatuses.begin(), m_impl->completionStatuses.end(), CompletionPending );
+
+	m_impl->isExecuting.store( true, std::memory_order_seq_cst );
+	m_impl->startScanFrom.store( 0, std::memory_order_seq_cst );
+
+	awakeWorkers();
+}
+
+bool TaskSystem::awaitCompletion() {
+	// Run the part of workload in this thread as well
+	bool succeeded = threadExecTasks( m_impl, ~0u );
+
+	// Interrupt workers which may spin on this variable
+	m_impl->awaitsCompletion.store( true, std::memory_order_seq_cst );
+
+	// Await completion reply from workers
+	m_impl->barrier.arrive_and_wait();
+
+	if( succeeded ) {
+		auto it = m_impl->completionStatuses.begin();
+		for(; it != m_impl->completionStatuses.end(); ++it ) {
+			const unsigned status = (*it).load( std::memory_order_relaxed );
+			assert( status != CompletionPending );
+			if( status != CompletionSuccess ) {
+				succeeded = false;
+				break;
+			}
+		}
+	}
+
+	m_impl->awaitsCompletion.store( false, std::memory_order_seq_cst );
+	m_impl->isExecuting.store( false, std::memory_order_seq_cst );
+
+	clear();
 
 	return succeeded;
 }
@@ -295,9 +266,10 @@ void TaskSystem::threadLoopFunc( TaskSystemImpl *__restrict impl, unsigned threa
 }
 
 bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned threadNumber ) {
+	assert( impl->isExecuting );
 	try {
-		TaskSystemImpl::TaskEntry *const __restrict entries = impl->entries.data();
-		const size_t numEntries                             = impl->entries.size();
+		auto *const __restrict entries = (TaskSystemImpl::TaskEntry *)impl->memOfTaskEntries.get();
+		const size_t numEntries        = impl->numTaskEntriesSoFar;
 
 		constexpr auto kIndexUnset    = (size_t)-1;
 		size_t pendingCompletionIndex = kIndexUnset;
@@ -311,11 +283,6 @@ bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned thre
 					TaskSystemImpl::TaskEntry &entry = entries[pendingCompletionIndex];
 					// Safe under mutex
 					entry.status = TaskSystemImpl::TaskEntry::Completed;
-					for( uint16_t dependentIndex: entry.getDependents() ) {
-						TaskSystemImpl::TaskEntry &dependent = entries[dependentIndex];
-						// Safe under mutex
-						dependent.numSatisfiedDependencies++;
-					}
 					pendingCompletionIndex = kIndexUnset;
 				}
 
@@ -331,10 +298,17 @@ bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned thre
 							isInNonPendingSpan = false;
 						}
 						if( entry.affinity == AnyThread || threadNumber == ~0u ) {
-							const unsigned numSatisfiedDeps = entry.numSatisfiedDependencies;
-							assert( numSatisfiedDeps <= entry.numDependencies );
-							if( numSatisfiedDeps == entry.numDependencies ) {
+							// TODO: These checks can be optimized by tracking indices/masks of already completed dependencies
+							bool hasSatisfiedDependencies = true;
+							unsigned dependencyIndex      = entry.offsetOfDependencies;
+							for(; dependencyIndex < entry.countOfDependencies; ++dependencyIndex ) {
 								// Safe under mutex
+								if( entries[dependencyIndex].status == TaskSystemImpl::TaskEntry::Completed ) {
+									hasSatisfiedDependencies = false;
+									break;
+								}
+							}
+							if( hasSatisfiedDependencies ) {
 								entry.status = TaskSystemImpl::TaskEntry::Busy;
 								chosenIndex  = entryIndex;
 								break;
@@ -346,7 +320,7 @@ bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned thre
 			} while( false );
 
 			if( chosenIndex != kIndexUnset ) {
-				auto *callable = (CallableStorage *)( impl->memOfCallables + entries[chosenIndex].offsetOfCallable );
+				auto *callable = (CallableStorage *)( impl->memOfCallables.get() + entries[chosenIndex].offsetOfCallable );
 				const unsigned workerIndex = threadNumber + 1;
 				callable->call( workerIndex );
 				// Postpone completion so we don't have to lock twice
@@ -354,14 +328,32 @@ bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned thre
 			} else {
 				// If all tasks are completed or busy
 				if( isInNonPendingSpan ) {
-					break;
+					// If it's an actual worker thread
+					if( threadNumber != ~0u ) {
+						// It's fine if we do another loop attempt, so a relaxed load could be used here,
+						// but seq_cst load should be less expensive than calling yield() as a consequence.
+						if( impl->awaitsCompletion.load( std::memory_order_seq_cst ) ) {
+							break;
+						} else {
+							// Await for dynamically submitted tasks.
+							// Looks better than reusing await logic in threadLoopFunc().
+							// Should be rarely reached if tuned right.
+							std::this_thread::yield();
+						}
+					} else {
+						// It's the main thread.
+						// Interrupt the execution and let us set the awaitsCompletion flag.
+						break;
+					}
 				}
 			}
 		}
 
 		assert( pendingCompletionIndex == kIndexUnset );
+		assert( impl->isExecuting );
 		return true;
 	} catch( ... ) {
+		assert( impl->isExecuting );
 		return false;
 	}
 }
