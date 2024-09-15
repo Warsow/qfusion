@@ -254,6 +254,25 @@ void Frontend::calcSubspansOfMergedSurfSpans( StateForCamera *stateForCamera ) {
 	unsigned *const mergedSurfSubspans     = stateForCamera->drawSurfSurfSubspansBuffer->get();
 	VertElemSpan *const surfVertElemSpans  = stateForCamera->drawSurfVertElemSpansBuffer->get();
 
+	std::span<PodBufferHolder<int>> minMaxSpansOfWorkers { stateForCamera->drawSurfMinMaxSpansBuffers->data(),
+														   m_taskSystem.getNumberOfWorkers() };
+	assert( !minMaxSpansOfWorkers.empty() );
+
+	for( unsigned mergedSurfNum = 0; mergedSurfNum < numMergedSurfaces; ++mergedSurfNum ) {
+		MergedSurfSpan *const surfSpan = mergedSurfSpans + mergedSurfNum;
+		surfSpan->numSubspans     = 0;
+		surfSpan->subspansOffset  = 0;
+		surfSpan->vertSpansOffset = 0;
+		surfSpan->firstSurface    = std::numeric_limits<int>::max();
+		surfSpan->lastSurface     = std::numeric_limits<int>::lowest();
+		size_t workerIndex = 0;
+		// TODO: We can unroll for specific sizes
+		do {
+			surfSpan->firstSurface = wsw::min( surfSpan->firstSurface, minMaxSpansOfWorkers[workerIndex].get()[2 * mergedSurfNum + 0] );
+			surfSpan->lastSurface  = wsw::max( surfSpan->lastSurface, minMaxSpansOfWorkers[workerIndex].get()[2 * mergedSurfNum + 1] );
+		} while( ++workerIndex < minMaxSpansOfWorkers.size() );
+	}
+
 	unsigned subspanDataOffset      = 0;
 	unsigned vertElemSpanDataOffset = 0;
 	for( unsigned mergedSurfNum = 0; mergedSurfNum < numMergedSurfaces; ++mergedSurfNum ) {

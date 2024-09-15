@@ -51,6 +51,9 @@ public:
 	Frontend();
 	~Frontend();
 
+	// Includes the main thread
+	static constexpr unsigned kMaxWorkers = 4;
+
 	static void init();
 	static void shutdown();
 
@@ -172,6 +175,7 @@ private:
 		// TODO: Merge these two? Keeping it separate can be more cache-friendly though
 		PodBufferHolder<drawSurfaceBSP_t> *bspDrawSurfacesBuffer;
 		PodBufferHolder<MergedSurfSpan> *drawSurfSurfSpansBuffer;
+		wsw::StaticVector<PodBufferHolder<int>, kMaxWorkers> *drawSurfMinMaxSpansBuffers;
 
 		PodBufferHolder<uint8_t> *surfVisTableBuffer;
 		PodBufferHolder<VertElemSpan> *drawSurfVertElemSpansBuffer;
@@ -374,8 +378,7 @@ private:
 	void cullSurfacesInVisLeavesByOccludersArch( unsigned cameraIndex,
 												 std::span<const unsigned> indicesOfLeaves,
 												 std::span<const Frustum> occluderFrusta,
-												 MergedSurfSpan *mergedSurfSpans,
-												 uint8_t *surfVisTable );
+												 int *surfMinMaxSpans, uint8_t *surfVisTable );
 
 	template <unsigned Arch>
 	[[nodiscard]]
@@ -405,8 +408,7 @@ private:
 	void cullSurfacesInVisLeavesByOccludersSse2( unsigned cameraIndex,
 												 std::span<const unsigned> indicesOfLeaves,
 												 std::span<const Frustum> occluderFrusta,
-												 MergedSurfSpan *mergedSurfSpans,
-												 uint8_t *surfVisTable );
+												 int *surfMinMaxSpans, uint8_t *surfVisTable );
 
 	[[nodiscard]]
 	auto cullEntriesWithBoundsSse2( const void *entries, unsigned numEntries, unsigned boundsFieldOffset,
@@ -435,8 +437,7 @@ private:
 	void cullSurfacesInVisLeavesByOccludersSse41( unsigned cameraIndex,
 												  std::span<const unsigned> indicesOfLeaves,
 												  std::span<const Frustum> occluderFrusta,
-												  MergedSurfSpan *mergedSurfSpans,
-												  uint8_t *surfVisTable );
+												  int *surfMinMaxSpans, uint8_t *surfVisTable );
 
 	[[nodiscard]]
 	auto cullEntriesWithBoundsSse41( const void *entries, unsigned numEntries, unsigned boundsFieldOffset,
@@ -453,8 +454,7 @@ private:
 	void cullSurfacesInVisLeavesByOccludersAvx( unsigned cameraIndex,
 												std::span<const unsigned> indicesOfLeaves,
 												std::span<const Frustum> occluderFrusta,
-												MergedSurfSpan *mergedSurfSpans,
-												uint8_t *surfVisTable );
+												int *surfMinMaxSpans, uint8_t *surfVisTable );
 	[[nodiscard]]
 	auto cullLeavesByOccludersAvx( StateForCamera *stateForCamera, std::span<const unsigned> indicesOfLeaves,
 								   std::span<const Frustum> occluderFrusta )
@@ -481,8 +481,7 @@ private:
 	void cullSurfacesInVisLeavesByOccluders( unsigned cameraIndex,
 											 std::span<const unsigned> indicesOfLeaves,
 											 std::span<const Frustum> occluderFrusta,
-											 MergedSurfSpan *mergedSurfSpans,
-											 uint8_t *surfVisTable );
+											 int *surfMinMaxSpans, uint8_t *surfVisTable );
 
 	[[nodiscard]]
 	static auto coProcessLeavesAndOccluders( CoroTask::StartInfo si, Frontend *self, StateForCamera *stateForCamera ) -> CoroTask;
@@ -498,7 +497,9 @@ private:
 								  const Frustum *__restrict primaryFrustum, std::span<const Frustum> occluderFrusta,
 								  uint16_t *tmpIndices ) -> std::span<const uint16_t>;
 
-	void markSurfacesOfLeavesAsVisible( std::span<const unsigned> indicesOfLeaves, MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable );
+	void markSurfacesOfLeavesAsVisible( std::span<const unsigned> indicesOfLeaves,
+										std::span<PodBufferHolder<int>> minMaxSpansOfWorkers,
+										uint8_t *surfVisTable );
 
 	void markLightsOfSurfaces( StateForCamera *stateForCamera, const Scene *scene,
 							   std::span<std::span<const unsigned>> spansOfLeaves,
@@ -546,7 +547,7 @@ private:
 	auto ( Frontend::*m_cullLeavesByOccludersArchMethod )( StateForCamera *, std::span<const unsigned>, std::span<const Frustum> )
 		-> std::pair<std::span<const unsigned>, std::span<const unsigned>>;
 	void ( Frontend::*m_cullSurfacesInVisLeavesByOccludersArchMethod )
-		( unsigned, std::span<const unsigned>, std::span<const Frustum>, MergedSurfSpan *, uint8_t * );
+		( unsigned, std::span<const unsigned>, std::span<const Frustum>, int *, uint8_t * );
 	auto ( Frontend::*m_cullEntriesWithBoundsArchMethod )( const void *, unsigned, unsigned, unsigned, const Frustum *,
 														   std::span<const Frustum>, uint16_t * ) -> std::span<const uint16_t>;
 	auto ( Frontend::*m_cullEntryPtrsWithBoundsArchMethod )( const void **, unsigned, unsigned, const Frustum *,
@@ -590,6 +591,7 @@ private:
 		PodBufferHolder<SortedOccluder> sortedOccludersBuffer;
 
 		PodBufferHolder<drawSurfaceBSP_t> bspDrawSurfacesBuffer;
+		wsw::StaticVector<PodBufferHolder<int>, kMaxWorkers> drawSurfMinMaxSpansBuffers;
 		PodBufferHolder<MergedSurfSpan> drawSurfSurfSpansBuffer;
 		PodBufferHolder<uint8_t> bspSurfVisTableBuffer;
 		PodBufferHolder<unsigned> drawSurfSurfSubspansBuffer;

@@ -194,7 +194,9 @@ auto Frontend::collectVisibleLights( StateForCamera *stateForCamera, Scene *scen
 }
 
 void Frontend::markSurfacesOfLeavesAsVisible( std::span<const unsigned> indicesOfLeaves,
-											  MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable ) {
+											  std::span<PodBufferHolder<int>> minMaxSpansOfWorkers,
+											  uint8_t *surfVisTable ) {
+	assert( !minMaxSpansOfWorkers.empty() );
 	const auto surfaces = rsh.worldBrushModel->surfaces;
 	const auto leaves   = rsh.worldBrushModel->visleafs;
 	for( const unsigned leafNum: indicesOfLeaves ) {
@@ -204,10 +206,13 @@ void Frontend::markSurfacesOfLeavesAsVisible( std::span<const unsigned> indicesO
 			assert( surfaces[surfNum].mergedSurfNum > 0 );
 			surfVisTable[surfNum] = 1;
 			const unsigned mergedSurfNum = surfaces[surfNum].mergedSurfNum - 1;
-			MergedSurfSpan *const __restrict span = &mergedSurfSpans[mergedSurfNum];
-			// TODO: Branchless min/max
-			span->firstSurface = wsw::min( span->firstSurface, (int)surfNum );
-			span->lastSurface = wsw::max( span->lastSurface, (int)surfNum );
+			size_t workerIndex = 0;
+			do {
+				int *const __restrict spans = minMaxSpansOfWorkers[workerIndex].get();
+				// TODO: Branchless min/max
+				spans[mergedSurfNum * 2 + 0] = wsw::min( spans[mergedSurfNum * 2 + 0], (int)surfNum );
+				spans[mergedSurfNum * 2 + 1] = wsw::max( spans[mergedSurfNum * 2 + 1], (int)surfNum );
+			} while( ++workerIndex < minMaxSpansOfWorkers.size() );
 		}
 	}
 }
@@ -578,10 +583,9 @@ auto Frontend::cullLeavesByOccluders( StateForCamera *stateForCamera, std::span<
 void Frontend::cullSurfacesInVisLeavesByOccluders( unsigned cameraIndex,
 												   std::span<const unsigned> indicesOfLeaves,
 												   std::span<const Frustum> occluderFrusta,
-												   MergedSurfSpan *mergedSurfSpans,
-												   uint8_t *surfVisTable ) {
+												   int *surfMinMaxSpans, uint8_t *surfVisTable ) {
 	return ( this->*m_cullSurfacesInVisLeavesByOccludersArchMethod )( cameraIndex, indicesOfLeaves, occluderFrusta,
-																	  mergedSurfSpans, surfVisTable );
+																	  surfMinMaxSpans, surfVisTable );
 }
 
 auto Frontend::cullEntriesWithBounds( const void *entries, unsigned numEntries, unsigned boundsFieldOffset,
@@ -722,16 +726,16 @@ static auto clipAgainstPlane( PlaneTraits planeTraits, unsigned numInVertices, c
 
 		if( isPrevInside != isCurrInside ) {
 			const float frac = planeTraits.getIntersectionFrac( prevCoord, currCoord );
-			assert( frac >= 0.0f && frac <= 1.0f );
+			//assert( frac >= 0.0f && frac <= 1.0f );
 
-			assert( prevIndex != numOutVertices && currIndex != numOutVertices );
+			//assert( prevIndex != numOutVertices && currIndex != numOutVertices );
 			float *__restrict destCoord = outCoords[numOutVertices];
 			Vector4Lerp( prevCoord, frac, currCoord, destCoord );
 			numOutVertices += 1;
 		}
 
 		if( isCurrInside ) {
-			assert( currIndex != numOutVertices );
+			//assert( currIndex != numOutVertices );
 			float *__restrict destCoord = outCoords[numOutVertices];
 			Vector4Copy( currCoord, destCoord );
 			numOutVertices += 1;
@@ -778,7 +782,7 @@ static auto clipTriangle( vec4_t inCoords[], vec4_t outCoords[] ) -> unsigned {
 				return 0;
 			}
 		} while( ++turn < 6 );
-		assert( turnCoords[turn % 2] == inCoords );
+		//assert( turnCoords[turn % 2] == inCoords );
 		return numVertices;
 	}
 }

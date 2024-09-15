@@ -175,9 +175,10 @@ static auto suggestNumExtraThreads() -> unsigned {
 		unsigned numPhysicalProcessors = 0, numLogicalProcessors = 0;
 		Sys_GetNumberOfProcessors( &numPhysicalProcessors, &numLogicalProcessors );
 		if( numPhysicalProcessors > 3 ) {
-			// Not more than 3, starting from 1 extra worker thread in addition to the main one on a 4-core machine.
+			// Not more than kMaxWorkers - 1 (accounting for the main thread which is a worker as well),
+			// starting from 1 extra worker thread in addition to the main one on a 4-core machine.
 			// TODO: Reserve more, park threads dynamically depending on whether the builtin server is really running.
-			return wsw::min<unsigned>( 3, numPhysicalProcessors - 3 );
+			return wsw::min<unsigned>( Frontend::kMaxWorkers - 1, numPhysicalProcessors - 3 );
 		}
 	}
 	return 0;
@@ -266,6 +267,7 @@ auto Frontend::allocStateForCamera() -> StateForCamera * {
 	stateForCamera->visibleOccludersBuffer                   = &resultStorage->visibleOccludersBuffer;
 	stateForCamera->sortedOccludersBuffer                    = &resultStorage->sortedOccludersBuffer;
 	stateForCamera->drawSurfSurfSpansBuffer                  = &resultStorage->drawSurfSurfSpansBuffer;
+	stateForCamera->drawSurfMinMaxSpansBuffers               = &resultStorage->drawSurfMinMaxSpansBuffers;
 	stateForCamera->bspDrawSurfacesBuffer                    = &resultStorage->bspDrawSurfacesBuffer;
 	stateForCamera->surfVisTableBuffer                       = &resultStorage->bspSurfVisTableBuffer;
 	stateForCamera->drawSurfSurfSubspansBuffer               = &resultStorage->drawSurfSurfSubspansBuffer;

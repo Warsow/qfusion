@@ -391,35 +391,12 @@ template <unsigned Arch>
 void Frontend::cullSurfacesInVisLeavesByOccludersArch( unsigned cameraIndex,
 													   std::span<const unsigned> indicesOfVisibleLeaves,
 													   std::span<const Frustum> occluderFrusta,
-													   MergedSurfSpan *mergedSurfSpans,
-													   uint8_t *surfVisTable ) {
+													   int *surfMinMaxSpans, uint8_t *surfVisTable ) {
 	assert( !occluderFrusta.empty() );
 
 #ifdef DEBUG_OCCLUDERS
 	const int pinnedOccluderNum = Cvar_Integer( "pinnedOccluderNum" );
 #endif
-
-	// TODO: Use library functions once they are available, use intrinsics on ARM64
-
-	auto setMinAtomic = []( int *addr, int newValue ) {
-		assert( ( (uintptr_t)addr % alignof( std::atomic<int> ) ) == 0 );
-		auto *const a = (std::atomic<int> *)addr;
-		int oldValue  = a->load();
-		// TODO: Can we do something smarter with memory loads
-		while( oldValue > newValue && !a->compare_exchange_weak( oldValue, newValue ) ) {
-			oldValue = a->load();
-		}
-	};
-
-	auto setMaxAtomic = []( int *addr, int newValue ) {
-		assert( ( (uintptr_t)addr % alignof( std::atomic<int> ) ) == 0 );
-		auto *a      = (std::atomic<int> *)addr;
-		int oldValue = a->load();
-		// TODO: Can we do something smarter with memory loads
-		while( oldValue < newValue && !a->compare_exchange_weak( oldValue, newValue ) ) {
-			oldValue = a->load();
-		}
-	};
 
 	const msurface_t *const surfaces    = rsh.worldBrushModel->surfaces;
 	const auto leaves                   = rsh.worldBrushModel->visleafs;
@@ -465,9 +442,8 @@ void Frontend::cullSurfacesInVisLeavesByOccludersArch( unsigned cameraIndex,
 					surfVisTable[surfNum] = 1;
 					assert( surf->mergedSurfNum > 0 );
 					const unsigned mergedSurfNum = surf->mergedSurfNum - 1;
-					MergedSurfSpan *const __restrict span = &mergedSurfSpans[mergedSurfNum];
-					setMinAtomic( &span->firstSurface, (int)surfNum );
-					setMaxAtomic( &span->lastSurface, (int)surfNum );
+					surfMinMaxSpans[2 * mergedSurfNum + 0] = wsw::min( surfMinMaxSpans[2 * mergedSurfNum + 0], (int)surfNum );
+					surfMinMaxSpans[2 * mergedSurfNum + 1] = wsw::max( surfMinMaxSpans[2 * mergedSurfNum + 1], (int)surfNum );
 				}
 			}
 		}

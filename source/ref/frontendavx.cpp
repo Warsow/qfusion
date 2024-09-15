@@ -89,10 +89,10 @@ namespace wsw::ref {
 void Frontend::cullSurfacesInVisLeavesByOccludersAvx( unsigned cameraIndex,
 													  std::span<const unsigned> indicesOfVisibleLeaves,
 													  std::span<const Frustum> occluderFrusta,
-													  MergedSurfSpan *mergedSurfSpans,
+													  int *surfMinMaxSpans,
 													  uint8_t *surfVisTable ) {
 	_mm256_zeroupper();
-	cullSurfacesInVisLeavesByOccludersArch<Avx>( cameraIndex, indicesOfVisibleLeaves, occluderFrusta, mergedSurfSpans, surfVisTable );
+	cullSurfacesInVisLeavesByOccludersArch<Avx>( cameraIndex, indicesOfVisibleLeaves, occluderFrusta, surfMinMaxSpans, surfVisTable );
 	_mm256_zeroupper();
 }
 

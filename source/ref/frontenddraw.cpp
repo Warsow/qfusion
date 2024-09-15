@@ -502,7 +502,9 @@ auto Frontend::setupStateForCamera( const refdef_t *fd, unsigned sceneIndex,
 
 auto Frontend::coProcessLeavesAndOccluders( CoroTask::StartInfo si, Frontend *self, StateForCamera *stateForCamera ) -> CoroTask {
 	const std::span<const Frustum> occluderFrusta { stateForCamera->occluderFrusta, stateForCamera->numOccluderFrusta };
-	MergedSurfSpan *const mergedSurfSpans   = stateForCamera->drawSurfSurfSpansBuffer->get();
+	const std::span<PodBufferHolder<int>> minMaxSpansOfWorkers { stateForCamera->drawSurfMinMaxSpansBuffers->data(),
+																 si.taskSystem->getNumberOfWorkers() };
+
 	uint8_t *const surfVisTable             = stateForCamera->surfVisTableBuffer->get();
 	std::span<const unsigned> visibleLeaves = stateForCamera->visibleLeaves;
 
@@ -511,7 +513,7 @@ auto Frontend::coProcessLeavesAndOccluders( CoroTask::StartInfo si, Frontend *se
 	if( occluderFrusta.empty() || ( stateForCamera->refdef.rdflags & RDF_NOBSPOCCLUSIONCULLING ) ) {
 		// No "good enough" occluders found.
 		// Just mark every surface that falls into the primary frustum visible in this case.
-		self->markSurfacesOfLeavesAsVisible( visibleLeaves, mergedSurfSpans, surfVisTable );
+		self->markSurfacesOfLeavesAsVisible( visibleLeaves, minMaxSpansOfWorkers, surfVisTable );
 		nonOccludedLeaves = visibleLeaves;
 	} else {
 		// If we want to limit the number of frusta for occluding surfaces, do it prior to occluding of leaves.
@@ -524,11 +526,12 @@ auto Frontend::coProcessLeavesAndOccluders( CoroTask::StartInfo si, Frontend *se
 		std::tie( nonOccludedLeaves, partiallyOccludedLeaves ) = self->cullLeavesByOccluders( stateForCamera,
 																						      visibleLeaves,
 																						      bestFrusta );
-		self->markSurfacesOfLeavesAsVisible( nonOccludedLeaves, mergedSurfSpans, surfVisTable );
+		self->markSurfacesOfLeavesAsVisible( nonOccludedLeaves, minMaxSpansOfWorkers, surfVisTable );
 
-		auto cullSubrangeFn = [=]( unsigned, unsigned start, unsigned end ) {
+		auto cullSubrangeFn = [=]( unsigned workerIndex, unsigned start, unsigned end ) {
 			std::span<const unsigned> workloadSpan { partiallyOccludedLeaves.data() + start, partiallyOccludedLeaves.data() + end };
-			self->cullSurfacesInVisLeavesByOccluders( stateForCamera->cameraIndex, workloadSpan, bestFrusta, mergedSurfSpans, surfVisTable );
+			int *minMaxSpans = minMaxSpansOfWorkers[workerIndex].get();
+			self->cullSurfacesInVisLeavesByOccluders( stateForCamera->cameraIndex, workloadSpan, bestFrusta, minMaxSpans, surfVisTable );
 		};
 
 		TaskHandle newTask = si.taskSystem->addForSubrangesInRange( { 0, partiallyOccludedLeaves.size() }, 8,
@@ -558,10 +561,14 @@ auto Frontend::coBeginPreparingRenderingFromTheseCameras( CoroTask::StartInfo si
 
 	self->m_occlusionCullingFrame++;
 
+	const unsigned actualNumWorkers = si.taskSystem->getNumberOfWorkers();
+	// Includes the main thread
+	assert( actualNumWorkers > 0 );
+
 	TaskHandle prepareBuffersTaskHandles[MAX_REF_CAMERAS];
 	for( unsigned cameraIndex = 0; cameraIndex < statesForValidCameras.size(); ++cameraIndex ) {
 		StateForCamera *const stateForCamera = statesForValidCameras[cameraIndex];
-		auto prepareBuffersFn = [=]( [[maybe_unused]] unsigned workerIndex ) {
+		auto prepareBuffersFn = [=]( unsigned ) {
 			const unsigned numMergedSurfaces = rsh.worldBrushModel->numMergedSurfaces;
 			const unsigned numWorldSurfaces  = rsh.worldBrushModel->numModelSurfaces;
 			const unsigned numWorldLeaves    = rsh.worldBrushModel->numvisleafs;
@@ -579,6 +586,22 @@ auto Frontend::coBeginPreparingRenderingFromTheseCameras( CoroTask::StartInfo si
 			stateForCamera->drawSurfSurfSpansBuffer->reserve( numMergedSurfaces );
 			stateForCamera->bspDrawSurfacesBuffer->reserve( numMergedSurfaces );
 
+			for( unsigned workerNum = 0; workerNum < actualNumWorkers; ++workerNum ) {
+				wsw::StaticVector<PodBufferHolder<int>, kMaxWorkers> &buffers = *stateForCamera->drawSurfMinMaxSpansBuffers;
+				if( workerNum >= buffers.size() ) {
+					buffers.emplace_back( PodBufferHolder<int> {} );
+					assert( workerNum < buffers.size() );
+				}
+				if( numMergedSurfaces ) {
+					unsigned surfNum = 0;
+					int *const __restrict minMaxSpans = buffers[workerNum].reserveAndGet( 2 * numMergedSurfaces );
+					do {
+						minMaxSpans[2 * surfNum + 0] = std::numeric_limits<int>::max();
+						minMaxSpans[2 * surfNum + 1] = std::numeric_limits<int>::lowest();
+					} while( ++surfNum < numMergedSurfaces );
+				}
+			}
+
 			// Try guessing the required size
 			const unsigned estimatedNumSubspans = wsw::max( 8 * numMergedSurfaces, numWorldSurfaces );
 			// Two unsigned elements per each subspan TODO: Allow storing std::pair in this container
@@ -586,15 +609,6 @@ auto Frontend::coBeginPreparingRenderingFromTheseCameras( CoroTask::StartInfo si
 			stateForCamera->drawSurfVertElemSpansBuffer->reserve( estimatedNumSubspans );
 
 			stateForCamera->surfVisTableBuffer->reserveZeroed( numWorldSurfaces );
-
-			MergedSurfSpan *const mergedSurfSpans = stateForCamera->drawSurfSurfSpansBuffer->get();
-			for( unsigned i = 0; i < numMergedSurfaces; ++i ) {
-				mergedSurfSpans[i].firstSurface    = std::numeric_limits<int>::max();
-				mergedSurfSpans[i].lastSurface     = std::numeric_limits<int>::min();
-				mergedSurfSpans[i].subspansOffset  = 0;
-				mergedSurfSpans[i].vertSpansOffset = 0;
-				mergedSurfSpans[i].numSubspans     = 0;
-			}
 
 			stateForCamera->drawWorld = true;
 		};
