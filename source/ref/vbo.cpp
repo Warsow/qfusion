@@ -53,8 +53,6 @@ static size_t r_vbo_tempvsoupsize;
 
 static int r_num_active_vbos;
 
-static GLuint r_vao;
-
 static elem_t *R_VBOElemBuffer( unsigned numElems );
 static void *R_VBOVertBuffer( unsigned numVerts, size_t vertSize );
 
@@ -86,9 +84,6 @@ void R_InitVBO( void ) {
 	for( i = 0; i < MAX_MESH_VERTEX_BUFFER_OBJECTS - 1; i++ ) {
 		r_vbohandles[i].next = &r_vbohandles[i + 1];
 	}
-
-	qglGenVertexArrays( 1, &r_vao );
-	qglBindVertexArray( r_vao );
 }
 
 /*
@@ -104,6 +99,7 @@ mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numIns
 	int i;
 	size_t size;
 	GLuint vbo_id;
+	GLuint vao_id;
 	vbohandle_t *vboh = NULL;
 	mesh_vbo_t *vbo = NULL;
 	GLenum usage = VBO_USAGE_FOR_TAG( tag );
@@ -217,6 +213,14 @@ mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numIns
 		size += numInstances * sizeof( GLfloat ) * 8;
 	}
 
+	vao_id = 0;
+	qglGenVertexArrays( 1, &vao_id );
+	if( !vao_id ) {
+		goto error;
+	}
+	vbo->vaoId = vao_id;
+	qglBindVertexArray( vao_id );
+
 	// pre-allocate vertex buffer
 	vbo_id = 0;
 	qglGenBuffers( 1, &vbo_id );
@@ -247,6 +251,8 @@ mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numIns
 	if( qglGetError() == GL_OUT_OF_MEMORY ) {
 		goto error;
 	}
+
+	qglBindVertexArray( 0 );
 
 	vbo->elemBufferSize = size;
 
@@ -305,6 +311,7 @@ void R_ReleaseMeshVBO( mesh_vbo_t *vbo ) {
 
 	assert( vbo != NULL );
 
+	qglBindVertexArray( 0 );
 	qglBindBuffer( GL_ARRAY_BUFFER, 0 );
 	qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
 
@@ -316,6 +323,11 @@ void R_ReleaseMeshVBO( mesh_vbo_t *vbo ) {
 	if( vbo->elemId ) {
 		vbo_id = vbo->elemId;
 		qglDeleteBuffers( 1, &vbo_id );
+	}
+
+	if( vbo->vaoId ) {
+		vbo_id = vbo->vaoId;
+		qglDeleteVertexArrays( 1, &vbo_id );
 	}
 
 	if( vbo->index >= 1 && vbo->index <= MAX_MESH_VERTEX_BUFFER_OBJECTS ) {
@@ -878,8 +890,4 @@ void R_ShutdownVBO( void ) {
 		Q_free( r_vbo_tempelems );
 	}
 	r_vbo_numtempelems = 0;
-
-	qglBindVertexArray( 0 );
-	qglDeleteVertexArrays( 1, &r_vao );
-	r_vao = 0;
 }

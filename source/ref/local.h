@@ -1497,6 +1497,7 @@ typedef struct mesh_vbo_s {
 
 	unsigned int vertexId;
 	unsigned int elemId;
+	unsigned int vaoId;
 	void                *owner;
 	unsigned int visframe;
 
@@ -1506,6 +1507,9 @@ typedef struct mesh_vbo_s {
 	size_t vertexSize;
 	size_t arrayBufferSize;
 	size_t elemBufferSize;
+
+	unsigned int vertexAttribEnabled;
+	vattribmask_t lastVAttribs, lastHalfFloatVAttribs;
 
 	vattribmask_t vertexAttribs;
 	vattribmask_t halfFloatAttribs;

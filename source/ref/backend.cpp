@@ -89,6 +89,8 @@ void RB_SetTime( int64_t time ) {
 	rb.nullEnt.shaderTime = Sys_Milliseconds();
 }
 
+int numVattribSwitches;
+
 void RB_BeginFrame() {
 	Vector4Set( rb.nullEnt.shaderRGBA, 1, 1, 1, 1 );
 	rb.nullEnt.scale = 1;
@@ -99,9 +101,12 @@ void RB_BeginFrame() {
 	RB_SetShaderStateMask( ~0, 0 );
 	RB_BindVBO( 0, 0 );
 	RB_FlushTextureCache();
+
+	numVattribSwitches = 0;
 }
 
 void RB_EndFrame() {
+	rNotice() << "Num vattrib switches" << numVattribSwitches;
 }
 
 static void RB_SetGLDefaults( void ) {
@@ -369,29 +374,24 @@ void RB_FlipFrontFace( void ) {
 }
 
 void RB_BindArrayBuffer( int buffer ) {
-	if( buffer != rb.gl.currentArrayVBO ) {
 		qglBindBuffer( GL_ARRAY_BUFFER, buffer );
 		rb.gl.currentArrayVBO = buffer;
-		rb.gl.lastVAttribs = 0;
-	}
 }
 
 void RB_BindElementArrayBuffer( int buffer ) {
-	if( buffer != rb.gl.currentElemArrayVBO ) {
 		qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, buffer );
 		rb.gl.currentElemArrayVBO = buffer;
-	}
 }
 
 static void RB_EnableVertexAttrib( int index, bool enable ) {
 	const unsigned bit = 1 << index;
-	const unsigned diff = ( rb.gl.vertexAttribEnabled & bit ) ^ ( enable ? bit : 0 );
+	const unsigned diff = ( rb.currentVBO->vertexAttribEnabled & bit ) ^ ( enable ? bit : 0 );
 	if( diff ) {
 		if( enable ) {
-			rb.gl.vertexAttribEnabled |= bit;
+			rb.currentVBO->vertexAttribEnabled |= bit;
 			qglEnableVertexAttribArray( index );
 		} else {
-			rb.gl.vertexAttribEnabled &= ~bit;
+			rb.currentVBO->vertexAttribEnabled &= ~bit;
 			qglDisableVertexAttribArray( index );
 		}
 	}
@@ -589,13 +589,16 @@ void RB_BindVBO( int id, int primitive ) {
 	rb.currentVBOId = id;
 	rb.currentVBO = vbo;
 	if( !vbo ) {
-		RB_BindArrayBuffer( 0 );
-		RB_BindElementArrayBuffer( 0 );
+		//RB_BindArrayBuffer( 0 );
+		//RB_BindElementArrayBuffer( 0 );
+		qglBindVertexArray( 0 );
 		return;
 	}
 
-	RB_BindArrayBuffer( vbo->vertexId );
-	RB_BindElementArrayBuffer( vbo->elemId );
+	assert( vbo->vaoId );
+	qglBindVertexArray( vbo->vaoId );
+	//RB_BindArrayBuffer( vbo->vertexId );
+	//RB_BindElementArrayBuffer( vbo->elemId );
 }
 
 int RB_VBOIdForFrameUploads() {
@@ -630,6 +633,9 @@ void R_EndFrameUploads() {
 	if( auto &fru = rb.frameUploads; fru.vertexDataSize && fru.indexDataSize ) {
 		RB_BindVBO( RB_VBOIdForFrameUploads(), GL_TRIANGLES );
 
+		RB_BindArrayBuffer( fru.vbo->vertexId );
+		RB_BindElementArrayBuffer( fru.vbo->elemId );
+
 		qglBufferSubData( GL_ARRAY_BUFFER, 0, (GLsizeiptr)( fru.vbo->vertexSize * fru.vertexDataSize ), fru.vboData );
 		qglBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)( sizeof( uint16_t ) * fru.indexDataSize ), fru.iboData );
 
@@ -641,7 +647,6 @@ void R_EndFrameUploads() {
 void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
 						const struct mfog_s *fog, const struct portalSurface_s *portalSurface, unsigned shadowBits,
 						const struct mesh_s *mesh, int primitive, float x_offset, float y_offset ) {
-
 	// can't (and shouldn't because that would break batching) merge strip draw calls
 	// (consider simply disabling merge later in this case if models with tristrips are added in the future, but that's slow)
 	assert( ( primitive == GL_TRIANGLES ) || ( primitive == GL_LINES ) );
@@ -830,19 +835,49 @@ void RB_FlushDynamicMeshes() {
 	}
 }
 
+const char *vattribNames[] {
+	"VATTRIB_POSITION",
+
+	"VATTRIB_NORMAL",
+
+	"VATTRIB_SVECTOR",
+
+	"VATTRIB_COLOR0",
+
+	"VATTRIB_TEXCOORDS",
+
+	"VATTRIB_SPRITEPOINT",
+
+	"VATTRIB_BONESINDICES",
+	"VATTRIB_BONESWEIGHTS",
+
+	"VATTRIB_LMCOORDS01",
+	"VATTRIB_LMCOORDS23",
+	"VATTRIB_LMLAYERS0123",
+
+	"VATTRIB_INSTANCE_QUAT",
+	"VATTRIB_INSTANCE_XYZS",
+};
+
 static void RB_EnableVertexAttribs( void ) {
 	const vattribmask_t vattribs = rb.currentVAttribs;
-	const mesh_vbo_t *vbo = rb.currentVBO;
+	mesh_vbo_t *vbo = rb.currentVBO;
 	const vattribmask_t hfa = vbo->halfFloatAttribs;
 
 	assert( vattribs & VATTRIB_POSITION_BIT );
 
-	if( ( vattribs == rb.gl.lastVAttribs ) && ( hfa == rb.gl.lastHalfFloatVAttribs ) ) {
+	if( ( vattribs == vbo->lastVAttribs ) && ( hfa == vbo->lastHalfFloatVAttribs ) ) {
 		return;
 	}
 
-	rb.gl.lastVAttribs = vattribs;
-	rb.gl.lastHalfFloatVAttribs = hfa;
+	numVattribSwitches++;
+	//rNotice() << "Doing switch in VBO no." << rb.currentVBOId << "oldVattribs" << vbo->lastVAttribs << "vattribs" << vattribs;
+
+	RB_BindArrayBuffer( vbo->vertexId );
+	RB_BindElementArrayBuffer( vbo->elemId );
+
+	vbo->lastVAttribs = vattribs;
+	vbo->lastHalfFloatVAttribs = hfa;
 
 	// xyz position
 	RB_EnableVertexAttrib( VATTRIB_POSITION, true );

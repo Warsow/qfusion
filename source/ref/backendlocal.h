@@ -58,6 +58,7 @@ typedef struct r_backend_s {
 	struct {
 		int state;
 
+		int currentVAO;
 		int currentArrayVBO;
 		int currentElemArrayVBO;
 
@@ -67,9 +68,6 @@ typedef struct r_backend_s {
 		int viewport[4];
 		int scissor[4];
 		bool scissorChanged;
-
-		unsigned int vertexAttribEnabled;
-		vattribmask_t lastVAttribs, lastHalfFloatVAttribs;
 
 		int fbWidth, fbHeight;
 
