@@ -74,6 +74,8 @@ typedef struct r_backend_s {
 		int fbWidth, fbHeight;
 
 		float depthmin, depthmax;
+		float savedDepthmin, savedDepthmax;
+		bool hasSavedDepth;
 
 		bool depthoffset;
 

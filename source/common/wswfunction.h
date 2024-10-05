@@ -32,7 +32,7 @@ SOFTWARE.
 
 namespace wsw {
 
-template <class, size_t MaxSize = 1024> class Function;
+template <class, size_t MaxSize = 96> class Function;
 
 template <class R, class... Args, size_t MaxSize> class Function<R(Args...), MaxSize> {
 public:
@@ -42,7 +42,7 @@ public:
 
 	Function(const Function &other) {
 		if (other) {
-			other.manager(data, other.data, Operation::Clone);
+			other.manager(&data, &other.data, Operation::Clone);
 			invoker = other.invoker;
 			manager = other.manager;
 		}

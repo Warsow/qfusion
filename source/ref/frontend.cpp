@@ -264,6 +264,7 @@ auto Frontend::allocStateForCamera() -> StateForCamera * {
 	resultStorage->isStateConstructed = true;
 
 	stateForCamera->sortList                      = &resultStorage->meshSortList;
+	stateForCamera->drawActionsList               = &resultStorage->drawActionsList;
 	stateForCamera->visibleLeavesBuffer           = &resultStorage->visibleLeavesBuffer;
 	stateForCamera->visibleOccludersBuffer        = &resultStorage->visibleOccludersBuffer;
 	stateForCamera->sortedOccludersBuffer         = &resultStorage->sortedOccludersBuffer;

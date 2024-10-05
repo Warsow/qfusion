@@ -170,6 +170,19 @@ void RB_GetDepthRange( float* depthmin, float *depthmax ) {
 	*depthmax = rb.gl.depthmax;
 }
 
+void RB_SaveDepthRange() {
+	assert( !rb.gl.hasSavedDepth );
+	rb.gl.savedDepthmin = rb.gl.depthmin;
+	rb.gl.savedDepthmax = rb.gl.depthmax;
+	rb.gl.hasSavedDepth = true;
+}
+
+void RB_RestoreDepthRange() {
+	assert( rb.gl.hasSavedDepth );
+	RB_DepthRange( rb.gl.savedDepthmin, rb.gl.savedDepthmax );
+	rb.gl.hasSavedDepth = false;
+}
+
 void RB_DepthOffset( bool enable ) {
 	float depthmin = rb.gl.depthmin;
 	float depthmax = rb.gl.depthmax;

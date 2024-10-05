@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <span>
 
 #include "../common/podbufferholder.h"
+#include "../common/wswfunction.h"
 #include "../common/tasksystem.h"
 
 struct alignas( 32 )Frustum {
@@ -159,6 +160,9 @@ private:
 
 		// TODO: We don't really need a growable vector, preallocate at it start
 		wsw::PodVector<sortedDrawSurf_t> *sortList;
+		// Same here, we can't use PodBufferHolder yet for wsw::Function<>
+		// TODO: Use something less wasteful wrt storage than wsw::Function<>
+		wsw::PodVector<wsw::Function<void( FrontendToBackendShared *)>> *drawActionsList;
 
 		PodBufferHolder<unsigned> *visibleLeavesBuffer;
 		PodBufferHolder<unsigned> *visibleOccludersBuffer;
@@ -521,7 +525,8 @@ private:
 	[[nodiscard]]
 	auto findNearestPortalEntity( const portalSurface_t *portalSurface, Scene *scene ) -> const entity_t *;
 
-	void submitSortedSurfacesToBackend( StateForCamera *stateForCamera, Scene *scene );
+	void processSortList( StateForCamera *stateForCamera, Scene *scene );
+	void submitDrawActionsList( StateForCamera *stateForCamera, Scene *scene );
 
 	auto ( Frontend::*m_collectVisibleWorldLeavesArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
 	auto ( Frontend::*m_collectVisibleOccludersArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
@@ -560,6 +565,8 @@ private:
 		bool isStateConstructed { false };
 
 		wsw::PodVector<sortedDrawSurf_t> meshSortList;
+		// TODO: Use something more compact
+		wsw::PodVector<wsw::Function<void( FrontendToBackendShared * )>> drawActionsList;
 
 		PodBufferHolder<unsigned> visibleLeavesBuffer;
 		PodBufferHolder<unsigned> visibleOccludersBuffer;
