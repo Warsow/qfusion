@@ -48,6 +48,8 @@ struct alignas( 32 )Frustum {
 namespace wsw::ref {
 
 class alignas( 32 ) Frontend {
+	friend struct BatchedMeshBuilder;
+
 public:
 	Frontend();
 	~Frontend();
@@ -116,6 +118,22 @@ private:
 	static constexpr unsigned kMaxLightsInScene       = 1024;
 	static constexpr unsigned kMaxProgramLightsInView = 32;
 
+	struct StateForCamera;
+
+	struct PrepareBatchedSurfWorkload {
+		std::span<const sortedDrawSurf_t> batchSpan;
+		Scene *scene;
+		StateForCamera *stateForCamera;
+		unsigned vertSpanOffset;
+	};
+
+	// ST_SPRITE surfaces need special handling as they go through the legacy dynamic mesh path
+	struct PrepareSpriteSurfWorkload {
+		std::span<const sortedDrawSurf_t> batchSpan;
+		StateForCamera *stateForCamera;
+		unsigned firstMeshOffset;
+	};
+
 	struct alignas( alignof( Frustum ) ) StateForCamera {
 		alignas( alignof( Frustum ) )Frustum frustum;
 		alignas( alignof( Frustum ) )Frustum occluderFrusta[kMaxOccluderFrusta];
@@ -163,6 +181,16 @@ private:
 		// Same here, we can't use PodBufferHolder yet for wsw::Function<>
 		// TODO: Use something less wasteful wrt storage than wsw::Function<>
 		wsw::PodVector<wsw::Function<void( FrontendToBackendShared *)>> *drawActionsList;
+
+		wsw::PodVector<PrepareBatchedSurfWorkload> *preparePolysWorkload;
+		wsw::PodVector<PrepareBatchedSurfWorkload> *prepareCoronasWorkload;
+		wsw::PodVector<PrepareBatchedSurfWorkload> *prepareParticlesWorkload;
+
+		// Results of preparation get stored in this buffer
+		wsw::PodVector<VertElemSpan> *batchedSurfVertSpans;
+
+		wsw::PodVector<PrepareSpriteSurfWorkload> *prepareSpritesWorkload;
+		wsw::PodVector<mesh_t> *preparedSpriteMeshes;
 
 		PodBufferHolder<unsigned> *visibleLeavesBuffer;
 		PodBufferHolder<unsigned> *visibleOccludersBuffer;
@@ -528,6 +556,22 @@ private:
 	void processSortList( StateForCamera *stateForCamera, Scene *scene );
 	void submitDrawActionsList( StateForCamera *stateForCamera, Scene *scene );
 
+	using SubmitBatchedSurfFn = void(*)( const FrontendToBackendShared *, const entity_t *, const shader_t *,
+		const mfog_t *, const portalSurface_t *, unsigned );
+
+	[[nodiscard]]
+	auto registerBuildingBatchedSurf( StateForCamera *stateForCamera, Scene *scene, unsigned surfType, std::span<const sortedDrawSurf_t> batchSpan )
+		-> std::pair<SubmitBatchedSurfFn, unsigned>;
+
+	void markBuffersOfBatchedDynamicsForUpload( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras );
+
+	struct DynamicMeshFillDataWorkload;
+	void prepareDynamicMesh( DynamicMeshFillDataWorkload *workload );
+
+	void prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *workload );
+	void prepareBatchedCoronas( PrepareBatchedSurfWorkload *workload );
+	void prepareBatchedParticles( PrepareBatchedSurfWorkload *workload );
+
 	auto ( Frontend::*m_collectVisibleWorldLeavesArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
 	auto ( Frontend::*m_collectVisibleOccludersArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
 	auto ( Frontend::*m_buildFrustaOfOccludersArchMethod )( StateForCamera *, std::span<const SortedOccluder> ) -> std::span<const Frustum>;
@@ -566,6 +610,14 @@ private:
 
 		wsw::PodVector<sortedDrawSurf_t> meshSortList;
 		wsw::PodVector<wsw::Function<void( FrontendToBackendShared * )>> drawActionsList;
+
+		wsw::PodVector<PrepareBatchedSurfWorkload> preparePolysWorkloadBuffer;
+		wsw::PodVector<PrepareBatchedSurfWorkload> prepareCoronasWorkloadBuffer;
+		wsw::PodVector<PrepareBatchedSurfWorkload> prepareParticlesWorkloadBuffer;
+		wsw::PodVector<VertElemSpan> batchedSurfVertSpansBuffer;
+
+		wsw::PodVector<PrepareSpriteSurfWorkload> prepareSpritesWorkloadBuffer;
+		wsw::PodVector<mesh_t> preparedSpriteMeshesBuffer;
 
 		PodBufferHolder<unsigned> visibleLeavesBuffer;
 		PodBufferHolder<unsigned> visibleOccludersBuffer;
@@ -628,6 +680,18 @@ private:
 	wsw::PodVector<DynamicMeshData> m_tmpDynamicMeshData;
 	wsw::PodVector<DynamicMeshFillDataWorkload> m_tmpDynamicMeshFillDataWorkload;
 	std::pair<unsigned, unsigned> m_dynamicMeshOffsetsOfVerticesAndIndices { 0, 0 };
+	std::pair<unsigned, unsigned> m_variousDynamicsOffsetsOfVerticesAndIndices { 0, 0 };
+
+	// TODO: Use proper Scene-dependent constants
+	wsw::StaticVector<PrepareBatchedSurfWorkload *, 192> m_selectedPolysWorkload;
+	wsw::StaticVector<PrepareBatchedSurfWorkload *, 192> m_selectedCoronasWorkload;
+	wsw::StaticVector<PrepareBatchedSurfWorkload *, 1024> m_selectedParticlesWorkload;
+
+	// TODO: Write to mapped buffers directly
+	PodBufferHolder<vec4_t> m_tmpMeshPositions;
+	PodBufferHolder<vec2_t> m_tmpMeshTexCoords;
+	PodBufferHolder<byte_vec4_t> m_tmpMeshColors;
+	PodBufferHolder<uint16_t> m_tmpMeshIndices;
 
 	// This is not an appropriate place to keep the client-global instance of task system.
 	// However, moving it to the client code is complicated due to lifetime issues related to client global vars.

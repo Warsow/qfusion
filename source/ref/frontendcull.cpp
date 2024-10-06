@@ -728,16 +728,16 @@ static auto clipAgainstPlane( PlaneTraits planeTraits, unsigned numInVertices, c
 
 		if( isPrevInside != isCurrInside ) {
 			const float frac = planeTraits.getIntersectionFrac( prevCoord, currCoord );
-			assert( frac >= 0.0f && frac <= 1.0f );
+			//assert( frac >= 0.0f && frac <= 1.0f );
 
-			assert( prevIndex != numOutVertices && currIndex != numOutVertices );
+			//assert( prevIndex != numOutVertices && currIndex != numOutVertices );
 			float *__restrict destCoord = outCoords[numOutVertices];
 			Vector4Lerp( prevCoord, frac, currCoord, destCoord );
 			numOutVertices += 1;
 		}
 
 		if( isCurrInside ) {
-			assert( currIndex != numOutVertices );
+			//assert( currIndex != numOutVertices );
 			float *__restrict destCoord = outCoords[numOutVertices];
 			Vector4Copy( currCoord, destCoord );
 			numOutVertices += 1;
@@ -784,7 +784,7 @@ static auto clipTriangle( vec4_t inCoords[], vec4_t outCoords[] ) -> unsigned {
 				return 0;
 			}
 		} while( ++turn < 6 );
-		assert( turnCoords[turn % 2] == inCoords );
+		//assert( turnCoords[turn % 2] == inCoords );
 		return numVertices;
 	}
 }

@@ -263,8 +263,16 @@ auto Frontend::allocStateForCamera() -> StateForCamera * {
 	auto *stateForCamera = new( resultStorage->theStateStorage )StateForCamera;
 	resultStorage->isStateConstructed = true;
 
-	stateForCamera->sortList                      = &resultStorage->meshSortList;
-	stateForCamera->drawActionsList               = &resultStorage->drawActionsList;
+	stateForCamera->sortList        = &resultStorage->meshSortList;
+	stateForCamera->drawActionsList = &resultStorage->drawActionsList;
+
+	stateForCamera->preparePolysWorkload     = &resultStorage->preparePolysWorkloadBuffer;
+	stateForCamera->prepareCoronasWorkload   = &resultStorage->prepareCoronasWorkloadBuffer;
+	stateForCamera->prepareParticlesWorkload = &resultStorage->prepareParticlesWorkloadBuffer;
+	stateForCamera->batchedSurfVertSpans     = &resultStorage->batchedSurfVertSpansBuffer;
+	stateForCamera->prepareSpritesWorkload   = &resultStorage->prepareSpritesWorkloadBuffer;
+	stateForCamera->preparedSpriteMeshes     = &resultStorage->preparedSpriteMeshesBuffer;
+
 	stateForCamera->visibleLeavesBuffer           = &resultStorage->visibleLeavesBuffer;
 	stateForCamera->visibleOccludersBuffer        = &resultStorage->visibleOccludersBuffer;
 	stateForCamera->sortedOccludersBuffer         = &resultStorage->sortedOccludersBuffer;

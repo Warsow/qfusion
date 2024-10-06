@@ -692,11 +692,16 @@ void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
 						const struct mesh_s *mesh, int primitive, float x_offset, float y_offset );
 void RB_FlushDynamicMeshes( void );
 
-int RB_VBOIdForFrameUploads();
+enum : unsigned {
+	UPLOAD_GROUP_DYNAMIC_MESH = 0,
+	UPLOAD_GROUP_BATCHED_MESH = 1,
+};
 
-void R_BeginFrameUploads();
-void R_SetFrameUploadMeshSubdata( unsigned verticesOffset, unsigned indicesOffset, const mesh_t *mesh );
-void R_EndFrameUploads();
+int RB_VBOIdForFrameUploads( unsigned group );
+
+void R_BeginFrameUploads( unsigned group );
+void R_SetFrameUploadMeshSubdata( unsigned group, unsigned verticesOffset, unsigned indicesOffset, const mesh_t *mesh );
+void R_EndFrameUploads( unsigned group );
 
 struct VertElemSpan {
 	unsigned firstVert;
@@ -1425,6 +1430,8 @@ struct FrontendToBackendShared {
 	const Scene::ParticlesAggregate *particleAggregates;
 	std::span<const uint16_t> visibleProgramLightIndices;
 	std::span<const uint16_t> allVisibleLightIndices;
+	const VertElemSpan *batchedVertElemSpans;
+	// TODO: How do i supply mesh
 	vec3_t viewOrigin;
 	mat3_t viewAxis;
 	unsigned renderFlags;
@@ -1439,10 +1446,8 @@ void R_SubmitDynamicMeshToBackend( const FrontendToBackendShared *fsh, const ent
 void R_SubmitBSPSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceBSP_t *drawSurf );
 void R_SubmitNullSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const void * );
 
-void R_SubmitSpriteSurfsToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, std::span<const sortedDrawSurf_t> surfSpan );
-void R_SubmitQuadPolysToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, std::span<const sortedDrawSurf_t> surfSpan );
-void R_SubmitParticleSurfsToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, std::span<const sortedDrawSurf_t> surfSpan );
-void R_SubmitCoronaSurfsToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, std::span<const sortedDrawSurf_t> surfSpan );
+void R_SubmitSpriteSurfsToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, unsigned meshOffset );
+void R_SubmitBatchedSurfsToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, unsigned vertElemSpanOffset );
 
 //
 // r_poly.c

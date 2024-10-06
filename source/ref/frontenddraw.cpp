@@ -503,6 +503,7 @@ auto Frontend::endPreparingRenderingFromTheseCameras( std::span<std::pair<Scene 
 auto Frontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, Frontend *self,
 														std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
 														bool areCamerasPortalCameras ) -> CoroTask {
+	// TODO: We cannot use this with portals due to reallocations!
 	// Caution! There is an implication that preparing uploads is executed in serial fashion by primary and portal camera groups
 	wsw::PodVector<DynamicMeshFillDataWorkload> *tmpDynamicMeshFillDataWorkload = &self->m_tmpDynamicMeshFillDataWorkload;
 	wsw::PodVector<DynamicMeshData> *tmpDynamicMeshData = &self->m_tmpDynamicMeshData;
@@ -510,8 +511,16 @@ auto Frontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, 
 	if( !areCamerasPortalCameras ) {
 		tmpDynamicMeshFillDataWorkload->clear();
 		tmpDynamicMeshData->clear();
-		self->m_dynamicMeshOffsetsOfVerticesAndIndices = { 0, 0 };
-		R_BeginFrameUploads();
+
+		self->m_selectedPolysWorkload.clear();
+		self->m_selectedCoronasWorkload.clear();
+		self->m_selectedParticlesWorkload.clear();
+
+		self->m_dynamicMeshOffsetsOfVerticesAndIndices     = { 0, 0 };
+		self->m_variousDynamicsOffsetsOfVerticesAndIndices = { 0, 0 };
+
+		R_BeginFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
+		R_BeginFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
 	}
 
 	if( r_drawentities->integer ) {
@@ -529,6 +538,7 @@ auto Frontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, 
 			}
 		}
 		if( !tmpDynamicMeshFillDataWorkload->empty() ) {
+			// TODO: Is this safe wrt drawing portals
 			tmpDynamicMeshData->resize( tmpDynamicMeshFillDataWorkload->size() );
 			for( unsigned i = 0; i < tmpDynamicMeshFillDataWorkload->size(); ++i ) {
 				tmpDynamicMeshFillDataWorkload->operator[]( i ).destData = tmpDynamicMeshData->data() + i;
@@ -550,60 +560,12 @@ auto Frontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, 
 	}
 
 	TaskHandle fillMeshBuffersTask;
+	// TODO: Check how much is actually added during portal stage!!!!!!!
 	if( !tmpDynamicMeshFillDataWorkload->empty() ) {
 		auto fn = [=]( unsigned, unsigned elemIndex ) {
-			DynamicMeshFillDataWorkload &workload = tmpDynamicMeshFillDataWorkload->operator[]( elemIndex );
-			assert( workload.drawSurface );
-			const DynamicMesh *dynamicMesh = workload.drawSurface->dynamicMesh;
-			assert( dynamicMesh );
-
-			unsigned numAffectingLights     = 0;
-			uint16_t *affectingLightIndices = nullptr;
-			std::span<const uint16_t> lightIndicesSpan;
-			if( dynamicMesh->applyVertexDynLight && r_dynamiclight->integer && workload.stateForCamera->numAllVisibleLights ) {
-				std::span<const uint16_t> availableLights { workload.stateForCamera->allVisibleLightIndices,
-															workload.stateForCamera->numAllVisibleLights };
-
-				affectingLightIndices = (uint16_t *)alloca( sizeof( uint16_t ) * workload.stateForCamera->numAllVisibleLights );
-				numAffectingLights = findLightsThatAffectBounds( workload.scene->m_dynamicLights.data(), availableLights,
-																 dynamicMesh->cullMins, dynamicMesh->cullMaxs, affectingLightIndices );
-
-				lightIndicesSpan = { affectingLightIndices, numAffectingLights };
-			}
-
-			auto [numVertices, numIndices] = dynamicMesh->fillMeshBuffers( workload.stateForCamera->viewOrigin,
-																		   workload.stateForCamera->viewAxis,
-																		   workload.stateForCamera->lodScaleForFov,
-																		   workload.stateForCamera->cameraId,
-																		   workload.scene->m_dynamicLights.data(),
-																		   lightIndicesSpan,
-																		   workload.drawSurface->scratchpad,
-																		   workload.destData->positions,
-																		   workload.destData->normals,
-																		   workload.destData->texCoords,
-																		   workload.destData->colors,
-																		   workload.destData->indices );
-			assert( numVertices <= workload.drawSurface->requestedNumVertices );
-			assert( numIndices <= workload.drawSurface->requestedNumIndices );
-			workload.drawSurface->actualNumVertices = numVertices;
-			workload.drawSurface->actualNumIndices  = numIndices;
-
-			// fillMeshBuffers() may legally return zeroes (even if the initially requested numbers were non-zero)
-			if( numVertices && numIndices ) {
-				mesh_t mesh;
-
-				std::memset( &mesh, 0, sizeof( mesh_t ) );
-				mesh.numVerts       = numVertices;
-				mesh.numElems       = numIndices;
-				mesh.xyzArray       = workload.destData->positions;
-				mesh.stArray        = workload.destData->texCoords;
-				mesh.colorsArray[0] = workload.destData->colors;
-				mesh.elems          = workload.destData->indices;
-
-				R_SetFrameUploadMeshSubdata( workload.drawSurface->verticesOffset, workload.drawSurface->indicesOffset, &mesh );
-			}
+			self->prepareDynamicMesh( tmpDynamicMeshFillDataWorkload->data() + elemIndex );
 		};
-
+		// TODO: This is a bug!!!! limit the range of entries in the shared buffer!!!!!
 		fillMeshBuffersTask = si.taskSystem->addForIndicesInRange( { 0u, (unsigned)tmpDynamicMeshFillDataWorkload->size() },
 																   std::span<const TaskHandle> {}, std::move( fn ) );
 	}
@@ -650,6 +612,22 @@ auto Frontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, 
 		self->processSortList( stateForCamera, scene );
 	}
 
+	const unsigned oldPolysWorkloadSize     = self->m_selectedPolysWorkload.size();
+	const unsigned oldCoronasWorkloadSize   = self->m_selectedCoronasWorkload.size();
+	const unsigned oldParticlesWorkloadSize = self->m_selectedParticlesWorkload.size();
+
+	self->markBuffersOfBatchedDynamicsForUpload( scenesAndCameras );
+
+	for( unsigned i = oldPolysWorkloadSize; i < self->m_selectedPolysWorkload.size(); ++i ) {
+		self->prepareBatchedQuadPolys( self->m_selectedPolysWorkload[i] );
+	}
+	for( unsigned i = oldCoronasWorkloadSize; i < self->m_selectedCoronasWorkload.size(); ++i ) {
+		self->prepareBatchedCoronas( self->m_selectedCoronasWorkload[i] );
+	}
+	for( unsigned i = oldParticlesWorkloadSize; i < self->m_selectedParticlesWorkload.size(); ++i ) {
+		self->prepareBatchedParticles( self->m_selectedParticlesWorkload[i] );
+	}
+
 	// If there's processing of portals, finish it prior to awaiting uploads
 	if( endPreparingRenderingFromPortalsTask ) {
 		co_await si.taskSystem->awaiterOf( endPreparingRenderingFromPortalsTask );
@@ -661,7 +639,110 @@ auto Frontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, 
 
 	// The primary group of cameras ends uploads
 	if( !areCamerasPortalCameras ) {
-		R_EndFrameUploads();
+		R_EndFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
+		R_EndFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
+	}
+}
+
+// TODO: Make these dynamics view-dependent?
+
+[[nodiscard]]
+auto getParticleSpanStorageRequirements( std::span<const sortedDrawSurf_t> batchSpan ) -> std::optional<std::pair<unsigned, unsigned>> {
+	return std::make_optional<std::pair<unsigned, unsigned>>( 4 * batchSpan.size(), 6 * batchSpan.size() );
+}
+
+[[nodiscard]]
+auto getCoronaSpanStorageRequirements( std::span<const sortedDrawSurf_t> batchSpan ) -> std::optional<std::pair<unsigned, unsigned>> {
+	return std::make_optional<std::pair<unsigned, unsigned>>( 4 * batchSpan.size(), 6 * batchSpan.size() );
+}
+
+[[nodiscard]]
+auto getQuadPolySpanStorageRequirements( std::span<const sortedDrawSurf_t> batchSpan ) -> std::optional<std::pair<unsigned, unsigned>> {
+	return std::make_optional<std::pair<unsigned, unsigned>>( 4 * batchSpan.size(), 6 * batchSpan.size() );
+}
+
+[[nodiscard]]
+auto getSpriteSpanStorageRequirements( std::span<const sortedDrawSurf_t> batchSpan ) -> std::optional<std::pair<unsigned, unsigned>> {
+	return std::nullopt;
+}
+
+void Frontend::markBuffersOfBatchedDynamicsForUpload( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras ) {
+	const auto markAndAdvanceOffsets = [this]( const std::pair<unsigned, unsigned> &storageRequirements,
+											   StateForCamera *stateForCamera,
+											   const PrepareBatchedSurfWorkload &workload ) -> bool {
+		// TODO: Protect against overflow
+		unsigned *offsetOfVertices = &m_variousDynamicsOffsetsOfVerticesAndIndices.first;
+		unsigned *offsetOfIndices  = &m_variousDynamicsOffsetsOfVerticesAndIndices.second;
+		stateForCamera->batchedSurfVertSpans->data()[workload.vertSpanOffset] = VertElemSpan {
+			.firstVert = *offsetOfVertices,
+			.numVerts  = storageRequirements.first,
+			.firstElem = *offsetOfIndices,
+			.numElems  = storageRequirements.second,
+		};
+		*offsetOfVertices += storageRequirements.first;
+		*offsetOfIndices  += storageRequirements.second;
+		return true;
+	};
+
+	// TODO: Just return?
+	bool overflow = false;
+	// We have to join the execution flow for this
+	for( auto [scene, stateForCamera] : scenesAndCameras ) {
+		if( !m_selectedPolysWorkload.full() ) {
+			for( PrepareBatchedSurfWorkload &workload: *stateForCamera->preparePolysWorkload ) {
+				if( auto maybeRequirements = getQuadPolySpanStorageRequirements( workload.batchSpan ) ) [[likely]] {
+					if( !markAndAdvanceOffsets( *maybeRequirements, stateForCamera, workload ) ) [[unlikely]] {
+						overflow = true;
+						break;
+					}
+					m_selectedPolysWorkload.push_back( std::addressof( workload ) );
+					if( m_selectedPolysWorkload.full() ) [[unlikely]] {
+						break;
+					}
+				}
+			}
+		}
+		if( !overflow && !m_selectedCoronasWorkload.full() ) {
+			for( PrepareBatchedSurfWorkload &workload: *stateForCamera->prepareCoronasWorkload ) {
+				if( auto maybeRequirements = getCoronaSpanStorageRequirements( workload.batchSpan ) ) [[likely]] {
+					if( !markAndAdvanceOffsets( *maybeRequirements, stateForCamera, workload ) ) [[unlikely]] {
+						overflow = true;
+						break;
+					}
+					this->m_selectedCoronasWorkload.push_back( std::addressof( workload ) );
+					if( this->m_selectedCoronasWorkload.full() ) [[unlikely]] {
+						break;
+					}
+				}
+			}
+		}
+		if( !overflow && !m_selectedParticlesWorkload.full() ) {
+			for( PrepareBatchedSurfWorkload &workload: *stateForCamera->prepareParticlesWorkload ) {
+				if( auto maybeRequirements = getParticleSpanStorageRequirements( workload.batchSpan ) ) [[likely]] {
+					if( !markAndAdvanceOffsets( *maybeRequirements, stateForCamera, workload ) ) [[unlikely]] {
+						overflow = true;
+						break;
+					}
+					m_selectedParticlesWorkload.push_back( std::addressof( workload ) );
+					if( m_selectedParticlesWorkload.full() ) [[unlikely]] {
+						break;
+					}
+				}
+			}
+		}
+		if( overflow ) {
+			break;
+		}
+	}
+
+	// Process legacy sprites regardless of upload overflow
+	for( auto [scene, stateForCamera] : scenesAndCameras ) {
+		/*
+		for( const PrepareSpriteSurfWorkload &workload: *stateForCamera->prepareSpritesWorkload ) {
+			if( auto maybeRequirements = getSpriteSpanStorageRequirements( workload.batchSpan ) ) {
+				markAndAdvanceOffsets( self, *maybeRequirements, stateForCamera, workload );
+			}
+		}*/
 	}
 }
 
@@ -767,6 +848,7 @@ void Frontend::submitDrawActionsList( StateForCamera *stateForCamera, Scene *sce
 	FrontendToBackendShared fsh;
 	fsh.dynamicLights               = scene->m_dynamicLights.data();
 	fsh.particleAggregates          = scene->m_particles.data();
+	fsh.batchedVertElemSpans        = stateForCamera->batchedSurfVertSpans->data();
 	fsh.allVisibleLightIndices      = { stateForCamera->allVisibleLightIndices, stateForCamera->numAllVisibleLights };
 	fsh.visibleProgramLightIndices  = { stateForCamera->visibleProgramLightIndices, stateForCamera->numVisibleProgramLights };
 	fsh.renderFlags                 = stateForCamera->renderFlags;
@@ -1061,4 +1143,679 @@ void Frontend::addDebugLine( const float *p1, const float *p2, int color ) {
 	});
 }
 
+void Frontend::prepareDynamicMesh( DynamicMeshFillDataWorkload *workload ) {
+	assert( workload->drawSurface );
+	const DynamicMesh *dynamicMesh = workload->drawSurface->dynamicMesh;
+	assert( dynamicMesh );
+
+	unsigned numAffectingLights     = 0;
+	uint16_t *affectingLightIndices = nullptr;
+	std::span<const uint16_t> lightIndicesSpan;
+	if( dynamicMesh->applyVertexDynLight && r_dynamiclight->integer && workload->stateForCamera->numAllVisibleLights ) {
+		std::span<const uint16_t> availableLights { workload->stateForCamera->allVisibleLightIndices,
+													workload->stateForCamera->numAllVisibleLights };
+
+		affectingLightIndices = (uint16_t *)alloca( sizeof( uint16_t ) * workload->stateForCamera->numAllVisibleLights );
+		numAffectingLights = findLightsThatAffectBounds( workload->scene->m_dynamicLights.data(), availableLights,
+														 dynamicMesh->cullMins, dynamicMesh->cullMaxs, affectingLightIndices );
+
+		lightIndicesSpan = { affectingLightIndices, numAffectingLights };
+	}
+
+	auto [numVertices, numIndices] = dynamicMesh->fillMeshBuffers( workload->stateForCamera->viewOrigin,
+																   workload->stateForCamera->viewAxis,
+																   workload->stateForCamera->lodScaleForFov,
+																   workload->stateForCamera->cameraId,
+																   workload->scene->m_dynamicLights.data(),
+																   lightIndicesSpan,
+																   workload->drawSurface->scratchpad,
+																   workload->destData->positions,
+																   workload->destData->normals,
+																   workload->destData->texCoords,
+																   workload->destData->colors,
+																   workload->destData->indices );
+	assert( numVertices <= workload->drawSurface->requestedNumVertices );
+	assert( numIndices <= workload->drawSurface->requestedNumIndices );
+	workload->drawSurface->actualNumVertices = numVertices;
+	workload->drawSurface->actualNumIndices  = numIndices;
+
+	// fillMeshBuffers() may legally return zeroes (even if the initially requested numbers were non-zero)
+	if( numVertices && numIndices ) {
+		mesh_t mesh;
+
+		std::memset( &mesh, 0, sizeof( mesh_t ) );
+		mesh.numVerts       = numVertices;
+		mesh.numElems       = numIndices;
+		mesh.xyzArray       = workload->destData->positions;
+		mesh.stArray        = workload->destData->texCoords;
+		mesh.colorsArray[0] = workload->destData->colors;
+		mesh.elems          = workload->destData->indices;
+
+		R_SetFrameUploadMeshSubdata( UPLOAD_GROUP_DYNAMIC_MESH, workload->drawSurface->verticesOffset,
+									 workload->drawSurface->indicesOffset, &mesh );
+	}
+}
+
+static wsw_forceinline void calcAddedParticleLight( const float *__restrict particleOrigin,
+													const Scene::DynamicLight *__restrict lights,
+													std::span<const uint16_t> affectingLightIndices,
+													float *__restrict addedLight ) {
+	assert( !affectingLightIndices.empty() );
+
+	size_t lightNum = 0;
+	do {
+		const Scene::DynamicLight *light = lights + affectingLightIndices[lightNum];
+		const float squareDistance = DistanceSquared( light->origin, particleOrigin );
+		// May go outside [0.0, 1.0] as we test against the bounding box of the entire aggregate
+		float impactStrength = 1.0f - Q_Sqrt( squareDistance ) * Q_Rcp( light->maxRadius );
+		// Just clamp so the code stays branchless
+		impactStrength = wsw::clamp( impactStrength, 0.0f, 1.0f );
+		VectorMA( addedLight, impactStrength, light->color, addedLight );
+	} while( ++lightNum < affectingLightIndices.size() );
+}
+
+// TODO: Write to mapped buffers directly
+struct BatchedMeshBuilder {
+	vec4_t *meshPositions { nullptr };
+	vec2_t *meshTexCoords { nullptr };
+	byte_vec4_t *meshColors { nullptr };
+	uint16_t *meshIndices { nullptr };
+	unsigned numVerticesSoFar { 0 };
+	unsigned numIndicesSoFar { 0 };
+
+	void reserveForQuads( Frontend *self, unsigned numQuads ) {
+		this->meshPositions = self->m_tmpMeshPositions.reserveAndGet( 4 * numQuads );
+		this->meshTexCoords = self->m_tmpMeshTexCoords.reserveAndGet( 4 * numQuads );
+		this->meshColors    = self->m_tmpMeshColors.reserveAndGet( 4 * numQuads );
+		this->meshIndices   = self->m_tmpMeshIndices.reserveAndGet( 6 * numQuads );
+
+		this->numVerticesSoFar = 0;
+		this->numIndicesSoFar  = 0;
+	}
+
+	void appendQuad( const vec4_t positions[4], const vec2_t texCoords[4], const byte_vec4_t colors[4], const uint16_t indices[6] ) {
+		std::memcpy( meshPositions + numVerticesSoFar, positions, 4 * sizeof( vec4_t ) );
+		std::memcpy( meshTexCoords + numVerticesSoFar, texCoords, 4 * sizeof( vec2_t ) );
+		std::memcpy( meshColors + numVerticesSoFar, colors, 4 * sizeof( byte_vec4_t ) );
+
+		for( unsigned i = 0; i < 6; ++i ) {
+			meshIndices[numIndicesSoFar + i] = numVerticesSoFar + indices[i];
+		}
+
+		numVerticesSoFar += 4;
+		numIndicesSoFar += 6;
+	}
+};
+
+static void uploadBatchedMesh( BatchedMeshBuilder *builder, VertElemSpan *inOutSpan ) {
+	if( builder->numVerticesSoFar && builder->numIndicesSoFar ) {
+		mesh_t mesh;
+		std::memset( &mesh, 0, sizeof( mesh_t ) );
+
+		mesh.numVerts       = builder->numVerticesSoFar;
+		mesh.numElems       = builder->numIndicesSoFar;
+		mesh.xyzArray       = builder->meshPositions;
+		mesh.stArray        = builder->meshTexCoords;
+		mesh.colorsArray[0] = builder->meshColors;
+		mesh.elems          = builder->meshIndices;
+
+		const unsigned verticesOffset = inOutSpan->firstVert;
+		const unsigned indicesOffset  = inOutSpan->firstElem;
+
+		R_SetFrameUploadMeshSubdata( UPLOAD_GROUP_BATCHED_MESH, verticesOffset, indicesOffset, &mesh );
+
+		// Correct original estimations by final values
+		assert( builder->numVerticesSoFar <= inOutSpan->numVerts );
+		assert( builder->numIndicesSoFar <= inOutSpan->numElems );
+		inOutSpan->numVerts = builder->numVerticesSoFar;
+		inOutSpan->numElems = builder->numIndicesSoFar;
+	} else {
+		// Suppress drawing attempts
+		inOutSpan->numVerts = 0;
+		inOutSpan->numElems = 0;
+	}
+}
+
+static void buildMeshForSpriteParticles( BatchedMeshBuilder *meshBuilder,
+										 const Scene::ParticlesAggregate *aggregate,
+										 std::span<const sortedDrawSurf_t> surfSpan,
+										 const float *viewAxis, bool shouldMirrorView,
+										 const Scene::DynamicLight *dynamicLights,
+										 std::span<const uint16_t> affectingLightIndices ) {
+	const auto *__restrict appearanceRules = &aggregate->appearanceRules;
+	const auto *__restrict spriteRules     = std::get_if<Particle::SpriteRules>( &appearanceRules->geometryRules );
+	const bool applyLight                  = !affectingLightIndices.empty();
+
+	for( const sortedDrawSurf_t &sds: surfSpan ) {
+		// TODO: Write directly to mapped buffers
+		elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
+		vec4_t xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
+		// TODO: Do we need normals?
+		vec4_t normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
+		byte_vec4_t colors[4];
+		vec2_t texcoords[4] = { {0, 1}, {0, 0}, {1,0}, {1,1} };
+
+		const auto *drawSurf = (const ParticleDrawSurface *)sds.drawSurf;
+
+		// Ensure that the aggregate is the same
+		//assert( fsh->particleAggregates + drawSurf->aggregateIndex == aggregate );
+
+		assert( drawSurf->particleIndex < aggregate->numParticles );
+		const Particle *const __restrict particle = aggregate->particles + drawSurf->particleIndex;
+
+		assert( particle->lifetimeFrac >= 0.0f && particle->lifetimeFrac <= 1.0f );
+
+		assert( spriteRules->radius.mean > 0.0f );
+		assert( spriteRules->radius.spread >= 0.0f );
+
+		float signedFrac = Particle::kByteSpreadNormalizer * (float)particle->instanceRadiusSpreadFraction;
+		float radius     = wsw::max( 0.0f, spriteRules->radius.mean + signedFrac * spriteRules->radius.spread );
+
+		radius *= Particle::kScaleOfByteExtraScale * (float)particle->instanceRadiusExtraScale;
+
+		if( spriteRules->sizeBehaviour != Particle::SizeNotChanging ) {
+			radius *= calcSizeFracForLifetimeFrac( particle->lifetimeFrac, spriteRules->sizeBehaviour );
+		}
+
+		if( radius < 0.1f ) {
+			continue;
+		}
+
+		vec3_t v_left, v_up;
+		if( particle->rotationAngle != 0.0f ) {
+			mat3_t axis;
+			Matrix3_Rotate( viewAxis, particle->rotationAngle, &viewAxis[AXIS_FORWARD], axis );
+			VectorCopy( &axis[AXIS_RIGHT], v_left );
+			VectorCopy( &axis[AXIS_UP], v_up );
+		} else {
+			VectorCopy( &viewAxis[AXIS_RIGHT], v_left );
+			VectorCopy( &viewAxis[AXIS_UP], v_up );
+		}
+
+		if( shouldMirrorView ) {
+			VectorInverse( v_left );
+		}
+
+		vec3_t point;
+		VectorMA( particle->origin, -radius, v_up, point );
+		VectorMA( point, radius, v_left, xyz[0] );
+		VectorMA( point, -radius, v_left, xyz[3] );
+
+		VectorMA( particle->origin, radius, v_up, point );
+		VectorMA( point, radius, v_left, xyz[1] );
+		VectorMA( point, -radius, v_left, xyz[2] );
+
+		vec4_t colorBuffer;
+		const RgbaLifespan &colorLifespan = appearanceRules->colors[particle->instanceColorIndex];
+		colorLifespan.getColorForLifetimeFrac( particle->lifetimeFrac, colorBuffer );
+
+		if( applyLight ) {
+			vec4_t addedLight { 0.0f, 0.0f, 0.0f, 1.0f };
+			calcAddedParticleLight( particle->origin, dynamicLights, affectingLightIndices, addedLight );
+
+			// TODO: Pass as a floating-point attribute to a GPU program?
+			colorBuffer[0] = wsw::min( 1.0f, colorBuffer[0] + addedLight[0] );
+			colorBuffer[1] = wsw::min( 1.0f, colorBuffer[1] + addedLight[1] );
+			colorBuffer[2] = wsw::min( 1.0f, colorBuffer[2] + addedLight[2] );
+		}
+
+		Vector4Set( colors[0],
+					(uint8_t)( 255 * colorBuffer[0] ),
+					(uint8_t)( 255 * colorBuffer[1] ),
+					(uint8_t)( 255 * colorBuffer[2] ),
+					(uint8_t)( 255 * colorBuffer[3] ) );
+
+		Vector4Copy( colors[0], colors[1] );
+		Vector4Copy( colors[0], colors[2] );
+		Vector4Copy( colors[0], colors[3] );
+
+		meshBuilder->appendQuad( xyz, texcoords, colors, elems );
+	}
+}
+
+static void buildMeshForSparkParticles( BatchedMeshBuilder *meshBuilder,
+										const Scene::ParticlesAggregate *aggregate,
+										std::span<const sortedDrawSurf_t> surfSpan,
+										const float *viewOrigin, const float *viewAxis,
+										const Scene::DynamicLight *dynamicLights,
+										std::span<const uint16_t> affectingLightIndices ) {
+	const auto *__restrict appearanceRules = &aggregate->appearanceRules;
+	const auto *__restrict sparkRules      = std::get_if<Particle::SparkRules>( &appearanceRules->geometryRules );
+	const bool applyLight                  = !affectingLightIndices.empty();
+
+	for( const sortedDrawSurf_t &sds: surfSpan ) {
+		// TODO: Write directly to mapped buffers
+		elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
+		vec4_t xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
+		// TODO: Do we need normals?
+		vec4_t normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
+		byte_vec4_t colors[4];
+		vec2_t texcoords[4] = { {0, 1}, {0, 0}, {1,0}, {1,1} };
+
+		const auto *drawSurf = (const ParticleDrawSurface *)sds.drawSurf;
+
+		// Ensure that the aggregate is the same
+		//assert( fsh->particleAggregates + drawSurf->aggregateIndex == aggregate );
+
+		assert( drawSurf->particleIndex < aggregate->numParticles );
+		const Particle *const __restrict particle = aggregate->particles + drawSurf->particleIndex;
+
+		assert( particle->lifetimeFrac >= 0.0f && particle->lifetimeFrac <= 1.0f );
+
+		assert( sparkRules->length.mean >= 0.1f && sparkRules->width.mean >= 0.1f );
+		assert( sparkRules->length.spread >= 0.0f && sparkRules->width.spread >= 0.0f );
+
+		const float lengthSignedFrac = Particle::kByteSpreadNormalizer * (float)particle->instanceLengthSpreadFraction;
+		const float widthSignedFrac  = Particle::kByteSpreadNormalizer * (float)particle->instanceWidthSpreadFraction;
+
+		float length = wsw::max( 0.0f, sparkRules->length.mean + lengthSignedFrac * sparkRules->length.spread );
+		float width  = wsw::max( 0.0f, sparkRules->width.mean + widthSignedFrac * sparkRules->width.spread );
+
+		length *= Particle::kScaleOfByteExtraScale * (float)particle->instanceLengthExtraScale;
+		width  *= Particle::kScaleOfByteExtraScale * (float)particle->instanceWidthExtraScale;
+
+		const Particle::SizeBehaviour sizeBehaviour = sparkRules->sizeBehaviour;
+		if( sizeBehaviour != Particle::SizeNotChanging ) {
+			const float sizeFrac = calcSizeFracForLifetimeFrac( particle->lifetimeFrac, sizeBehaviour );
+			if( sizeBehaviour != Particle::SizeBehaviour::Thinning &&
+				sizeBehaviour != Particle::SizeBehaviour::Thickening &&
+				sizeBehaviour != Particle::SizeBehaviour::ThickeningAndThinning ) {
+				length *= sizeFrac;
+			}
+			width *= sizeFrac;
+		}
+
+		if( length < 0.1f || width < 0.1f ) {
+			continue;
+		}
+
+		vec3_t particleDir;
+		float fromFrac, toFrac;
+		vec3_t visualVelocity;
+		VectorAdd( particle->dynamicsVelocity, particle->artificialVelocity, visualVelocity );
+		if( const float squareVisualSpeed = VectorLengthSquared( visualVelocity ); squareVisualSpeed > 1.0f ) [[likely]] {
+			const float rcpVisualSpeed = Q_RSqrt( squareVisualSpeed );
+			if( particle->rotationAngle == 0.0f ) [[likely]] {
+				VectorScale( visualVelocity, rcpVisualSpeed, particleDir );
+				fromFrac = 0.0f, toFrac = 1.0f;
+			} else {
+				vec3_t tmpParticleDir;
+				VectorScale( visualVelocity, rcpVisualSpeed, tmpParticleDir );
+
+				mat3_t rotationMatrix;
+				const float *rotationAxis = kPredefinedDirs[particle->rotationAxisIndex];
+				Matrix3_Rotate( axis_identity, particle->rotationAngle, rotationAxis, rotationMatrix );
+				Matrix3_TransformVector( rotationMatrix, tmpParticleDir, particleDir );
+
+				fromFrac = -0.5f, toFrac = +0.5f;
+			}
+		} else {
+			continue;
+		}
+
+		assert( std::fabs( VectorLengthSquared( particleDir ) - 1.0f ) < 0.1f );
+
+		// Reduce the viewDir-aligned part of the particleDir
+		const float *const __restrict viewDir = &viewAxis[AXIS_FORWARD];
+		assert( sparkRules->viewDirPartScale >= 0.0f && sparkRules->viewDirPartScale <= 1.0f );
+		const float viewDirCutScale = ( 1.0f - sparkRules->viewDirPartScale ) * DotProduct( particleDir, viewDir );
+		if( std::fabs( viewDirCutScale ) < 0.999f ) [[likely]] {
+			VectorMA( particleDir, -viewDirCutScale, viewDir, particleDir );
+			VectorNormalizeFast( particleDir );
+		} else {
+			continue;
+		}
+
+		vec3_t from, to, mid;
+		VectorMA( particle->origin, fromFrac * length, particleDir, from );
+		VectorMA( particle->origin, toFrac * length, particleDir, to );
+		VectorAvg( from, to, mid );
+
+		vec3_t viewToMid, right;
+		VectorSubtract( mid, viewOrigin, viewToMid );
+		CrossProduct( viewToMid, particleDir, right );
+		if( const float squareLength = VectorLengthSquared( right ); squareLength > wsw::square( 0.001f ) ) [[likely]] {
+			const float rcpLength = Q_RSqrt( squareLength );
+			VectorScale( right, rcpLength, right );
+
+			const float halfWidth = 0.5f * width;
+
+			VectorMA( from, +halfWidth, right, xyz[0] );
+			VectorMA( from, -halfWidth, right, xyz[1] );
+			VectorMA( to, -halfWidth, right, xyz[2] );
+			VectorMA( to, +halfWidth, right, xyz[3] );
+		} else {
+			continue;
+		}
+
+		vec4_t colorBuffer;
+		const RgbaLifespan &colorLifespan = appearanceRules->colors[particle->instanceColorIndex];
+		colorLifespan.getColorForLifetimeFrac( particle->lifetimeFrac, colorBuffer );
+
+		if( applyLight ) {
+			alignas( 16 ) vec4_t addedLight { 0.0f, 0.0f, 0.0f, 1.0f };
+			calcAddedParticleLight( particle->origin, dynamicLights, affectingLightIndices, addedLight );
+
+			// The clipping due to LDR limitations sucks...
+			// TODO: Pass as a floating-point attribute to a GPU program?
+			colorBuffer[0] = wsw::min( 1.0f, colorBuffer[0] + addedLight[0] );
+			colorBuffer[1] = wsw::min( 1.0f, colorBuffer[1] + addedLight[1] );
+			colorBuffer[2] = wsw::min( 1.0f, colorBuffer[2] + addedLight[2] );
+		}
+
+		Vector4Set( colors[0],
+					(uint8_t)( 255 * colorBuffer[0] ),
+					(uint8_t)( 255 * colorBuffer[1] ),
+					(uint8_t)( 255 * colorBuffer[2] ),
+					(uint8_t)( 255 * colorBuffer[3] ) );
+
+		Vector4Copy( colors[0], colors[1] );
+		Vector4Copy( colors[0], colors[2] );
+		Vector4Copy( colors[0], colors[3] );
+
+		meshBuilder->appendQuad( xyz, texcoords, colors, elems );
+	}
+}
+
+void Frontend::prepareBatchedParticles( PrepareBatchedSurfWorkload *workload ) {
+	const auto *const scene          = workload->scene;
+	const auto *const stateForCamera = workload->stateForCamera;
+	const auto surfSpan              = workload->batchSpan;
+	const auto *const firstDrawSurf  = (const ParticleDrawSurface *)surfSpan.front().drawSurf;
+
+	const Scene::ParticlesAggregate *const aggregate = scene->m_particles.data() + firstDrawSurf->aggregateIndex;
+	// Less if the aggregate is visually split by some surfaces of other kinds
+	assert( surfSpan.size() <= aggregate->numParticles );
+
+	const Particle::AppearanceRules *const appearanceRules = &aggregate->appearanceRules;
+
+	unsigned numAffectingLights     = 0;
+	uint16_t *affectingLightIndices = nullptr;
+	std::span<const uint16_t> lightIndicesSpan;
+
+	if( appearanceRules->applyVertexDynLight && r_dynamiclight->integer ) {
+		const std::span<uint16_t> allVisibleLightIndices = workload->stateForCamera->allVisibleLightIndices;
+		if( !allVisibleLightIndices.empty() ) {
+			affectingLightIndices = (uint16_t *)alloca( sizeof( uint16_t ) * allVisibleLightIndices.size() );
+
+			numAffectingLights = findLightsThatAffectBounds( scene->m_dynamicLights.data(), allVisibleLightIndices,
+															 aggregate->mins, aggregate->maxs, affectingLightIndices );
+
+			lightIndicesSpan = { affectingLightIndices, numAffectingLights };
+		}
+	}
+
+	BatchedMeshBuilder meshBuilder;
+	meshBuilder.reserveForQuads( this, surfSpan.size() );
+
+	if( std::holds_alternative<Particle::SpriteRules>( appearanceRules->geometryRules ) ) {
+		buildMeshForSpriteParticles( &meshBuilder, aggregate, surfSpan, stateForCamera->viewAxis,
+									 ( stateForCamera->renderFlags & RF_MIRRORVIEW ) != 0,
+									 scene->m_dynamicLights.data(), lightIndicesSpan );
+	} else if( std::holds_alternative<Particle::SparkRules>( appearanceRules->geometryRules ) ) {
+		// TODO: We don't handle MIRRORVIEW
+		buildMeshForSparkParticles( &meshBuilder, aggregate, surfSpan, stateForCamera->viewOrigin,
+									stateForCamera->viewAxis, scene->m_dynamicLights.data(), lightIndicesSpan );
+	} else {
+		wsw::failWithRuntimeError( "Unreachable" );
+	}
+
+	uploadBatchedMesh( &meshBuilder, workload->stateForCamera->batchedSurfVertSpans->data() + workload->vertSpanOffset );
+}
+
+void Frontend::prepareBatchedCoronas( PrepareBatchedSurfWorkload *workload ) {
+	vec3_t v_left, v_up;
+	VectorCopy( &workload->stateForCamera->viewAxis[AXIS_RIGHT], v_left );
+	VectorCopy( &workload->stateForCamera->viewAxis[AXIS_UP], v_up );
+
+	if( workload->stateForCamera->renderFlags & RF_MIRRORVIEW ) {
+		VectorInverse( v_left );
+	}
+
+	BatchedMeshBuilder meshBuilder;
+	meshBuilder.reserveForQuads( this, workload->batchSpan.size() );
+
+	for( const sortedDrawSurf_t &sds: workload->batchSpan ) {
+		elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
+		vec4_t xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
+		// TODO: Do we need normals?
+		vec4_t normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
+		byte_vec4_t colors[4];
+		vec2_t texcoords[4] = { {0, 1}, {0, 0}, {1,0}, {1,1} };
+
+		const auto *light = (const Scene::DynamicLight *)sds.drawSurf;
+
+		assert( light && light->hasCoronaLight );
+
+		const float radius = light->coronaRadius;
+
+		vec3_t origin;
+		VectorCopy( light->origin, origin );
+
+		vec3_t point;
+		VectorMA( origin, -radius, v_up, point );
+		VectorMA( point, radius, v_left, xyz[0] );
+		VectorMA( point, -radius, v_left, xyz[3] );
+
+		VectorMA( origin, radius, v_up, point );
+		VectorMA( point, radius, v_left, xyz[1] );
+		VectorMA( point, -radius, v_left, xyz[2] );
+
+		Vector4Set( colors[0],
+					bound( 0, light->color[0] * 96, 255 ),
+					bound( 0, light->color[1] * 96, 255 ),
+					bound( 0, light->color[2] * 96, 255 ),
+					255 );
+
+		Vector4Copy( colors[0], colors[1] );
+		Vector4Copy( colors[0], colors[2] );
+		Vector4Copy( colors[0], colors[3] );
+
+		meshBuilder.appendQuad( xyz, texcoords, colors, elems );
+	}
+
+	uploadBatchedMesh( &meshBuilder, workload->stateForCamera->batchedSurfVertSpans->data() + workload->vertSpanOffset );
+}
+
+void Frontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *workload ) {
+	BatchedMeshBuilder meshBuilder;
+	meshBuilder.reserveForQuads( this, workload->batchSpan.size() );
+
+	[[maybe_unused]] const float *const viewOrigin = workload->stateForCamera->viewOrigin;
+	[[maybe_unused]] const float *const viewAxis   = workload->stateForCamera->viewAxis;
+	[[maybe_unused]] const bool shouldMirrorView   = ( workload->stateForCamera->renderFlags & RF_MIRRORVIEW ) != 0;
+
+	for( const sortedDrawSurf_t &sds: workload->batchSpan ) {
+		uint16_t indices[6] { 0, 1, 2, 0, 2, 3 };
+
+		vec4_t positions[4];
+		byte_vec4_t colors[4];
+		vec2_t texCoords[4];
+
+		positions[0][3] = positions[1][3] = positions[2][3] = positions[3][3] = 1.0f;
+
+		const auto *__restrict poly = (const QuadPoly *)sds.drawSurf;
+
+		if( const auto *__restrict beamRules = std::get_if<QuadPoly::ViewAlignedBeamRules>( &poly->appearanceRules ) ) {
+			assert( std::fabs( VectorLengthFast( beamRules->dir ) - 1.0f ) < 1.01f );
+			vec3_t viewToOrigin, right;
+			VectorSubtract( poly->origin, viewOrigin, viewToOrigin );
+			CrossProduct( viewToOrigin, beamRules->dir, right );
+
+			const float squareLength = VectorLengthSquared( right );
+			if( squareLength > wsw::square( 0.001f ) ) [[likely]] {
+				const float rcpLength = Q_RSqrt( squareLength );
+				VectorScale( right, rcpLength, right );
+
+				const float halfWidth = 0.5f * beamRules->width;
+
+				vec3_t from, to;
+				VectorMA( poly->origin, -poly->halfExtent, beamRules->dir, from );
+				VectorMA( poly->origin, +poly->halfExtent, beamRules->dir, to );
+
+				VectorMA( from, +halfWidth, right, positions[0] );
+				VectorMA( from, -halfWidth, right, positions[1] );
+				VectorMA( to, -halfWidth, right, positions[2] );
+				VectorMA( to, +halfWidth, right, positions[3] );
+
+				float stx = 1.0f;
+				if( beamRules->tileLength > 0 ) {
+					const float fullExtent = 2.0f * poly->halfExtent;
+					stx = fullExtent * Q_Rcp( beamRules->tileLength );
+				}
+
+				Vector2Set( texCoords[0], 0.0f, 0.0f );
+				Vector2Set( texCoords[1], 0.0f, 1.0f );
+				Vector2Set( texCoords[2], stx, 1.0f );
+				Vector2Set( texCoords[3], stx, 0.0f );
+
+				const byte_vec4_t fromColorAsBytes {
+					(uint8_t)( beamRules->fromColor[0] * 255 ),
+					(uint8_t)( beamRules->fromColor[1] * 255 ),
+					(uint8_t)( beamRules->fromColor[2] * 255 ),
+					(uint8_t)( beamRules->fromColor[3] * 255 ),
+				};
+				const byte_vec4_t toColorAsBytes {
+					(uint8_t)( beamRules->toColor[0] * 255 ),
+					(uint8_t)( beamRules->toColor[1] * 255 ),
+					(uint8_t)( beamRules->toColor[2] * 255 ),
+					(uint8_t)( beamRules->toColor[3] * 255 ),
+				};
+
+				Vector4Copy( fromColorAsBytes, colors[0] );
+				Vector4Copy( fromColorAsBytes, colors[1] );
+				Vector4Copy( toColorAsBytes, colors[2] );
+				Vector4Copy( toColorAsBytes, colors[3] );
+
+				meshBuilder.appendQuad( positions, texCoords, colors, indices );
+			}
+		} else {
+			vec3_t left, up;
+			const float *color;
+
+			if( const auto *orientedRules = std::get_if<QuadPoly::OrientedSpriteRules>( &poly->appearanceRules ) ) {
+				color = orientedRules->color;
+				VectorCopy( &orientedRules->axis[AXIS_RIGHT], left );
+				VectorCopy( &orientedRules->axis[AXIS_UP], up );
+			} else {
+				color = std::get_if<QuadPoly::OrientedSpriteRules>( &poly->appearanceRules )->color;
+				VectorCopy( &viewAxis[AXIS_RIGHT], left );
+				VectorCopy( &viewAxis[AXIS_UP], up );
+			}
+
+			if( shouldMirrorView ) {
+				VectorInverse( left );
+			}
+
+			vec3_t point;
+			const float radius = poly->halfExtent;
+			VectorMA( poly->origin, -radius, up, point );
+			VectorMA( point, +radius, left, positions[0] );
+			VectorMA( point, -radius, left, positions[3] );
+
+			VectorMA( poly->origin, radius, up, point );
+			VectorMA( point, +radius, left, positions[1] );
+			VectorMA( point, -radius, left, positions[2] );
+
+			Vector2Set( texCoords[0], 0.0f, 0.0f );
+			Vector2Set( texCoords[1], 0.0f, 1.0f );
+			Vector2Set( texCoords[2], 1.0f, 1.0f );
+			Vector2Set( texCoords[3], 1.0f, 0.0f );
+
+			colors[0][0] = ( uint8_t )( color[0] * 255 );
+			colors[0][1] = ( uint8_t )( color[1] * 255 );
+			colors[0][2] = ( uint8_t )( color[2] * 255 );
+			colors[0][3] = ( uint8_t )( color[3] * 255 );
+
+			Vector4Copy( colors[0], colors[1] );
+			Vector4Copy( colors[0], colors[2] );
+			Vector4Copy( colors[0], colors[3] );
+
+			meshBuilder.appendQuad( positions, texCoords, colors, indices );
+		}
+	}
+
+	uploadBatchedMesh( &meshBuilder, workload->stateForCamera->batchedSurfVertSpans->data() + workload->vertSpanOffset );
+}
+
+void R_SubmitSpriteSurfsToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader,
+								   const mfog_t *fog, const portalSurface_t *portalSurface, std::span<const sortedDrawSurf_t> surfSpan ) {
+	mesh_t mesh;
+
+	for( size_t surfInSpan = 0; surfInSpan < surfSpan.size(); ++surfInSpan ) {
+
+		vec3_t v_left, v_up;
+		if( const float rotation = e->rotation; rotation != 0.0f ) {
+			RotatePointAroundVector( v_left, &fsh->viewAxis[AXIS_FORWARD], &fsh->viewAxis[AXIS_RIGHT], rotation );
+			CrossProduct( &fsh->viewAxis[AXIS_FORWARD], v_left, v_up );
+		} else {
+			VectorCopy( &fsh->viewAxis[AXIS_RIGHT], v_left );
+			VectorCopy( &fsh->viewAxis[AXIS_UP], v_up );
+		}
+
+		if( fsh->renderFlags & RF_MIRRORVIEW ) {
+			VectorInverse( v_left );
+		}
+
+		vec4_t xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
+		vec4_t normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
+
+		vec3_t point;
+		const float radius = e->radius * e->scale;
+		VectorMA( e->origin, -radius, v_up, point );
+		VectorMA( point, radius, v_left, xyz[0] );
+		VectorMA( point, -radius, v_left, xyz[3] );
+
+		VectorMA( e->origin, radius, v_up, point );
+		VectorMA( point, radius, v_left, xyz[1] );
+		VectorMA( point, -radius, v_left, xyz[2] );
+
+		byte_vec4_t colors[4];
+		for( unsigned i = 0; i < 4; i++ ) {
+			VectorNegate( &fsh->viewAxis[AXIS_FORWARD], normals[i] );
+			Vector4Copy( e->color, colors[i] );
+		}
+
+		elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
+		vec2_t texcoords[4] = { {0, 1}, {0, 0}, {1,0}, {1,1} };
+
+		mesh.elems = elems;
+		mesh.numElems = 6;
+		mesh.numVerts = 4;
+		mesh.xyzArray = xyz;
+		mesh.normalsArray = normals;
+		mesh.lmstArray[0] = NULL;
+		mesh.lmlayersArray[0] = NULL;
+		mesh.stArray = texcoords;
+		mesh.colorsArray[0] = colors;
+		mesh.colorsArray[1] = NULL;
+		mesh.sVectorsArray = NULL;
+
+		RB_AddDynamicMesh( e, shader, fog, portalSurface, 0, &mesh, GL_TRIANGLES, 0.0f, 0.0f );
+	}
+}
+
+}
+
+auto findLightsThatAffectBounds( const Scene::DynamicLight *lights, std::span<const uint16_t> lightIndicesSpan,
+								 const float *mins, const float *maxs, uint16_t *affectingLightIndices ) -> unsigned {
+	assert( mins[3] == 0.0f && maxs[3] == 1.0f );
+
+	const uint16_t *lightIndices = lightIndicesSpan.data();
+	const auto numLights         = (unsigned)lightIndicesSpan.size();
+
+	unsigned lightIndexNum = 0;
+	unsigned numAffectingLights = 0;
+	do {
+		const uint16_t lightIndex = lightIndices[lightIndexNum];
+		const Scene::DynamicLight *light = lights + lightIndex;
+
+		// TODO: Use SIMD explicitly without these redundant loads/shuffles
+		const bool overlaps = BoundsIntersect( light->mins, light->maxs, mins, maxs );
+
+		affectingLightIndices[numAffectingLights] = lightIndex;
+		numAffectingLights += overlaps;
+	} while( ++lightIndexNum < numLights );
+
+	return numAffectingLights;
 }

@@ -119,7 +119,7 @@ typedef struct r_backend_s {
 		mesh_vbo_t *vbo;
 		void *vboData;
 		void *iboData;
-	} frameUploads;
+	} frameUploads[2];
 
 	rbDynamicStream_t dynamicStreams[RB_VBO_NUM_STREAMS];
 	rbDynamicDraw_t dynamicDraws[MAX_DYNAMIC_DRAWS];
