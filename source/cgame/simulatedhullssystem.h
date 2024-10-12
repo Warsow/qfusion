@@ -203,7 +203,7 @@ private:
 		mutable SharedMeshData *m_shared { nullptr };
 
 		[[nodiscard]]
-		auto calcSolidSubdivLodLevel( const float *viewOrigin, float cameraViewTangent ) const -> std::optional<unsigned>;
+		auto calcSolidSubdivLodLevel( const float *viewOrigin, float cameraViewTangent, float viewLodScale ) const -> std::optional<unsigned>;
 
 		[[nodiscard]]
 		auto getCacheEntryByCameraId( unsigned cameraId ) const -> SharedMeshData::CacheEntry *;
@@ -230,14 +230,12 @@ private:
 
 		[[nodiscard]]
 		auto getStorageRequirements( const float *viewOrigin, const float *viewAxis, float cameraViewTangent,
-									 unsigned cameraId, void *scratchpad ) const
+									 float viewLodScale, unsigned cameraId, void *scratchpad ) const
 									 -> std::optional<std::pair<unsigned, unsigned>> override;
 
 		[[nodiscard]]
 		auto fillMeshBuffers( const float *__restrict viewOrigin,
 							  const float *__restrict viewAxis,
-							  float cameraViewTangent,
-							  unsigned cameraId,
 							  const Scene::DynamicLight *lights,
 							  std::span<const uint16_t> affectingLightIndices,
 							  void *__restrict scratchpad,
@@ -266,14 +264,12 @@ private:
 
 		[[nodiscard]]
 		auto getStorageRequirements( const float *viewOrigin, const float *viewAxis, float cameraViewTangent,
-									 unsigned cameraId, void *scratchpad ) const
+									 float viewLodScale, unsigned cameraId, void *scratchpad ) const
 									 -> std::optional<std::pair<unsigned, unsigned>> override;
 
 		[[nodiscard]]
 		auto fillMeshBuffers( const float *__restrict viewOrigin,
 							  const float *__restrict viewAxis,
-							  float cameraViewTangent,
-							  unsigned cameraId,
 							  const Scene::DynamicLight *lights,
 							  std::span<const uint16_t> affectingLightIndices,
 							  void *__restrict scratchpad,

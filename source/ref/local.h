@@ -1355,7 +1355,7 @@ void R_LatLongToNorm4( const uint8_t latlong[2], vec4_t out );
 //
 // r_alias.c
 //
-model_t *R_AliasModelLOD( const entity_t *e, const float *viewOrigin, const float fovDotScale );
+model_t *R_AliasModelLOD( const entity_t *e, const float *viewOrigin, float fovLodScale, float viewLodScale );
 void R_AliasModelLerpBBox( const entity_t *e, const model_t *mod, vec3_t mins, vec3_t maxs );
 bool R_AliasModelLerpTag( orientation_t *orient, const maliasmodel_t *aliasmodel, int framenum, int oldframenum,
 							 float lerpfrac, const char *name );
@@ -1406,7 +1406,7 @@ void        R_DataSync( void );
  */
 void        R_DeferDataSync( void );
 
-int         R_LODForSphere( const vec3_t origin, float radius, const float *viewOrigin, float fovLodScale );
+int         R_LODForSphere( const vec3_t origin, float radius, const float *viewOrigin, float fovLodScale, float viewLodScale );
 
 struct mesh_vbo_s *R_InitNullModelVBO( void );
 struct mesh_vbo_s *R_InitPostProcessingVBO( void );
@@ -1439,7 +1439,6 @@ struct FrontendToBackendShared {
 	unsigned renderFlags;
 	unsigned cameraId;
 	unsigned sceneIndex;
-	float fovTangent;
 };
 
 void R_SubmitAliasSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceAlias_t *drawSurf );
@@ -1476,7 +1475,7 @@ struct skmcacheentry_s;
 // r_skm.c
 //
 void R_AddSkeletalModelCache( const entity_t *e, const model_t *mod, unsigned sceneIndex );
-model_t *R_SkeletalModelLOD( const entity_t *e, const float *viewOrigin, float fovLodScale );
+model_t *R_SkeletalModelLOD( const entity_t *e, const float *viewOrigin, float fovLodScale, float viewLodScale );
 skmcacheentry_s *R_GetSkeletalCache( int entNum, int lodNum, unsigned sceneIndex );
 dualquat_t *R_GetSkeletalBones( skmcacheentry_s *cache );
 bool R_SkeletalRenderAsFrame0( skmcacheentry_s *cache );

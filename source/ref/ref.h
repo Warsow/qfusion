@@ -64,6 +64,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define RDF_USEORTHO                0x100   // use orthographic projection
 #define RDF_NOBSPOCCLUSIONCULLING   0x200
 #define RDF_DRAWBRIGHT              0x400
+#define RDF_USEAUTOLODSCALE         0x800   // calculate additional lod scale based on dimensions of the (mini) view
 
 // skm flags
 #define SKM_ATTACHMENT_BONE     1
@@ -517,6 +518,7 @@ struct DynamicMesh {
 	virtual auto getStorageRequirements( const float *__restrict viewOrigin,
 										 const float *__restrict viewAxis,
 										 float cameraViewTangent,
+										 float viewLodScale,
 										 unsigned cameraId,
 										 void *__restrict scratchpad ) const
 		-> std::optional<std::pair<unsigned, unsigned>> = 0;
@@ -525,8 +527,6 @@ struct DynamicMesh {
 	[[nodiscard]]
 	virtual auto fillMeshBuffers( const float *__restrict viewOrigin,
 								  const float *__restrict viewAxis,
-								  float cameraViewTangent,
-								  unsigned cameraId,
 								  const Scene::DynamicLight *dynamicLights,
 								  std::span<const uint16_t> affectingLightIndices,
 								  void *__restrict scratchpad,

@@ -565,11 +565,12 @@ void Frontend::addDynamicMeshToSortList( StateForCamera *stateForCamera, const e
 										 std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
 	DynamicMeshDrawSurface *const drawSurface = stateForCamera->dynamicMeshDrawSurfaces +
 												stateForCamera->numDynamicMeshDrawSurfaces;
-
+	// Dynamic mesh lod code is special
+	const float cameraViewTangent = stateForCamera->fovLodScale;
 	std::optional<std::pair<unsigned, unsigned>> maybeStorageRequirements;
 	maybeStorageRequirements = mesh->getStorageRequirements( stateForCamera->viewOrigin, stateForCamera->viewAxis,
-															 stateForCamera->lodScaleForFov, stateForCamera->cameraId,
-															 drawSurface->scratchpad );
+															 cameraViewTangent, stateForCamera->viewLodScale,
+															 stateForCamera->cameraId, drawSurface->scratchpad );
 	if( maybeStorageRequirements ) [[likely]] {
 		const auto [numVertices, numIndices] = *maybeStorageRequirements;
 		assert( numVertices && numIndices );

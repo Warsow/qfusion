@@ -178,7 +178,8 @@ private:
 		mat4_t projectionMatrix;
 		mat4_t cameraProjectionMatrix;                  // cameraMatrix * projectionMatrix
 
-		float lodScaleForFov;
+		float fovLodScale { 1.0f };
+		float viewLodScale { 1.0f };
 
 		unsigned numPortalSurfaces;
 

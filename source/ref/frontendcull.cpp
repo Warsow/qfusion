@@ -305,7 +305,8 @@ auto Frontend::cullAliasModelEntities( StateForCamera *stateForCamera, std::span
 			}
 		}
 
-		const model_t *mod = R_AliasModelLOD( entity, stateForCamera->lodOrigin, stateForCamera->lodScaleForFov );
+		const model_t *mod = R_AliasModelLOD( entity, stateForCamera->lodOrigin, stateForCamera->fovLodScale,
+											  stateForCamera->viewLodScale );
 		const auto *aliasmodel = ( const maliasmodel_t * )mod->extradata;
 		// TODO: Could this ever happen
 		if( !aliasmodel ) [[unlikely]] {
@@ -365,20 +366,17 @@ auto Frontend::cullSkeletalModelEntities( StateForCamera *stateForCamera, std::s
 	const auto *const entities = entitiesSpan.data();
 	const unsigned numEntities = entitiesSpan.size();
 
-	const float *const stateLodOrigin = stateForCamera->lodOrigin;
-	const float stateLodScaleForFov   = stateForCamera->lodScaleForFov;
-	const unsigned stateRenderFlags   = stateForCamera->renderFlags;
-
 	unsigned numSelectedModels = 0;
 	for( unsigned entIndex = 0; entIndex < numEntities; entIndex++ ) {
 		const entity_t *const __restrict entity = &entities[entIndex];
 		if( entity->flags & RF_VIEWERMODEL ) [[unlikely]] {
-			if( !( stateRenderFlags & (RF_MIRRORVIEW | RF_SHADOWMAPVIEW ) ) ) {
+			if( !( stateForCamera->renderFlags & (RF_MIRRORVIEW | RF_SHADOWMAPVIEW ) ) ) {
 				continue;
 			}
 		}
 
-		const model_t *mod = R_SkeletalModelLOD( entity, stateLodOrigin, stateLodScaleForFov );
+		const model_t *mod = R_SkeletalModelLOD( entity, stateForCamera->lodOrigin, stateForCamera->fovLodScale,
+												 stateForCamera->viewLodScale );
 		const mskmodel_t *skmodel = ( const mskmodel_t * )mod->extradata;
 		if( !skmodel ) [[unlikely]] {
 			continue;

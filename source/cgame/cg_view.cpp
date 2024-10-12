@@ -745,7 +745,7 @@ int CG_SkyPortal( ViewState *viewState ) {
 	return 0;
 }
 
-static int CG_RenderFlags( ViewState *viewState, bool isMiniview, bool isUsingTiledMode ) {
+static int CG_RenderFlags( ViewState *viewState, bool isMiniview ) {
 	int rdflags = 0;
 
 	// set the RDF_UNDERWATER and RDF_CROSSINGWATER bitflags
@@ -776,7 +776,8 @@ static int CG_RenderFlags( ViewState *viewState, bool isMiniview, bool isUsingTi
 
 	rdflags |= CG_SkyPortal( viewState );
 
-	if( isMiniview && !isUsingTiledMode ) {
+	if( isMiniview ) {
+		rdflags |= RDF_USEAUTOLODSCALE;
 		rdflags |= RDF_NOBSPOCCLUSIONCULLING;
 	} else {
 		const auto *const uiSystem = wsw::ui::UISystem::instance();
@@ -1231,7 +1232,7 @@ static void createDrawSceneRequests( DrawSceneRequest **drawSceneRequests, bool 
 		refdef_t *rd = &viewState->view.refdef;
 		AnglesToAxis( viewState->view.angles, rd->viewaxis );
 
-		rd->rdflags = CG_RenderFlags( viewState, isMiniview, actuallyUseTiledMode );
+		rd->rdflags = CG_RenderFlags( viewState, isMiniview );
 
 		// warp if underwater
 		if( rd->rdflags & RDF_UNDERWATER ) {

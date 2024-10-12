@@ -168,14 +168,12 @@ public:
 		CurvedBeamUVMode uvMode;
 
 		[[nodiscard]]
-		auto getStorageRequirements( const float *, const float *, float, unsigned, void * ) const
+		auto getStorageRequirements( const float *, const float *, float, float, unsigned, void * ) const
 			-> std::optional<std::pair<unsigned, unsigned>> override;
 
 		[[nodiscard]]
 		auto fillMeshBuffers( const float *__restrict viewOrigin,
 							  const float *__restrict viewAxis,
-							  float,
-							  unsigned,
 							  const Scene::DynamicLight *,
 							  std::span<const uint16_t>,
 							  void *__restrict,
@@ -258,14 +256,12 @@ private:
 		ImpactRosetteEffect *parentEffect;
 
 		[[nodiscard]]
-		auto getStorageRequirements( const float *, const float *, float, unsigned, void * ) const
+		auto getStorageRequirements( const float *, const float *, float, float, unsigned, void * ) const
 			-> std::optional<std::pair<unsigned, unsigned>> override;
 
 		[[nodiscard]]
 		auto fillMeshBuffers( const float *__restrict viewOrigin,
 							  const float *__restrict viewAxis,
-							  float,
-							  unsigned,
 							  const Scene::DynamicLight *,
 							  std::span<const uint16_t>,
 							  void *__restrict,
@@ -280,14 +276,12 @@ private:
 		ImpactRosetteEffect *parentEffect;
 
 		[[nodiscard]]
-		auto getStorageRequirements( const float *, const float *, float, unsigned, void * ) const
+		auto getStorageRequirements( const float *, const float *, float, float, unsigned, void * ) const
 		-> std::optional<std::pair<unsigned, unsigned>> override;
 
 		[[nodiscard]]
 		auto fillMeshBuffers( const float *__restrict viewOrigin,
 							  const float *__restrict viewAxis,
-							  float,
-							  unsigned,
 							  const Scene::DynamicLight *,
 							  std::span<const uint16_t>,
 							  void *__restrict,
@@ -327,14 +321,12 @@ private:
 		float lifetimeFrac { 0.0f };
 
 		[[nodiscard]]
-		auto getStorageRequirements( const float *, const float *, float, unsigned, void * ) const
+		auto getStorageRequirements( const float *, const float *, float, float, unsigned, void * ) const
 			-> std::optional<std::pair<unsigned, unsigned>> override;
 
 		[[nodiscard]]
 		auto fillMeshBuffers( const float *__restrict viewOrigin,
 							  const float *__restrict viewAxis,
-							  float,
-							  unsigned,
 							  const Scene::DynamicLight *,
 							  std::span<const uint16_t>,
 							  void *__restrict,

@@ -516,7 +516,6 @@ void Frontend::submitDrawActionsList( StateForCamera *stateForCamera, Scene *sce
 	fsh.allVisibleLightIndices      = { stateForCamera->allVisibleLightIndices, stateForCamera->numAllVisibleLights };
 	fsh.visibleProgramLightIndices  = { stateForCamera->visibleProgramLightIndices, stateForCamera->numVisibleProgramLights };
 	fsh.renderFlags                 = stateForCamera->renderFlags;
-	fsh.fovTangent                  = stateForCamera->lodScaleForFov;
 	fsh.cameraId                    = stateForCamera->cameraId;
 	fsh.sceneIndex                  = stateForCamera->sceneIndex;
 	std::memcpy( fsh.viewAxis, stateForCamera->viewAxis, sizeof( mat3_t ) );
@@ -652,8 +651,6 @@ void Frontend::prepareDynamicMesh( DynamicMeshFillDataWorkload *workload ) {
 
 	auto [numVertices, numIndices] = dynamicMesh->fillMeshBuffers( workload->stateForCamera->viewOrigin,
 																   workload->stateForCamera->viewAxis,
-																   workload->stateForCamera->lodScaleForFov,
-																   workload->stateForCamera->cameraId,
 																   workload->scene->m_dynamicLights.data(),
 																   lightIndicesSpan,
 																   workload->drawSurface->scratchpad,

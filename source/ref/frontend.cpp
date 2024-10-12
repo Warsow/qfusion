@@ -413,7 +413,13 @@ auto Frontend::setupStateForCamera( const refdef_t *fd, unsigned sceneIndex,
 	VectorCopy( stateForCamera->refdef.vieworg, stateForCamera->viewOrigin );
 	Matrix3_Copy( stateForCamera->refdef.viewaxis, stateForCamera->viewAxis );
 
-	stateForCamera->lodScaleForFov = std::tan( stateForCamera->refdef.fov_x * ( M_PI / 180 ) * 0.5f );
+	stateForCamera->fovLodScale = std::tan( stateForCamera->refdef.fov_x * ( M_PI / 180 ) * 0.5f );
+	if( fd->rdflags & RDF_USEAUTOLODSCALE ) {
+		stateForCamera->viewLodScale = wsw::max( fd->scissor_width / (float)rf.width2D, fd->scissor_height / (float)rf.height2D );
+		assert( stateForCamera->viewLodScale > 0.0f && stateForCamera->viewLodScale <= 1.0f );
+	} else {
+		assert( stateForCamera->viewLodScale == 1.0f );
+	}
 
 	Vector4Set( stateForCamera->scissor, fd->scissor_x, fd->scissor_y, fd->scissor_width, fd->scissor_height );
 	Vector4Set( stateForCamera->viewport, fd->x, fd->y, fd->width, fd->height );

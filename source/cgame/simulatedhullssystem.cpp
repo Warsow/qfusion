@@ -2424,9 +2424,11 @@ static void applyLightsToVertices( const vec4_t *__restrict givenPositions,
 }
 
 auto SimulatedHullsSystem::HullDynamicMesh::calcSolidSubdivLodLevel( const float *viewOrigin,
-																	 float cameraViewTangent ) const
+																	 float cameraViewTangent,
+																	 float viewLodScale ) const
 	-> std::optional<unsigned> {
 	assert( cameraViewTangent > 0.0f );
+	assert( viewLodScale >= 0.0f && viewLodScale <= 1.0f );
 	assert( m_shared->nextLodTangentRatio > 0.0f && m_shared->nextLodTangentRatio < 1.0f );
 
 	vec3_t center, extentVector;
@@ -2448,7 +2450,8 @@ auto SimulatedHullsSystem::HullDynamicMesh::calcSolidSubdivLodLevel( const float
 	const float squareDistance = DistanceSquared( center, viewOrigin );
 	// Don't even try using lesser lods if the mesh is sufficiently close to the viewer
 	if( squareDistance > wsw::square( 0.5f * extentValue + 64.0f ) ) {
-		const float meshViewTangent  = extentValue * Q_RSqrt( squareDistance );
+		// Let the view lod scale affect meshViewTangent multiplicatively, effectively diminishing it
+		const float meshViewTangent  = viewLodScale * extentValue * Q_RSqrt( squareDistance );
 		const float meshTangentRatio = meshViewTangent * Q_Rcp( cameraViewTangent );
 
 		// Diminish lod tangent ratio in the loop, drop subdiv level every step.
@@ -2653,6 +2656,7 @@ struct SolidMeshScratchpad {
 auto SimulatedHullsSystem::HullSolidDynamicMesh::getStorageRequirements( const float *viewOrigin,
 																		 const float *viewAxis,
 																		 float cameraViewTangent,
+																		 float viewLodScale,
 																		 unsigned cameraId,
 																		 void *scratchpadStorage ) const
 	-> std::optional<std::pair<unsigned, unsigned>> {
@@ -2669,7 +2673,7 @@ auto SimulatedHullsSystem::HullSolidDynamicMesh::getStorageRequirements( const f
 		} else {
 			return std::nullopt;
 		}
-	} else if( const std::optional<unsigned> drawLevel = calcSolidSubdivLodLevel( viewOrigin, cameraViewTangent ) ) {
+	} else if( const std::optional<unsigned> drawLevel = calcSolidSubdivLodLevel( viewOrigin, cameraViewTangent, viewLodScale ) ) {
 		scratchpad->chosenSubdivLevel = *drawLevel;
 		cacheEntry->chosenSubdivLevel = *drawLevel;
 	} else {
@@ -2691,6 +2695,7 @@ struct CloudMeshScratchpad {
 auto SimulatedHullsSystem::HullCloudDynamicMesh::getStorageRequirements( const float *viewOrigin,
 																		 const float *viewAxis,
 																		 float cameraViewTangent,
+																		 float viewLodScale,
 																		 unsigned cameraId,
 																		 void *scratchpadStorage ) const
 	-> std::optional<std::pair<unsigned, unsigned>> {
@@ -2705,7 +2710,7 @@ auto SimulatedHullsSystem::HullCloudDynamicMesh::getStorageRequirements( const f
 		} else {
 			return std::nullopt;
 		}
-	} else if( const std::optional<unsigned> drawLevel = calcSolidSubdivLodLevel( viewOrigin, cameraViewTangent ) ) {
+	} else if( const std::optional<unsigned> drawLevel = calcSolidSubdivLodLevel( viewOrigin, cameraViewTangent, viewLodScale ) ) {
 		scratchpad->chosenSubdivLevel = *drawLevel;
 		cacheEntry->chosenSubdivLevel = *drawLevel;
 	} else {
@@ -2897,8 +2902,6 @@ static struct CombinedToonLayerShadeFnHolder : public ToonLayerShadeFnHolder<Sim
 
 auto SimulatedHullsSystem::HullSolidDynamicMesh::fillMeshBuffers( const float *__restrict viewOrigin,
 																  const float *__restrict viewAxis,
-																  float cameraFovTangent,
-																  unsigned cameraId,
 																  const Scene::DynamicLight *lights,
 																  std::span<const uint16_t> affectingLightIndices,
 																  void *__restrict scratchpadStorage,
@@ -3129,8 +3132,6 @@ static_assert( std::size( kRandomBytes ) == 1024 );
 
 auto SimulatedHullsSystem::HullCloudDynamicMesh::fillMeshBuffers( const float *__restrict viewOrigin,
 																  const float *__restrict viewAxis,
-																  float cameraFovTangent,
-																  unsigned cameraId,
 																  const Scene::DynamicLight *lights,
 																  std::span<const uint16_t> affectingLightIndices,
 																  void *__restrict scratchpadStorage,

@@ -418,8 +418,15 @@ mesh_vbo_t *R_InitPostProcessingVBO( void ) {
 	return vbo;
 }
 
-int R_LODForSphere( const vec3_t origin, float radius, const float *viewOrigin, float fovLodScale ) {
-	const float dist = DistanceFast( origin, viewOrigin ) * fovLodScale;
+int R_LODForSphere( const vec3_t origin, float radius, const float *viewOrigin, float fovLodScale, float viewLodScale ) {
+	assert( fovLodScale > 0.0f );
+	assert( viewLodScale > 0.0f && viewLodScale <= 1.0f );
+
+	float dist = DistanceFast( origin, viewOrigin );
+	// The tested distance should be larger for greater fovs
+	dist *= fovLodScale;
+	// The tested distance should be larger for smaller views
+	dist /= viewLodScale;
 
 	int lod = (int)( dist / radius );
 	if( r_lodscale->integer ) {

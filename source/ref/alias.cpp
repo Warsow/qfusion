@@ -400,12 +400,12 @@ void Mod_LoadAliasMD3Model( model_t *mod, model_t *parent, void *buffer, bspForm
 	}
 }
 
-model_t *R_AliasModelLOD( const entity_t *e, const float *viewOrigin, float fovDotScale ) {
+model_t *R_AliasModelLOD( const entity_t *e, const float *viewOrigin, float fovLodScale, float viewLodScale ) {
 	if( !e->model->numlods || ( e->flags & RF_FORCENOLOD ) ) {
 		return e->model;
 	}
 
-	const int lod = R_LODForSphere( e->origin, e->model->radius, viewOrigin, fovDotScale );
+	const int lod = R_LODForSphere( e->origin, e->model->radius, viewOrigin, fovLodScale, viewLodScale );
 	if( lod < 1 ) {
 		return e->model;
 	}
