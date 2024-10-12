@@ -173,17 +173,34 @@ void Frontend::addNullModelEntitiesToSortList( StateForCamera *stateForCamera, c
 	}
 }
 
-[[nodiscard]]
-inline auto makeVertElemSpan( const MergedBspSurface *mergedSurf, const msurface_t *firstSurf, const msurface_t *lastSurf ) {
-	assert( firstSurf <= lastSurf );
+struct MultiDrawSpanBuilder {
+	const GLvoid **m_indices { nullptr };
+	GLsizei *m_counts { nullptr };
+	unsigned m_offset { 0 };
+	unsigned m_numCallsInSpan { 0 };
 
-	return VertElemSpan {
-		.firstVert = mergedSurf->firstVboVert + firstSurf->firstDrawSurfVert,
-		.numVerts  = lastSurf->mesh.numVerts + ( lastSurf->firstDrawSurfVert - firstSurf->firstDrawSurfVert ),
-		.firstElem = mergedSurf->firstVboElem + firstSurf->firstDrawSurfElem,
-		.numElems  = lastSurf->mesh.numElems + ( lastSurf->firstDrawSurfElem - firstSurf->firstDrawSurfElem ),
-	};
-}
+	void addSurfSpan( const MergedBspSurface *mergedSurf, const msurface_t *firstSurf, const msurface_t *lastSurf ) {
+		assert( firstSurf <= lastSurf );
+		const auto firstElem = mergedSurf->firstVboElem + firstSurf->firstDrawSurfElem;
+		const auto numElems  = lastSurf->mesh.numElems + ( lastSurf->firstDrawSurfElem - firstSurf->firstDrawSurfElem );
+		m_indices[m_offset] = (GLvoid *)( firstElem * sizeof( elem_t ) );
+		m_counts[m_offset]  = (GLint)numElems;
+		m_offset++;
+		m_numCallsInSpan++;
+	}
+
+	[[nodiscard]]
+	auto buildAndReset() -> MultiDrawElemSpan {
+		assert( m_numCallsInSpan && m_offset && m_numCallsInSpan <= m_offset );
+		MultiDrawElemSpan result {
+			.counts   = m_counts  + ( m_offset - m_numCallsInSpan ),
+			.indices  = m_indices + ( m_offset - m_numCallsInSpan ),
+			.numDraws = (GLsizei)m_numCallsInSpan,
+		};
+		m_numCallsInSpan = 0;
+		return result;
+	}
+};
 
 void Frontend::addBrushModelEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *brushModelEntities,
 												std::span<const VisTestedModel> models,
@@ -191,9 +208,14 @@ void Frontend::addBrushModelEntitiesToSortList( StateForCamera *stateForCamera, 
 	const MergedBspSurface *const mergedSurfaces = rsh.worldBrushModel->mergedSurfaces;
 	const msurface_t *const surfaces             = rsh.worldBrushModel->surfaces;
 
-	MergedSurfSpan *const mergedSurfSpans  = stateForCamera->drawSurfSurfSpansBuffer->get();
-	unsigned *const subspans               = stateForCamera->drawSurfSurfSubspansBuffer->get();
-	VertElemSpan *const vertElemSpans      = stateForCamera->drawSurfVertElemSpansBuffer->get();
+	MergedSurfSpan *const mergedSurfSpans   = stateForCamera->drawSurfSurfSpansBuffer->get();
+	unsigned *const subspans                = stateForCamera->drawSurfSurfSubspansBuffer->get();
+
+	MultiDrawSpanBuilder multiDrawSpanBuilder {
+		.m_indices = stateForCamera->drawSurfMultiDrawIndicesBuffer->get(),
+		.m_counts  = stateForCamera->drawSurfMultiDrawCountsBuffer->get(),
+		.m_offset  = stateForCamera->drawSurfSurfSubspansOffset,
+	};
 
 	for( const auto modelIndex: indices ) {
 		const VisTestedModel &visTestedModel = models[modelIndex];
@@ -212,14 +234,12 @@ void Frontend::addBrushModelEntitiesToSortList( StateForCamera *stateForCamera, 
 
 			surfSpan->firstSurface    = (int)mergedSurface->firstWorldSurface;
 			surfSpan->lastSurface     = (int)( mergedSurface->firstWorldSurface + mergedSurface->numWorldSurfaces - 1 );
-			surfSpan->vertSpansOffset = stateForCamera->drawSurfVertElemSpansOffset;
 			surfSpan->numSubspans     = 1;
 			surfSpan->subspansOffset  = stateForCamera->drawSurfSurfSubspansOffset;
 
-			assert( stateForCamera->drawSurfVertElemSpansOffset < stateForCamera->drawSurfVertElemSpansBuffer->capacity() );
-			vertElemSpans[stateForCamera->drawSurfVertElemSpansOffset++] = makeVertElemSpan( mergedSurface,
-																							 surfaces + surfSpan->firstSurface,
-																							 surfaces + surfSpan->lastSurface );
+			multiDrawSpanBuilder.addSurfSpan( mergedSurface, surfaces + surfSpan->firstSurface, surfaces + surfSpan->lastSurface );
+			surfSpan->mdSpan = multiDrawSpanBuilder.buildAndReset();
+
 			subspans[stateForCamera->drawSurfSurfSubspansOffset++] = surfSpan->firstSurface;
 			subspans[stateForCamera->drawSurfSurfSubspansOffset++] = surfSpan->lastSurface;
 
@@ -249,13 +269,15 @@ void Frontend::calcSubspansOfMergedSurfSpans( StateForCamera *stateForCamera ) {
 	const unsigned numMergedSurfaces          = rsh.worldBrushModel->numMergedSurfaces;
 
 	const unsigned maxTotalSubspans        = stateForCamera->drawSurfSurfSubspansBuffer->capacity();
-	const unsigned maxTotalVertSpans       = stateForCamera->drawSurfVertElemSpansBuffer->capacity();
 	MergedSurfSpan *const mergedSurfSpans  = stateForCamera->drawSurfSurfSpansBuffer->get();
 	unsigned *const mergedSurfSubspans     = stateForCamera->drawSurfSurfSubspansBuffer->get();
-	VertElemSpan *const surfVertElemSpans  = stateForCamera->drawSurfVertElemSpansBuffer->get();
 
-	unsigned subspanDataOffset      = 0;
-	unsigned vertElemSpanDataOffset = 0;
+	MultiDrawSpanBuilder multiDrawSpanBuilder {
+		.m_indices = stateForCamera->drawSurfMultiDrawIndicesBuffer->get(),
+		.m_counts  = stateForCamera->drawSurfMultiDrawCountsBuffer->get(),
+	};
+
+	unsigned subspanDataOffset  = 0;
 	for( unsigned mergedSurfNum = 0; mergedSurfNum < numMergedSurfaces; ++mergedSurfNum ) {
 		MergedSurfSpan *const surfSpan = mergedSurfSpans + mergedSurfNum;
 		if( surfSpan->firstSurface <= surfSpan->lastSurface ) {
@@ -264,9 +286,6 @@ void Frontend::calcSubspansOfMergedSurfSpans( StateForCamera *stateForCamera ) {
 			// We *have* to check it in runtime.
 			if( subspanDataOffset + 2 * maxSpansForThisSurface > maxTotalSubspans ) [[unlikely]] {
 				wsw::failWithRuntimeError( "Too many surf subspans" );
-			}
-			if( vertElemSpanDataOffset + maxSpansForThisSurface > maxTotalVertSpans ) [[unlikely]] {
-				wsw::failWithRuntimeError( "Too many surf vert/elem spans");
 			}
 
 			assert( surfVisTable[surfSpan->firstSurface] );
@@ -296,8 +315,7 @@ void Frontend::calcSubspansOfMergedSurfSpans( StateForCamera *stateForCamera ) {
 			}
 #endif
 
-			const auto oldSubspanDataOffset      = subspanDataOffset;
-			const auto oldVertElemSpanDataOffset = vertElemSpanDataOffset;
+			const auto oldSubspanDataOffset   = subspanDataOffset;
 
 			unsigned numSubspans = 0;
 #if 1
@@ -308,10 +326,9 @@ void Frontend::calcSubspansOfMergedSurfSpans( StateForCamera *stateForCamera ) {
 					if( isInVisSubspan ) {
 						assert( subspanStart <= surfNum - 1 );
 						assert( subspanDataOffset + 2 <= stateForCamera->drawSurfSurfSubspansBuffer->capacity() );
-						mergedSurfSubspans[subspanDataOffset++]     = subspanStart;
-						mergedSurfSubspans[subspanDataOffset++]     = surfNum - 1;
-						surfVertElemSpans[vertElemSpanDataOffset++] = makeVertElemSpan( mergedSurf, surfaces + subspanStart,
-																						surfaces + surfNum - 1 );
+						mergedSurfSubspans[subspanDataOffset++] = subspanStart;
+						mergedSurfSubspans[subspanDataOffset++] = surfNum - 1;
+						multiDrawSpanBuilder.addSurfSpan( mergedSurf, surfaces + subspanStart, surfaces + surfNum - 1 );
 						isInVisSubspan = false;
 						numSubspans++;
 					} else {
@@ -326,8 +343,7 @@ void Frontend::calcSubspansOfMergedSurfSpans( StateForCamera *stateForCamera ) {
 			assert( subspanDataOffset + 2 <= stateForCamera->drawSurfSurfSubspansBuffer->capacity() );
 			mergedSurfSubspans[subspanDataOffset++]     = subspanStart;
 			mergedSurfSubspans[subspanDataOffset++]     = surfSpan->lastSurface;
-			surfVertElemSpans[vertElemSpanDataOffset++] = makeVertElemSpan( mergedSurf, surfaces + subspanStart,
-																			surfaces + surfSpan->lastSurface );
+			multiDrawSpanBuilder.addSurfSpan( mergedSurf, surfaces + subspanStart, surfaces + surfSpan->lastSurface );
 			numSubspans++;
 #else
 			// Extreme partitioning for test purposes
@@ -335,25 +351,23 @@ void Frontend::calcSubspansOfMergedSurfSpans( StateForCamera *stateForCamera ) {
 				if( surfVisTable[surfNum] ) {
 					mergedSurfSubspans[subspanDataOffset++]     = surfNum;
 					mergedSurfSubspans[subspanDataOffset++]     = surfNum;
-					surfVertElemSpans[vertElemSpanDataOffset++] = makeVertElemSpan( mergedSurf, surfaces + surfNum,
-																					surfaces + surfNum );
+					multiDrawSpanBuilder.addSurfSpan( mergedSurf, surfaces + surfNum, surfaces + surfNum );
 					++numSubspans;
 				}
 			}
 #endif
 
-			surfSpan->subspansOffset  = oldSubspanDataOffset;
-			surfSpan->vertSpansOffset = oldVertElemSpanDataOffset;
-			surfSpan->numSubspans     = numSubspans;
+			surfSpan->subspansOffset = oldSubspanDataOffset;
+			surfSpan->numSubspans    = numSubspans;
+			surfSpan->mdSpan         = multiDrawSpanBuilder.buildAndReset();
 
 			assert( subspanDataOffset - oldSubspanDataOffset == 2 * numSubspans );
-			assert( vertElemSpanDataOffset - oldVertElemSpanDataOffset == numSubspans );
 		}
 	}
 
 	// Save for further use for supplying brush models
 	stateForCamera->drawSurfSurfSubspansOffset  = subspanDataOffset;
-	stateForCamera->drawSurfVertElemSpansOffset = vertElemSpanDataOffset;
+	stateForCamera->drawSurfMultiDrawDataOffset = multiDrawSpanBuilder.m_offset;
 }
 
 void Frontend::addMergedBspSurfToSortList( StateForCamera *stateForCamera, const entity_t *entity,
@@ -389,8 +403,7 @@ void Frontend::addMergedBspSurfToSortList( StateForCamera *stateForCamera, const
 		//addEntryToSortList( m_state.portalmasklist, e, nullptr, nullptr, 0, 0, nullptr, drawSurf );
 	}
 
-	drawSurf->vertElemSpans = stateForCamera->drawSurfVertElemSpansBuffer->get() + surfSpan.vertSpansOffset;
-	drawSurf->numSpans      = surfSpan.numSubspans;
+	drawSurf->mdSpan = stateForCamera->drawSurfSurfSpansBuffer->get()[mergedSurfNum].mdSpan;
 
 	unsigned dlightBits = 0;
 	if( stateForCamera->numVisibleProgramLights ) {

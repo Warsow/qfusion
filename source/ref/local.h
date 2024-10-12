@@ -70,7 +70,73 @@ typedef struct superLightStyle_s {
 } superLightStyle_t;
 
 #include "glimp.h"
-#include "surface.h"
+
+
+enum drawSurfaceType_t : unsigned {
+	ST_NONE,
+	ST_BSP,
+	ST_ALIAS,
+	ST_SKELETAL,
+	ST_SPRITE,
+	ST_QUAD_POLY,
+	ST_DYNAMIC_MESH,
+	ST_PARTICLE,
+	ST_CORONA,
+	ST_NULLMODEL,
+
+	ST_MAX_TYPES,
+};
+
+struct DynamicMeshDrawSurface {
+	// TODO: Do we really need to keep temporaries of algorithms here
+	unsigned requestedNumVertices;
+	unsigned requestedNumIndices;
+	unsigned actualNumVertices;
+	unsigned actualNumIndices;
+	unsigned verticesOffset;
+	unsigned indicesOffset;
+	const struct DynamicMesh *dynamicMesh;
+	char scratchpad[32];
+};
+
+struct MergedBspSurface {
+	struct shader_s *shader;
+	struct mfog_s *fog;
+	struct mesh_vbo_s *vbo;
+	struct superLightStyle_s *superLightStyle;
+	instancePoint_t *instances;
+	unsigned numVerts, numElems;
+	unsigned firstVboVert, firstVboElem;
+	unsigned firstWorldSurface, numWorldSurfaces;
+	unsigned numInstances;
+	unsigned numLightmaps;
+};
+
+struct MultiDrawElemSpan {
+	const GLsizei *counts;
+	const GLvoid **indices;
+	GLsizei numDraws;
+};
+struct portalSurface_s;
+
+typedef struct {
+	void *listSurf;                 // only valid if visFrame == rf.frameCount
+	MergedBspSurface *mergedBspSurf;
+	unsigned dlightBits;
+	MultiDrawElemSpan mdSpan;
+	portalSurface_s *portalSurface;
+	float portalDistance;
+} drawSurfaceBSP_t;
+
+typedef struct {
+	struct maliasmesh_s *mesh;
+	struct model_s *model;
+} drawSurfaceAlias_t;
+
+typedef struct {
+	struct mskmesh_s *mesh;
+	struct model_s *model;
+} drawSurfaceSkeletal_t;
 
 #include "../common/wswpodvector.h"
 #include "../common/wswstaticstring.h"
@@ -710,9 +776,11 @@ struct VertElemSpan {
 	unsigned numElems;
 };
 
+using DrawCallData = std::variant<VertElemSpan, MultiDrawElemSpan>;
+
 void RB_DrawElements( const FrontendToBackendShared *fsh, int firstVert, int numVerts, int firstElem, int numElems );
 
-void RB_DrawElements( const FrontendToBackendShared *fsh, std::span<const VertElemSpan> spans );
+void RB_DrawElements( const FrontendToBackendShared *fsh, const DrawCallData &drawCallData );
 
 void RB_FlushTextureCache( void );
 

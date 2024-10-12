@@ -96,10 +96,10 @@ private:
 	};
 
 	struct MergedSurfSpan {
+		MultiDrawElemSpan mdSpan;
 		int firstSurface;
 		int lastSurface;
 		unsigned subspansOffset;
-		unsigned vertSpansOffset;
 		unsigned numSubspans;
 	};
 
@@ -215,12 +215,13 @@ private:
 		PodBufferHolder<unsigned> *leafSurfNumsBuffer;
 
 		PodBufferHolder<uint8_t> *surfVisTableBuffer;
-		PodBufferHolder<VertElemSpan> *drawSurfVertElemSpansBuffer;
+		PodBufferHolder<GLsizei> *drawSurfMultiDrawCountsBuffer;
+		PodBufferHolder<const GLvoid *> *drawSurfMultiDrawIndicesBuffer;
 		// For lights
 		PodBufferHolder<unsigned> *drawSurfSurfSubspansBuffer;
 
 		unsigned drawSurfSurfSubspansOffset { 0 };
-		unsigned drawSurfVertElemSpansOffset { 0 };
+		unsigned drawSurfMultiDrawDataOffset { 0 };
 
 		PodBufferHolder<VisTestedModel> *visTestedModelsBuffer;
 		PodBufferHolder<uint32_t> *leafLightBitsOfSurfacesBuffer;
@@ -644,7 +645,8 @@ private:
 		PodBufferHolder<MergedSurfSpan> drawSurfSurfSpansBuffer;
 		PodBufferHolder<uint8_t> bspSurfVisTableBuffer;
 		PodBufferHolder<unsigned> drawSurfSurfSubspansBuffer;
-		PodBufferHolder<VertElemSpan> drawSurfVertElemSpansBuffer;
+		PodBufferHolder<GLsizei> drawSurfMultiDrawCountsBuffer;
+		PodBufferHolder<const GLvoid *> drawSurfMultiDrawIndicesBuffer;
 
 		PodBufferHolder<VisTestedModel> visTestedModelsBuffer;
 		PodBufferHolder<uint32_t> leafLightBitsOfSurfacesBuffer;

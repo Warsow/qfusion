@@ -616,6 +616,7 @@ QGL_FUNC( void, glPolygonMode, ( GLenum face, GLenum mode ) );
 
 QGL_FUNC( void, glActiveTexture, ( GLenum ) );
 QGL_FUNC( void, glDrawRangeElements, ( GLenum, GLuint, GLuint, GLsizei, GLenum, const GLvoid * ) );
+QGL_FUNC( void, glMultiDrawElements, ( GLenum, const GLsizei *, GLenum,  const void * const *, GLsizei ) );
 QGL_FUNC( void, glBindBuffer, ( GLenum target, GLuint buffer ) );
 QGL_FUNC( void, glDeleteBuffers, ( GLsizei n, const GLuint * buffers ) );
 QGL_FUNC( void, glGenBuffers, ( GLsizei n, GLuint * buffers ) );

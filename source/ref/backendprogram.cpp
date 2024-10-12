@@ -665,7 +665,7 @@ static uint64_t RB_InstancedArraysProgramFeatures( void ) {
 	uint64_t programFeatures = 0;
 	if( ( rb.currentVAttribs & VATTRIB_INSTANCES_BITS ) == VATTRIB_INSTANCES_BITS ) {
 		programFeatures |= GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS;
-	} else if( /*rb.drawElements.numInstances*/ false ) {
+	} else if( /*rb.drawCallData.numInstances*/ false ) {
 		programFeatures |= GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS;
 	}
 	return programFeatures;
@@ -1066,7 +1066,7 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 			}
 		}
 
-		RB_DrawElementsReal( rb.drawElements );
+		RB_DrawElementsReal( rb.drawCallData );
 	}
 }
 
@@ -1150,7 +1150,7 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, uint64_t pro
 
 		RP_UpdateTextureUniforms( program, width, height );
 
-		RB_DrawElementsReal( rb.drawElements );
+		RB_DrawElementsReal( rb.drawCallData );
 	}
 }
 
@@ -1198,7 +1198,7 @@ static void RB_RenderMeshGLSL_Outline( const shaderpass_t *pass, uint64_t progra
 		RP_UpdateBonesUniforms( program, rb.bonesData.numBones, rb.bonesData.dualQuats );
 	}
 
-	RB_DrawElementsReal( rb.drawElements );
+	RB_DrawElementsReal( rb.drawCallData );
 
 	RB_Cull( faceCull );
 }
@@ -1418,7 +1418,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, con
 			RP_UpdateTextureUniforms( program, rb.st.screenDepthTex->width, rb.st.screenDepthTex->height );
 		}*/
 
-		RB_DrawElementsReal( rb.drawElements );
+		RB_DrawElementsReal( rb.drawCallData );
 	}
 }
 
@@ -1509,7 +1509,7 @@ static void RB_RenderMeshGLSL_Celshade( const shaderpass_t *pass, uint64_t progr
 			RP_UpdateBonesUniforms( program, rb.bonesData.numBones, rb.bonesData.dualQuats );
 		}
 
-		RB_DrawElementsReal( rb.drawElements );
+		RB_DrawElementsReal( rb.drawCallData );
 	}
 }
 
@@ -1539,7 +1539,7 @@ static void RB_RenderMeshGLSL_Fog( const shaderpass_t *pass, uint64_t programFea
 			RP_UpdateBonesUniforms( program, rb.bonesData.numBones, rb.bonesData.dualQuats );
 		}
 
-		RB_DrawElementsReal( rb.drawElements );
+		RB_DrawElementsReal( rb.drawCallData );
 	}
 }
 
@@ -1575,7 +1575,7 @@ static void RB_RenderMeshGLSL_FXAA( const shaderpass_t *pass, uint64_t programFe
 
 		RP_UpdateTextureUniforms( program, image->width, image->height );
 
-		RB_DrawElementsReal( rb.drawElements );
+		RB_DrawElementsReal( rb.drawCallData );
 	}
 }
 
@@ -1599,7 +1599,7 @@ static void RB_RenderMeshGLSL_YUV( const shaderpass_t *pass, uint64_t programFea
 	if( RB_BindProgram( program ) ) {
 		RB_UpdateCommonUniforms( program, pass, texMatrix );
 
-		RB_DrawElementsReal( rb.drawElements );
+		RB_DrawElementsReal( rb.drawCallData );
 	}
 }
 
@@ -1654,7 +1654,7 @@ static void RB_RenderMeshGLSL_ColorCorrection( const shaderpass_t *pass, uint64_
 
 		RP_UpdateColorCorrectionUniforms( program, r_hdr_gamma->value, rb.hdrExposure );
 
-		RB_DrawElementsReal( rb.drawElements );
+		RB_DrawElementsReal( rb.drawCallData );
 	}
 }
 
@@ -1680,7 +1680,7 @@ static void RB_RenderMeshGLSL_KawaseBlur( const shaderpass_t *pass, uint64_t pro
 
 		RP_UpdateKawaseUniforms( program, pass->images[0]->width, pass->images[0]->height, pass->anim_numframes );
 
-		RB_DrawElementsReal( rb.drawElements );
+		RB_DrawElementsReal( rb.drawCallData );
 	}
 }
 
@@ -2063,7 +2063,7 @@ static void RB_SetShaderpassState( int state ) {
 static bool RB_CleanSinglePass( void ) {
 	// reuse current GLSL state (same program bound, same uniform values)
 	if( !rb.dirtyUniformState && rb.donePassesTotal == 1 ) {
-		RB_DrawElementsReal( rb.drawElements );
+		RB_DrawElementsReal( rb.drawCallData );
 		return true;
 	}
 	return false;

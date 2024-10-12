@@ -337,18 +337,19 @@ auto Frontend::allocStateForCamera() -> StateForCamera * {
 	stateForCamera->prepareSpritesWorkload   = &resultStorage->prepareSpritesWorkloadBuffer;
 	stateForCamera->preparedSpriteMeshes     = &resultStorage->preparedSpriteMeshesBuffer;
 
-	stateForCamera->visibleLeavesBuffer           = &resultStorage->visibleLeavesBuffer;
-	stateForCamera->visibleOccludersBuffer        = &resultStorage->visibleOccludersBuffer;
-	stateForCamera->sortedOccludersBuffer         = &resultStorage->sortedOccludersBuffer;
-	stateForCamera->leafSurfTableBuffer           = &resultStorage->leafSurfTableBuffer;
-	stateForCamera->leafSurfNumsBuffer            = &resultStorage->leafSurfNumsBuffer;
-	stateForCamera->drawSurfSurfSpansBuffer       = &resultStorage->drawSurfSurfSpansBuffer;
-	stateForCamera->bspDrawSurfacesBuffer         = &resultStorage->bspDrawSurfacesBuffer;
-	stateForCamera->surfVisTableBuffer            = &resultStorage->bspSurfVisTableBuffer;
-	stateForCamera->drawSurfSurfSubspansBuffer    = &resultStorage->drawSurfSurfSubspansBuffer;
-	stateForCamera->drawSurfVertElemSpansBuffer   = &resultStorage->drawSurfVertElemSpansBuffer;
-	stateForCamera->visTestedModelsBuffer         = &resultStorage->visTestedModelsBuffer;
-	stateForCamera->leafLightBitsOfSurfacesBuffer = &resultStorage->leafLightBitsOfSurfacesBuffer;
+	stateForCamera->visibleLeavesBuffer            = &resultStorage->visibleLeavesBuffer;
+	stateForCamera->visibleOccludersBuffer         = &resultStorage->visibleOccludersBuffer;
+	stateForCamera->sortedOccludersBuffer          = &resultStorage->sortedOccludersBuffer;
+	stateForCamera->leafSurfTableBuffer            = &resultStorage->leafSurfTableBuffer;
+	stateForCamera->leafSurfNumsBuffer             = &resultStorage->leafSurfNumsBuffer;
+	stateForCamera->drawSurfSurfSpansBuffer        = &resultStorage->drawSurfSurfSpansBuffer;
+	stateForCamera->bspDrawSurfacesBuffer          = &resultStorage->bspDrawSurfacesBuffer;
+	stateForCamera->surfVisTableBuffer             = &resultStorage->bspSurfVisTableBuffer;
+	stateForCamera->drawSurfSurfSubspansBuffer     = &resultStorage->drawSurfSurfSubspansBuffer;
+	stateForCamera->drawSurfMultiDrawIndicesBuffer = &resultStorage->drawSurfMultiDrawIndicesBuffer;
+	stateForCamera->drawSurfMultiDrawCountsBuffer  = &resultStorage->drawSurfMultiDrawCountsBuffer;
+	stateForCamera->visTestedModelsBuffer          = &resultStorage->visTestedModelsBuffer;
+	stateForCamera->leafLightBitsOfSurfacesBuffer  = &resultStorage->leafLightBitsOfSurfacesBuffer;
 
 	resultStorage->particleDrawSurfacesBuffer.reserve( Scene::kMaxParticleAggregates * Scene::kMaxParticlesInAggregate );
 	stateForCamera->particleDrawSurfaces = resultStorage->particleDrawSurfacesBuffer.get();
@@ -617,7 +618,8 @@ auto Frontend::coBeginPreparingRenderingFromTheseCameras( CoroTask::StartInfo si
 			const unsigned estimatedNumSubspans = wsw::max( 8 * numMergedSurfaces, numWorldSurfaces );
 			// Two unsigned elements per each subspan TODO: Allow storing std::pair in this container
 			stateForCamera->drawSurfSurfSubspansBuffer->reserve( 2 * estimatedNumSubspans );
-			stateForCamera->drawSurfVertElemSpansBuffer->reserve( estimatedNumSubspans );
+			stateForCamera->drawSurfMultiDrawCountsBuffer->reserve( estimatedNumSubspans );
+			stateForCamera->drawSurfMultiDrawIndicesBuffer->reserve( estimatedNumSubspans );
 
 			stateForCamera->surfVisTableBuffer->reserveZeroed( numWorldSurfaces );
 
@@ -638,10 +640,10 @@ auto Frontend::coBeginPreparingRenderingFromTheseCameras( CoroTask::StartInfo si
 
 			MergedSurfSpan *const mergedSurfSpans = stateForCamera->drawSurfSurfSpansBuffer->get();
 			for( unsigned i = 0; i < numMergedSurfaces; ++i ) {
+				mergedSurfSpans[i].mdSpan          = { .counts = nullptr, .indices = nullptr, .numDraws = 0 };
 				mergedSurfSpans[i].firstSurface    = std::numeric_limits<int>::max();
 				mergedSurfSpans[i].lastSurface     = std::numeric_limits<int>::min();
 				mergedSurfSpans[i].subspansOffset  = 0;
-				mergedSurfSpans[i].vertSpansOffset = 0;
 				mergedSurfSpans[i].numSubspans     = 0;
 			}
 

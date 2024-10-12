@@ -441,9 +441,9 @@ void RB_GetScissor( int *x, int *y, int *w, int *h ) {
 }
 
 void RB_ApplyScissor( void ) {
-	int h = rb.gl.scissor[3];
 	if( rb.gl.scissorChanged ) {
 		rb.gl.scissorChanged = false;
+		const int h = rb.gl.scissor[3];
 		qglScissor( rb.gl.scissor[0], rb.gl.fbHeight - h - rb.gl.scissor[1], rb.gl.scissor[2], h );
 	}
 }
@@ -978,51 +978,49 @@ static void RB_EnableVertexAttribs( void ) {
 	}
 }
 
-void RB_DrawElementsReal( std::span<const VertElemSpan> spans ) {
-	if( !( r_drawelements->integer || rb.currentEntity == &rb.nullEnt ) || spans.empty() ) {
+void RB_DrawElementsReal( const DrawCallData &drawCallData ) {
+	if( !( r_drawelements->integer || rb.currentEntity == &rb.nullEnt ) ) [[unlikely]] {
 		return;
 	}
 
 	RB_ApplyScissor();
 
-	size_t subspanNum = 0;
-	do {
-		const unsigned numVerts  = spans[subspanNum].numVerts;
-		const unsigned numElems  = spans[subspanNum].numElems;
-		const unsigned firstVert = spans[subspanNum].firstVert;
-		const unsigned firstElem = spans[subspanNum].firstElem;
+	if( const auto *mdSpan = std::get_if<MultiDrawElemSpan>( &drawCallData ) ) {
+		qglMultiDrawElements( rb.primitive, mdSpan->counts, GL_UNSIGNED_SHORT, mdSpan->indices, mdSpan->numDraws );
+	} else if( const auto *vertElemSpan = std::get_if<VertElemSpan>( &drawCallData ) ) {
+		const unsigned numVerts  = vertElemSpan->numVerts;
+		const unsigned numElems  = vertElemSpan->numElems;
+		const unsigned firstVert = vertElemSpan->firstVert;
+		const unsigned firstElem = vertElemSpan->firstElem;
 
-		qglDrawRangeElements( rb.primitive, firstVert, firstVert + numVerts - 1, (int)numElems, GL_UNSIGNED_SHORT, (GLvoid *)( firstElem * sizeof( elem_t ) ) );
-	} while( ++subspanNum < spans.size() );
+		qglDrawRangeElements( rb.primitive, firstVert, firstVert + numVerts - 1, (int)numElems,
+							  GL_UNSIGNED_SHORT, (GLvoid *)( firstElem * sizeof( elem_t ) ) );
+	} else {
+		assert( false );
+	}
 }
 
 static void RB_DrawElements_( const FrontendToBackendShared *fsh ) {
-	if( !rb.drawElements.empty() ) [[likely]] {
-		assert( rb.currentShader );
+	assert( rb.currentShader );
 
-		RB_EnableVertexAttribs();
+	RB_EnableVertexAttribs();
 
-		if( rb.wireframe ) {
-			RB_DrawWireframeElements( fsh );
-		} else {
-			RB_DrawShadedElements( fsh );
-		}
+	if( rb.wireframe ) {
+		RB_DrawWireframeElements( fsh );
+	} else {
+		RB_DrawShadedElements( fsh );
 	}
 }
 
 void RB_DrawElements( const FrontendToBackendShared *fsh, int firstVert, int numVerts, int firstElem, int numElems ) {
-	rb.tmpDrawElements->firstVert = firstVert;
-	rb.tmpDrawElements->numVerts  = numVerts;
-	rb.tmpDrawElements->firstElem = firstElem;
-	rb.tmpDrawElements->numElems  = numElems;
-
-	RB_DrawElements( fsh, { rb.tmpDrawElements, rb.tmpDrawElements + 1 } );
+	RB_DrawElements( fsh, VertElemSpan { .firstVert = (unsigned)firstVert, .numVerts = (unsigned)numVerts,
+										 .firstElem = (unsigned)firstElem, .numElems = (unsigned)numElems } );
 }
 
-void RB_DrawElements( const FrontendToBackendShared *fsh, std::span<const VertElemSpan> spans ) {
+void RB_DrawElements( const FrontendToBackendShared *fsh, const DrawCallData &drawCallData ) {
 	rb.currentVAttribs &= ~VATTRIB_INSTANCES_BITS;
 
-	rb.drawElements = spans;
+	rb.drawCallData = drawCallData;
 
 	RB_DrawElements_( fsh );
 }
@@ -1099,13 +1097,12 @@ void R_SubmitBSPSurfToBackend( const FrontendToBackendShared *fsh, const entity_
 	const MergedBspSurface *mergedBspSurf = drawSurf->mergedBspSurf;
 
 	assert( !mergedBspSurf->numInstances );
-	assert( drawSurf->numSpans );
 
 	RB_BindVBO( mergedBspSurf->vbo->index, GL_TRIANGLES );
 	RB_SetDlightBits( drawSurf->dlightBits );
 	RB_SetLightstyle( mergedBspSurf->superLightStyle );
 
-	RB_DrawElements( fsh, { drawSurf->vertElemSpans, drawSurf->numSpans } );
+	RB_DrawElements( fsh, drawSurf->mdSpan );
 }
 
 void R_SubmitNullSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const void * ) {
@@ -1128,7 +1125,7 @@ void R_SubmitDynamicMeshToBackend( const FrontendToBackendShared *fsh, const ent
 			.numElems  = drawSurface->actualNumIndices,
 		};
 
-		RB_DrawElements( fsh, { &vertElemSpan, 1 } );
+		RB_DrawElements( fsh, vertElemSpan );
 	}
 }
 
@@ -1138,7 +1135,7 @@ void R_SubmitBatchedSurfsToBackend( const FrontendToBackendShared *fsh, const en
 	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
 		RB_BindShader( e, shader, fog );
 		RB_BindVBO( RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH ), GL_TRIANGLES );
-		RB_DrawElements( fsh, { &vertElemSpan, 1 } );
+		RB_DrawElements( fsh, vertElemSpan );
 	}
 }
 

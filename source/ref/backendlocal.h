@@ -125,8 +125,7 @@ typedef struct r_backend_s {
 	rbDynamicDraw_t dynamicDraws[MAX_DYNAMIC_DRAWS];
 	int numDynamicDraws;
 
-	VertElemSpan tmpDrawElements[1];
-	std::span<const VertElemSpan> drawElements;
+	DrawCallData drawCallData;
 
 	vattribmask_t currentVAttribs;
 
@@ -170,7 +169,7 @@ typedef struct r_backend_s {
 
 extern rbackend_t rb;
 
-void RB_DrawElementsReal( std::span<const VertElemSpan> spans );
+void RB_DrawElementsReal( const DrawCallData &drawCallData );
 
 #define RB_IsAlphaBlending( blendsrc,blenddst ) \
 	( ( blendsrc ) == GLSTATE_SRCBLEND_SRC_ALPHA || ( blenddst ) == GLSTATE_DSTBLEND_SRC_ALPHA ) || \
