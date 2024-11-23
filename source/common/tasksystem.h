@@ -200,14 +200,22 @@ public:
 		return task;
 	}
 
-	void startExecution();
-	[[nodiscard]] bool awaitCompletion();
+	class ExecutionHandle {
+		friend class TaskSystem;
+		uintptr_t m_opaque { 0 };
+	};
+
+	// Caution! Don't think that this method is reentrant
+	[[nodiscard]]
+	auto startExecution( unsigned numAllowedExtraThreads = ~0u ) -> ExecutionHandle;
+
+	[[nodiscard]] bool awaitCompletion( const ExecutionHandle &executionHandle );
 private:
 	enum CompletionStatus : unsigned { CompletionPending, CompletionSuccess, CompletionFailure };
 	enum DependencyAddressMode : uint8_t { RangeOfEntries, RangeOfEntryHandles };
 
 	void clear();
-	void awakeWorkers();
+	void awakeWorkers( unsigned numThreadsToAwake );
 
 	[[nodiscard]]
 	auto addImpl( std::span<const TaskHandle> deps, size_t alignment, size_t size, Affinity affinity ) -> std::pair<void *, TaskHandle>;

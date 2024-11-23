@@ -146,7 +146,7 @@ TaskSystem::TaskSystem( CtorArgs &&args ) {
 
 TaskSystem::~TaskSystem() {
 	m_impl->isShuttingDown.store( true, std::memory_order_seq_cst );
-	awakeWorkers();
+	awakeWorkers( m_impl->threads.size() );
 	for( std::jthread &thread: m_impl->threads ) {
 		thread.join();
 	}
@@ -171,8 +171,8 @@ void TaskSystem::endTapeModification( TaskSystemImpl *impl, bool succeeded ) {
 		// Callables must be constructed in a nonthrowing fashion, hence we just reset the offset
 		impl->sizeOfUsedMemOfCallables  = impl->savedSizeOfUsedMemOfCallables;
 		impl->numDependencyEntriesSoFar = impl->savedNumDependencyEntriesSoFar;
-		impl->tapes[0].numEntriesSoFar  = impl->tapes[0].numEntriesSoFar;
-		impl->tapes[1].numEntriesSoFar  = impl->tapes[1].numEntriesSoFar;
+		impl->tapes[0].numEntriesSoFar  = impl->savedNumEntriesInTapesSoFar[0];
+		impl->tapes[1].numEntriesSoFar  = impl->savedNumEntriesInTapesSoFar[1];
 	}
 	impl->globalMutex.unlock();
 }
@@ -566,28 +566,37 @@ void TaskSystem::clear() {
 	m_impl->numDependencyEntriesSoFar = 0;
 }
 
-void TaskSystem::awakeWorkers() {
-	// Awake all threads
-	// TODO: Is there something smarter
-	for( std::atomic_flag &flag: m_impl->signalingFlags ) {
+void TaskSystem::awakeWorkers( unsigned numThreadsToAwake ) {
+	assert( numThreadsToAwake <= m_impl->signalingFlags.size() );
+	for( unsigned i = 0; i < numThreadsToAwake; ++i ) {
+		auto &flag = m_impl->signalingFlags[i];
 		flag.test_and_set();
 		flag.notify_one();
 	}
 }
 
-void TaskSystem::startExecution() {
+auto TaskSystem::startExecution( unsigned numAllowedExtraThreads ) -> ExecutionHandle {
 	assert( !m_impl->isExecuting );
 	clear();
 
-	std::fill( m_impl->completionStatuses.begin(), m_impl->completionStatuses.end(), CompletionPending );
+	const unsigned numThreadsToUse = std::min( (unsigned)m_impl->threads.size(), numAllowedExtraThreads );
+	for( unsigned i = 0; i < numThreadsToUse; ++i ) {
+		m_impl->completionStatuses[i] = CompletionPending;
+	}
 
 	m_impl->isExecuting.store( true, std::memory_order_seq_cst );
 
-	awakeWorkers();
+	awakeWorkers( numThreadsToUse );
+
+	ExecutionHandle result;
+	result.m_opaque = numThreadsToUse;
+	return result;
 }
 
-bool TaskSystem::awaitCompletion() {
+bool TaskSystem::awaitCompletion( const ExecutionHandle &executionHandle ) {
 	assert( m_impl->isExecuting );
+
+	const unsigned numUsedThreads = executionHandle.m_opaque;
 
 	// Run the part of workload in this thread as well
 	bool succeeded = threadExecTasks( m_impl, ~0u );
@@ -595,12 +604,19 @@ bool TaskSystem::awaitCompletion() {
 	// Interrupt workers which may spin on this variable
 	m_impl->awaitsCompletion.store( true, std::memory_order_seq_cst );
 
+	// Balance the barrier counter in case if some threads stay parked
+	if( numUsedThreads != m_impl->threads.size() ) {
+		assert( numUsedThreads < m_impl->threads.size() );
+		(void)m_impl->barrier.arrive( (ptrdiff_t)( m_impl->threads.size() - numUsedThreads ) );
+	}
+
 	// Await completion reply from workers
 	m_impl->barrier.arrive_and_wait();
 
 	if( succeeded ) {
-		auto it = m_impl->completionStatuses.begin();
-		for(; it != m_impl->completionStatuses.end(); ++it ) {
+		unsigned threadNum = 0;
+		auto it            = m_impl->completionStatuses.begin();
+		for(; threadNum < numUsedThreads; ++threadNum, ++it ) {
 			const unsigned status = (*it).load( std::memory_order_relaxed );
 			assert( status != CompletionPending );
 			if( status != CompletionSuccess ) {

@@ -331,9 +331,9 @@ bool LeafPropsCache::ComputeNewState( bool fastAndCoarse ) {
 			}
 		};
 		// Start early to test dynamic submission
-		taskSystem.startExecution();
+		const TaskSystem::ExecutionHandle executionHandle = taskSystem.startExecution();
 		(void)taskSystem.addForSubrangesInRange( { 1u, (unsigned)actualNumLeafs }, subrangeLength, {}, std::move( fn ) );
-		return taskSystem.awaitCompletion();
+		return taskSystem.awaitCompletion( executionHandle );
 	} catch( ... ) {
 		return false;
 	}

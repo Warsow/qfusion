@@ -244,9 +244,12 @@ static auto suggestNumExtraThreads() -> unsigned {
 		unsigned numPhysicalProcessors = 0, numLogicalProcessors = 0;
 		Sys_GetNumberOfProcessors( &numPhysicalProcessors, &numLogicalProcessors );
 		if( numPhysicalProcessors > 3 ) {
-			// Not more than 3, starting from 1 extra worker thread in addition to the main one on a 4-core machine.
-			// TODO: Reserve more, park threads dynamically depending on whether the builtin server is really running.
-			return wsw::min<unsigned>( 3, numPhysicalProcessors - 3 );
+			// Reserve not more than 3 extra threads.
+			// In case of a 4-core machine we use 3 threads for rendering (the main thread and 2 workers)
+			// and reserve the remaining core for the sound thread.
+			// Note that we park (keep it awaiting condition) a worker thread in case when the builtin server is launched.
+			// In the latter case, we use 2 active threads for rendering, 1 thread for the server, 1 thread for sound.
+			return wsw::min<unsigned>( 3, numPhysicalProcessors - 2 );
 		}
 	}
 	return 0;

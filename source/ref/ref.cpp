@@ -740,15 +740,33 @@ void BeginDrawingScenes() {
 	wsw::ref::Frontend::instance()->beginDrawingScenes();
 }
 
+static std::optional<TaskSystem::ExecutionHandle> g_taskSystemExecutionHandle;
+
 TaskSystem *BeginProcessingOfTasks() {
 	auto *result = wsw::ref::Frontend::instance()->getTaskSystem();
-	result->startExecution();
+	assert( !g_taskSystemExecutionHandle );
+	unsigned numAllowedExtraThreads = 0;
+	// The number of workers includes the main thread, so its always non-zero
+	if( const unsigned numWorkers = result->getNumberOfWorkers(); numWorkers > 1 ) {
+		// TODO: Use named constants here
+		// TODO: Use all available threads if there's no active bots on the server.
+		if( Com_ServerState() > 0 ) {
+			numAllowedExtraThreads = numWorkers - 2;
+		} else {
+			numAllowedExtraThreads = numWorkers - 1;
+		}
+		// Check for wrapping
+		assert( numAllowedExtraThreads <= numWorkers - 1 );
+	}
+	g_taskSystemExecutionHandle = result->startExecution( numAllowedExtraThreads );
 	return result;
 }
 
 void EndProcessingOfTasks() {
-	if( !wsw::ref::Frontend::instance()->getTaskSystem()->awaitCompletion() ) {
-		wsw::failWithLogicError( "" );
+	const bool awaitResult = wsw::ref::Frontend::instance()->getTaskSystem()->awaitCompletion( g_taskSystemExecutionHandle.value() );
+	g_taskSystemExecutionHandle = std::nullopt;
+	if( !awaitResult ) {
+		wsw::failWithLogicError( "Failed to execute rendering tasks" );
 	}
 }
 

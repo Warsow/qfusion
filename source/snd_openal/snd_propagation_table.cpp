@@ -561,9 +561,9 @@ class FinePropagationBuilder : public PropagationTableBuilder {
 			threadStatesForWorkers[workerIndex]->DoForRangeOfLeafs( leafNumsBegin, leafNumsEnd );
 		};
 		// Start early to test dynamic submission
-		taskSystem.startExecution();
+		const TaskSystem::ExecutionHandle executionHandle = taskSystem.startExecution();
 		(void)taskSystem.addForSubrangesInRange( { 1u, (unsigned)numLeafs }, subrangeLength, {}, std::move( fn ) );
-		return taskSystem.awaitCompletion();
+		return taskSystem.awaitCompletion( executionHandle );
 	}
 public:
 	explicit FinePropagationBuilder( int actualNumLeafs_ )
@@ -591,9 +591,9 @@ class CoarsePropagationBuilder : public PropagationTableBuilder {
 			threadStatesForWorkers[workerIndex]->DoForRangeOfLeafs( leafNumsBegin, leafNumsEnd );
 		};
 		// Start early to test dynamic submission
-		taskSystem.startExecution();
+		const TaskSystem::ExecutionHandle executionHandle = taskSystem.startExecution();
 		(void)taskSystem.addForSubrangesInRange( {1u, (unsigned)numLeafs }, subrangeLength, {}, std::move( fn ) );
-		return taskSystem.awaitCompletion();
+		return taskSystem.awaitCompletion( executionHandle );
 	}
 public:
 	explicit CoarsePropagationBuilder( int actualNumLeafs_ )
