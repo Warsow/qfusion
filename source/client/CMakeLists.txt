@@ -226,10 +226,10 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 		xkbcommon xkbcommon-x11 xcb-keysyms xcb-xkb xcb-sync xcb-shape xcb-shm xcb-randr
 		xcb-xfixes xcb-xinput xcb-image xcb-render xcb-render-util xcb-glx xcb-xinerama xcb-icccm xcb X11 X11-xcb)
 	# Must get rid of this for the release
-	set(QT_PLATFORM_DEPENDENCY_LIBRARIES ${QT_XCB_DEPENDENCY_LIBRARIES} dbus-1)
+	set(QT_PLATFORM_DEPENDENCY_LIBRARIES ${QT_XCB_DEPENDENCY_LIBRARIES})
 	set(CLIENT_PLATFORM_LIBRARIES
 		${SDL2_LIBRARY} ${FREETYPE_LIBRARY} pthread m dl rt uuid
-		qxcb qxcb-glx-integration Qt5XcbQpa Qt5XkbCommonSupport Qt5ServiceSupport Qt5EdidSupport Qt5GlxSupport Qt5DBus
+		qxcb qxcb-glx-integration Qt5XcbQpa Qt5XkbCommonSupport Qt5ServiceSupport Qt5EdidSupport Qt5GlxSupport
 		${QT_PLATFORM_DEPENDENCY_LIBRARIES})
     set(CLIENT_BINARY_TYPE "")
 
