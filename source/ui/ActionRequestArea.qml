@@ -47,7 +47,7 @@ ListView {
                 verticalAlignment: Qt.AlignVCenter
                 wrapMode: Text.WordWrap
                 font.weight: Font.Bold
-                font.pointSize: Hud.labelFontSize + 1.0
+                font.pointSize: Hud.labelFontSize + 2.0
                 font.letterSpacing: Hud.labelLetterSpacing
                 textFormat: Text.StyledText
                 text: title
@@ -61,7 +61,7 @@ ListView {
                 verticalAlignment: Qt.AlignVCenter
                 wrapMode: Text.WordWrap
                 font.weight: Font.Bold
-                font.pointSize: Hud.labelFontSize
+                font.pointSize: Hud.labelFontSize + 1.0
                 font.letterSpacing: Hud.labelLetterSpacing
                 textFormat: Text.StyledText
                 text: desc

@@ -140,11 +140,6 @@ static int scr_draw_loading;
 static cvar_t *scr_consize;
 static cvar_t *scr_conspeed;
 
-static cvar_t *con_fontSystemFamily;
-static cvar_t *con_fontSystemFallbackFamily;
-static cvar_t *con_fontSystemMonoFamily;
-static cvar_t *con_fontSystemConsoleSize;
-
 #define PLAYER_MULT 5
 
 // ENV_CNT is map load
@@ -1210,63 +1205,27 @@ void VID_Shutdown( void ) {
 }
 
 qfontface_t *SCR_RegisterFont( const char *family, int style, unsigned int size ) {
-	return FTLIB_RegisterFont( family, con_fontSystemFallbackFamily->string, style, size );
+	return FTLIB_RegisterFont( family, DEFAULT_SYSTEM_FONT_FAMILY_FALLBACK, style, size );
 }
 
 static void SCR_RegisterConsoleFont( void ) {
-	const int con_fontSystemStyle = DEFAULT_SYSTEM_FONT_STYLE;
-	const float pixelRatio = VID_GetPixelRatio();
-
-	// register system fonts
-	const char *con_fontSystemFamilyName = con_fontSystemMonoFamily->string;
-	if( !con_fontSystemConsoleSize->integer ) {
-		Cvar_SetValue( con_fontSystemConsoleSize->name, DEFAULT_SYSTEM_FONT_SMALL_SIZE );
-	} else if( con_fontSystemConsoleSize->integer > DEFAULT_SYSTEM_FONT_SMALL_SIZE * 2 ) {
-		Cvar_SetValue( con_fontSystemConsoleSize->name, DEFAULT_SYSTEM_FONT_SMALL_SIZE * 2 );
-	} else if( con_fontSystemConsoleSize->integer < DEFAULT_SYSTEM_FONT_SMALL_SIZE / 2 ) {
-		Cvar_SetValue( con_fontSystemConsoleSize->name, DEFAULT_SYSTEM_FONT_SMALL_SIZE / 2 );
-	}
-
-	int size = ceil( con_fontSystemConsoleSize->integer * pixelRatio );
-	cls.consoleFont = SCR_RegisterFont( con_fontSystemFamilyName, con_fontSystemStyle, size );
+	const int size = ceilf( 15 * VID_GetPixelRatio() );
+	cls.consoleFont = SCR_RegisterFont( DEFAULT_SYSTEM_FONT_FAMILY_MONO, DEFAULT_SYSTEM_FONT_STYLE, size );
 	if( !cls.consoleFont ) {
-		Cvar_ForceSet( con_fontSystemMonoFamily->name, con_fontSystemMonoFamily->dvalue );
-		con_fontSystemFamilyName = con_fontSystemMonoFamily->dvalue;
-
-		size = DEFAULT_SYSTEM_FONT_SMALL_SIZE;
-		cls.consoleFont = SCR_RegisterFont( con_fontSystemFamilyName, con_fontSystemStyle, size );
-		if( !cls.consoleFont ) {
-			Com_Error( ERR_FATAL, "Couldn't load default font \"%s\"", con_fontSystemMonoFamily->dvalue );
-		}
-
-		Con_CheckResize();
+		Com_Error( ERR_FATAL, "Couldn't load default font \"%s\"", DEFAULT_SYSTEM_FONT_FAMILY_MONO );
 	}
+	Con_CheckResize();
 }
 
 static void SCR_InitFonts( void ) {
-	con_fontSystemFamily = Cvar_Get( "con_fontSystemFamily", DEFAULT_SYSTEM_FONT_FAMILY, CVAR_ARCHIVE );
-	con_fontSystemMonoFamily = Cvar_Get( "con_fontSystemMonoFamily", DEFAULT_SYSTEM_FONT_FAMILY_MONO, CVAR_ARCHIVE );
-	con_fontSystemFallbackFamily = Cvar_Get( "con_fontSystemFallbackFamily", DEFAULT_SYSTEM_FONT_FAMILY_FALLBACK, CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-	con_fontSystemConsoleSize = Cvar_Get( "con_fontSystemConsoleSize", STR_TOSTR( DEFAULT_SYSTEM_FONT_SMALL_SIZE ), CVAR_ARCHIVE );
-
 	SCR_RegisterConsoleFont();
 }
 
 static void SCR_ShutdownFonts( void ) {
 	cls.consoleFont = NULL;
-
-	con_fontSystemFamily = NULL;
-	con_fontSystemConsoleSize = NULL;
 }
 
 static void SCR_CheckSystemFontsModified( void ) {
-	if( con_fontSystemMonoFamily && con_fontSystemConsoleSize ) {
-		if( con_fontSystemMonoFamily->modified || con_fontSystemConsoleSize->modified ) {
-			SCR_RegisterConsoleFont();
-			con_fontSystemMonoFamily->modified = false;
-			con_fontSystemConsoleSize->modified = false;
-		}
-	}
 }
 
 static int SCR_HorizontalAlignForString( const int x, int align, int width ) {

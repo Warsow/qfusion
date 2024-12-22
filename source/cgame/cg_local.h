@@ -478,16 +478,9 @@ typedef struct {
 
 	int fullclipShaderNum;
 
-	// fonts
-	char fontSystemFamily[MAX_QPATH];
-	char fontSystemMonoFamily[MAX_QPATH];
-	int fontSystemSmallSize;
-	int fontSystemMediumSize;
-	int fontSystemBigSize;
-
-	struct qfontface_s *fontSystemSmall;
-	struct qfontface_s *fontSystemMedium;
-	struct qfontface_s *fontSystemBig;
+	struct qfontface_s *fontPlayerNameTiny;
+	struct qfontface_s *fontPlayerNameSmall;
+	struct qfontface_s *fontPlayerNameLarge;
 
 	MediaCache media;
 

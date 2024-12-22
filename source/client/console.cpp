@@ -745,6 +745,14 @@ void Console::drawPane( unsigned width, unsigned height ) {
 	}
 
 	int lineY = height - smallCharHeight - inputReservedHeight;
+	int minY  = 0;
+	if( const int rem = lineY % smallCharHeight ) {
+		const int extraHeight = smallCharHeight - rem;
+		lineY -= extraHeight / 2;
+		// Make sure that the calculations are exact
+		minY = extraHeight - ( extraHeight / 2 );
+	}
+
 	const unsigned lineWidthLimit = width - 2 * sideMargin;
 
 	// Lock during drawing lines
@@ -774,13 +782,14 @@ void Console::drawPane( unsigned width, unsigned height ) {
 		const int arrowWidth   = SCR_strWidth( "^", cls.consoleFont, 0, 0 );
 		const int arrowSpacing = 3 * arrowWidth;
 
-		// draw arrows to show the buffer is backscrolled
-		for( unsigned x = arrowSpacing; x + arrowSpacing <= width; x += arrowSpacing ) {
-			SCR_DrawRawChar( x, lineY, '^', cls.consoleFont, colorOrange );
+		if( lineY >= minY ) {
+			// draw arrows to show the buffer is backscrolled
+			for( unsigned x = arrowSpacing; x + arrowSpacing <= width; x += arrowSpacing ) {
+				SCR_DrawRawChar( x, lineY, '^', cls.consoleFont, colorOrange );
+			}
+			// the arrows obscure one line of scrollback
+			lineY -= smallCharHeight;
 		}
-
-		// the arrows obscure one line of scrollback
-		lineY -= smallCharHeight;
 	}
 
 	// TODO: Get rid of this copying, allow supplying spans directly
@@ -809,15 +818,15 @@ void Console::drawPane( unsigned width, unsigned height ) {
 
 			const auto end = std::make_reverse_iterator( spansToDraw.begin() );
 			for(; it != end; ++it ) {
+				if( lineY < minY ) {
+					break;
+				}
 				scrDrawStringBuffer.assign( it->data(), it->size() );
 				scrDrawStringBuffer.push_back( '\0' );
 				SCR_DrawString( sideMargin, lineY, ALIGN_LEFT_TOP, scrDrawStringBuffer.data(), cls.consoleFont, colorWhite, 0 );
 				lineY -= smallCharHeight;
-				if( lineY < -smallCharHeight ) {
-					break;
-				}
 			}
-			if( lineY < -smallCharHeight ) {
+			if( lineY < minY ) {
 				break;
 			}
 		}
