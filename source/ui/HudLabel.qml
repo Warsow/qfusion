@@ -5,6 +5,6 @@ import net.warsow 2.6
 
 Label {
     font.weight: Hud.labelFontWeight
-    font.pointSize: Hud.labelFontSize + 1.0
+    font.pointSize: Hud.labelFontSize
     font.letterSpacing: Hud.labelLetterSpacing
 }

@@ -1424,6 +1424,7 @@ static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actual
 				if( drawGfx ) {
 					std::optional<float> miniviewScale;
 					if( isMiniview ) {
+						// TODO: Shouldn't it be max()?
 						miniviewScale = wsw::min( (float)rd.width / (float)cgs.vidWidth, (float)rd.height / (float)cgs.vidHeight );
 					}
 					drawNamesAndBeacons( viewState, miniviewScale );
@@ -1942,8 +1943,17 @@ static void drawNamesAndBeacons( ViewState *viewState, std::optional<float> mini
 	}
 
 	if( hasNamesToDraw ) {
-		// That's all we can do for now
-		qfontface_s *const font = miniviewScale != std::nullopt ? cgs.fontSystemSmall : cgs.fontSystemMedium;
+		qfontface_s *font;
+		if( miniviewScale != std::nullopt ) {
+			// TODO: Identify HUD miniviews by enums
+			if( *miniviewScale < 0.15f ) {
+				font = cgs.font2DTiny;
+			} else {
+				font = cgs.font2DMedium;
+			}
+		} else {
+			font = cgs.font2DBig;
+		}
 		for( int i = 0; i < cggs->maxclients; ++i ) {
 			const vec4_t color { 1.0f, 1.0f, 1.0f, playerNameAlphaValues[i] };
 			const int requestedX = savedCoords[i][0];
@@ -2009,7 +2019,7 @@ static void drawCrosshair( int weapon, int fireMode, std::optional<float> minivi
 		// Note: We use a fixed downscale factor as changing image size is very expensive and everything relies on caching
 		const unsigned sizeVarValue = sizeVar->get();
 		const bool isForMiniview    = miniviewScale != std::nullopt;
-		const unsigned chosenSize   = ( isForMiniview ? ( 2 * sizeVarValue / 3 ) : sizeVarValue ) * cgs.pixelRatio;
+		const unsigned chosenSize   = ( isForMiniview ? ( sizeVarValue / 2 ) : sizeVarValue ) * cgs.pixelRatio;
 		if( fireMode == FIRE_MODE_STRONG ) {
 			materialAndDimensions = getStrongCrosshairMaterial( name, isForMiniview, chosenSize );
 		} else {
