@@ -1067,9 +1067,9 @@ static void CG_Event_WeaponBeam( vec3_t origin, vec3_t dir, int ownerNum, int we
 	if( trace.ent != -1 ) {
 		[[maybe_unused]] bool spawnDecal = ( trace.surfFlags & ( SURF_FLESH | SURF_NOMARKS ) ) == 0;
 		if( weapondef->weapon_id == WEAP_ELECTROBOLT ) {
-			cg.effectsSystem.spawnElectroboltHitEffect( trace.endpos, trace.plane.normal, dir, ownerNum, spawnDecal );
+			cg.effectsSystem.spawnElectroboltHitEffect( trace.endpos, trace.plane.normal, dir, spawnDecal, ownerNum );
 		} else if( weapondef->weapon_id == WEAP_INSTAGUN ) {
-			cg.effectsSystem.spawnInstagunHitEffect( trace.endpos, trace.plane.normal, dir, ownerNum, spawnDecal );
+			cg.effectsSystem.spawnInstagunHitEffect( trace.endpos, trace.plane.normal, dir, spawnDecal, ownerNum );
 		}
 	}
 

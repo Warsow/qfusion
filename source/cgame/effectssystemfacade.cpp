@@ -103,16 +103,23 @@ static bool findWaterHitPointBetweenTwoPoints( const float *checkFromPoint, cons
 	return false;
 }
 
-static void addUnderwaterSplashImpactsForKnownWaterZ( const float *fireOrigin, float radius, float waterZ,
+using SolidImpactsVector  = wsw::StaticVector<SolidImpact, 12>;
+using LiquidImpactsVector = wsw::StaticVector<LiquidImpact, 16>;
+
+static void addUnderwaterSplashImpactsForKnownWaterZ( const float *fireOrigin, float radius,
+													  float percentage, float waterZ,
 													  wsw::RandomGenerator *rng, int impactContents,
-													  wsw::StaticVector<LiquidImpact, 12> *impacts ) {
+													  LiquidImpactsVector *impacts ) {
 	assert( waterZ - fireOrigin[2] > 0.0f && "Make sure directions are normalizable" );
 	assert( radius > 0.0f );
+	assert( percentage >= 0.0f && percentage <= 1.0f );
+
+	const auto limit = wsw::max( 1u, (unsigned)( percentage * (float)impacts->size() ) );
 
 	// TODO: Build a shape list once and clip against it in the loop
 
 	// This number of attempts is sufficient in this case
-	const unsigned maxTraceAttempts = ( 3 * impacts->capacity() ) / 2;
+	const unsigned maxTraceAttempts = ( 3 * limit ) / 2;
 	for( unsigned i = 0; i < maxTraceAttempts; ++i ) {
 		// Sample a random point on the sphere projection onto the water plane (let it actually be a donut)
 		const float phi    = rng->nextFloat( 0.0f, 2.0f * (float)M_PI );
@@ -137,22 +144,26 @@ static void addUnderwaterSplashImpactsForKnownWaterZ( const float *fireOrigin, f
 			});
 
 			// TODO: Vary limit of spawned impacts by explosion depth
-			if( impacts->full() ) [[unlikely]] {
+			if( impacts->size() == limit ) [[unlikely]] {
 				break;
 			}
 		}
 	}
 }
 
-static void addUnderwaterSplashImpactsForUnknownWaterZ( const float *fireOrigin, float radius, float maxZ,
+static void addUnderwaterSplashImpactsForUnknownWaterZ( const float *fireOrigin, float radius,
+														float maxZ, float percentage,
 														wsw::RandomGenerator *rng, int impactContents,
-														wsw::StaticVector<LiquidImpact, 12> *impacts ) {
+														LiquidImpactsVector *impacts ) {
 	assert( maxZ - fireOrigin[2] > 0.0f && "Make sure directions are normalizable" );
+	assert( percentage >= 0.0f && percentage <= 1.0f );
+
+	const auto limit = wsw::max( 1u, (unsigned)( percentage * (float)impacts->size() ) );
 
 	// TODO: Build a shape list once and clip against it in the loop
 	// TODO: Use a grid propagation instead?
 
-	const unsigned maxTraceAttempts = 6 * impacts->capacity();
+	const unsigned maxTraceAttempts = 8 * limit;
 	for( unsigned i = 0; i < maxTraceAttempts; ++i ) {
 		// Sample a random point on the sphere projection onto the water plane.
 		// Let it actually be a donut with an outer radius larger than the explosion radius
@@ -176,17 +187,22 @@ static void addUnderwaterSplashImpactsForUnknownWaterZ( const float *fireOrigin,
 				.contents = impactContents,
 			});
 
-			if( impacts->full() ) [[unlikely]] {
+			if( impacts->size() == limit ) [[unlikely]] {
 				break;
 			}
 		}
 	}
 }
 
-static void makeRegularExplosionImpacts( const float *fireOrigin, float radius, wsw::RandomGenerator *rng,
-										 wsw::StaticVector<SolidImpact, 12> *solidImpacts,
-										 wsw::StaticVector<LiquidImpact, 12> *waterImpacts ) {
-	const unsigned numTraceAttempts = 3 * solidImpacts->capacity();
+static void makeRegularExplosionImpacts( const float *fireOrigin, float radius,
+										 float percentage, wsw::RandomGenerator *rng,
+										 SolidImpactsVector *solidImpacts, LiquidImpactsVector *liquidImpacts ) {
+	assert( percentage >= 0.0f && percentage <= 1.0f );
+
+	const auto solidLimit  = wsw::max( 1u, (unsigned)( percentage * (float)solidImpacts->capacity() ) );
+	const auto liquidLimit = wsw::max( 1u, (unsigned)( percentage * (float)liquidImpacts->capacity() ) );
+
+	const unsigned numTraceAttempts = 3 * wsw::max( solidLimit, liquidLimit );
 	for( unsigned i = 0; i < numTraceAttempts; ++i ) {
 		trace_t trace;
 		vec3_t traceEnd;
@@ -201,12 +217,12 @@ static void makeRegularExplosionImpacts( const float *fireOrigin, float radius, 
 			if( !( trace.surfFlags & ( SURF_FLESH | SURF_NOIMPACT ) ) ) {
 				bool addedOnThisStep = false;
 				if( trace.contents & MASK_WATER ) {
-					if( !waterImpacts->full() ) {
+					if( liquidImpacts->size() < liquidLimit ) {
 						// This condition produces better-looking results so far
 						if( const float absDirZ = std::fabs( traceDir[2] ); absDirZ > 0.1f && absDirZ < 0.7f ) {
 							vec3_t burstDir;
 							VectorReflect( traceDir, trace.plane.normal, 0.0f, burstDir );
-							waterImpacts->emplace_back( LiquidImpact {
+							liquidImpacts->emplace_back( LiquidImpact {
 								.origin   = { trace.endpos[0], trace.endpos[1], trace.endpos[2] },
 								.burstDir = { burstDir[0], burstDir[1], burstDir[2] },
 								.contents = trace.contents,
@@ -215,11 +231,11 @@ static void makeRegularExplosionImpacts( const float *fireOrigin, float radius, 
 						}
 					}
 				} else {
-					if( !solidImpacts->full() ) {
+					if( solidImpacts->size() < solidLimit ) {
 						const auto surfFlags = getSurfFlagsForImpact( trace, traceDir );
 						const auto material  = decodeSurfImpactMaterial( (unsigned)surfFlags );
-						// Make sure it adds something to visuals in the desired way.
-						if( material != SurfImpactMaterial::Unknown && material != SurfImpactMaterial::Metal ) {
+						// Make sure it adds something to visuals
+						if( material != SurfImpactMaterial::Unknown ) {
 							solidImpacts->emplace_back( SolidImpact {
 								.origin      = { trace.endpos[0], trace.endpos[1], trace.endpos[2] },
 								.normal      = { trace.plane.normal[0], trace.plane.normal[1], trace.plane.normal[2] },
@@ -231,7 +247,7 @@ static void makeRegularExplosionImpacts( const float *fireOrigin, float radius, 
 					}
 				}
 				if( addedOnThisStep ) {
-					if( solidImpacts->full() && waterImpacts->full() ) {
+					if( solidImpacts->size() == solidLimit && liquidImpacts->size() == liquidLimit ) {
 						break;
 					}
 				}
@@ -240,6 +256,47 @@ static void makeRegularExplosionImpacts( const float *fireOrigin, float radius, 
 	}
 }
 
+[[nodiscard]]
+static auto prepareExplosionLikeImpacts( const float *fireOrigin, float radius,
+										 float percentage, wsw::RandomGenerator *rng,
+										 SolidImpactsVector *solidImpacts, LiquidImpactsVector *liquidImpacts ) -> int {
+	solidImpacts->clear();
+	liquidImpacts->clear();
+
+	const int contents = CG_PointContents( fireOrigin );
+	if( contents & MASK_WATER ) {
+		vec3_t topOrigin;
+		VectorCopy( fireOrigin, topOrigin );
+		topOrigin[2] += radius;
+
+		if( !( CG_PointContents( topOrigin ) & MASK_WATER ) ) {
+			vec3_t waterHitPoint;
+			if( findWaterHitPointBetweenTwoPoints( topOrigin, fireOrigin, waterHitPoint ) ) {
+				if( waterHitPoint[2] - fireOrigin[2] > 1.0f ) {
+					liquidImpacts->emplace_back( LiquidImpact {
+						.origin   = { waterHitPoint[0], waterHitPoint[1], waterHitPoint[2] },
+						.burstDir = { 0.0f, 0.0f, +1.0f },
+						.contents = contents,
+					});
+
+					const float waterZ = waterHitPoint[2];
+					addUnderwaterSplashImpactsForKnownWaterZ( fireOrigin, radius, percentage, waterZ, rng, contents, liquidImpacts );
+				} else if( radius > 2.0f ) {
+					// Generate impacts from a point above the fire origin but within the fire radius
+					topOrigin[2] -= 2.0f;
+					makeRegularExplosionImpacts( topOrigin, radius, percentage, rng, solidImpacts, liquidImpacts );
+				}
+			} else {
+				const float maxZ = topOrigin[2];
+				addUnderwaterSplashImpactsForUnknownWaterZ( fireOrigin, radius, maxZ, percentage, rng, contents, liquidImpacts );
+			}
+		}
+	} else {
+		makeRegularExplosionImpacts( fireOrigin, radius, percentage, rng, solidImpacts, liquidImpacts );
+	}
+
+	return contents;
+}
 
 static const RgbaLifespan kExplosionSparksColors[1] {
 	{
@@ -285,8 +342,8 @@ void EffectsSystemFacade::spawnExplosionEffect( const float *origin, const float
 	VectorMA( origin, 8.0f, dir, fireOrigin );
 	VectorAdd( origin, dir, almostExactOrigin );
 
-	wsw::StaticVector<SolidImpact, 12> solidImpacts;
-	wsw::StaticVector<LiquidImpact, 12> waterImpacts;
+	SolidImpactsVector solidImpacts;
+	LiquidImpactsVector liquidImpacts;
 
 	trace_t fireOriginTrace;
 	CG_Trace( &fireOriginTrace, origin, vec3_origin, vec3_origin, fireOrigin, 0, MASK_SOLID );
@@ -297,42 +354,11 @@ void EffectsSystemFacade::spawnExplosionEffect( const float *origin, const float
 		}
 	}
 
-	int liquidContentsAtFireOrigin = 0;
+	int contentsAtFireOrigin = 0;
 	if( v_particles.get() ) {
-		if( const int contentsAtFireOrigin = CG_PointContents( fireOrigin ); contentsAtFireOrigin & MASK_WATER ) {
-			liquidContentsAtFireOrigin = contentsAtFireOrigin;
-
-			vec3_t tmpOrigin;
-			VectorCopy( fireOrigin, tmpOrigin );
-			tmpOrigin[2] += radius;
-
-			if( !( CG_PointContents( tmpOrigin ) & MASK_WATER ) ) {
-				vec3_t waterHitPoint;
-				if( findWaterHitPointBetweenTwoPoints( tmpOrigin, fireOrigin, waterHitPoint ) ) {
-					if( waterHitPoint[2] - fireOrigin[2] > 1.0f ) {
-						waterImpacts.emplace_back( LiquidImpact {
-							.origin   = { waterHitPoint[0], waterHitPoint[1], waterHitPoint[2] },
-							.burstDir = { 0.0f, 0.0f, +1.0f },
-							.contents = contentsAtFireOrigin,
-						});
-
-						const float waterZ = waterHitPoint[2];
-						addUnderwaterSplashImpactsForKnownWaterZ( fireOrigin, radius, waterZ, &m_rng,
-																  contentsAtFireOrigin, &waterImpacts );
-					} else if( radius > 2.0f ) {
-						// Generate impacts from a point above the fire origin but within the fire radius
-						const vec3_t shiftedFireOrigin { fireOrigin[0], fireOrigin[1], fireOrigin[2] + 0.75f * radius };
-						makeRegularExplosionImpacts( shiftedFireOrigin, radius, &m_rng, &solidImpacts, &waterImpacts );
-					}
-				} else {
-					const float maxZ = tmpOrigin[2];
-					addUnderwaterSplashImpactsForUnknownWaterZ( fireOrigin, radius, maxZ, &m_rng,
-																contentsAtFireOrigin, &waterImpacts );
-				}
-			}
-		} else {
-			makeRegularExplosionImpacts( fireOrigin, radius, &m_rng, &solidImpacts, &waterImpacts );
-		}
+		contentsAtFireOrigin = prepareExplosionLikeImpacts( fireOrigin, radius, 1.0f, &m_rng, &solidImpacts, &liquidImpacts );
+		spawnMultipleExplosionImpactEffects( solidImpacts, 1.0f );
+		spawnMultipleLiquidImpactEffects( liquidImpacts, 1.0f, { 0.7f, 0.9f }, std::make_pair( 0u, 100u ) );
 	}
 
 	startSound( sound, almostExactOrigin, ATTN_DISTANT );
@@ -341,7 +367,7 @@ void EffectsSystemFacade::spawnExplosionEffect( const float *origin, const float
 		startSound( cgs.media.sndExplosionLfe, almostExactOrigin, ATTN_NORM );
 	}
 
-	if( v_particles.get() && !liquidContentsAtFireOrigin ) {
+	if( v_particles.get() && !( contentsAtFireOrigin & MASK_WATER ) ) {
 		vec3_t particleDir;
 		VectorCopy( dir, particleDir );
 		// If the dir vector is a zero vector (happens at times at direct hits), set the particleDir to an up vector
@@ -432,9 +458,6 @@ void EffectsSystemFacade::spawnExplosionEffect( const float *origin, const float
 	}
 
 	m_transientEffectsSystem.spawnExplosionHulls( fireOrigin );
-
-	spawnMultipleExplosionImpactEffects( solidImpacts );
-	spawnMultipleLiquidImpactEffects( waterImpacts, 1.0f, { 0.7f, 0.9f }, std::make_pair( 0u, 100u ) );
 }
 
 void EffectsSystemFacade::spawnShockwaveExplosionEffect( const float *origin, const float *dir, int mode ) {
@@ -688,76 +711,80 @@ void EffectsSystemFacade::spawnElectroboltHitEffect( const float *origin, const 
 	}
 
 	if( v_particles.get() ) {
+		SolidImpactsVector solidImpacts;
+		LiquidImpactsVector liquidImpacts;
 
-		const RgbaLifespan *singleColorAddress;
-		ParticleColorsForTeamHolder *colorsHolder = &::electroboltParticleColorsHolder;
-		if( useTeamColor ) {
-			singleColorAddress = colorsHolder->getColorsForTeam( team, teamColor );
-		} else {
-			singleColorAddress = &colorsHolder->defaultColors;
+		const int contentsAtFireOrigin = prepareExplosionLikeImpacts( origin, 36.0f, 0.7f, &m_rng,
+																	  &solidImpacts, &liquidImpacts );
+		spawnMultipleExplosionImpactEffects( solidImpacts, 0.7f );
+		spawnMultipleLiquidImpactEffects( liquidImpacts, 0.7f, { 0.7f, 0.9f }, std::make_pair( 0u, 100u ) );
+
+		if( !( contentsAtFireOrigin & MASK_WATER ) ) {
+			const RgbaLifespan *singleColorAddress;
+			ParticleColorsForTeamHolder *colorsHolder = &::electroboltParticleColorsHolder;
+			if( useTeamColor ) {
+				singleColorAddress = colorsHolder->getColorsForTeam( team, teamColor );
+			} else {
+				singleColorAddress = &colorsHolder->defaultColors;
+			}
+
+			constexpr float length = 8.0f, lengthSpread = 3.5f;
+			constexpr float width = 9.0f, widthSpread = 3.5f;
+			constexpr unsigned particleLifetimeMin = 175, particleLifetimeMax = 210;
+
+			Particle::AppearanceRules appearanceRules {
+				.materials     = cgs.media.shaderElectroImpactParticle.getAddressOfHandle(),
+				.colors        = { singleColorAddress, 1 },
+				.geometryRules = Particle::SparkRules {
+					.length = { .mean = length, .spread = lengthSpread },
+					.width  = { .mean = width, .spread = widthSpread },
+					.sizeBehaviour = Particle::Thinning,
+				},
+			};
+
+			EllipsoidalFlockParams flockParams {
+				.origin     = { origin[0], origin[1], origin[2] },
+				.offset     = { impactNormal[0], impactNormal[1], impactNormal[2] },
+				.gravity         = 0.0f,
+				.drag            = 0.03f,
+				.bounceCount     = { .minInclusive = 0, .maxInclusive = 0 },
+				.speed           = { .min = 900.0f, .max = 1000.0f },
+				.angularVelocity = { .min = -5.0f, .max = +5.0f },
+				.percentage      = { .min = 0.65, .max = 0.78 },
+				.timeout         = { .min = 175, .max = 210 },
+			};
+
+			Particle::AppearanceRules trailAppearanceRules {
+				.materials     = cgs.media.shaderElectroImpactParticle.getAddressOfHandle(),
+				.colors        = { singleColorAddress, 1 },
+				.geometryRules = Particle::SparkRules {
+					.length = { .mean = length, .spread = lengthSpread },
+					.width  = { .mean = width, .spread = widthSpread },
+					.sizeBehaviour = Particle::Thinning,
+				},
+			};
+
+			ConicalFlockParams trailFlockParams {
+				.gravity    = 0.0f,
+				.drag       = 0.01f,
+				.angle      = 25.0f,
+				.speed      = { .min = 1.f, .max = 1.5f },
+				.angularVelocity = { .min = -5.0f, .max = +5.0f },
+				.percentage = { .min = 0.5f, .max = 0.8f },
+				.timeout    = { .min = particleLifetimeMin - 50, .max = particleLifetimeMax - 50 },
+			};
+
+			constexpr float dropDistance = ( length - lengthSpread ) * 0.8f;
+
+			ParamsOfParticleTrailOfParticles paramsOfParticleTrails {
+				.appearanceRules = trailAppearanceRules,
+				.flockParamsTemplate = trailFlockParams,
+				.updateParams = { .maxParticlesPerDrop = 1, .dropDistance = dropDistance },
+				.modulateByParentSize = false
+			};
+
+			cg.particleSystem.addMediumParticleFlock( appearanceRules, flockParams, &paramsOfParticleTrails );
 		}
-
-		constexpr float length = 8;
-		constexpr float lengthSpread = 3.5;
-
-		constexpr float width = 9.0f;
-		constexpr float widthSpread = 3.5f;
-
-		constexpr unsigned particleLifetimeMin = 175;
-		constexpr unsigned particleLifetimeMax = 210;
-
-		Particle::AppearanceRules appearanceRules {
-			.materials     = cgs.media.shaderElectroImpactParticle.getAddressOfHandle(),
-			.colors        = { singleColorAddress, 1 },
-			.geometryRules = Particle::SparkRules {
-				.length = { .mean = length, .spread = lengthSpread },
-				.width  = { .mean = width, .spread = widthSpread },
-				.sizeBehaviour = Particle::Thinning,
-			},
-		};
-
-		EllipsoidalFlockParams flockParams {
-			.origin     = { origin[0], origin[1], origin[2] },
-			.offset     = { impactNormal[0], impactNormal[1], impactNormal[2] },
-			.gravity         = 0.0f,
-			.drag            = 0.03f,
-			.bounceCount     = { .minInclusive = 0, .maxInclusive = 0 },
-			.speed           = { .min = 900.0f, .max = 1000.0f },
-			.angularVelocity = { .min = -5.0f, .max = +5.0f },
-			.percentage      = { .min = 0.65, .max = 0.78 },
-			.timeout         = { .min = 175, .max = 210 },
-		};
-
-		Particle::AppearanceRules trailAppearanceRules {
-			.materials     = cgs.media.shaderElectroImpactParticle.getAddressOfHandle(),
-			.colors        = { singleColorAddress, 1 },
-			.geometryRules = Particle::SparkRules {
-				.length = { .mean = length, .spread = lengthSpread },
-				.width  = { .mean = width, .spread = widthSpread },
-				.sizeBehaviour = Particle::Thinning,
-			},
-		};
-
-		ConicalFlockParams trailFlockParams {
-			.gravity    = 0.0f,
-			.drag       = 0.01f,
-			.angle      = 25.0f,
-			.speed      = { .min = 1.f, .max = 1.5f },
-			.angularVelocity = { .min = -5.0f, .max = +5.0f },
-			.percentage = { .min = 0.5f, .max = 0.8f },
-			.timeout    = { .min = particleLifetimeMin - 50, .max = particleLifetimeMax - 50 },
-		};
-
-		constexpr float dropDistance = ( length - lengthSpread ) * 0.8f;
-
-		ParamsOfParticleTrailOfParticles paramsOfParticleTrails {
-			.appearanceRules = trailAppearanceRules,
-			.flockParamsTemplate = trailFlockParams,
-			.updateParams = { .maxParticlesPerDrop = 1, .dropDistance = dropDistance },
-			.modulateByParentSize = false
-		};
-
-		cg.particleSystem.addMediumParticleFlock( appearanceRules, flockParams, &paramsOfParticleTrails );
 	}
 
 	const vec3_t soundOrigin { origin[0] + impactNormal[0], origin[1] + impactNormal[1], origin[2] + impactNormal[2] };
@@ -794,76 +821,79 @@ void EffectsSystemFacade::spawnInstagunHitEffect( const float *origin, const flo
 	}
 
 	if( v_particles.get() ) {
+		SolidImpactsVector solidImpacts;
+		LiquidImpactsVector liquidImpacts;
 
-		const RgbaLifespan *singleColorAddress;
-		ParticleColorsForTeamHolder *colorsHolder = &::instagunParticleColorsHolder;
-		if( useTeamColor ) {
-			singleColorAddress = colorsHolder->getColorsForTeam( team, teamColor );
-		} else {
-			singleColorAddress = &colorsHolder->defaultColors;
+		const int contentsAtFireOrigin = prepareExplosionLikeImpacts( origin, 36.0f, 0.5f, &m_rng, &solidImpacts, &liquidImpacts );
+		spawnMultipleExplosionImpactEffects( solidImpacts, 0.5f );
+		spawnMultipleLiquidImpactEffects( liquidImpacts, 0.5f, { 0.7, 0.9f }, std::make_pair( 0u, 100u ) );
+
+		if( !( contentsAtFireOrigin & MASK_WATER ) ) {
+			const RgbaLifespan *singleColorAddress;
+			ParticleColorsForTeamHolder *colorsHolder = &::instagunParticleColorsHolder;
+			if( useTeamColor ) {
+				singleColorAddress = colorsHolder->getColorsForTeam( team, teamColor );
+			} else {
+				singleColorAddress = &colorsHolder->defaultColors;
+			}
+
+			constexpr float length = 8.0f, lengthSpread = 3.5f;
+			constexpr float width = 9.0f, widthSpread = 3.5f;
+			constexpr unsigned particleLifetimeMin = 175, particleLifetimeMax = 210;
+
+			Particle::AppearanceRules appearanceRules {
+				.materials     = cgs.media.shaderElectroImpactParticle.getAddressOfHandle(),
+				.colors        = { singleColorAddress, 1 },
+				.geometryRules = Particle::SparkRules {
+					.length = { .mean = length, .spread = lengthSpread },
+					.width  = { .mean = width, .spread = widthSpread },
+					.sizeBehaviour = Particle::Thinning,
+				},
+			};
+
+			EllipsoidalFlockParams flockParams {
+				.origin     = { origin[0], origin[1], origin[2] },
+				.offset     = { impactNormal[0], impactNormal[1], impactNormal[2] },
+				.gravity         = 0.0f,
+				.drag            = 0.03f,
+				.bounceCount     = { .minInclusive = 0, .maxInclusive = 0 },
+				.speed           = { .min = 900.0f, .max = 1000.0f },
+				.angularVelocity = { .min = -5.0f, .max = +5.0f },
+				.percentage      = { .min = 0.65, .max = 0.78 },
+				.timeout         = { .min = 175, .max = 210 },
+			};
+
+			Particle::AppearanceRules trailAppearanceRules {
+				.materials     = cgs.media.shaderElectroImpactParticle.getAddressOfHandle(),
+				.colors        = { singleColorAddress, 1 },
+				.geometryRules = Particle::SparkRules {
+					.length = { .mean = length, .spread = lengthSpread },
+					.width  = { .mean = width, .spread = widthSpread },
+					.sizeBehaviour = Particle::Thinning,
+				},
+			};
+
+			ConicalFlockParams trailFlockParams {
+				.gravity    = 0.0f,
+				.drag       = 0.01f,
+				.angle      = 25.0f,
+				.speed      = { .min = 1.f, .max = 1.5f },
+				.angularVelocity = { .min = -5.0f, .max = +5.0f },
+				.percentage = { .min = 0.5f, .max = 0.8f },
+				.timeout    = { .min = particleLifetimeMin - 50, .max = particleLifetimeMax - 50 },
+			};
+
+			constexpr float dropDistance = ( length - lengthSpread ) * 0.8f;
+
+			ParamsOfParticleTrailOfParticles paramsOfParticleTrails {
+				.appearanceRules = trailAppearanceRules,
+				.flockParamsTemplate = trailFlockParams,
+				.updateParams = { .maxParticlesPerDrop = 1, .dropDistance = dropDistance },
+				.modulateByParentSize = false
+			};
+
+			cg.particleSystem.addMediumParticleFlock( appearanceRules, flockParams, &paramsOfParticleTrails );
 		}
-
-		constexpr float length = 8;
-		constexpr float lengthSpread = 3.5;
-
-		constexpr float width = 9.0f;
-		constexpr float widthSpread = 3.5f;
-
-		constexpr unsigned particleLifetimeMin = 175;
-		constexpr unsigned particleLifetimeMax = 210;
-
-		Particle::AppearanceRules appearanceRules {
-			.materials     = cgs.media.shaderElectroImpactParticle.getAddressOfHandle(),
-			.colors        = { singleColorAddress, 1 },
-			.geometryRules = Particle::SparkRules {
-				.length = { .mean = length, .spread = lengthSpread },
-				.width  = { .mean = width, .spread = widthSpread },
-				.sizeBehaviour = Particle::Thinning,
-			},
-		};
-
-		EllipsoidalFlockParams flockParams {
-			.origin     = { origin[0], origin[1], origin[2] },
-			.offset     = { impactNormal[0], impactNormal[1], impactNormal[2] },
-			.gravity         = 0.0f,
-			.drag            = 0.03f,
-			.bounceCount     = { .minInclusive = 0, .maxInclusive = 0 },
-			.speed           = { .min = 900.0f, .max = 1000.0f },
-			.angularVelocity = { .min = -5.0f, .max = +5.0f },
-			.percentage      = { .min = 0.65, .max = 0.78 },
-			.timeout         = { .min = 175, .max = 210 },
-		};
-
-		Particle::AppearanceRules trailAppearanceRules {
-			.materials     = cgs.media.shaderElectroImpactParticle.getAddressOfHandle(),
-			.colors        = { singleColorAddress, 1 },
-			.geometryRules = Particle::SparkRules {
-				.length = { .mean = length, .spread = lengthSpread },
-				.width  = { .mean = width, .spread = widthSpread },
-				.sizeBehaviour = Particle::Thinning,
-			},
-		};
-
-		ConicalFlockParams trailFlockParams {
-			.gravity    = 0.0f,
-			.drag       = 0.01f,
-			.angle      = 25.0f,
-			.speed      = { .min = 1.f, .max = 1.5f },
-			.angularVelocity = { .min = -5.0f, .max = +5.0f },
-			.percentage = { .min = 0.5f, .max = 0.8f },
-			.timeout    = { .min = particleLifetimeMin - 50, .max = particleLifetimeMax - 50 },
-		};
-
-		constexpr float dropDistance = ( length - lengthSpread ) * 0.8f;
-
-		ParamsOfParticleTrailOfParticles paramsOfParticleTrails {
-			.appearanceRules = trailAppearanceRules,
-			.flockParamsTemplate = trailFlockParams,
-			.updateParams = { .maxParticlesPerDrop = 1, .dropDistance = dropDistance },
-			.modulateByParentSize = false
-		};
-
-		cg.particleSystem.addMediumParticleFlock( appearanceRules, flockParams, &paramsOfParticleTrails );
 	}
 
 	// TODO: Don't we need an IG-specific sound
@@ -978,57 +1008,65 @@ void EffectsSystemFacade::spawnGunbladeBlastHitEffect( const float *origin, cons
 	startSound( cgs.media.sndGunbladeStrongHit, origin, ATTN_IDLE );
 
 	if( v_particles.get() ) {
-		EllipsoidalFlockParams flockParams {
-			.origin          = { origin[0], origin[1], origin[2] },
-			.offset          = { dir[0], dir[1], dir[2] },
-			.gravity         = -0.3f * GRAVITY,
-			.drag            = 0.01f,
-			.turbulenceSpeed = 85.0f,
-			.turbulenceScale = 155.0f,
-			.bounceCount     = { .minInclusive = 1, .maxInclusive = 2 },
-			.speed           = { .min = 100.0f, .max = 350.0f },
-			.percentage      = { .min = 0.5f, .max = 0.6f },
-			.timeout         = { .min = 450, .max = 800 },
-			.activationDelay = { .min = 50, .max = 225 }
-		};
-		Particle::AppearanceRules appearanceRules {
-			.materials     = cgs.media.shaderBlastImpactParticle.getAddressOfHandle(),
-			.colors        = kGunbladeBlastColors,
-			.flareProps    = Particle::FlareProps {
-				.lightProps                  = kGunbladeBlastFlareProps,
-				.alphaScale                  = 0.09f,
-				.particleFrameAffinityModulo = 4,
-			},
-			.geometryRules = Particle::SparkRules {
-				.length = { .mean = 7.0f, .spread = 3.2f },
-				.width  = { .mean = 9.0f, .spread = 3.5f },
-				.sizeBehaviour = Particle::Thinning
-			},
-		};
-		cg.particleSystem.addMediumParticleFlock( appearanceRules, flockParams );
+		SolidImpactsVector solidImpacts;
+		LiquidImpactsVector liquidImpacts;
 
-		// GB spike effect
+		const int contentsAtFireOrigin = prepareExplosionLikeImpacts( origin, 48.0f, 0.5f, &m_rng, &solidImpacts, &liquidImpacts );
+		spawnMultipleExplosionImpactEffects( solidImpacts, 0.7f );
+		spawnMultipleLiquidImpactEffects( liquidImpacts, 1.0f, { 0.5f, 0.7f }, std::make_pair( 0u, 100u ) );
 
-		appearanceRules.materials = cgs.media.shaderExplosionSpikeParticle.getAddressOfHandle();
+		if( !( contentsAtFireOrigin & MASK_WATER ) ) {
+			EllipsoidalFlockParams flockParams {
+				.origin          = { origin[0], origin[1], origin[2] },
+				.offset          = { dir[0], dir[1], dir[2] },
+				.gravity         = -0.3f * GRAVITY,
+				.drag            = 0.01f,
+				.turbulenceSpeed = 85.0f,
+				.turbulenceScale = 155.0f,
+				.bounceCount     = { .minInclusive = 1, .maxInclusive = 2 },
+				.speed           = { .min = 100.0f, .max = 350.0f },
+				.percentage      = { .min = 0.5f, .max = 0.6f },
+				.timeout         = { .min = 450, .max = 800 },
+				.activationDelay = { .min = 50, .max = 225 }
+			};
+			Particle::AppearanceRules appearanceRules {
+				.materials     = cgs.media.shaderBlastImpactParticle.getAddressOfHandle(),
+				.colors        = kGunbladeBlastColors,
+				.flareProps    = Particle::FlareProps {
+					.lightProps                  = kGunbladeBlastFlareProps,
+					.alphaScale                  = 0.09f,
+					.particleFrameAffinityModulo = 4,
+				},
+				.geometryRules = Particle::SparkRules {
+					.length = { .mean = 7.0f, .spread = 3.2f },
+					.width  = { .mean = 9.0f, .spread = 3.5f },
+					.sizeBehaviour = Particle::Thinning
+				},
+			};
+			cg.particleSystem.addMediumParticleFlock( appearanceRules, flockParams );
 
-		appearanceRules.geometryRules = Particle::SparkRules {
-			.length = { .mean = 12.0f, .spread = 5.0f },
-			.width  = { .mean = 4.0f, .spread = 1.0f },
-			.sizeBehaviour = Particle::SizeNotChanging,
-		};
+			// GB spike effect
 
-		flockParams.speed           = { .min = 100.0f, .max = 600.0f };
-		flockParams.turbulenceSpeed = 0.0f;
-		flockParams.gravity         = 0.0f;
-		flockParams.drag            = 0.02f;
-		flockParams.bounceCount     = { .minInclusive = 0, .maxInclusive = 0 };
-		flockParams.timeout         = { .min = 85, .max = 125 };
-		flockParams.percentage      = { .min = 0.55f, .max = 0.8f };
-		flockParams.activationDelay = { .min = 0, .max = 0 };
+			appearanceRules.materials = cgs.media.shaderExplosionSpikeParticle.getAddressOfHandle();
 
-		cg.particleSystem.addMediumParticleFlock( appearanceRules, flockParams );
+			appearanceRules.geometryRules = Particle::SparkRules {
+				.length = { .mean = 12.0f, .spread = 5.0f },
+				.width  = { .mean = 4.0f, .spread = 1.0f },
+				.sizeBehaviour = Particle::SizeNotChanging,
+			};
+
+			flockParams.speed           = { .min = 100.0f, .max = 600.0f };
+			flockParams.turbulenceSpeed = 0.0f;
+			flockParams.gravity         = 0.0f;
+			flockParams.drag            = 0.02f;
+			flockParams.bounceCount     = { .minInclusive = 0, .maxInclusive = 0 };
+			flockParams.timeout         = { .min = 85, .max = 125 };
+			flockParams.percentage      = { .min = 0.55f, .max = 0.8f };
+			flockParams.activationDelay = { .min = 0, .max = 0 };
+
+			cg.particleSystem.addMediumParticleFlock( appearanceRules, flockParams );
+		}
 	}
-
 
 	m_transientEffectsSystem.spawnGunbladeBlastImpactEffect( origin, dir );
 }
@@ -1384,7 +1422,7 @@ static const RgbaLifespan kStoneSmokeColors[1] {
 };
 
 void EffectsSystemFacade::spawnStoneSmokeParticles( unsigned delay, const FlockOrientation &orientation,
-													float upShiftScale, unsigned materialParam ) {
+													float upShiftScale, unsigned materialParam, float percentageScale ) {
 	constexpr float radius       = 25.0f;
 	constexpr float radiusSpread = 5.0f;
 
@@ -1404,7 +1442,7 @@ void EffectsSystemFacade::spawnStoneSmokeParticles( unsigned delay, const FlockO
 		.restitution     = 0.8f,
 		.angle           = 90.0f,
 		.speed           = { .min = 800.0f, .max = 990.0f },
-		.percentage      = { .min = 0.15f, .max = 0.2f },
+		.percentage      = { .min = 0.15f * percentageScale, .max = 0.2f * percentageScale },
 		.timeout         = { .min = 400, .max = 500 },
 	};
 
@@ -1453,7 +1491,7 @@ static const RgbaLifespan kStoneDustColors[1] {
 
 void EffectsSystemFacade::spawnStoneDustParticles( unsigned delay, const FlockOrientation &orientation,
 												   float upShiftScale, unsigned materialParam,
-												   float dustPercentageScale ) {
+												   float percentageScale ) {
 
 	const Particle::AppearanceRules appearanceRules {
 		.materials           = cgs.media.shaderStoneDustSoft.getAddressOfHandle(),
@@ -1471,7 +1509,7 @@ void EffectsSystemFacade::spawnStoneDustParticles( unsigned delay, const FlockOr
 		.restitution = 1.0f,
 		.angle       = 30.0f,
 		.speed       = { .min = 100.0f, .max = 250.0f },
-		.percentage  = { .min = 0.8f * dustPercentageScale, .max = 1.0f * dustPercentageScale },
+		.percentage  = { .min = 0.8f * percentageScale, .max = 1.0f * percentageScale },
 		.timeout     = { .min = 700, .max = 900 },
 	};
 
@@ -1490,7 +1528,7 @@ static const RgbaLifespan kStuccoSmokeColors[1] {
 };
 
 void EffectsSystemFacade::spawnStuccoSmokeParticles( unsigned delay, const FlockOrientation &orientation,
-													 float upShiftScale, unsigned materialParam ) {
+													 float upShiftScale, unsigned materialParam, float percentageScale ) {
 	const Particle::AppearanceRules appearanceRules {
 		.materials           = cgs.media.shaderStoneDustSoft.getAddressOfHandle(),
 		.colors              = kStuccoSmokeColors,
@@ -1507,7 +1545,7 @@ void EffectsSystemFacade::spawnStuccoSmokeParticles( unsigned delay, const Flock
 		.restitution = 1.0f,
 		.angle       = 30.0f,
 		.speed       = { .min = 100.0f, .max = 250.0f },
-		.percentage  = { .min = 0.2f, .max = 0.5f },
+		.percentage  = { .min = 0.2f * percentageScale, .max = 0.5f * percentageScale },
 		.timeout     = { .min = 500, .max = 1000 },
 	};
 
@@ -1527,7 +1565,7 @@ static const RgbaLifespan kStuccoDustColors[1] {
 
 void EffectsSystemFacade::spawnStuccoDustParticles( unsigned delay, const FlockOrientation &orientation,
 													float upShiftScale, unsigned materialParam,
-													float dustPercentageScale ) {
+													float percentageScale ) {
 
 	const Particle::AppearanceRules appearanceRules {
 		.materials = cgs.media.shaderStoneDustSoft.getAddressOfHandle(),
@@ -1545,7 +1583,7 @@ void EffectsSystemFacade::spawnStuccoDustParticles( unsigned delay, const FlockO
 		.restitution     = 1.0f,
 		.angle           = 30.0f,
 		.speed           = { .min = 50.0f, .max = 150.0f },
-		.percentage      = { .min = 0.7f * dustPercentageScale, .max = 1.0f * dustPercentageScale },
+		.percentage      = { .min = 0.7f * percentageScale, .max = 1.0f * percentageScale },
 		.timeout         = { .min = 1000, .max = 1750 },
 	};
 
@@ -1574,7 +1612,7 @@ static const RgbaLifespan kWoodDustColors[1] {
 
 void EffectsSystemFacade::spawnWoodBulletImpactParticles( unsigned delay, const FlockOrientation &orientation,
 														  float upShiftScale, unsigned materialParam,
-														  float debrisPercentageScale ) {
+														  float percentageScale ) {
 	const Particle::AppearanceRules burstAppearanceRules {
 		.materials     = cgs.media.shaderWoodBurstParticle.getAddressOfHandle(),
 		.colors        = kWoodImpactColors,
@@ -1588,7 +1626,7 @@ void EffectsSystemFacade::spawnWoodBulletImpactParticles( unsigned delay, const 
 	ConicalFlockParams burstFlockParams {
 		.angle      = 24,
 		.speed      = { .min = 700, .max = 900 },
-		.percentage = { .min = 0.3f, .max = 0.6f },
+		.percentage = { .min = 0.3f * percentageScale, .max = 0.6f * percentageScale },
 		.timeout    = { .min = 75, .max = 150 },
 	};
 
@@ -1605,7 +1643,7 @@ void EffectsSystemFacade::spawnWoodBulletImpactParticles( unsigned delay, const 
 		.gravity    = 25.0f,
 		.angle      = 24.0f,
 		.speed      = { .min = 75.0f, .max = 175.0f },
-		.percentage = { .min = 1.0f, .max = 1.0f },
+		.percentage = { .min = 1.0f * percentageScale, .max = 1.0f * percentageScale },
 		.timeout    = { .min = 300, .max = 500 },
 	};
 
@@ -1626,7 +1664,7 @@ void EffectsSystemFacade::spawnWoodBulletImpactParticles( unsigned delay, const 
 		.bounceCount     = { .minInclusive = 2, .maxInclusive = 3 },
 		.speed           = { .min = 400.0f, .max = 700.0f },
 		.angularVelocity = { .min = -9.0f * 360.0f, .max = 9.0f * 360.0f },
-		.percentage      = { .min = 0.2f * debrisPercentageScale, .max = 0.5f * debrisPercentageScale },
+		.percentage      = { .min = 0.2f * percentageScale, .max = 0.5f * percentageScale },
 		.timeout         = { .min = 150, .max = 500 },
 	};
 
@@ -1662,12 +1700,11 @@ static const RgbaLifespan kDirtDustColors[1] {
 static shader_s *g_dirtCloudMaterials[2];
 
 void EffectsSystemFacade::spawnDirtImpactParticles( unsigned delay, const FlockOrientation &orientation,
-													float upShiftScale, unsigned materialParam,
-													float percentageScale, float dustSpeedScale ) {
+													float upShiftScale, unsigned materialParam, float percentageScale ) {
 	ConicalFlockParams burstStripesFlockParams {
 		.gravity    = GRAVITY,
 		.angle      = 12,
-		.speed      = { .min = 500, .max = 700 },
+		.speed      = { .min = 200, .max = 400 },
 		.percentage = { .min = 0.5f * percentageScale, .max = 1.0f * percentageScale },
 		.timeout    = { .min = 100, .max = 200 },
 	};
@@ -1686,7 +1723,7 @@ void EffectsSystemFacade::spawnDirtImpactParticles( unsigned delay, const FlockO
 		.gravity    = GRAVITY,
 		.drag       = 0.01f,
 		.angle      = 12,
-		.speed      = { .min = 500, .max = 700 },
+		.speed      = { .min = 300, .max = 500 },
 		.percentage = { .min = 0.5f * percentageScale, .max = 1.0f * percentageScale },
 		.timeout    = { .min = 350, .max = 1000 }
 	};
@@ -1745,13 +1782,12 @@ static const RgbaLifespan kSandDustColors[1] {
 };
 
 void EffectsSystemFacade::spawnSandImpactParticles( unsigned delay, const FlockOrientation &orientation,
-													float upShiftScale, unsigned materialParam,
-													float percentageScale, float dustSpeedScale ) {
+													float upShiftScale, unsigned materialParam, float percentageScale ) {
 	// Don't let the percentage affect burst
 	ConicalFlockParams burstFlockParams {
 		.gravity    = GRAVITY,
 		.angle      = 12,
-		.speed      = { .min = 550, .max = 700 },
+		.speed      = { .min = 300, .max = 400 },
 		.percentage = { .min = 0.7f, .max = 1.0f },
 		.timeout    = { .min = 300, .max = 400 },
 	};
@@ -1770,15 +1806,12 @@ void EffectsSystemFacade::spawnSandImpactParticles( unsigned delay, const FlockO
 	// Never delay burst
 	cg.particleSystem.addSmallParticleFlock( burstParticlesAppearanceRules, burstFlockParams );
 
-	assert( dustSpeedScale >= 1.0f );
-	const float timeoutScale = 0.5f * ( 1.0f + Q_Rcp( dustSpeedScale ) );
-
 	EllipsoidalFlockParams dustFlockParams {
-		.stretchScale = 0.33f * Q_Rcp( dustSpeedScale ),
+		.stretchScale = 0.33f,
 		.gravity      = 100.0f,
-		.speed        = { .min = 50 * dustSpeedScale, .max = 100 * dustSpeedScale },
+		.speed        = { .min = 50.0f, .max = 100.0f },
 		.percentage   = { .min = 0.7f * percentageScale, .max = 1.0f * percentageScale },
-		.timeout      = { .min = (unsigned)( 500 * timeoutScale ), .max = (unsigned)( 750 * timeoutScale ) },
+		.timeout      = { .min = 500, .max = 750 },
 	};
 
 	Particle::AppearanceRules dustAppearanceRules {
@@ -1799,8 +1832,8 @@ void EffectsSystemFacade::spawnSandImpactParticles( unsigned delay, const FlockO
 		.radius = { .mean = 7.5f, .spread = 2.5f }, .sizeBehaviour = Particle::Expanding,
 	};
 
-	dustFlockParams.speed           = { .min = 30 * dustSpeedScale, .max = 50 * dustSpeedScale };
-	dustFlockParams.timeout         = { .min = (unsigned)( 200 * timeoutScale ), .max = (unsigned)( 450 * timeoutScale ) };
+	dustFlockParams.speed           = { .min = 30.0f, .max = 50.0f };
+	dustFlockParams.timeout         = { .min = 200u, .max = 450 };
 	dustFlockParams.angularVelocity = { .min = -180.0f, .max = +180.0f };
 	//assignUpShiftAndModifyBaseSpeed( &dustFlockParams, upShiftScale, 50.0f, 75.0f );
 	spawnOrPostponeImpactParticleEffect( delay, dustFlockParams, dustAppearanceRules );
@@ -2068,6 +2101,7 @@ void EffectsSystemFacade::spawnPelletImpactParticleEffectForMaterial( unsigned d
 }
 
 void EffectsSystemFacade::spawnExplosionImpactParticleEffectForMaterial( const FlockOrientation &flockOrientation,
+																		 float percentageScale,
 																		 SurfImpactMaterial impactMaterial,
 																		 unsigned materialParam,
 																		 unsigned lightFrameAffinityIndex,
@@ -2076,42 +2110,52 @@ void EffectsSystemFacade::spawnExplosionImpactParticleEffectForMaterial( const F
 	[[maybe_unused]] const float upShiftScale = Q_Sqrt( wsw::max( 0.0f, flockOrientation.dir[2] ) );
 	[[maybe_unused]] unsigned delay = 0;
 
+	const auto scaleDelay = [&]( unsigned d ) -> unsigned { return (unsigned)Q_Sqrt( percentageScale * (float)d ); };
+
 	switch( impactMaterial ) {
 		case SurfImpactMaterial::Unknown:
 			break;
 		case SurfImpactMaterial::Stone:
-			delay = 100 + m_rng.nextBoundedFast( 100 );
-			spawnStoneSmokeParticles( delay, flockOrientation, upShiftScale, materialParam );
+			if( m_rng.tryWithChance( 0.33f ) ) {
+				delay = scaleDelay( 100 + m_rng.nextBoundedFast( 100 ) );
+				spawnStoneSmokeParticles( delay, flockOrientation, upShiftScale, materialParam, 0.8f * percentageScale );
+				spawnStoneDustParticles( delay, flockOrientation, upShiftScale, materialParam, 0.8f * percentageScale );
+			}
 			break;
 		case SurfImpactMaterial::Stucco:
-			delay = 100 + m_rng.nextBoundedFast( 100 );
-			spawnStuccoSmokeParticles( delay, flockOrientation, upShiftScale, materialParam );
+			if( m_rng.tryWithChance( 0.33f ) ) {
+				delay = scaleDelay( 100 + m_rng.nextBoundedFast( 100 ) );
+				spawnStuccoSmokeParticles( delay, flockOrientation, upShiftScale, materialParam, 0.7f * percentageScale );
+				spawnStuccoDustParticles( delay, flockOrientation, upShiftScale, materialParam, 0.7f * percentageScale );
+			}
 			break;
 		case SurfImpactMaterial::Wood:
-			delay = 50 + m_rng.nextBoundedFast( 150 );
-			spawnWoodBulletImpactParticles( delay, flockOrientation, upShiftScale, materialParam );
+			delay = scaleDelay( 50 + m_rng.nextBoundedFast( 150 ) );
+			spawnWoodBulletImpactParticles( delay, flockOrientation, upShiftScale, materialParam, 0.7f * percentageScale );
 			break;
 		case SurfImpactMaterial::Dirt:
-			delay = m_rng.nextBoundedFast( 300 );
-			spawnDirtImpactParticles( delay, flockOrientation, upShiftScale, materialParam, 0.67f, 2.0f );
+			delay = scaleDelay( m_rng.nextBoundedFast( 300 ) );
+			spawnDirtImpactParticles( delay, flockOrientation, upShiftScale, materialParam, 0.7f * percentageScale );
 			break;
 		case SurfImpactMaterial::Sand:
-			delay = 100 + m_rng.nextBoundedFast( 300 );
-			spawnSandImpactParticles( delay, flockOrientation, upShiftScale, materialParam, 0.67f, 2.0f );
+			delay = scaleDelay( 100 + m_rng.nextBoundedFast( 300 ) );
+			spawnSandImpactParticles( delay, flockOrientation, upShiftScale, materialParam, 0.7f * percentageScale );
 			break;
 		case SurfImpactMaterial::Metal:
-			delay = m_rng.nextBoundedFast( 100 );
-			if( m_rng.next() % 2 ) {
-				spawnBulletMetalRicochetParticles( delay, flockOrientation, upShiftScale, materialParam, 0.7f, 1.0f,
+			delay = scaleDelay( m_rng.nextBoundedFast( 100 ) );
+			if( m_rng.tryWithChance( 0.5f ) ) {
+				spawnBulletMetalRicochetParticles( delay, flockOrientation, upShiftScale, materialParam,
+												   percentageScale * 0.7f, percentageScale * 1.0f,
 												   lightFrameAffinityIndex, lightFrameAffinityModulo );
 			} else {
-				spawnBulletMetalDebrisParticles( delay, flockOrientation, upShiftScale, materialParam, 0.3f, 0.9f,
+				spawnBulletMetalDebrisParticles( delay, flockOrientation, upShiftScale, materialParam,
+												 percentageScale * 0.3f, percentageScale * 0.9f,
 												 lightFrameAffinityIndex, lightFrameAffinityModulo );
 			}
 			break;
 		case SurfImpactMaterial::Glass:
-			delay = m_rng.nextBoundedFast( 100 );
-			spawnGlassImpactParticles( delay, flockOrientation, upShiftScale, materialParam, 0.25f );
+			delay = scaleDelay( m_rng.nextBoundedFast( 100 ) );
+			spawnGlassImpactParticles( delay, flockOrientation, upShiftScale, materialParam, percentageScale );
 			break;
 	}
 }
@@ -2435,7 +2479,7 @@ void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const Soli
 	}
 }
 
-void EffectsSystemFacade::spawnMultipleExplosionImpactEffects( std::span<const SolidImpact> impacts ) {
+void EffectsSystemFacade::spawnMultipleExplosionImpactEffects( std::span<const SolidImpact> impacts, float percentageScale ) {
 	unsigned totalNumRosetteImpacts = 0;
 	for( const SolidImpact &impact: impacts ) {
 		// Only metal surfaces produce impact rosettes in case of explosions
@@ -2448,7 +2492,7 @@ void EffectsSystemFacade::spawnMultipleExplosionImpactEffects( std::span<const S
 		const SurfImpactMaterial material  = decodeSurfImpactMaterial( impact.surfFlags );
 		const FlockOrientation orientation = makeRicochetFlockOrientation( impact, &m_rng );
 		const unsigned materialParam       = decodeSurfImpactMaterialParam( impact.surfFlags );
-		spawnExplosionImpactParticleEffectForMaterial( orientation, material, materialParam,
+		spawnExplosionImpactParticleEffectForMaterial( orientation, percentageScale, material, materialParam,
 													   numRosetteImpactsSoFar, totalNumRosetteImpacts );
 		if( material == SurfImpactMaterial::Metal ) {
 			numRosetteImpactsSoFar++;
@@ -2471,38 +2515,40 @@ void EffectsSystemFacade::spawnMultipleLiquidImpactEffects( std::span<const Liqu
 															std::variant<std::span<const unsigned>,
 															std::pair<unsigned, unsigned>> delaysOrDelayRange ) {
 	assert( impacts.size() < 64 );
-	wsw::StaticVector<unsigned, 64> tmpDelays;
-	std::span<const unsigned> chosenDelays;
+	wsw::StaticVector<unsigned, 64> scaledDelays;
+
+	const auto scaleDelay = [&]( unsigned d ) -> unsigned { return (unsigned)( percentageScale * (float)d ); };
 
 	if( const auto *delayRange = std::get_if<std::pair<unsigned, unsigned>>( &delaysOrDelayRange ) ) {
 		assert( delayRange->first <= delayRange->second );
 		if( delayRange->second > 0 && delayRange->first != delayRange->second ) {
 			for( const LiquidImpact &impact: impacts ) {
-				const unsigned delay = delayRange->first + m_rng.nextBoundedFast( delayRange->second - delayRange->first );
+				const unsigned delay = scaleDelay( delayRange->first + m_rng.nextBoundedFast( delayRange->second - delayRange->first ) );
 				spawnLiquidImpactParticleEffect( delay, impact, percentageScale, randomRotationAngleCosineRange );
-				tmpDelays.push_back( delay );
+				scaledDelays.push_back( delay );
 			}
 		} else {
+			const unsigned delay = scaleDelay( delayRange->first );
 			for( const LiquidImpact &impact: impacts ) {
-				spawnLiquidImpactParticleEffect( delayRange->first, impact, percentageScale, randomRotationAngleCosineRange );
-				tmpDelays.push_back( delayRange->first );
+				spawnLiquidImpactParticleEffect( delay, impact, percentageScale, randomRotationAngleCosineRange );
+				scaledDelays.push_back( delay );
 			}
 		}
-		chosenDelays = std::span<const unsigned> { tmpDelays.data(), tmpDelays.size() };
 	} else if( const auto *individualDelays = std::get_if<std::span<const unsigned>>( &delaysOrDelayRange ) ) {
 		assert( individualDelays->size() == impacts.size() );
 		for( size_t i = 0; i < impacts.size(); ++i ) {
-			spawnLiquidImpactParticleEffect( ( *individualDelays )[i], impacts[i], percentageScale, randomRotationAngleCosineRange );
+			const unsigned delay = scaleDelay( ( *individualDelays )[i] );
+			spawnLiquidImpactParticleEffect( delay, impacts[i], percentageScale, randomRotationAngleCosineRange );
+			scaledDelays.push_back( delay );
 		}
-		chosenDelays = *individualDelays;
 	} else [[unlikely]] {
 		wsw::failWithRuntimeError( "Unreachable" );
 	}
 
 	// It's better to keep loops split for a better instruction cache utilization
-	assert( chosenDelays.size() == impacts.size() );
+	assert( scaledDelays.size() == impacts.size() );
 	for( size_t i = 0; i < impacts.size(); ++i ) {
-		spawnWaterImpactRing( chosenDelays[i], impacts[i].origin );
+		spawnWaterImpactRing( scaledDelays[i], impacts[i].origin );
 	}
 
 	// TODO: Add delays to sounds?

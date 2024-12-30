@@ -207,28 +207,26 @@ private:
 										  unsigned lightFrameAffinityIndex = 0, unsigned lightFrameAffinityModulo = 0 );
 
 	void spawnStoneDustParticles( unsigned delay, const FlockOrientation &orientation, float upShiftScale,
-								  unsigned materialParam, float dustPercentageScale = 1.0f );
+								  unsigned materialParam, float percentageScale = 1.0f );
 
 	void spawnStoneSmokeParticles( unsigned delay, const FlockOrientation &orientation, float upShiftScale,
-								   unsigned materialParam );
+								   unsigned materialParam, float percentageScale = 1.0f );
 
 	void spawnStuccoDustParticles( unsigned delay, const FlockOrientation &orientation,
-								   float upShiftScale, unsigned materialParam, float dustPercentageScale = 1.0f );
+								   float upShiftScale, unsigned materialParam, float percentageScale = 1.0f );
 
 	void spawnStuccoSmokeParticles( unsigned delay, const FlockOrientation &orientation, float upShiftScale,
-									unsigned materialParam );
+									unsigned materialParam, float percentageScale = 1.0f );
 
 	void spawnWoodBulletImpactParticles( unsigned delay, const FlockOrientation &orientation,
 										 float upShiftScale, unsigned materialParam,
-										 float debrisPercentageScale = 1.0f );
+										 float percentageScale = 1.0f );
 
 	void spawnDirtImpactParticles( unsigned delay, const FlockOrientation &orientation,
-								   float upShiftScale, unsigned materialParam,
-								   float percentageScale = 1.0f, float dustSpeedScale = 1.0f );
+								   float upShiftScale, unsigned materialParam, float percentageScale = 1.0f );
 
 	void spawnSandImpactParticles( unsigned delay, const FlockOrientation &orientation,
-								   float upShiftScale, unsigned materialParam,
-								   float percentageScale = 1.0f, float dustSpeedScale = 1.0f );
+								   float upShiftScale, unsigned materialParam, float percentageScale = 1.0f );
 
 	void spawnGlassImpactParticles( unsigned delay, const FlockOrientation &orientation,
 									float upShiftScale, unsigned materialParam, float percentageScale );
@@ -251,7 +249,7 @@ private:
 
 	void spawnOrPostponeImpactRosetteEffect( unsigned delay, PolyEffectsSystem::ImpactRosetteParams &&params );
 
-	void spawnExplosionImpactParticleEffectForMaterial( const FlockOrientation &flockOrientation,
+	void spawnExplosionImpactParticleEffectForMaterial( const FlockOrientation &flockOrientation, float percentageScale,
 														SurfImpactMaterial impactMaterial, unsigned materialParam,
 														unsigned lightFrameAffinityIndex, unsigned lightFrameAffinityModulo );
 
@@ -261,7 +259,7 @@ private:
 	[[nodiscard]]
 	auto getSfxForImpactGroup( unsigned group ) -> const SoundSet *;
 
-	void spawnMultipleExplosionImpactEffects( std::span<const SolidImpact> impacts );
+	void spawnMultipleExplosionImpactEffects( std::span<const SolidImpact> impacts, float percentageScale );
 
 	struct EventRateLimiterParams {
 		float dropChanceAtZeroDistance { 1.0f };
