@@ -49,7 +49,7 @@ public:
 	void enterScope( ProfilerScope *scope, const wsw::HashedStringView &name );
 	void leaveScope( ProfilerScope *scope, const wsw::HashedStringView &name );
 
-	void resetFrameStats();
+	void dumpFrameStats( ProfilerResultSink *dataSink );
 
 	struct DescendantEntry {
 		uint64_t enterTimestamp { 0 };
@@ -75,7 +75,7 @@ public:
 	std::unordered_map<wsw::HashedStringView, DescendantEntry> m_statsOfDescendantScopes;
 };
 
-void ProfilerThreadInstance::resetFrameStats() {
+void ProfilerThreadInstance::dumpFrameStats( ProfilerResultSink *dataSink ) {
 	if( m_discoverRootScopes ) {
 		assert( m_globalScopeDepth == 0 );
 		comNotice() << "Discovered profiling root scopes:";
@@ -162,10 +162,33 @@ void ProfilingSystem::detachFromThisThread( FrameGroup group ) {
 	}
 }
 
-void ProfilingSystem::beginFrame( FrameGroup group, const FrameArgs &frameArgs ) {
+void ProfilingSystem::beginFrame( FrameGroup group, ProfilerArgsSupplier *argsSupplier ) {
+	// TODO: Use scope-guards
+	argsSupplier->beginSupplyingArgs();
+	try {
+		doBeginFrame( group, argsSupplier->getArgs( group ) );
+	} catch( ... ) {
+		argsSupplier->endSupplyingArgs();
+		throw;
+	}
+	argsSupplier->endSupplyingArgs();
+}
+
+void ProfilingSystem::endFrame( FrameGroup group, ProfilerResultSink *resultSink ) {
+	resultSink->beginAcceptingResults( group );
+	try {
+		doEndFrame( group, resultSink );
+	} catch( ... ) {
+		resultSink->endAcceptingResults( group );
+		throw;
+	}
+	resultSink->endAcceptingResults( group );
+}
+
+void ProfilingSystem::doBeginFrame( FrameGroup group, const ProfilerArgs &args ) {
 	assert( group == 0 || group == 1 );
 	s_isProfilingEnabled[group] = false;
-	if( const auto *targetName = std::get_if<wsw::StringView>( &frameArgs ) ) {
+	if( const auto *targetName = std::get_if<wsw::StringView>( &args.args ) ) {
 		if( !targetName->empty() ) {
 			[[maybe_unused]] volatile wsw::ScopedLock<wsw::Mutex> lock( &g_mutex );
 			for( ProfilerThreadInstance *instance = s_instances[group]; instance; instance = instance->next ) {
@@ -173,7 +196,7 @@ void ProfilingSystem::beginFrame( FrameGroup group, const FrameArgs &frameArgs )
 			}
 			s_isProfilingEnabled[group] = true;
 		}
-	} else if( std::holds_alternative<DiscoverRootScopes>( frameArgs ) ) {
+	} else if( std::holds_alternative<ProfilerArgs::DiscoverRootScopes>( args.args ) ) {
 		[[maybe_unused]] volatile wsw::ScopedLock<wsw::Mutex> lock( &g_mutex );
 		for( ProfilerThreadInstance *instance = s_instances[group]; instance; instance = instance->next ) {
 			instance->m_discoverRootScopes = true;
@@ -182,11 +205,11 @@ void ProfilingSystem::beginFrame( FrameGroup group, const FrameArgs &frameArgs )
 	}
 }
 
-void ProfilingSystem::endFrame( FrameGroup group ) {
+void ProfilingSystem::doEndFrame( FrameGroup group, ProfilerResultSink *resultSink ) {
 	if( s_isProfilingEnabled[group] ) {
 		[[maybe_unused]] volatile wsw::ScopedLock<wsw::Mutex> lock( &g_mutex );
 		for( ProfilerThreadInstance *instance = s_instances[group]; instance; instance = instance->next ) {
-			instance->resetFrameStats();
+			instance->dumpFrameStats( resultSink );
 		}
 	}
 }

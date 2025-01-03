@@ -22,6 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define WSW_462961de_963c_4da6_b80b_b0ff67392202_H
 
 #include "wswstringview.h"
+#include "wswpodvector.h"
+#include <optional>
+#include <span>
 #include <variant>
 
 namespace wsw {
@@ -40,6 +43,13 @@ private:
 };
 
 class ProfilerThreadInstance;
+class ProfilerArgsSupplier;
+class ProfilerResultSink;
+
+struct ProfilerArgs {
+	struct DiscoverRootScopes {};
+	std::variant<wsw::StringView, DiscoverRootScopes, std::monostate> args;
+};
 
 class ProfilingSystem {
 public:
@@ -51,15 +61,50 @@ public:
 	static void attachToThisThread( FrameGroup group );
 	static void detachFromThisThread( FrameGroup group );
 
-	struct DiscoverRootScopes {};
-	using FrameArgs = std::variant<wsw::StringView, DiscoverRootScopes, std::monostate>;
-
-	static void beginFrame( FrameGroup group, const FrameArgs &frameArgs );
-	static void endFrame( FrameGroup group );
+	static void beginFrame( FrameGroup group, ProfilerArgsSupplier *argsSupplier );
+	static void endFrame( FrameGroup group, ProfilerResultSink *resultSink );
 private:
+	static void doBeginFrame( FrameGroup group, const ProfilerArgs &args );
+	static void doEndFrame( FrameGroup group, ProfilerResultSink *resultSink );
+
 	// Per-group
 	static class ProfilerThreadInstance *s_instances[2];
 	static volatile unsigned s_isProfilingEnabled[2];
+};
+
+class ProfilerArgsSupplier {
+public:
+	virtual ~ProfilerArgsSupplier() = 0;
+
+	virtual void beginSupplyingArgs() = 0;
+	[[nodiscard]]
+	virtual auto getArgs( ProfilingSystem::FrameGroup group ) -> ProfilerArgs = 0;
+	virtual void endSupplyingArgs() = 0;
+};
+
+template <typename T>
+class StreamIterator {
+	virtual ~StreamIterator() = 0;
+	[[nodiscard]]
+	virtual auto next() -> std::optional<T> = 0;
+};
+
+class ProfilerResultSink {
+public:
+	virtual ~ProfilerResultSink() = 0;
+
+	virtual void beginAcceptingResults( ProfilingSystem::FrameGroup group ) = 0;
+	virtual void endAcceptingResults( ProfilingSystem::FrameGroup group ) = 0;
+
+	virtual void acceptEmptyResult( int thread, int totalThreads ) = 0;
+	virtual void acceptRoots( int thread, int totalThreads, StreamIterator<wsw::StringView> *roots ) = 0;
+
+	struct CallStats {
+		uint64_t totalTime { 0 };
+		int enterCount { 0 };
+	};
+
+	virtual void acceptCallStats( int thread, int totalThreads, const CallStats &callStats, StreamIterator<CallStats> *children ) = 0;
 };
 
 class ThreadProfilingAttachment {

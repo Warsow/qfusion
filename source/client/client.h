@@ -490,6 +490,19 @@ void SCR_DrawClampString( int x, int y, const char *str, int xmin, int ymin, int
 void SCR_DrawRawChar( int x, int y, wchar_t num, qfontface_t *font, const vec4_t color );
 void SCR_DrawFillRect( int x, int y, int w, int h, const vec4_t color );
 
+void CL_ProfilerHud_Init();
+void CL_ProfilerHud_Shutdown();
+void CL_ProfilerHud_Update();
+void CL_ProfilerHud_Draw( int x, int y, unsigned width, unsigned height );
+
+namespace wsw {
+class ProfilerArgsSupplier;
+class ProfilerResultSink;
+};
+
+wsw::ProfilerArgsSupplier *CL_GetProfilerArgsSupplier();
+wsw::ProfilerResultSink *CL_GetProfilerResultSink();
+
 void CL_InitMedia( void );
 void CL_ShutdownMedia( void );
 void CL_RestartMedia( void );

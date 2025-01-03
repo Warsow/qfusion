@@ -88,7 +88,7 @@ public:
 	void clearInput();
 
 	void drawPane( unsigned width, unsigned height );
-	void drawNotifications( unsigned width, unsigned height );
+	void drawNotifications( int x, int y, unsigned width, unsigned height );
 
 	enum NotificationBehaviour : uint8_t {
 		DrawNotification,
@@ -652,9 +652,9 @@ static auto calcPrefixLenForNumVisibleCodePoints( const char *utf8Chars, unsigne
 	return (unsigned)( utf8Chars - start );
 }
 
-void Con_DrawNotify( unsigned width, unsigned height ) {
+void Con_DrawNotify( int x, int y, unsigned width, unsigned height ) {
 	if( con_initialized ) {
-		g_console.instance()->drawNotifications( width, height );
+		g_console.instance()->drawNotifications( x, y, width, height );
 	}
 }
 
@@ -1374,7 +1374,7 @@ auto Console::CompletionEntry::getCharSpansForDrawing( unsigned resizeId, unsign
 	return builder->getFinalSpans();
 }
 
-void Console::drawNotifications( unsigned width, unsigned height ) {
+void Console::drawNotifications( int x, int y, unsigned width, unsigned height ) {
 	const auto maxLines = (unsigned)con_maxNotificationLines->integer;
 	if( maxLines <= 0 ) {
 		return;
@@ -1413,8 +1413,8 @@ void Console::drawNotifications( unsigned width, unsigned height ) {
 		matchingLines.erase( matchingLines.begin(), matchingLines.begin() + extraLines );
 	}
 
-	int textY = 0;
-	const int textX = 8 * pixelRatio;
+	int textY = y;
+	const int textX = 8 * pixelRatio + x;
 	for( const RegularEntry *line: matchingLines ) {
 		// TODO: Is it guaranteed to be zero-terminated?
 		SCR_DrawString( textX, textY, ALIGN_LEFT_TOP, line->m_data, cls.consoleFont, colorWhite, 0 );

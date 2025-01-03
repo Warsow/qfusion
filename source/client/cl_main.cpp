@@ -1377,7 +1377,7 @@ void SCR_UpdateScreen( void ) {
 
 	bool canRenderView = false;
 	bool canDrawConsole = false;
-	bool canDrawConsoleNotify = false;
+	bool canDrawDebug = false;
 
 	auto *const uiSystem = wsw::ui::UISystem::instance();
 
@@ -1397,7 +1397,7 @@ void SCR_UpdateScreen( void ) {
 		uiSystem->addToFrametimeTimeline( cls.realtime, cls.frametime );
 
 		canDrawConsole = true;
-		canDrawConsoleNotify = true;
+		canDrawDebug = true;
 	}
 
 	// Perform UI refresh (that may include binding UI GL context and unbinding it) first
@@ -1456,8 +1456,9 @@ void SCR_UpdateScreen( void ) {
 
 	uiSystem->drawCursorInMainContext();
 
-	if( canDrawConsoleNotify ) {
-		Con_DrawNotify( viddef.width, viddef.height );
+	if( canDrawDebug ) {
+		Con_DrawNotify( 0, 0, viddef.width, viddef.height );
+		CL_ProfilerHud_Draw( 0, 0, viddef.width, viddef.height );
 	}
 
 	if( canDrawConsole ) {
@@ -5513,6 +5514,8 @@ void CL_Frame( int realMsec, int gameMsec ) {
 		// allow rendering DLL change
 		VID_CheckChanges();
 
+		CL_ProfilerHud_Update();
+
 		if( !cls.disable_screen && scr_initialized && con_initialized && cls.mediaInitialized ) {
 			SCR_UpdateScreen();
 		}
@@ -5697,6 +5700,8 @@ void CL_Init( void ) {
 
 	Con_Init();
 
+	CL_ProfilerHud_Init();
+
 	CL_Sys_Init();
 
 	VID_Init();
@@ -5781,6 +5786,8 @@ void CL_Shutdown( void ) {
 		Steam_Shutdown();
 
 		CL_Sys_Shutdown();
+
+		CL_ProfilerHud_Shutdown();
 
 		Con_Shutdown();
 
