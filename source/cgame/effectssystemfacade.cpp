@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../common/common.h"
 #include "../client/snd_public.h"
 #include "../common/configvars.h"
-#include "../common/wswprofiler.h"
+#include "../common/profilerscope.h"
 
 void EffectsSystemFacade::startSound( const SoundSet *sound, const float *origin, float attenuation ) {
 	// TODO: We can save plenty of computations if we do this check earlier in the call stack
@@ -563,7 +563,7 @@ void EffectsSystemFacade::clear() {
 }
 
 void EffectsSystemFacade::simulateFrame( int64_t currTime ) {
-	[[maybe_unused]] volatile wsw::ProfilerScope scope( wsw::HashedStringView( "EffectsSystemFacade::simulateFrame" ) );
+	WSW_PROFILER_SCOPE();
 	m_transientEffectsSystem.simulateFrame( currTime );
 	m_trackedEffectsSystem.simulateFrame( currTime );
 }

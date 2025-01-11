@@ -29,19 +29,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 namespace wsw {
 
-class ProfilerScope {
-public:
-	explicit ProfilerScope( const wsw::HashedStringView &name );
-	~ProfilerScope();
-
-	ProfilerScope( const ProfilerScope & ) = delete;
-	auto operator=( const ProfilerScope & ) -> ProfilerScope & = delete;
-	ProfilerScope( ProfilerScope && ) = delete;
-	auto operator=( ProfilerScope && ) -> ProfilerScope & = delete;
-private:
-	wsw::HashedStringView m_name;
-};
-
 class ProfilerThreadInstance;
 class ProfilerArgsSupplier;
 class ProfilerResultSink;
@@ -63,6 +50,16 @@ public:
 
 	static void beginFrame( FrameGroup group, ProfilerArgsSupplier *argsSupplier );
 	static void endFrame( FrameGroup group, ProfilerResultSink *resultSink );
+
+	struct RegisteredScope {
+		wsw::StringView file;
+		int line;
+		wsw::StringView exactFunction;
+		wsw::StringView readableFunction;
+	};
+
+	[[nodiscard]]
+	static auto getRegisteredScopes() -> std::span<const RegisteredScope>;
 private:
 	// Per-group
 	static class ProfilerThreadInstance *s_instances[2];

@@ -235,7 +235,7 @@ public:
 	CachedMaterial shaderMetalImpactRosetteInnerSpike { this, wsw::StringView( "gfx/effects/metal_impact_inner_spike" ) };
 	CachedMaterial shaderMetalImpactRosetteOuterSpike { this, wsw::StringView( "gfx/effects/metal_impact_outer_spike" ) };
 
-	CachedMaterial shaderElectroImpactParticle { this, wsw::StringView( "gfx/effects/electro_impact_particle" ) };
+	CachedMaterial shaderElectroImpactParticle { this, wsw::StringView( "gfx/misc/electro2a" ) };
 	CachedMaterial shaderInstaImpactParticle { this, wsw::StringView( "gfx/effects/insta_impact_particle" ) };
 
 	CachedMaterial shaderMetalRicochetParticle { this, wsw::StringView( "gfx/effects/metal_ricochet_particle" ) };

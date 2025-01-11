@@ -79,6 +79,8 @@ public:
 	void select( wsw::ProfilingSystem::FrameGroup group, const wsw::StringView &token );
 
 	void reset();
+
+	void listScopes();
 private:
 	wsw::Mutex m_mutex;
 
@@ -136,6 +138,9 @@ void CL_ProfilerHud_Init() {
 			clNotice() << "Usage: pf_select <client|server> <name>";
 		}
 	});
+	CL_Cmd_Register( "pf_listscopes"_asView, []( const CmdArgs &args ) {
+		g_profilerHudHolder.instance()->listScopes();
+	});
 	CL_Cmd_Register( "pf_reset"_asView, []( const CmdArgs &args ) {
 		g_profilerHudHolder.instance()->reset();
 	});
@@ -145,6 +150,7 @@ void CL_ProfilerHud_Init() {
 void CL_ProfilerHud_Shutdown() {
 	CL_Cmd_Unregister( "pf_listroots"_asView );
 	CL_Cmd_Unregister( "pf_select"_asView );
+	CL_Cmd_Unregister( "pf_listscopes"_asView );
 	CL_Cmd_Unregister( "pf_reset"_asView );
 	g_profilerHudHolder.shutdown();
 }
@@ -201,6 +207,13 @@ void ProfilerHud::reset() {
 
 	m_groupStates[0].operationMode = GroupState::NoOp;
 	m_groupStates[1].operationMode = GroupState::NoOp;
+}
+
+void ProfilerHud::listScopes() {
+	clNotice() << "Available scopes:";
+	for( const auto &scope: wsw::ProfilingSystem::getRegisteredScopes() ) {
+		clNotice() << scope.file << scope.readableFunction << scope.line;
+	}
 }
 
 void ProfilerHud::drawSelf( unsigned width, unsigned ) {

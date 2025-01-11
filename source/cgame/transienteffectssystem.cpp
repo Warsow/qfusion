@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../common/links.h"
 #include "../common/configvars.h"
 #include "../common/noise.h"
-#include "../common/wswprofiler.h"
+#include "../common/profilerscope.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -1088,7 +1088,7 @@ void TransientEffectsSystem::unlinkAndFreeDelayedEffect( DelayedEffect *effect )
 }
 
 void TransientEffectsSystem::simulateFrame( int64_t currTime ) {
-	[[maybe_unused]] volatile wsw::ProfilerScope scope( wsw::HashedStringView( "TransientEffectsSystem::simulateFrame" ) );
+	WSW_PROFILER_SCOPE();
 
 	if( currTime != m_lastTime ) {
 		assert( currTime > m_lastTime );

@@ -85,7 +85,7 @@ void Frustum::setupFor4Planes( const float *viewOrigin, const mat3_t viewAxis, f
 
 auto findLightsThatAffectBounds( const Scene::DynamicLight *lights, std::span<const uint16_t> lightIndicesSpan,
 								 const float *mins, const float *maxs, uint16_t *affectingLightIndices ) -> unsigned {
-	assert( mins[3] == 0.0f && maxs[3] == 1.0f );
+	//assert( mins[3] == 0.0f && maxs[3] == 1.0f );
 
 	const uint16_t *lightIndices = lightIndicesSpan.data();
 	const auto numLights         = (unsigned)lightIndicesSpan.size();

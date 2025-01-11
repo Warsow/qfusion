@@ -29,7 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../common/cmdcompat.h"
 #include "../common/wswalgorithm.h"
 #include "../common/wswfs.h"
-#include "../common/wswprofiler.h"
+#include "../common/profilerscope.h"
 #include "../common/configvars.h"
 
 using wsw::operator""_asView;
@@ -1189,7 +1189,7 @@ static auto prepareViewRectsAndStateIndices( Rect *viewRects, unsigned *viewStat
 
 static void createDrawSceneRequests( DrawSceneRequest **drawSceneRequests, bool actuallyUseTiledMode,
 									 const Rect *viewRects, const unsigned *viewStateIndices, unsigned numDisplayedViewStates ) {
-	[[maybe_unused]] volatile wsw::ProfilerScope profilerScope( "createDrawSceneRequests"_asHView );
+	WSW_PROFILER_SCOPE();
 
 	const auto *const uiSystem = wsw::ui::UISystem::instance();
 
@@ -1321,7 +1321,7 @@ static void createDrawSceneRequests( DrawSceneRequest **drawSceneRequests, bool 
 [[nodiscard]]
 static auto coPrepareDrawSceneRequests( CoroTask::StartInfo si, DrawSceneRequest **drawSceneRequests,
 										const unsigned *viewStateIndices, unsigned numDisplayedViewStates ) -> CoroTask {
-	[[maybe_unused]] volatile wsw::ProfilerScope profilerScope( "coPrepareDrawSceneRequests"_asHView );
+	WSW_PROFILER_SCOPE();
 
 	const TaskHandle beginTask = BeginProcessingDrawSceneRequests( { drawSceneRequests, drawSceneRequests + numDisplayedViewStates } );
 

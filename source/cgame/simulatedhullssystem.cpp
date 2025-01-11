@@ -4,8 +4,8 @@
 #include "../client/client.h"
 #include "../common/memspecbuilder.h"
 #include "../common/mmcommon.h"
+#include "../common/profilerscope.h"
 #include "../common/wswalgorithm.h"
-#include "../common/wswprofiler.h"
 #include "../cgame/cg_local.h"
 
 #include <memory>
@@ -853,7 +853,7 @@ auto SimulatedHullsSystem::buildMatchingHullPairs( const BaseKeyframedHull **too
 }
 
 void SimulatedHullsSystem::simulateFrame( int64_t currTime ) {
-	[[maybe_unused]] volatile wsw::ProfilerScope scope( wsw::HashedStringView( "SimulatedHullsSystem::simulateFrame" ) );
+	WSW_PROFILER_SCOPE();
 
 	if( currTime != m_lastTime ) {
 		assert( currTime > m_lastTime );

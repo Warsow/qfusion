@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "wswprofiler.h"
 #include "wswpodvector.h"
 #include "wswexceptions.h"
+#include "profilerscope.h"
 #include "links.h"
 #include "local.h"
 #include "common.h"
@@ -111,14 +112,14 @@ void ProfilerThreadInstance::dumpFrameStats( unsigned threadIndex, ProfilerResul
 
 static thread_local ProfilerThreadInstance *tl_profilerThreadInstance;
 
-ProfilerScope::ProfilerScope( const wsw::HashedStringView &name ) : m_name( name ) {
+ProfilerScope::ProfilerScope( const ProfilerScopeName &name ) : m_name( name ) {
 	// That's why these fields are of non-boolean type
 	if( ProfilingSystem::s_isProfilingEnabled[0] | ProfilingSystem::s_isProfilingEnabled[1] ) {
 		// We avoid touching thread-locals by checking the outer condition first
 		if( ProfilerThreadInstance *instance = tl_profilerThreadInstance ) {
 			assert( instance->group == 0 || instance->group == 1 );
 			if( ProfilingSystem::s_isProfilingEnabled[instance->group] ) {
-				instance->enterScope( this, name );
+				instance->enterScope( this, m_name.m_name );
 			}
 		}
 	}
@@ -129,16 +130,52 @@ ProfilerScope::~ProfilerScope() {
 		if( ProfilerThreadInstance *instance = tl_profilerThreadInstance ) {
 			assert( instance->group == 0 || instance->group == 1 );
 			if( ProfilingSystem::s_isProfilingEnabled[instance->group] ) {
-				instance->leaveScope( this, m_name );
+				instance->leaveScope( this, m_name.m_name );
 			}
 		}
 	}
+}
+
+static wsw::PodVector<ProfilingSystem::RegisteredScope> g_registeredScopes;
+
+void ProfilerScopeName::doRegisterSelf( const wsw::StringView &givenFile, int line, const wsw::StringView &givenFunction ) {
+	wsw::StringView file = givenFile;
+	for( const wsw::StringView &sourceRoot: { "/source/"_asView, "\\source\\"_asView } ) {
+		if( const std::optional<unsigned> maybeIndex = file.indexOf( sourceRoot ) ) {
+			file = file.drop( *maybeIndex + sourceRoot.length() );
+			break;
+		}
+	}
+
+	wsw::StringView readableFunction = givenFunction;
+	if( const std::optional<unsigned> maybeIndex = readableFunction.lastIndexOf( "::Scope_"_asView ) ) {
+		readableFunction = readableFunction.take( *maybeIndex );
+	}
+	// TODO: Should we care of displaying overloads?
+	if( const std::optional<unsigned> maybeIndex = readableFunction.lastIndexOf( '(' ) ) {
+		readableFunction = readableFunction.take( *maybeIndex );
+	}
+	// Note: This has to be performed after stripping arguments
+	if( const std::optional<unsigned> maybeIndex = readableFunction.lastIndexOf( ' ' ) ) {
+		readableFunction = readableFunction.drop( *maybeIndex + 1 );
+	}
+
+	g_registeredScopes.emplace_back( ProfilingSystem::RegisteredScope {
+		.file             = file,
+		.line             = line,
+		.exactFunction    = givenFunction,
+		.readableFunction = readableFunction,
+	});
 }
 
 ProfilerThreadInstance *ProfilingSystem::s_instances[2];
 volatile unsigned ProfilingSystem::s_isProfilingEnabled[2];
 
 static wsw::Mutex g_mutex;
+
+auto ProfilingSystem::getRegisteredScopes() -> std::span<const RegisteredScope> {
+	return g_registeredScopes;
+}
 
 void ProfilingSystem::attachToThisThread( FrameGroup group ) {
 	assert( group == 0 || group == 1 );
