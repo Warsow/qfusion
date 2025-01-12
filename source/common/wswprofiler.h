@@ -35,7 +35,8 @@ class ProfilerResultSink;
 
 struct ProfilerArgs {
 	struct DiscoverRootScopes {};
-	std::variant<wsw::StringView, DiscoverRootScopes, std::monostate> args;
+	struct ProfileCall { unsigned scopeIndex { 0 }; };
+	std::variant<DiscoverRootScopes, ProfileCall, std::monostate> args;
 };
 
 class ProfilingSystem {
@@ -53,8 +54,8 @@ public:
 
 	struct RegisteredScope {
 		wsw::StringView file;
-		int line;
-		wsw::StringView exactFunction;
+		int line { 0 };
+		wsw::HashedStringView exactFunction;
 		wsw::StringView readableFunction;
 	};
 
@@ -83,15 +84,15 @@ public:
 	virtual void beginAcceptingResults( ProfilingSystem::FrameGroup group, unsigned totalThreads ) = 0;
 	virtual void endAcceptingResults( ProfilingSystem::FrameGroup group ) = 0;
 
-	virtual void addDiscoveredRoot( unsigned threadIndex, const wsw::StringView &root ) = 0;
+	virtual void addDiscoveredRoot( unsigned threadIndex, unsigned scopeId ) = 0;
 
 	struct CallStats {
 		uint64_t totalTime { 0 };
 		int enterCount { 0 };
 	};
 
-	virtual void addCallStats( unsigned threadIndex, const wsw::StringView &call, const CallStats &callStats ) = 0;
-	virtual void addCallChildStats( unsigned threadIndex, const wsw::StringView &child, const CallStats &callStats ) = 0;
+	virtual void addCallStats( unsigned threadIndex, unsigned callScopeId, const CallStats &callStats ) = 0;
+	virtual void addCallChildStats( unsigned threadIndex, unsigned childScopeId, const CallStats &callStats ) = 0;
 };
 
 class ThreadProfilingAttachment {

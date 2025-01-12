@@ -25,20 +25,23 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 namespace wsw {
 
-class ProfilerScopeName {
+class ProfilerScopeLabel {
 	friend class ProfilerScope;
 	friend class ProfilingSystem;
+	friend class ProfilerThreadInstance;
 protected:
-	explicit ProfilerScopeName( const wsw::HashedStringView &name ) : m_name( name ) {}
+	ProfilerScopeLabel( const wsw::HashedStringView &function, int line ) : m_function( function ), m_line( line ) {}
 
-	static void doRegisterSelf( const wsw::StringView &file, int line, const wsw::StringView &function );
+	static void doRegisterSelf( const wsw::StringView &file, int line, const wsw::HashedStringView &function );
 
-	wsw::HashedStringView m_name;
+	wsw::HashedStringView m_function;
+	int m_line;
 };
 
 class ProfilerScope {
+	friend class ProfilerThreadInstance;
 public:
-	explicit ProfilerScope( const ProfilerScopeName &name );
+	explicit ProfilerScope( const ProfilerScopeLabel &m_label );
 	~ProfilerScope();
 
 	ProfilerScope( const ProfilerScope & ) = delete;
@@ -46,7 +49,7 @@ public:
 	ProfilerScope( ProfilerScope && ) = delete;
 	auto operator=( ProfilerScope && ) -> ProfilerScope & = delete;
 private:
-	ProfilerScopeName m_name;
+	ProfilerScopeLabel m_label;
 };
 
 // http://quantumgraphics.blogspot.com/2014/11/abusing-static-initialization.html
@@ -73,24 +76,23 @@ template<typename T> typename ScopeRegistrator<T>::Proxy ScopeRegistrator<T>::s_
 #define MAKE_UNIQUE_NAME_CONCAT( prefix, suffix ) MAKE_UNIQUE_NAME_CONCAT_( prefix, suffix )
 #define MAKE_UNIQUE_NAME( prefix ) MAKE_UNIQUE_NAME_CONCAT( prefix##_, __LINE__ )
 
+#define WSW_PROFILER_SCOPE_IMPL( file, line, functionMagic ) \
+	static constexpr const char *MAKE_UNIQUE_NAME( functionName ) = functionMagic; \
+class MAKE_UNIQUE_NAME( Label ) : \
+	public wsw::ProfilerScopeLabel, wsw::ScopeRegistrator<MAKE_UNIQUE_NAME( Label )> { \
+public: \
+	MAKE_UNIQUE_NAME( Label )() : \
+		wsw::ProfilerScopeLabel( wsw::HashedStringView( MAKE_UNIQUE_NAME( functionName ) ), line ) {} \
+	static void registerSelf() {                                 \
+		doRegisterSelf( wsw::StringView( file ), line, wsw::HashedStringView( MAKE_UNIQUE_NAME( functionName ) ) ); \
+	} \
+} MAKE_UNIQUE_NAME( _labelName ); \
+[[maybe_unused]] volatile wsw::ProfilerScope MAKE_UNIQUE_NAME( _label )( MAKE_UNIQUE_NAME( _labelName ) )
+
 #ifndef _MSC_VER
-#define WSW_PROFILER_SCOPE() \
-class MAKE_UNIQUE_NAME( Scope ) : \
-	public wsw::ProfilerScopeName, wsw::ScopeRegistrator<MAKE_UNIQUE_NAME( Scope )> { \
-public: \
-	MAKE_UNIQUE_NAME( Scope )() : wsw::ProfilerScopeName( wsw::HashedStringView( __PRETTY_FUNCTION__ ) ) {} \
-	static void registerSelf() { doRegisterSelf( wsw::StringView( __FILE__ ), __LINE__, wsw::StringView( __PRETTY_FUNCTION__ ) ); } \
-} MAKE_UNIQUE_NAME( _scopeName ); \
-[[maybe_unused]] volatile wsw::ProfilerScope MAKE_UNIQUE_NAME( _scope )( MAKE_UNIQUE_NAME( _scopeName ) )
+#define WSW_PROFILER_SCOPE() WSW_PROFILER_SCOPE_IMPL( __FILE__, __LINE__, __PRETTY_FUNCTION__ )
 #else
-#define WSW_PROFILER_SCOPE() \
-class MAKE_UNIQUE_NAME( Scope ) : \
-	public wsw::ProfilerScopeName, wsw::ScopeRegistrator<MAKE_UNIQUE_NAME( Scope )> { \
-public: \
-	MAKE_UNIQUE_NAME( Scope )() : wsw::ProfilerScopeName( wsw::HashedStringView( __FUNCSIG__ ) ) {} \
-	static void registerSelf() { doRegisterSelf( wsw::StringView( __FILE__ ), __LINE__, wsw::StringView( __FUNCSIG__ ) ); } \
-} MAKE_UNIQUE_NAME( _scopeName ); \
-[[maybe_unused]] volatile wsw::ProfilerScope MAKE_UNIQUE_NAME( _scope )( MAKE_UNIQUE_NAME( _scopeName ) )
+#define WSW_PROFILER_SCOPE() WSW_PROFILER_SCOPE_IMPL( __FILE__, __LINE__, __FUNCSIG__ )
 #endif
 
 #endif

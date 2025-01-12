@@ -49,8 +49,11 @@ public:
 
 	ProfilerThreadInstance *prev { nullptr }, *next { nullptr };
 
-	void enterScope( ProfilerScope *scope, const wsw::HashedStringView &name );
-	void leaveScope( ProfilerScope *scope, const wsw::HashedStringView &name );
+	void enterScope( ProfilerScope *scope );
+	void leaveScope( ProfilerScope *scope );
+
+	[[nodiscard]]
+	bool matchesTargetScope( const ProfilerScope *scope ) const;
 
 	void dumpFrameStats( unsigned threadIndex, ProfilerResultSink *dataSink );
 
@@ -61,7 +64,9 @@ public:
 	};
 
 	// Reset each frame
-	wsw::PodVector<char> m_targetName;
+	wsw::PodVector<char> m_targetFunction;
+	// Adds an extra protection against hash/length collisions
+	int m_targetLine { 0 };
 
 	std::unordered_set<wsw::HashedStringView> m_frameRoots;
 
@@ -80,21 +85,43 @@ public:
 	std::unordered_map<wsw::HashedStringView, DescendantEntry> m_statsOfDescendantScopes;
 };
 
+struct RegisteredScopesHolder {
+	wsw::PodVector<ProfilingSystem::RegisteredScope> vec;
+	std::unordered_map<wsw::HashedStringView, unsigned> map;
+};
+
+// This is a workaround for initialization order issues
+// (we can't just use a global var for a holder instance)
+[[nodiscard]]
+static auto getRegisteredScopesHolder() -> RegisteredScopesHolder & {
+	static RegisteredScopesHolder instance;
+	return instance;
+}
+
 void ProfilerThreadInstance::dumpFrameStats( unsigned threadIndex, ProfilerResultSink *dataSink ) {
+	RegisteredScopesHolder &scopesHolder = getRegisteredScopesHolder();
+
 	if( m_discoverRootScopes ) {
 		assert( m_globalScopeDepth == 0 );
-		for( const auto &name: m_frameRoots ) {
-			dataSink->addDiscoveredRoot( threadIndex, name );
+		for( const auto &function: m_frameRoots ) {
+			assert( scopesHolder.map.contains( function ) );
+			dataSink->addDiscoveredRoot( threadIndex, scopesHolder.map[function] );
 		}
 	} else {
-		dataSink->addCallStats( threadIndex, { m_targetName.data(), m_targetName.size() },
-								{ .totalTime = m_accumTime, .enterCount = m_enterCount } );
+		const wsw::HashedStringView targetFunction( m_targetFunction.data(), m_targetFunction.size() );
+		assert( scopesHolder.map.contains( targetFunction ) );
+		dataSink->addCallStats( threadIndex, scopesHolder.map[targetFunction], {
+			.totalTime = m_accumTime, .enterCount = m_enterCount
+		});
 		for( const auto &[k, v] : m_statsOfDescendantScopes ) {
-			dataSink->addCallChildStats( threadIndex, k, { .totalTime = v.accumTime, .enterCount = v.enterCount } );
+			assert( scopesHolder.map.contains( k ) );
+			dataSink->addCallChildStats( threadIndex, scopesHolder.map[k], {
+				.totalTime = v.accumTime, .enterCount = v.enterCount
+			});
 		}
 	}
 
-	m_targetName.clear();
+	m_targetFunction.clear();
 	m_frameRoots.clear();
 
 	m_discoverRootScopes = false;
@@ -112,14 +139,14 @@ void ProfilerThreadInstance::dumpFrameStats( unsigned threadIndex, ProfilerResul
 
 static thread_local ProfilerThreadInstance *tl_profilerThreadInstance;
 
-ProfilerScope::ProfilerScope( const ProfilerScopeName &name ) : m_name( name ) {
+ProfilerScope::ProfilerScope( const ProfilerScopeLabel &label ) : m_label( label ) {
 	// That's why these fields are of non-boolean type
 	if( ProfilingSystem::s_isProfilingEnabled[0] | ProfilingSystem::s_isProfilingEnabled[1] ) {
 		// We avoid touching thread-locals by checking the outer condition first
 		if( ProfilerThreadInstance *instance = tl_profilerThreadInstance ) {
 			assert( instance->group == 0 || instance->group == 1 );
 			if( ProfilingSystem::s_isProfilingEnabled[instance->group] ) {
-				instance->enterScope( this, m_name.m_name );
+				instance->enterScope( this );
 			}
 		}
 	}
@@ -130,15 +157,13 @@ ProfilerScope::~ProfilerScope() {
 		if( ProfilerThreadInstance *instance = tl_profilerThreadInstance ) {
 			assert( instance->group == 0 || instance->group == 1 );
 			if( ProfilingSystem::s_isProfilingEnabled[instance->group] ) {
-				instance->leaveScope( this, m_name.m_name );
+				instance->leaveScope( this );
 			}
 		}
 	}
 }
 
-static wsw::PodVector<ProfilingSystem::RegisteredScope> g_registeredScopes;
-
-void ProfilerScopeName::doRegisterSelf( const wsw::StringView &givenFile, int line, const wsw::StringView &givenFunction ) {
+void ProfilerScopeLabel::doRegisterSelf( const wsw::StringView &givenFile, int line, const wsw::HashedStringView &givenFunction ) {
 	wsw::StringView file = givenFile;
 	for( const wsw::StringView &sourceRoot: { "/source/"_asView, "\\source\\"_asView } ) {
 		if( const std::optional<unsigned> maybeIndex = file.indexOf( sourceRoot ) ) {
@@ -147,10 +172,7 @@ void ProfilerScopeName::doRegisterSelf( const wsw::StringView &givenFile, int li
 		}
 	}
 
-	wsw::StringView readableFunction = givenFunction;
-	if( const std::optional<unsigned> maybeIndex = readableFunction.lastIndexOf( "::Scope_"_asView ) ) {
-		readableFunction = readableFunction.take( *maybeIndex );
-	}
+	wsw::StringView readableFunction( givenFunction.data(), givenFunction.size() );
 	// TODO: Should we care of displaying overloads?
 	if( const std::optional<unsigned> maybeIndex = readableFunction.lastIndexOf( '(' ) ) {
 		readableFunction = readableFunction.take( *maybeIndex );
@@ -160,7 +182,9 @@ void ProfilerScopeName::doRegisterSelf( const wsw::StringView &givenFile, int li
 		readableFunction = readableFunction.drop( *maybeIndex + 1 );
 	}
 
-	g_registeredScopes.emplace_back( ProfilingSystem::RegisteredScope {
+	RegisteredScopesHolder &scopesHolder = getRegisteredScopesHolder();
+	scopesHolder.map.insert( { givenFunction, scopesHolder.vec.size() } );
+	scopesHolder.vec.emplace_back( ProfilingSystem::RegisteredScope {
 		.file             = file,
 		.line             = line,
 		.exactFunction    = givenFunction,
@@ -174,7 +198,7 @@ volatile unsigned ProfilingSystem::s_isProfilingEnabled[2];
 static wsw::Mutex g_mutex;
 
 auto ProfilingSystem::getRegisteredScopes() -> std::span<const RegisteredScope> {
-	return g_registeredScopes;
+	return getRegisteredScopesHolder().vec;
 }
 
 void ProfilingSystem::attachToThisThread( FrameGroup group ) {
@@ -217,10 +241,11 @@ void ProfilingSystem::beginFrame( FrameGroup group, ProfilerArgsSupplier *argsSu
 	try {
 		s_isProfilingEnabled[group] = false;
 		const ProfilerArgs &args = argsSupplier->getArgs( group );
-		if( const auto *targetName = std::get_if<wsw::StringView>( &args.args ) ) {
-			assert( !targetName->empty() );
+		if( const auto *targetCall = std::get_if<ProfilerArgs::ProfileCall>( &args.args ) ) {
+			const ProfilingSystem::RegisteredScope &targetScope = getRegisteredScopes()[targetCall->scopeIndex];
 			for( ProfilerThreadInstance *instance = s_instances[group]; instance; instance = instance->next ) {
-				instance->m_targetName.assign( *targetName );
+				instance->m_targetFunction.assign( targetScope.exactFunction );
+				instance->m_targetLine = targetScope.line;
 			}
 			s_isProfilingEnabled[group] = true;
 		} else if( std::holds_alternative<ProfilerArgs::DiscoverRootScopes>( args.args ) ) {
@@ -261,24 +286,24 @@ void ProfilingSystem::endFrame( FrameGroup group, ProfilerResultSink *resultSink
 	resultSink->endAcceptingResults( group );
 }
 
-[[nodiscard]]
-static inline bool matchesName( const wsw::PodVector<char> &expected, const wsw::StringView &given ) {
-	return expected.size() == given.size() && std::memcmp( expected.data(), given.data(), expected.size() ) == 0;
+bool ProfilerThreadInstance::matchesTargetScope( const ProfilerScope *scope ) const {
+	return m_targetLine == scope->m_label.m_line &&
+		wsw::StringView( m_targetFunction.data(), m_targetFunction.size() ).equals( scope->m_label.m_function );
 }
 
-void ProfilerThreadInstance::enterScope( ProfilerScope *, const wsw::HashedStringView &name ) {
+void ProfilerThreadInstance::enterScope( ProfilerScope *scope ) {
 	if( m_discoverRootScopes ) {
 		m_globalScopeDepth++;
 		if( m_globalScopeDepth == 1 ) {
-			m_frameRoots.insert( name );
+			m_frameRoots.insert( scope->m_label.m_function );
 		}
 	} else {
-		assert( !m_targetName.empty() );
+		assert( !m_targetFunction.empty() );
 		// If we are in the target scope
 		if( m_targetScopeReentrancyCounter > 0 ) {
 			m_scopeDepthFromTheTargetScope++;
 		}
-		if( matchesName( m_targetName, name ) ) {
+		if( matchesTargetScope( scope ) ) {
 			m_targetScopeReentrancyCounter++;
 			if( m_targetScopeReentrancyCounter == 1 ) {
 				m_enterTimestamp = Sys_Microseconds();
@@ -287,7 +312,7 @@ void ProfilerThreadInstance::enterScope( ProfilerScope *, const wsw::HashedStrin
 		} else {
 			// If it's a direct call from the target scope
 			if( m_scopeDepthFromTheTargetScope == 1 ) {
-				DescendantEntry &entry = m_statsOfDescendantScopes[name];
+				DescendantEntry &entry = m_statsOfDescendantScopes[scope->m_label.m_function];
 				entry.enterTimestamp = Sys_Microseconds();
 				entry.enterCount++;
 			}
@@ -295,17 +320,17 @@ void ProfilerThreadInstance::enterScope( ProfilerScope *, const wsw::HashedStrin
 	}
 }
 
-void ProfilerThreadInstance::leaveScope( ProfilerScope *, const wsw::HashedStringView &name ) {
+void ProfilerThreadInstance::leaveScope( ProfilerScope *scope ) {
 	if( m_discoverRootScopes ) {
 		m_globalScopeDepth--;
 	} else {
-		assert( !m_targetName.empty() );
+		assert( !m_targetFunction.empty() );
 		// If we are in the target scope
 		const bool isInTargetScope = m_targetScopeReentrancyCounter > 0;
 		if( isInTargetScope ) {
 			m_scopeDepthFromTheTargetScope--;
 		}
-		if( matchesName( m_targetName, name ) ) {
+		if( matchesTargetScope( scope ) ) {
 			m_targetScopeReentrancyCounter--;
 			if( m_targetScopeReentrancyCounter == 0 ) {
 				m_accumTime += ( Sys_Microseconds() - m_enterTimestamp );
@@ -313,7 +338,7 @@ void ProfilerThreadInstance::leaveScope( ProfilerScope *, const wsw::HashedStrin
 		} else {
 			// If it's a direct call from the target scope
 			if( isInTargetScope && m_scopeDepthFromTheTargetScope == 0 ) {
-				DescendantEntry &entry = m_statsOfDescendantScopes[name];
+				DescendantEntry &entry = m_statsOfDescendantScopes[scope->m_label.m_function];
 				entry.accumTime += ( Sys_Microseconds() - entry.enterTimestamp );
 			}
 		}

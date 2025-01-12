@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "client.h"
 #include "../common/cmdargs.h"
 #include "../common/singletonholder.h"
+#include "../common/wswtonum.h"
 
 #include <vector>
 #include <string>
@@ -44,7 +45,7 @@ public:
 		assert( m_activeResultGroup == std::nullopt );
 		m_mutex.lock();
 		m_activeResultGroup = group;
-		m_groupStates[group].discoveredNames.clear();
+		m_groupStates[group].discoveredRootScopes.clear();
 		m_groupStates[group].threadResults.clear();
 		// TODO: Resize only if needed
 		m_groupStates[group].threadResults.resize( totalThreads );
@@ -55,28 +56,29 @@ public:
 		m_mutex.unlock();
 	}
 
-	void addDiscoveredRoot( unsigned threadIndex, const wsw::StringView &root ) override {
+	void addDiscoveredRoot( unsigned threadIndex, unsigned scopeId ) override {
 		GroupState &groupState = m_groupStates[m_activeResultGroup.value()];
-		groupState.discoveredNames.emplace_back( std::string { root.data(), root.size() } );
+		groupState.discoveredRootScopes.append( scopeId );
 	}
 
-	void addCallStats( unsigned threadIndex, const wsw::StringView &call, const CallStats &callStats ) override {
+	void addCallStats( unsigned threadIndex, unsigned callScopeId, const CallStats &callStats ) override {
 		GroupState &groupState = m_groupStates[m_activeResultGroup.value()];
 		ThreadProfilingResults &results = groupState.threadResults.at( threadIndex );
 		results.callStats = callStats;
 	}
 
-	void addCallChildStats( unsigned threadIndex, const wsw::StringView &child, const CallStats &callStats ) override {
+	void addCallChildStats( unsigned threadIndex, unsigned childScopeId, const CallStats &callStats ) override {
 		GroupState &groupState = m_groupStates[m_activeResultGroup.value()];
 		ThreadProfilingResults &results = groupState.threadResults.at( threadIndex );
-		results.childStats.emplace_back( std::make_pair( std::string { child.data(), child.size() }, callStats ) );
+		results.childStats.append( { childScopeId, callStats } );
 	}
 
 	void drawSelf( unsigned width, unsigned height );
 
 	void listRoots( wsw::ProfilingSystem::FrameGroup group );
 
-	void select( wsw::ProfilingSystem::FrameGroup group, const wsw::StringView &token );
+	[[nodiscard]]
+	bool select( wsw::ProfilingSystem::FrameGroup group, const wsw::StringView &token );
 
 	void reset();
 
@@ -88,14 +90,14 @@ private:
 
 	struct ThreadProfilingResults {
 		CallStats callStats;
-		std::vector<std::pair<std::string, CallStats>> childStats;
+		wsw::PodVector<std::pair<unsigned, CallStats>> childStats;
 	};
 
 	struct GroupState {
 		enum OperationMode { NoOp, ListRoots, ProfileCall };
 
-		std::vector<std::string> discoveredNames;
-		std::string selectedName;
+		wsw::PodVector<unsigned> discoveredRootScopes;
+		std::optional<unsigned> selectedScope;
 
 		OperationMode operationMode { NoOp };
 
@@ -129,13 +131,14 @@ void CL_ProfilerHud_Init() {
 	CL_Cmd_Register( "pf_select"_asView, []( const CmdArgs &args ) {
 		bool handled = false;
 		if( std::optional<wsw::ProfilingSystem::FrameGroup> maybeGroup = parseProfilerGroup( args[1] ) ) {
-			if( const wsw::StringView name = args[2]; !name.empty() ) {
-				g_profilerHudHolder.instance()->select( *maybeGroup, name );
-				handled = true;
+			if( const wsw::StringView token = args[2]; !token.empty() ) {
+				if( g_profilerHudHolder.instance()->select( *maybeGroup, token ) ) {
+					handled = true;
+				}
 			}
 		}
 		if( !handled ) {
-			clNotice() << "Usage: pf_select <client|server> <name>";
+			clNotice() << "Usage: pf_select <client|server> #<scope-number>";
 		}
 	});
 	CL_Cmd_Register( "pf_listscopes"_asView, []( const CmdArgs &args ) {
@@ -178,7 +181,7 @@ auto ProfilerHud::getArgs( wsw::ProfilingSystem::FrameGroup group ) -> wsw::Prof
 			return { wsw::ProfilerArgs::DiscoverRootScopes() };
 		};
 		case GroupState::ProfileCall: {
-			return { wsw::StringView( groupState.selectedName.data(), groupState.selectedName.size() ) };
+			return { wsw::ProfilerArgs::ProfileCall { .scopeIndex = groupState.selectedScope.value() } };
 		};
 		default: {
 			wsw::failWithLogicError( "Unreachable" );
@@ -193,26 +196,49 @@ void ProfilerHud::listRoots( wsw::ProfilingSystem::FrameGroup group ) {
 	m_groupStates[group].operationMode = GroupState::ListRoots;
 }
 
-void ProfilerHud::select( wsw::ProfilingSystem::FrameGroup group, const wsw::StringView &token ) {
+bool ProfilerHud::select( wsw::ProfilingSystem::FrameGroup group, const wsw::StringView &token ) {
+	assert( group == 0 || group == 1 );
+
+	if( !token.startsWith( '#' ) ) {
+		return false;
+	}
+
+	const std::optional<size_t> maybeNumber = wsw::toNum<size_t>( token.drop( 1 ) );
+	if( !maybeNumber ) {
+		return false;
+	}
+
+	const std::span<const wsw::ProfilingSystem::RegisteredScope> scopes = wsw::ProfilingSystem::getRegisteredScopes();
+	if( *maybeNumber >= scopes.size() ) {
+		return false;
+	}
+
 	[[maybe_unused]] volatile wsw::ScopedLock<wsw::Mutex> lock( &m_mutex );
 
-	assert( group == 0 || group == 1 );
 	GroupState &groupState = m_groupStates[group];
 	groupState.operationMode = GroupState::ProfileCall;
-	groupState.selectedName.assign( token.data(), token.size() );
+	groupState.selectedScope = *maybeNumber;
+
+	return true;
 }
 
 void ProfilerHud::reset() {
 	[[maybe_unused]] volatile wsw::ScopedLock<wsw::Mutex> lock( &m_mutex );
 
-	m_groupStates[0].operationMode = GroupState::NoOp;
-	m_groupStates[1].operationMode = GroupState::NoOp;
+	for( GroupState &groupState: m_groupStates ) {
+		groupState.operationMode = GroupState::NoOp;
+		groupState.threadResults.clear();
+		groupState.discoveredRootScopes.clear();
+		groupState.selectedScope = std::nullopt;
+	}
 }
 
 void ProfilerHud::listScopes() {
 	clNotice() << "Available scopes:";
-	for( const auto &scope: wsw::ProfilingSystem::getRegisteredScopes() ) {
-		clNotice() << scope.file << scope.readableFunction << scope.line;
+	const std::span<const wsw::ProfilingSystem::RegisteredScope> scopes = wsw::ProfilingSystem::getRegisteredScopes();
+	for( size_t i = 0; i < scopes.size(); ++i ) {
+		const auto &scope = scopes[i];
+		clNotice() << '#' << i << scope.file << scope.readableFunction << scope.line;
 	}
 }
 
@@ -229,6 +255,23 @@ void ProfilerHud::drawSelf( unsigned width, unsigned ) {
 		SCR_DrawString( x, y, ALIGN_RIGHT_TOP, text, cls.consoleFont, color );
 		y += lineHeight;
 	};
+	const auto drawTextViewLine = [&]( const wsw::StringView &text, const float *color ) {
+		if( text.isZeroTerminated() ) {
+			drawTextLine( text.data(), color );
+		} else {
+			if( text.length() < 256 ) {
+				wsw::StaticString<256> s;
+				s << text;
+				drawTextLine( s.data(), color );
+			} else {
+				static wsw::PodVector<char> s;
+				s.clear();
+				s.append( text.data(), text.size() );
+				s.append( '\0' );
+				drawTextLine( s.data(), color );
+			}
+		}
+	};
 
 	// Draw help messages
 	if( m_groupStates[0].operationMode == GroupState::NoOp && m_groupStates[1].operationMode == GroupState::NoOp ) {
@@ -241,6 +284,7 @@ void ProfilerHud::drawSelf( unsigned width, unsigned ) {
 		const auto drawGroupHeader = [&]( size_t groupIndex ) {
 			drawTextLine( groupIndex > 0 ? "SERVER" : "CLIENT", colorWhite );
 		};
+		const std::span<const wsw::ProfilingSystem::RegisteredScope> &scopes = wsw::ProfilingSystem::getRegisteredScopes();
 		for( size_t groupIndex = 0; groupIndex < std::size( m_groupStates ); ++groupIndex ) {
 			const GroupState &groupState = m_groupStates[groupIndex];
 			switch( groupState.operationMode ) {
@@ -248,10 +292,10 @@ void ProfilerHud::drawSelf( unsigned width, unsigned ) {
 				} break;
 				case GroupState::ListRoots: {
 					drawGroupHeader( groupIndex );
-					if( !groupState.discoveredNames.empty() ) {
+					if( !groupState.discoveredRootScopes.empty() ) {
 						drawTextLine( "Available profiling roots:", colorWhite );
-						for( const auto &name: groupState.discoveredNames ) {
-							drawTextLine( name.c_str(), colorLtGrey );
+						for( const unsigned scopeId: groupState.discoveredRootScopes ) {
+							drawTextViewLine( scopes[scopeId].readableFunction, colorLtGrey );
 						}
 					} else {
 						drawTextLine( "Failed to discover profiling roots", colorRed );
@@ -262,7 +306,7 @@ void ProfilerHud::drawSelf( unsigned width, unsigned ) {
 					if( !groupState.threadResults.empty() ) {
 						wsw::StaticString<256> commonHeader( "Profiling " );
 						constexpr unsigned maxNameLimit = 48;
-						commonHeader << wsw::StringView( groupState.selectedName.c_str() ).take( maxNameLimit );
+						commonHeader << scopes[groupState.selectedScope.value()].readableFunction.take( maxNameLimit );
 
 						drawTextLine( commonHeader.data(), colorWhite );
 
@@ -275,15 +319,15 @@ void ProfilerHud::drawSelf( unsigned width, unsigned ) {
 							drawTextLine( threadHeader.data(), colorLtGrey );
 
 							unsigned realNameLimit = 0;
-							for( const auto &[name, _] : threadResults.childStats ) {
-								realNameLimit = wsw::max<unsigned>( realNameLimit, name.length() );
+							for( const auto &[scopeId, _] : threadResults.childStats ) {
+								realNameLimit = wsw::max<unsigned>( realNameLimit, scopes[scopeId].readableFunction.length() );
 							}
 							realNameLimit = wsw::min( realNameLimit, maxNameLimit );
 
 							threadIndex++;
-							for( const auto &[name, callStats] : threadResults.childStats ) {
+							for( const auto &[scopeId, callStats] : threadResults.childStats ) {
 								wsw::StaticString<256> childDesc;
-								childDesc << wsw::StringView( name.data(), name.size() ).take( realNameLimit );
+								childDesc << scopes[scopeId].readableFunction.take( realNameLimit );
 								childDesc.resize( realNameLimit, ' ' );
 								childDesc.append( " : "_asView );
 								(void)childDesc.appendf( "count=%-4d", callStats.enterCount );
