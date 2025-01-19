@@ -1158,6 +1158,7 @@ void ParticleSystem::tryAddingFlares( ParticleFlock *flock, DrawSceneRequest *dr
 
 		vec4_t mins, maxs;
 		boundsBuilder.storeTo( mins, maxs );
+		mins[3] = 0.0f, maxs[3] = 1.0f;
 
 		drawSceneRequest->addParticles( mins, maxs, m_frameFlareAppearanceRules.back(), addedParticles, numAddedParticles );
 	}

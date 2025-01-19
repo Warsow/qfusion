@@ -1115,6 +1115,19 @@ static void Mod_TouchBrushModel( model_t *model ) {
 
 	for( unsigned modnum = 0; modnum < loadbmodel->numsubmodels; modnum++ ) {
 		loadbmodel->inlines[modnum].registrationSequence = rsh.registrationSequence;
+
+		// Hacks for touching some shaders which don't have respective draw surfaces
+		// in the current codebase state but still are in use
+		// (namely sky shaders but also some other shaders).
+		for( modnum = 0; modnum < loadbmodel->numsubmodels; modnum++ ) {
+			auto *const bm = loadbmodel->submodels + modnum;
+			for( unsigned i = 0; i < bm->numModelSurfaces; ++i  ) {
+				auto *const surf = loadbmodel->surfaces + bm->firstModelSurface + i;
+				if( surf->shader ) {
+					R_TouchShader( surf->shader );
+				}
+			}
+		}
 	}
 
 	// touch all shaders and vertex buffer objects for this bmodel

@@ -1125,6 +1125,7 @@ void DrawSceneRequest::addParticles( const float *mins, const float *maxs,
 									 const Particle::AppearanceRules &appearanceRules,
 									 const Particle *particles, unsigned numParticles ) {
 	assert( numParticles <= kMaxParticlesInAggregate );
+	assert( mins[3] == 0.0f && maxs[3] == 1.0f );
 	if( !m_particles.full() ) [[likely]] {
 		m_particles.emplace_back( ParticlesAggregate {
 			.particles       = particles,

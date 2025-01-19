@@ -209,6 +209,7 @@ void Frontend::addBrushModelEntitiesToSortList( StateForCamera *stateForCamera, 
 	const MergedBspSurface *const mergedSurfaces = rsh.worldBrushModel->mergedSurfaces;
 	const msurface_t *const surfaces             = rsh.worldBrushModel->surfaces;
 
+	drawSurfaceBSP_t *const bspDrawSurfaces = stateForCamera->bspDrawSurfacesBuffer->get();
 	MergedSurfSpan *const mergedSurfSpans   = stateForCamera->drawSurfSurfSpansBuffer->get();
 	unsigned *const subspans                = stateForCamera->drawSurfSurfSubspansBuffer->get();
 
@@ -229,9 +230,15 @@ void Frontend::addBrushModelEntitiesToSortList( StateForCamera *stateForCamera, 
 		VectorAvg( visTestedModel.absMins, visTestedModel.absMaxs, origin );
 
 		for( unsigned i = 0; i < brushModel->numModelMergedSurfaces; i++ ) {
-			const unsigned surfNum                = brushModel->firstModelMergedSurface + i;
-			const MergedBspSurface *mergedSurface = mergedSurfaces + surfNum;
-			MergedSurfSpan *surfSpan              = mergedSurfSpans + surfNum;
+			const unsigned mergedSurfNum          = brushModel->firstModelMergedSurface + i;
+			const MergedBspSurface *mergedSurface = mergedSurfaces + mergedSurfNum;
+			MergedSurfSpan *surfSpan              = mergedSurfSpans + mergedSurfNum;
+			drawSurfaceBSP_t *drawSurf            = bspDrawSurfaces + mergedSurfNum;
+
+			// processWorldPortalSurfaces() does not handle brush model surfaces.
+			// TODO: Should we care of portal surfaces in brush models?
+			drawSurf->portalSurface  = nullptr;
+			drawSurf->portalDistance = 0.0f;
 
 			surfSpan->firstSurface    = (int)mergedSurface->firstWorldSurface;
 			surfSpan->lastSurface     = (int)( mergedSurface->firstWorldSurface + mergedSurface->numWorldSurfaces - 1 );
@@ -244,7 +251,7 @@ void Frontend::addBrushModelEntitiesToSortList( StateForCamera *stateForCamera, 
 			subspans[stateForCamera->drawSurfSurfSubspansOffset++] = surfSpan->firstSurface;
 			subspans[stateForCamera->drawSurfSurfSubspansOffset++] = surfSpan->lastSurface;
 
-			addMergedBspSurfToSortList( stateForCamera, entity, *surfSpan, surfNum, origin, lights );
+			addMergedBspSurfToSortList( stateForCamera, entity, *surfSpan, mergedSurfNum, origin, lights );
 		}
 	}
 }
@@ -374,6 +381,7 @@ void Frontend::calcSubspansOfMergedSurfSpans( StateForCamera *stateForCamera ) {
 void Frontend::addMergedBspSurfToSortList( StateForCamera *stateForCamera, const entity_t *entity,
 										   const MergedSurfSpan &surfSpan, unsigned mergedSurfNum,
 										   const float *maybeOrigin, std::span<const Scene::DynamicLight> lightsSpan ) {
+	assert( mergedSurfNum < rsh.worldBrushModel->numMergedSurfaces );
 	assert( surfSpan.firstSurface <= surfSpan.lastSurface );
 	assert( surfSpan.numSubspans );
 
@@ -389,6 +397,7 @@ void Frontend::addMergedBspSurfToSortList( StateForCamera *stateForCamera, const
 
 	// Must be set earlier
 	portalSurface_t *portalSurface = drawSurf->portalSurface;
+	assert( !portalSurface || portalSurface - stateForCamera->portalSurfaces < stateForCamera->numPortalSurfaces );
 
 	const mfog_t *fog        = mergedSurf->fog;
 	const unsigned drawOrder = R_PackOpaqueOrder( fog, surfMaterial, mergedSurf->numLightmaps, false );

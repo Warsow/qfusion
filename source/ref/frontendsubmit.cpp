@@ -437,7 +437,7 @@ static constexpr unsigned kMaxNumDrawnPlanesForBeam = 7;
 
 [[nodiscard]]
 static inline auto getNumDrawnPlanesForBeam( const QuadPoly::ViewAlignedBeamRules *beamRules ) -> unsigned {
-	assert( beamRules->numPlanes > 1 );
+	assert( beamRules->numPlanes >= 1 );
 	unsigned limit;
 	static_assert( kMaxNumDrawnPlanesForBeam > 1 && kMaxNumDrawnPlanesForBeam % 2 );
 	// Preserve the original appearance (it differs for odd or even number of planes)

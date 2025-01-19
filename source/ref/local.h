@@ -1728,15 +1728,15 @@ constexpr uint64_t kSortKeyShaderLength = 11;
 
 inline uint64_t R_PackSortKey( unsigned shaderNum, int fogNum, int portalNum, unsigned entNum, int paramsNum ) {
 	assert( shaderNum < ( 1 << kSortKeyShaderLength ) );
-	assert( fogNum >= -1 && fogNum + 1 < (int)( 1 << kSortKeyFogOffset ) );
-	assert( portalNum >= -1 && portalNum + 1 < (int)( 1 << kSortKeyPortalOffset ) );
+	assert( fogNum >= -1 && fogNum + 1 < (int)( 1 << kSortKeyFogLength ) );
+	assert( portalNum >= -1 && portalNum + 1 < (int)( 1 << kSortKeyPortalLength ) );
 	assert( entNum < ( 1 << kSortKeyEntityLength ) );
-	assert( paramsNum >= -1 && paramsNum + 1 < (int)( 1 << kSortKeyParamsOffset ) );
+	assert( paramsNum >= -1 && paramsNum + 1 < (int)( 1 << kSortKeyParamsLength ) );
 
 	return ( ( (uint64_t)shaderNum ) << kSortKeyShaderOffset ) |
 		   ( ( (uint64_t)entNum ) << kSortKeyEntityOffset ) |
 		   ( ( (uint64_t)( paramsNum + 1 ) ) << kSortKeyParamsOffset ) |
-		   ( ( (uint64_t)( portalNum + 1 ) ) << kSortKeyPortalLength ) |
+		   ( ( (uint64_t)( portalNum + 1 ) ) << kSortKeyPortalOffset ) |
 		   ( ( (uint64_t)( fogNum + 1 ) ) << kSortKeyFogOffset );
 }
 
