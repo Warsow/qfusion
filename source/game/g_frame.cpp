@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../common/wswstaticvector.h"
 #include "../common/cvar.h"
 #include "../common/common.h"
+#include "../common/profilerscope.h"
 #include "ai/vec3.h"
 
 #include <chrono>
@@ -835,6 +836,8 @@ static void G_RunCMBenchmark() {
 * Advances the world
 */
 void G_RunFrame( unsigned int msec, int64_t serverTime ) {
+	WSW_PROFILER_SCOPE();
+
 	G_CheckCvars();
 
 	const auto utcTime = std::chrono::system_clock::now().time_since_epoch();

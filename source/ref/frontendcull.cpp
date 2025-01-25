@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "frontend.h"
 #include "program.h"
 #include "materiallocal.h"
+#include "../common/profilerscope.h"
 #include "../common/wswsortbyfield.h"
 
 #include <algorithm>
@@ -607,21 +608,25 @@ auto Frontend::cullDynamicMeshes( StateForCamera *stateForCamera,
 }
 
 auto Frontend::collectVisibleWorldLeaves( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
+	WSW_PROFILER_SCOPE();
 	return ( this->*m_collectVisibleWorldLeavesArchMethod )( stateForCamera );
 }
 
 auto Frontend::collectVisibleOccluders( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
+	WSW_PROFILER_SCOPE();
 	return ( this->*m_collectVisibleOccludersArchMethod )( stateForCamera );
 }
 
 auto Frontend::buildFrustaOfOccluders( StateForCamera *stateForCamera, std::span<const SortedOccluder> sortedOccluders )
 	-> std::span<const Frustum> {
+	WSW_PROFILER_SCOPE();
 	return ( this->*m_buildFrustaOfOccludersArchMethod )( stateForCamera, sortedOccluders );
 }
 
 void Frontend::cullSurfacesByOccluders( StateForCamera *stateForCamera, std::span<const unsigned> indicesOfSurfaces,
 										std::span<const Frustum> occluderFrusta,
 										MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable ) {
+	WSW_PROFILER_SCOPE();
 	return ( this->*m_cullSurfacesByOccludersArchMethod )( stateForCamera, indicesOfSurfaces, occluderFrusta,
 														   mergedSurfSpans, surfVisTable );
 }
@@ -631,6 +636,7 @@ auto Frontend::cullEntriesWithBounds( StateForCamera *stateForCamera, const void
 									  unsigned strideInBytes, const Frustum *__restrict primaryFrustum,
 									  std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices )
 	-> std::span<const uint16_t> {
+	WSW_PROFILER_SCOPE();
 	return ( this->*m_cullEntriesWithBoundsArchMethod )( stateForCamera, entries, numEntries, boundsFieldOffset,
 														 strideInBytes, primaryFrustum, occluderFrusta, tmpIndices );
 }
@@ -640,6 +646,7 @@ auto Frontend::cullEntryPtrsWithBounds( StateForCamera *stateForCamera, const vo
 										const Frustum *__restrict primaryFrustum, std::span<const Frustum> occluderFrusta,
 										uint16_t *tmpIndices )
 	-> std::span<const uint16_t> {
+	WSW_PROFILER_SCOPE();
 	return ( this->*m_cullEntryPtrsWithBoundsArchMethod )( stateForCamera, entryPtrs, numEntries, boundsFieldOffset,
 														   primaryFrustum, occluderFrusta, tmpIndices );
 }

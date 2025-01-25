@@ -1321,8 +1321,6 @@ static void createDrawSceneRequests( DrawSceneRequest **drawSceneRequests, bool 
 [[nodiscard]]
 static auto coPrepareDrawSceneRequests( CoroTask::StartInfo si, DrawSceneRequest **drawSceneRequests,
 										const unsigned *viewStateIndices, unsigned numDisplayedViewStates ) -> CoroTask {
-	WSW_PROFILER_SCOPE();
-
 	const TaskHandle beginTask = BeginProcessingDrawSceneRequests( { drawSceneRequests, drawSceneRequests + numDisplayedViewStates } );
 
 	for( unsigned viewNum = 0; viewNum < numDisplayedViewStates; ++viewNum ) {
@@ -1380,6 +1378,8 @@ static auto coPrepareDrawSceneRequests( CoroTask::StartInfo si, DrawSceneRequest
 }
 
 static void prepareDrawSceneRequests( DrawSceneRequest **drawSceneRequests, const unsigned *viewStateIndices, unsigned numDisplayedViewStates ) {
+	WSW_PROFILER_SCOPE();
+
 	TaskSystem *const taskSystem = BeginProcessingOfTasks();
 
 	(void)taskSystem->addCoro( [=]() {
@@ -1393,6 +1393,8 @@ static void prepareDrawSceneRequests( DrawSceneRequest **drawSceneRequests, cons
 [[nodiscard]]
 static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actuallyUseTiledMode, bool hasModalOverlay,
 							   const unsigned *viewStateIndices, unsigned numDisplayedViewStates ) {
+	WSW_PROFILER_SCOPE();
+
 	bool hasRenderedTheMenu    = false;
 	auto *const uiSystem       = wsw::ui::UISystem::instance();
 	const bool shouldDrawHuds  = v_showHud.get();
@@ -1451,6 +1453,8 @@ static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actual
 }
 
 CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t serverTime, unsigned extrapolationTime ) {
+	WSW_PROFILER_SCOPE();
+
 	CGRenderViewResult result {
 		.hasBlittedTheMenu       = false,
 		.hasBlittedTheHud        = false,

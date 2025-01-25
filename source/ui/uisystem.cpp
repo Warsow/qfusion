@@ -1,6 +1,7 @@
 #include "uisystem.h"
 #include "../common/configvars.h"
 #include "../common/links.h"
+#include "../common/profilerscope.h"
 #include "../common/singletonholder.h"
 #include "../common/wswstaticvector.h"
 #include "../common/common.h"
@@ -1029,6 +1030,8 @@ auto UISystem::instance() -> UISystem * {
 }
 
 void QtUISystem::renderInternally() {
+	WSW_PROFILER_SCOPE();
+
 	/*
 	if( m_hudSandbox ) {
 		const auto before = Sys_Microseconds();
@@ -1163,6 +1166,8 @@ auto QtUISystem::createQmlSandbox( int logicalWidth, int logicalHeight, SandboxK
 }
 
 void QtUISystem::renderQml( QmlSandbox *sandbox ) {
+	WSW_PROFILER_SCOPE();
+
 	assert( sandbox->m_hasPendingSceneChange || sandbox->m_hasPendingRedraw );
 
 	if( !sandbox->m_controlContext->makeCurrent( sandbox->m_surface.get() ) ) {
@@ -1197,6 +1202,8 @@ void QtUISystem::renderQml( QmlSandbox *sandbox ) {
 }
 
 void QtUISystem::enterUIRenderingMode() {
+	WSW_PROFILER_SCOPE();
+
 	assert( !m_isInUIRenderingMode );
 	m_isInUIRenderingMode = true;
 
@@ -1206,6 +1213,8 @@ void QtUISystem::enterUIRenderingMode() {
 }
 
 void QtUISystem::leaveUIRenderingMode() {
+	WSW_PROFILER_SCOPE();
+
 	assert( m_isInUIRenderingMode );
 	m_isInUIRenderingMode = false;
 
@@ -1215,6 +1224,8 @@ void QtUISystem::leaveUIRenderingMode() {
 }
 
 void QtUISystem::drawMenuPartInMainContext() {
+	WSW_PROFILER_SCOPE();
+
 	if( m_menuSandbox && m_menuSandbox->m_hasValidFboContent ) {
 		// TODO: All of this ties natively drawn items to the menu part
 
@@ -1298,6 +1309,8 @@ void QtUISystem::drawMenuPartInMainContext() {
 }
 
 void QtUISystem::drawHudPartInMainContext() {
+	WSW_PROFILER_SCOPE();
+
 	if( m_hudSandbox && m_hudSandbox->m_hasValidFboContent ) {
 		if( m_isShowingHud || m_isShowingChatPopup || m_isShowingTeamChatPopup || m_isShowingActionRequests ) {
 			shader_s *const material = R_WrapHudTextureHandleInMaterial( m_hudSandbox->m_framebufferObject->texture() );
@@ -1604,6 +1617,8 @@ void QtUISystem::setActiveMenuMask( unsigned activeMask ) {
 }
 
 void QtUISystem::refreshProperties() {
+	WSW_PROFILER_SCOPE();
+
 	const auto lastClientState = m_clientState;
 	const auto actualClientState = cls.state;
 	m_clientState = actualClientState;

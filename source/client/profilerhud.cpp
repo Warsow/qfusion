@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "client.h"
 #include "../common/cmdargs.h"
+#include "../common/profilerscope.h"
 #include "../common/singletonholder.h"
 #include "../common/wswtonum.h"
 
@@ -181,6 +182,8 @@ void CL_ProfilerHud_Shutdown() {
 }
 
 void CL_ProfilerHud_Draw( unsigned width, unsigned height ) {
+	WSW_PROFILER_SCOPE();
+
 	g_profilerHudHolder.instance()->drawSelf( width, height );
 }
 

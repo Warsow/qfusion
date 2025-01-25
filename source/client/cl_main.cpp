@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../common/maplist.h"
 #include "../common/mmcommon.h"
 #include "../common/hash.h"
+#include "../common/profilerscope.h"
 #include "../common/q_trie.h"
 #include "../common/textstreamwriterextras.h"
 #include "../common/wswalgorithm.h"
@@ -1383,6 +1384,8 @@ void SCR_ShutDownConsoleMedia( void ) {
 }
 
 void SCR_UpdateScreen( void ) {
+	WSW_PROFILER_SCOPE();
+
 	assert( !cls.disable_screen && scr_initialized && con_initialized && cls.mediaInitialized );
 
 	Con_CheckResize();
@@ -5430,6 +5433,8 @@ static void CL_NetFrame( int realMsec, int gameMsec ) {
 }
 
 void CL_Frame( int realMsec, int gameMsec ) {
+	WSW_PROFILER_SCOPE();
+
 	static int allRealMsec = 0, allGameMsec = 0, extraMsec = 0;
 	static float roundingMsec = 0.0f;
 

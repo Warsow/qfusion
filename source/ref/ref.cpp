@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "materiallocal.h"
 #include "frontend.h"
 #include "../common/textstreamwriterextras.h"
-#include "../common/wswprofiler.h"
+#include "../common/profilerscope.h"
 
 r_globals_t rf;
 
@@ -500,6 +500,8 @@ void R_SetWallFloorColors( const vec3_t wallColor, const vec3_t floorColor ) {
 }
 
 void R_BeginFrame( bool forceClear, int swapInterval ) {
+	WSW_PROFILER_SCOPE();
+
 	GLimp_BeginFrame();
 
 	RB_BeginFrame();
@@ -528,6 +530,8 @@ void R_BeginFrame( bool forceClear, int swapInterval ) {
 }
 
 void R_EndFrame( void ) {
+	WSW_PROFILER_SCOPE();
+
 	// render previously batched 2D geometry, if any
 	RB_FlushDynamicMeshes();
 
@@ -740,6 +744,7 @@ void R_BuildTangentVectors( int numVertexes, vec4_t *xyzArray, vec4_t *normalsAr
 }
 
 void BeginDrawingScenes() {
+	WSW_PROFILER_SCOPE();
 	wsw::ref::Frontend::instance()->beginDrawingScenes();
 }
 
@@ -760,6 +765,8 @@ auto suggestNumExtraWorkerThreads( const SuggestNumWorkerThreadsArgs &args ) -> 
 static std::optional<TaskSystem::ExecutionHandle> g_taskSystemExecutionHandle;
 
 TaskSystem *BeginProcessingOfTasks() {
+	WSW_PROFILER_SCOPE();
+
 	auto *result = wsw::ref::Frontend::instance()->getTaskSystem();
 	assert( !g_taskSystemExecutionHandle );
 
@@ -792,6 +799,8 @@ TaskSystem *BeginProcessingOfTasks() {
 }
 
 void EndProcessingOfTasks() {
+	WSW_PROFILER_SCOPE();
+
 	const bool awaitResult = wsw::ref::Frontend::instance()->getTaskSystem()->awaitCompletion( g_taskSystemExecutionHandle.value() );
 	g_taskSystemExecutionHandle = std::nullopt;
 	if( !awaitResult ) {
@@ -800,6 +809,7 @@ void EndProcessingOfTasks() {
 }
 
 DrawSceneRequest *CreateDrawSceneRequest( const refdef_t &refdef ) {
+	WSW_PROFILER_SCOPE();
 	return wsw::ref::Frontend::instance()->createDrawSceneRequest( refdef );
 }
 
@@ -812,10 +822,12 @@ TaskHandle EndProcessingDrawSceneRequests( std::span<DrawSceneRequest *> request
 }
 
 void CommitProcessedDrawSceneRequest( DrawSceneRequest *request ) {
+	WSW_PROFILER_SCOPE();
 	wsw::ref::Frontend::instance()->commitProcessedDrawSceneRequest( request );
 }
 
 void EndDrawingScenes() {
+	WSW_PROFILER_SCOPE();
 	wsw::ref::Frontend::instance()->endDrawingScenes();
 }
 

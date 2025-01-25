@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../common/pipeutils.h"
 #include "../common/compression.h"
 #include "../common/demometadata.h"
+#include "../common/profilerscope.h"
 #include "../common/wswtonum.h"
 #include "../common/wswfs.h"
 #include "../common/wswalgorithm.h"
@@ -733,6 +734,8 @@ static bool SV_ProcessPacket( netchan_t *netchan, msg_t *msg ) {
 }
 
 static void SV_ReadPackets() {
+	WSW_PROFILER_SCOPE();
+
 	msg_t msg;
 	uint8_t msgData[MAX_MSGLEN];
 
@@ -853,6 +856,8 @@ static void SV_CheckLatchedUserinfoChanges() {
 #define WORLDFRAMETIME 16 // 62.5fps
 
 static bool SV_RunGameFrame( int msec ) {
+	WSW_PROFILER_SCOPE();
+
 	accTime += msec;
 
 	bool refreshSnapshot   = false;
@@ -940,6 +945,8 @@ void SV_UpdateActivity( void ) {
 }
 
 void SV_Frame( unsigned realmsec, unsigned gamemsec ) {
+	WSW_PROFILER_SCOPE();
+
 	// if server is not active, do nothing
 	if( !svs.initialized ) {
 		if( !svc.autostarted ) {

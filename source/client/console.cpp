@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../common/cmdsystem.h"
 #include "../common/freelistallocator.h"
 #include "../common/podbufferholder.h"
+#include "../common/profilerscope.h"
 #include "../common/singletonholder.h"
 #include "../common/wswstringsplitter.h"
 #include "../common/wswstaticstring.h"
@@ -667,6 +668,8 @@ void Con_DrawConsole( unsigned width, unsigned height ) {
 extern const vec4_t kConsoleBackgroundColor { 0.10f, 0.05f, 0.17f, 0.7f };
 
 void Console::drawPane( unsigned width, unsigned height ) {
+	WSW_PROFILER_SCOPE();
+
 	const int smallCharHeight = SCR_FontHeight( cls.consoleFont );
 	if( !smallCharHeight ) {
 		return;
@@ -1377,6 +1380,8 @@ auto Console::CompletionEntry::getCharSpansForDrawing( unsigned resizeId, unsign
 }
 
 void Console::drawNotifications( unsigned width, unsigned height ) {
+	WSW_PROFILER_SCOPE();
+
 	const auto maxLines = (unsigned)con_maxNotificationLines->integer;
 	if( maxLines <= 0 ) {
 		return;
