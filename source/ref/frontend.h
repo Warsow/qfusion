@@ -78,6 +78,9 @@ public:
 
 	void endDrawingScenes();
 
+	[[nodiscard]]
+	auto getMiniviewRenderTarget() -> RenderTargetComponents *;
+
 	void initVolatileAssets();
 
 	void destroyVolatileAssets();

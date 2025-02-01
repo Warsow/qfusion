@@ -555,6 +555,9 @@ void EndProcessingOfTasks();
 void CommitProcessedDrawSceneRequest( DrawSceneRequest *request );
 void EndDrawingScenes();
 
+RenderTargetComponents *GetMiniviewRenderTarget();
+unsigned GetMiniviewRenderTargetTexture();
+
 // For UI purposes
 void ExecuteSingleDrawSceneRequestNonSpeedCritical( DrawSceneRequest *request );
 
@@ -567,6 +570,7 @@ void        R_DrawRotatedStretchPic( int x, int y, int w, int h, float s1, float
 
 shader_s *R_WrapMenuTextureHandleInMaterial( unsigned externalTexNum );
 shader_s *R_WrapHudTextureHandleInMaterial( unsigned externalTexNum );
+shader_s *R_WrapMiniviewRenderTargetInMaterial( RenderTargetComponents *renderTarget );
 
 struct model_s;
 

@@ -396,6 +396,36 @@ shader_s *R_WrapHudTextureHandleInMaterial( unsigned externalTexNum ) {
 	return R_WrapExternalTextureHandle( externalTexNum, 1 );
 }
 
+static shader_s g_miniviewMaterialStorage;
+static shaderpass_t g_miniviewMaterialPassStorage;
+
+static const wsw::HashedStringView kExternalMiniviewImage( "$miniviewimage" );
+
+shader_s *R_WrapMiniviewRenderTargetInMaterial( RenderTargetComponents *renderTarget ) {
+	// Currently all miniview render targets are shared
+	assert( renderTarget == GetMiniviewRenderTarget() );
+
+	shaderpass_t *const p = &g_miniviewMaterialPassStorage;
+	shader_t *const s     = &g_miniviewMaterialStorage;
+
+	s->vattribs  = VATTRIB_POSITION_BIT | VATTRIB_TEXCOORDS_BIT;
+	s->sort      = SHADER_SORT_NEAREST;
+	s->numpasses = 1;
+	s->name      = kExternalMiniviewImage;
+	s->passes    = p;
+
+	p->rgbgen.type      = RGB_GEN_CONST;
+	VectorCopy( colorWhite, p->rgbgen.args );
+	p->alphagen.type    = ALPHA_GEN_CONST;
+	p->alphagen.args[0] = colorWhite[3];
+	p->tcgen            = TC_GEN_BASE;
+	p->images[0]        = renderTarget->texture;
+	p->flags            = 0;
+	p->program_type     = GLSL_PROGRAM_TYPE_NONE;
+
+	return s;
+}
+
 mesh_vbo_t *R_InitPostProcessingVBO( void ) {
 	const vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_TEXCOORDS_BIT;
 	mesh_vbo_t *vbo = R_CreateMeshVBO( &rf, 4, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
@@ -806,6 +836,14 @@ void EndProcessingOfTasks() {
 	if( !awaitResult ) {
 		wsw::failWithLogicError( "Failed to execute rendering tasks" );
 	}
+}
+
+RenderTargetComponents *GetMiniviewRenderTarget() {
+	return wsw::ref::Frontend::instance()->getMiniviewRenderTarget();
+}
+
+unsigned GetMiniviewRenderTargetTexture() {
+	return wsw::ref::Frontend::instance()->getMiniviewRenderTarget()->texture->texnum;
 }
 
 DrawSceneRequest *CreateDrawSceneRequest( const refdef_t &refdef ) {

@@ -149,8 +149,13 @@ void Frontend::bindRenderTargetAndViewport( RenderTargetComponents *components, 
 
 	RB_BindFrameBufferObject( components );
 
-	RB_Viewport( stateForCamera->viewport[0], stateForCamera->viewport[1], stateForCamera->viewport[2], stateForCamera->viewport[3] );
-	RB_Scissor( stateForCamera->scissor[0], stateForCamera->scissor[1], stateForCamera->scissor[2], stateForCamera->scissor[3] );
+	if( stateForCamera ) {
+		RB_Viewport( stateForCamera->viewport[0], stateForCamera->viewport[1], stateForCamera->viewport[2], stateForCamera->viewport[3] );
+		RB_Scissor( stateForCamera->scissor[0], stateForCamera->scissor[1], stateForCamera->scissor[2], stateForCamera->scissor[3] );
+	} else {
+		RB_Viewport( 0, 0, glConfig.width, glConfig.height );
+		RB_Scissor( 0, 0, glConfig.width, glConfig.height );
+	}
 }
 
 void Frontend::beginDrawingScenes() {
@@ -218,12 +223,7 @@ void Frontend::commitProcessedDrawSceneRequest( DrawSceneRequest *request ) {
 	RB_SetTime( request->m_refdef.time );
 
 	if( auto *const stateForSceneCamera = (StateForCamera *)request->stateForCamera ) {
-		// TODO: Is this first call really needed
-		bindRenderTargetAndViewport( nullptr, stateForSceneCamera );
-
 		performPreparedRenderingFromThisCamera( request, stateForSceneCamera );
-
-		bindRenderTargetAndViewport( nullptr, stateForSceneCamera );
 	} else {
 		// TODO what to do
 	}
@@ -232,6 +232,8 @@ void Frontend::commitProcessedDrawSceneRequest( DrawSceneRequest *request ) {
 }
 
 void Frontend::endDrawingScenes() {
+	bindRenderTargetAndViewport( nullptr, nullptr );
+	set2DMode( true );
 	recycleFrameCameraStates();
 	m_drawSceneRequestsHolder.clear();
 }
@@ -276,6 +278,10 @@ void Frontend::shutdown() {
 
 Frontend *Frontend::instance() {
 	return sceneInstanceHolder.instance();
+}
+
+auto Frontend::getMiniviewRenderTarget() -> RenderTargetComponents * {
+	return TextureCache::instance()->getMiniviewRenderTarget();
 }
 
 void Frontend::initVolatileAssets() {

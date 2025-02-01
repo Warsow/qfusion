@@ -64,26 +64,42 @@ TextureCache::TextureCache() {
 	m_menuTextureWrapper = m_factory.createUITextureHandleWrapper();
 	m_hudTextureWrapper  = m_factory.createUITextureHandleWrapper();
 
-	const auto side = wsw::min<unsigned>( 1 << Q_log2( wsw::max( 1, r_portalmaps_maxtexsize->integer ) ),
-										  wsw::min( 1024, glConfig.maxRenderbufferSize ) );
+	// TODO: Don't store it as a member?
+	m_miniviewRenderTargetDepthBuffer = m_factory.createRenderTargetDepthBuffer( glConfig.width, glConfig.height );
+	if( m_miniviewRenderTargetDepthBuffer ) {
+		auto maybeRenderTargetAndRexture = createRenderTargetAndTexture( glConfig.width, glConfig.height );
+		if( !maybeRenderTargetAndRexture ) {
+			// TODO: Eliminate the duplication with the code below
+			wsw::failWithRuntimeError( "Failed to create miniview render target" );
+		}
+		auto *const components = new( m_miniviewRenderTarget.unsafe_grow_back() )RenderTargetComponents;
+		components->renderTarget = maybeRenderTargetAndRexture->first;
+		components->texture      = maybeRenderTargetAndRexture->second;
+		components->depthBuffer  = m_miniviewRenderTargetDepthBuffer;
+
+		// Setup attachments TODO: Fix state management
+		RB_BindFrameBufferObject( components );
+		RB_BindFrameBufferObject( nullptr );
+	} else {
+		// TODO: Eliminate this duplication
+		wsw::failWithRuntimeError( "Failed to create miniview render target" );
+	}
+
+	const auto portalBufferSide = wsw::min<unsigned>( 1 << Q_log2( wsw::max( 1, r_portalmaps_maxtexsize->integer ) ),
+													  wsw::min( 1024, glConfig.maxRenderbufferSize ) );
 
 	// TODO: Should we use separate depth buffers?
-	m_renderTargetDepthBuffer = m_factory.createRenderTargetDepthBuffer( side, side );
-	if( m_renderTargetDepthBuffer ) {
+	m_portalRenderTargetDepthBuffer = m_factory.createRenderTargetDepthBuffer( portalBufferSide, portalBufferSide );
+	if( m_portalRenderTargetDepthBuffer ) {
 		do {
-			RenderTarget *renderTarget = m_factory.createRenderTarget();
-			if( !renderTarget ) {
-				break;
-			}
-			RenderTargetTexture *texture = m_factory.createRenderTargetTexture( side, side );
-			if( !texture ) {
-				m_factory.releaseRenderTarget( renderTarget );
+			auto maybeRenderTargetAndTexture = createRenderTargetAndTexture( portalBufferSide, portalBufferSide );
+			if( !maybeRenderTargetAndTexture ) {
 				break;
 			}
 			auto *const components   = new( m_portalRenderTargets.unsafe_grow_back() )PortalRenderTargetComponents;
-			components->renderTarget = renderTarget;
-			components->texture      = texture;
-			components->depthBuffer  = m_renderTargetDepthBuffer;
+			components->renderTarget = maybeRenderTargetAndTexture->first;
+			components->texture      = maybeRenderTargetAndTexture->second;
+			components->depthBuffer  = m_portalRenderTargetDepthBuffer;
 		} while( !m_portalRenderTargets.full() );
 	}
 }
@@ -95,32 +111,56 @@ TextureCache::~TextureCache() {
 		m_factory.releaseBuiltinTexture( texture );
 	}
 
-	for( RenderTargetComponents &components : m_portalRenderTargets ) {
-		if( RenderTarget *attachmentTarget = components.texture->attachedToRenderTarget ) {
+	wsw::StaticVector<RenderTargetComponents *, kMaxPortalRenderTargets + 1> allRenderTargets;
+	for( RenderTargetComponents &components: m_portalRenderTargets ) {
+		allRenderTargets.push_back( std::addressof( components ) );
+	}
+	allRenderTargets.push_back( std::addressof( m_miniviewRenderTarget.front() ) );
+
+	for( RenderTargetComponents *components: allRenderTargets ) {
+		if( RenderTarget *attachmentTarget = components->texture->attachedToRenderTarget ) {
 			qglBindFramebuffer( GL_FRAMEBUFFER, attachmentTarget->fboId );
 			qglFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0 );
-			components.texture->attachedToRenderTarget = nullptr;
-			attachmentTarget->attachedTexture          = nullptr;
-			m_factory.releaseRenderTargetTexture( components.texture );
+			components->texture->attachedToRenderTarget = nullptr;
+			attachmentTarget->attachedTexture           = nullptr;
+			m_factory.releaseRenderTargetTexture( components->texture );
 		}
 	}
 
-	if( m_renderTargetDepthBuffer ) {
-		if( RenderTarget *attachmentTarget = m_renderTargetDepthBuffer->attachedToRenderTarget ) {
-			qglBindFramebuffer( GL_FRAMEBUFFER, attachmentTarget->fboId );
-			qglFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0 );
-			m_renderTargetDepthBuffer->attachedToRenderTarget = nullptr;
-			attachmentTarget->attachedDepthBuffer             = nullptr;
+	for( RenderTargetDepthBuffer *depthBuffer: { m_portalRenderTargetDepthBuffer, m_miniviewRenderTargetDepthBuffer } ) {
+		if( depthBuffer ) {
+			if( RenderTarget *attachmentTarget = depthBuffer->attachedToRenderTarget ) {
+				qglBindFramebuffer( GL_FRAMEBUFFER, attachmentTarget->fboId );
+				qglFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0 );
+				depthBuffer->attachedToRenderTarget  = nullptr;
+				attachmentTarget->attachedDepthBuffer = nullptr;
+			}
+			m_factory.releaseRenderTargetDepthBuffer( depthBuffer );
 		}
-
-		m_factory.releaseRenderTargetDepthBuffer( m_renderTargetDepthBuffer );
 	}
 
-	for( RenderTargetComponents &components : m_portalRenderTargets ) {
+	for( RenderTargetComponents &components: m_portalRenderTargets ) {
+		m_factory.releaseRenderTarget( components.renderTarget );
+	}
+	for( RenderTargetComponents &components: m_miniviewRenderTarget ) {
 		m_factory.releaseRenderTarget( components.renderTarget );
 	}
 
 	qglBindFramebuffer( GL_FRAMEBUFFER, 0 );
+}
+
+auto TextureCache::createRenderTargetAndTexture( unsigned width, unsigned height )
+	-> std::optional<std::pair<RenderTarget *, RenderTargetTexture *>> {
+	RenderTarget *renderTarget = m_factory.createRenderTarget();
+	if( !renderTarget ) {
+		return std::nullopt;
+	}
+	RenderTargetTexture *texture = m_factory.createRenderTargetTexture( width, height );
+	if( !texture ) {
+		m_factory.releaseRenderTarget( renderTarget );
+		return std::nullopt;
+	}
+	return std::make_pair( renderTarget, texture );
 }
 
 auto TextureManagementShared::makeCleanName( const wsw::StringView &rawName, const wsw::StringView &suffix )
@@ -361,4 +401,8 @@ auto TextureCache::getPortalRenderTarget( unsigned drawSceneFrameNum ) -> Render
 	}
 
 	return nullptr;
+}
+
+auto TextureCache::getMiniviewRenderTarget() -> RenderTargetComponents * {
+	return m_miniviewRenderTarget.data();
 }

@@ -1290,6 +1290,10 @@ static void createDrawSceneRequests( DrawSceneRequest **drawSceneRequests, bool 
 			rd->fov_y *= v;
 		}
 
+		if( viewNum > 0 && !actuallyUseTiledMode ) {
+			viewState->view.refdef.renderTarget = GetMiniviewRenderTarget();
+		}
+
 		drawSceneRequests[viewNum] = CreateDrawSceneRequest( viewState->view.refdef );
 	}
 
@@ -1390,18 +1394,48 @@ static void prepareDrawSceneRequests( DrawSceneRequest **drawSceneRequests, cons
 	EndProcessingOfTasks();
 }
 
+static void commitDrawSceneRequests( DrawSceneRequest **drawSceneRequests, bool actuallyUseTiledMode,
+									 const unsigned *viewStateIndices, unsigned numDisplayedViewStates ) {
+	WSW_PROFILER_SCOPE();
+
+	for( unsigned viewNum = 0; viewNum < numDisplayedViewStates; ++viewNum ) {
+		if( actuallyUseTiledMode || viewNum == 0 || (int)( cg.frameCount % 4 ) == (int)( ( viewNum - 1 ) % 4 ) ) {
+			CommitProcessedDrawSceneRequest( drawSceneRequests[viewNum] );
+		} else {
+			assert( cg.viewStates[viewStateIndices[viewNum]].view.refdef.renderTarget );
+		}
+	}
+}
+
 [[nodiscard]]
-static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actuallyUseTiledMode, bool hasModalOverlay,
+static bool blitPreparedViews( DrawSceneRequest **requests, bool actuallyUseTiledMode, bool hasModalOverlay,
 							   const unsigned *viewStateIndices, unsigned numDisplayedViewStates ) {
 	WSW_PROFILER_SCOPE();
 
-	bool hasRenderedTheMenu    = false;
-	auto *const uiSystem       = wsw::ui::UISystem::instance();
-	const bool shouldDrawHuds  = v_showHud.get();
+	bool hasRenderedTheMenu = false;
+
 	const bool shouldDraw2D    = v_draw2D.get();
+	const bool shouldDrawHuds  = v_showHud.get();
+
+	assert( cgs.vidWidth > 0 && cgs.vidHeight > 0 );
+
+	const float rcpVidWidth  = 1.0f / (float)cgs.vidWidth;
+	const float rcpVidHeight = 1.0f / (float)cgs.vidHeight;
+
 	for( unsigned viewNum = 0; viewNum < numDisplayedViewStates; ++viewNum ) {
 		ViewState *const viewState = cg.viewStates + viewStateIndices[viewNum];
-		CommitProcessedDrawSceneRequest( drawSceneRequests[viewNum] );
+		refdef_t &rd = viewState->view.refdef;
+		if( auto *renderTarget = rd.renderTarget ) {
+			const float tcX0 = rcpVidWidth * (float)rd.x;
+			const float tcY0 = rcpVidHeight * (float)( cgs.vidHeight - rd.y );
+			const float tcX1 = rcpVidWidth * (float)( rd.x + rd.width );
+			const float tcY1 = rcpVidHeight * (float)( cgs.vidHeight - ( rd.y + rd.height ) );
+
+			shader_s *shader = R_WrapMiniviewRenderTargetInMaterial( renderTarget );
+
+			RF_Set2DScissor( rd.x, rd.y, rd.width, rd.height );
+			R_DrawStretchPic( rd.x, rd.y, rd.width, rd.height, tcX0, tcY0, tcX1, tcY1, colorWhite, shader );
+		}
 
 		const bool isMiniview = viewNum != 0 || actuallyUseTiledMode;
 		if( shouldDraw2D && viewState->view.draw2D ) {
@@ -1425,14 +1459,13 @@ static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actual
 				}
 			}
 
-			const refdef_t &rd = viewState->view.refdef;
 			RF_Set2DScissor( rd.x, rd.y, rd.width, rd.height );
 
 			if( shouldDrawHuds ) {
 				if( drawGfx ) {
 					std::optional<float> miniviewScale;
 					if( isMiniview ) {
-						miniviewScale = wsw::min( (float)rd.width / (float)cgs.vidWidth, (float)rd.height / (float)cgs.vidHeight );
+						miniviewScale = wsw::min( rcpVidWidth * (float)rd.width, rcpVidHeight * (float)rd.height );
 					}
 					drawNamesAndBeacons( viewState, miniviewScale );
 					if( drawCrosshair ) {
@@ -1444,7 +1477,9 @@ static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actual
 
 		if( !isMiniview ) {
 			RF_Set2DScissor( 0, 0, cgs.vidWidth, cgs.vidHeight );
-			uiSystem->drawMenuPartInMainContext();
+			wsw::ui::UISystem::instance()->drawMenuPartInMainContext();
+			// TODO: The UI system should restore 2D mode on its own
+			R_Set2DMode( true );
 			hasRenderedTheMenu = true;
 		}
 	}
@@ -1522,6 +1557,11 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 			createDrawSceneRequests( drawSceneRequests, actuallyUseTiledMode, viewRects, viewStateIndices, numDisplayedViewStates );
 
 			prepareDrawSceneRequests( drawSceneRequests, viewStateIndices, numDisplayedViewStates );
+
+			commitDrawSceneRequests( drawSceneRequests, actuallyUseTiledMode, viewStateIndices, numDisplayedViewStates );
+
+			EndDrawingScenes();
+
 			result.hasRenderedUIInternally = true;
 
 			auto *const uiSystem       = wsw::ui::UISystem::instance();
@@ -1529,7 +1569,6 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 			result.hasBlittedTheMenu   = blitPreparedViews( drawSceneRequests, actuallyUseTiledMode, hasModalOverlay,
 															viewStateIndices, numDisplayedViewStates );
 
-			EndDrawingScenes();
 			CG_ResetTemporaryBoneposesCache();
 
 			// Blit the HUD first in this case (this is a hack for the demo playback menu which must be on top)
