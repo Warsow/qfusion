@@ -1,26 +1,41 @@
-# qfusion
+
+# Contents
+
+- [Contents](#contents)
+- [What is qfusion?](#what-is-qfusion)
+  - [Main features](#main-features)
+- [Build Instructions](#build-instructions)
+  - [Building dependencies](#building-dependencies)
+    - [Linux](#linux)
+    - [Windows](#windows)
+  - [Building and Running The Engine](#building-and-running-the-engine)
+- [Contributions](#contributions)
+  - [Pull Requests](#pull-requests)
+  - [Issues and Help](#issues-and-help)
+- [License](#license)
+
+
+# What is qfusion
 
 This is <a href="https://www.warsow.net/">Warsow</a>'s fork
 of <a href="http://qfusion.github.io/qfusion/">qfusion</a>, the id Tech 2 derived game engine
 
-## License (GPLv2)
+## Main Features
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+- Fully open-source under the GPLv2 and easy to mod
+- Runs on Linux, Windows and Android (in development)
+- Modern and fast OpenGL 3.0 and OpenGL ES 3.0 renderer, running in a dedicated program thread
+- Realtime lighting and shadows via omnidirectional and cascaded shadow maps
+- Support for vertex and skeletal animation
+- HDR & Bloom support with configurable color correction profiles
+- Fullscreen Anti-Aliasing support in the form of MSAA or FXAA
+- Powerful multiplayer & eSports features (global stats, friend lists, IRC, TV-server, etc.)
+- Ready to go FPS example gametype scripts from Warsow
+- Multithreaded sound mixer design
+- OpenAL support
+- Hardware-accelerated Ogg Theora video playback
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-
-See the GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-
-## Build instructions
+# Build Instructions
 
 Clone the repository and its submodules
 
@@ -28,7 +43,7 @@ Clone the repository and its submodules
 git clone --recursive https://github.com/Warsow/qfusion
 ```
 
-### Building dependencies
+## Building Dependencies
 
 You have to navigate to `qfusion/third-party` and build CMake-based `angelscript` and `openal-soft` subprojects.
 This has to be done once upon initial setup.
@@ -108,7 +123,7 @@ configure -static -release -opensource -confirm-license -opengl desktop ^
 Visit https://doc.qt.io/qt-5/windows-building.html for more information
 </details>
 
-### Building and running the engine
+## Building and Running The Engine
 
 Linux command line for configuration looks like this (assuming Qt is built and installed into `/opt/qt/5.13.2`)
 
@@ -127,3 +142,39 @@ Executables are found in `qfusion/source/build` subdirectory.
 
 Having built the engine, you have run it from a directory which contains `basewsw` subdirectory with data files
 of Warsow 2.6+ (visit Warsow website/Warsow Discord for details).
+
+
+# Contributions
+
+We greatly appreciate any contributions to this project and want to make it as transparent as possible
+
+## Pull Requests
+We welcome your pull requests greatly.
+
+- Fork the repo and create your branch from main.
+- If you've added code that should be tested, add tests.
+- If you've changed APIs, update the documentation.
+- Ensure all tests and GitHub Actions workflows checks pass.
+- Make sure your code lints.
+
+## Issues and Help
+We use GitHub issues to track any bugs, help requests, duplicates, enhancements, or questions. Please ensure your description is clear enough so that an issue can be reproduced or so that someone else can understand how they can help you.
+
+# License
+
+The qfusion software is under <a href="https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html">(GPLv2)</a> license.
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
