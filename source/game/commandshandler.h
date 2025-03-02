@@ -57,6 +57,7 @@ public:
 	static ClientCommandsHandler *instance();
 
 	ClientCommandsHandler();
+	~ClientCommandsHandler();
 
 	void precacheCommands();
 

@@ -36,7 +36,12 @@ void AasElementsMask::Init( AiAasWorld *aasWorld ) {
 }
 
 void AasElementsMask::Shutdown() {
+	for( BitVector &bv: bitVectorsHolder ) {
+		Q_free( bv.words );
+	}
+
 	::bitVectorsHolder.clear();
+
 	// Vectors do not manage the lifetime of supplied scratchpad but the level pool should take care of this
 	areasMask = nullptr;
 	facesMask = nullptr;

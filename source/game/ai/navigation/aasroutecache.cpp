@@ -932,17 +932,16 @@ void AiAasRouteCache::FreeAreaAndPortalCacheMemory( void *ptr ) {
 }
 
 void AiAasRouteCache::FreeAreaAndPortalMemoryPools() {
-	auto *bin = areaAndPortalCacheHead;
-	while( bin ) {
-		// Don't trigger "use after free"
-		auto *nextBin = bin->next;
+	for( AreaAndPortalCacheAllocatorBin *bin = areaAndPortalCacheHead, *nextBin = nullptr; bin; bin = nextBin ) {
+		nextBin = bin->next;
+		bin->~AreaAndPortalCacheAllocatorBin();
 		Q_free( bin );
-		bin = nextBin;
 	}
 
 	int binsTableCapacity = sizeof( areaAndPortalSmallBinsTable ) / sizeof( areaAndPortalSmallBinsTable[0] );
 	for( int i = 0; i < binsTableCapacity; ++i ) {
 		if( areaAndPortalSmallBinsTable[i] ) {
+			areaAndPortalSmallBinsTable[i]->~AreaAndPortalCacheAllocatorBin();
 			Q_free( areaAndPortalSmallBinsTable[i] );
 		}
 	}

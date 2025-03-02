@@ -63,6 +63,8 @@ AasStaticRouteTable::AasStaticRouteTable( const char *mapName ) {
 AasStaticRouteTable::~AasStaticRouteTable() {
 	Q_free( m_dataForAllowedFlags.entries );
 	Q_free( m_dataForAllowedFlags.areaNums );
+	Q_free( m_walkingAreaNums );
+	Q_free( m_walkingTravelTimes );
 
 	Q_free( m_bufferSpans );
 }

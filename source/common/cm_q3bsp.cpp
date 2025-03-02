@@ -596,7 +596,7 @@ static void CMod_LoadFaces_RBSP( cmodel_state_t *cms, lump_t *l ) {
 		out->contents = 0;
 		out->numfacets = 0;
 		out->facets = NULL;
-		cms->map_face_brushdata[0] = NULL;
+		cms->map_face_brushdata[i] = NULL;
 		out->globalNumber = (unsigned)( i + 1 );
 		if( LittleLong( in->facetype ) != FACETYPE_PATCH ) {
 			continue;

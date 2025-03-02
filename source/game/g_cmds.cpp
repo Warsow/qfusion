@@ -1392,6 +1392,15 @@ ClientCommandsHandler::ClientCommandsHandler() {
 	addBuiltin( "upstate"_asHView, Cmd_Upstate_f );
 }
 
+ClientCommandsHandler::~ClientCommandsHandler() {
+	const auto dtor = [this]( Callback *cb ) {
+		cb->~Callback();
+		m_allocator.free( cb );
+	};
+	removeByTag( kBuiltinTag, dtor );
+	removeByTag( kScriptTag, dtor );
+}
+
 void ClientCommandsHandler::handleClientCommand( edict_t *ent, uint64_t clientCommandNum, const CmdArgs &cmdArgs ) {
 	// Check whether the client is fully in-game
 	if( ent->r.client && G_GetClientState( PLAYERNUM( ent ) ) >= CS_SPAWNED ) {

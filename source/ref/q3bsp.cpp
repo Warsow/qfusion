@@ -1228,6 +1228,7 @@ static void Mod_LoadLeafs( const lump_t *l, const lump_t *msLump ) {
 		// TODO: Fix the inconsistency of using numMarkSurfaces
 		size = ( numVisSurfaces + numFragmentSurfaces + numMarkSurfaces ) * sizeof( unsigned );
 		buffer = ( uint8_t * )Q_malloc( size );
+		out->surfDataToFree = buffer;
 
 		out->visSurfaces = ( unsigned * )buffer;
 		buffer += numVisSurfaces * sizeof( unsigned );
@@ -1768,7 +1769,7 @@ void Mod_DestroyQ3BrushModel( mbrushmodel_t *model ) {
 		Q_free( model->surfaces[i].mesh.xyzArray );
 	}
 	for( unsigned i = 0; i < model->numleafs; ++i ) {
-		Q_free( model->leafs[i].visSurfaces );
+		Q_free( model->leafs[i].surfDataToFree );
 	}
 
 	Q_free( model->pvs );
@@ -1784,5 +1785,8 @@ void Mod_DestroyQ3BrushModel( mbrushmodel_t *model ) {
 	Q_free( model->surfaces );
 	Q_free( model->mergedSurfaces );
 	Q_free( model->submodels );
+	Q_free( model->occluderBoundsEntries );
+	Q_free( model->occluderDataEntries );
+	// Must be performed last
 	Q_free( model->inlines );
 }

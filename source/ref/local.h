@@ -911,6 +911,9 @@ typedef struct mleaf_s {
 	unsigned *visSurfaces;
 	unsigned *fragmentSurfaces;
 
+	// visSurfaces gets reassigned...
+	void *surfDataToFree;
+
 	unsigned numVisSurfaces;
 	unsigned numFragmentSurfaces;
 } mleaf_t;
