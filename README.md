@@ -40,7 +40,86 @@ We use our custom static build of Qt. You have to download Qt 5.13.2 source bund
 39a0465610f70d9f877f42fc5337d1ac  qt-everywhere-src-5.13.2.zip
 ```
 
-Build instructions follow.
+Regardless of the actual platform, you have to apply this patch:
+
+<details>
+<summary>Qml GC modification</summary>
+
+```
+diff --git a/qtdeclarative/src/qml/memory/qv4mm.cpp b/qtdeclarative/src/qml/memory/qv4mm.cpp
+index cac68bdca..171ba74a4 100644
+--- a/qtdeclarative/src/qml/memory/qv4mm.cpp
++++ b/qtdeclarative/src/qml/memory/qv4mm.cpp
+@@ -64,6 +64,8 @@
+ #include "qv4mapobject_p.h"
+ #include "qv4setobject_p.h"
+
++size_t qt_wswHeapSizeGCThreshold;
++
+//#define MM_STATS
+
+#if !defined(MM_STATS) && !defined(QT_NO_DEBUG)
+diff --git a/qtdeclarative/src/qml/memory/qv4mm_p.h b/qtdeclarative/src/qml/memory/qv4mm_p.h
+index 6dfdd81cb..f8099786b 100644
+--- a/qtdeclarative/src/qml/memory/qv4mm_p.h
++++ b/qtdeclarative/src/qml/memory/qv4mm_p.h
+@@ -64,6 +64,8 @@
+
+#define MM_DEBUG 0
+
++extern size_t qt_wswHeapSizeGCThreshold;
++
+QT_BEGIN_NAMESPACE
+
+namespace QV4 {
+@@ -296,36 +298,19 @@ private:
+
+     HeapItem *allocate(BlockAllocator *allocator, std::size_t size)
+     {
+-        bool didGCRun = false;
+         if (aggressiveGC) {
+             runGC();
+-            didGCRun = true;
+-        }
+-
+-        if (unmanagedHeapSize > unmanagedHeapSizeGCLimit) {
+-            if (!didGCRun)
++        } else {
++            // Note: We don't care of hugeItemAllocator as it stays unused
++            // in our setup and tracking of the actual size is complicated.
++            if (unmanagedHeapSize + (blockAllocator.allocatedMem() + icAllocator.allocatedMem()) > qt_wswHeapSizeGCThreshold) {
+                 runGC();
+-
+-            if (3*unmanagedHeapSizeGCLimit <= 4 * unmanagedHeapSize) {
+-                // more than 75% full, raise limit
+-                unmanagedHeapSizeGCLimit = std::max(unmanagedHeapSizeGCLimit,
+-                                                    unmanagedHeapSize) * 2;
+-            } else if (unmanagedHeapSize * 4 <= unmanagedHeapSizeGCLimit) {
+-                // less than 25% full, lower limit
+-                unmanagedHeapSizeGCLimit = qMax(std::size_t(MinUnmanagedHeapSizeGCLimit),
+-                                                unmanagedHeapSizeGCLimit/2);
+             }
+-            didGCRun = true;
+         }
+
+-        if (size > Chunk::DataSize)
+-            return hugeItemAllocator.allocate(size);
+-
+-        if (HeapItem *m = allocator->allocate(size))
+-            return m;
+-
+-        if (!didGCRun && shouldRunGC())
+-            runGC();
++        if (size > Chunk::DataSize) {
++            return hugeItemAllocator.allocate( size );
++        }
+
+         return allocator->allocate(size, true);
+  }
+```
+</details>
+
+Platform-specific build instructions follow.
 
 <details>
 <summary>Linux</summary>

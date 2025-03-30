@@ -77,6 +77,9 @@ bool GLimp_EndUIRenderingHacks();
 extern BoolConfigVar v_showFps;
 extern BoolConfigVar v_showNet;
 
+// See the respective Qt patch
+extern size_t qt_wswHeapSizeGCThreshold;
+
 static FloatConfigVar v_mouseSensitivity { "ui_mouseSensitivity"_asView, {
 	.byDefault = 1.0f, .min = inclusive( 0.5f ), .max = inclusive( 5.0f ), .flags = CVAR_ARCHIVE, }
 };
@@ -85,6 +88,11 @@ static FloatConfigVar v_mouseAccel { "ui_mouseAccel"_asView, {
 };
 static BoolConfigVar v_debugNativelyDrawnItems { "ui_debugNativelyDrawnItems"_asView, {
 	.byDefault = false, .flags = CVAR_DEVELOPER, }
+};
+
+// Let the upper bound be exclusive, so the limit fits 32 bits
+static UnsignedConfigVar v_heapSizeGCThreshold { "ui_heapSizeGCThreshold"_asView, {
+	.byDefault = 512u, .min = inclusive( 4u ), .max = exclusive( 4096u ), .flags = CVAR_ARCHIVE },
 };
 
 namespace wsw::ui {
@@ -635,6 +643,7 @@ private:
 	static void registerFont( const wsw::StringView &path );
 	static void registerCustomQmlTypes();
 	static void retrieveVideoModes();
+	static void updateGCThreshold();
 
 	enum SandboxKind { MenuSandbox, HudSandbox };
 	void registerContextProperties( QQmlContext *context, SandboxKind sandboxKind );
@@ -739,6 +748,10 @@ private:
 	auto convertQuakeKeyToQtKey( int quakeKey ) const -> std::optional<Qt::Key>;
 };
 
+void QtUISystem::updateGCThreshold() {
+	qt_wswHeapSizeGCThreshold = (size_t)( 1024 * 1024 ) * (size_t)v_heapSizeGCThreshold.get();
+}
+
 [[nodiscard]]
 static bool isAPrintableChar( int ch ) {
 	// See https://en.cppreference.com/w/cpp/string/byte/isprint
@@ -776,6 +789,8 @@ void QtUISystem::initPersistentPart( int pixelsPerLogicalUnit ) {
 		}
 
 		retrieveVideoModes();
+
+		updateGCThreshold();
 	}
 }
 
@@ -1906,6 +1921,8 @@ void QtUISystem::refreshProperties() {
 		const char *const playlist = "sounds/music/menu.m3u";
 		SoundSystem::instance()->startBackgroundTrack( playlist, playlist, 3 );
 	}
+
+	updateGCThreshold();
 }
 
 bool QtUISystem::handleMouseMovement( float frameTime, int dx, int dy ) {
