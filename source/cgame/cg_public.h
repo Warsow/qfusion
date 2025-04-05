@@ -99,6 +99,7 @@ struct CGRenderViewResult {
 	bool hasBlittedTheMenu { false };
 	bool hasBlittedTheHud { false };
 	bool hasRenderedUIInternally { false };
+	bool hasRunGCIfNeeded { false };
 };
 
 CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t serverTime, unsigned extrapolationTime );

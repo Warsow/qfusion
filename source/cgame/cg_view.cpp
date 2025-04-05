@@ -1420,6 +1420,11 @@ static void prepareDrawSceneRequests( DrawSceneRequest **drawSceneRequests, unsi
 		return coPrepareDrawSceneRequests( si, drawSceneRequests, useCachedViewsMask, viewStateIndices, numDisplayedViewStates );
 	});
 
+	// Let worker threads execute while we are running GC in the main thread.
+	// We must note that this approach is benefitial only for small GC threshold values
+	// (otherwise, the spike is way too large to be hidden anyway).
+	wsw::ui::UISystem::instance()->runGCIfNeeded( cls.realtime );
+
 	EndProcessingOfTasks();
 }
 
@@ -1523,6 +1528,7 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 		.hasBlittedTheMenu       = false,
 		.hasBlittedTheHud        = false,
 		.hasRenderedUIInternally = false,
+		.hasRunGCIfNeeded        = false,
 	};
 
 	// update time
@@ -1587,6 +1593,7 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 																		 viewStateIndices, numDisplayedViewStates );
 
 			prepareDrawSceneRequests( drawSceneRequests, useCachedViewsMask, viewStateIndices, numDisplayedViewStates );
+			result.hasRunGCIfNeeded = true;
 
 			commitDrawSceneRequests( drawSceneRequests, actuallyUseTiledMode, viewStateIndices, numDisplayedViewStates );
 

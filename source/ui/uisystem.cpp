@@ -157,6 +157,8 @@ public:
 	void drawHudPartInMainContext() override;
 	void drawCursorInMainContext() override;
 
+	void runGCIfNeeded( int64_t clientRealTime ) override;
+
 	void beginRegistration() override;
 	void endRegistration() override;
 
@@ -637,13 +639,17 @@ private:
 
 	VarModificationTracker m_debugNativelyDrawnItemsChangesTracker { &v_debugNativelyDrawnItems };
 
+	bool m_hasStartedSandboxGCSequence { false };
+	int64_t m_lastGCClientTime { 0 };
+
 	static void initPersistentPart( int logicalUnitsToPixelRatio );
 	static void registerFonts();
 	static void registerFontFlavorsFromDirectory( const wsw::StringView &shortDirectoryName );
 	static void registerFont( const wsw::StringView &path );
 	static void registerCustomQmlTypes();
 	static void retrieveVideoModes();
-	static void updateGCThreshold();
+	[[maybe_unused]]
+	static bool updateGCThreshold();
 
 	enum SandboxKind { MenuSandbox, HudSandbox };
 	void registerContextProperties( QQmlContext *context, SandboxKind sandboxKind );
@@ -748,8 +754,10 @@ private:
 	auto convertQuakeKeyToQtKey( int quakeKey ) const -> std::optional<Qt::Key>;
 };
 
-void QtUISystem::updateGCThreshold() {
+bool QtUISystem::updateGCThreshold() {
+	const auto oldGCTreshold  = qt_wswHeapSizeGCThreshold;
 	qt_wswHeapSizeGCThreshold = (size_t)( 1024 * 1024 ) * (size_t)v_heapSizeGCThreshold.get();
+	return oldGCTreshold > qt_wswHeapSizeGCThreshold;
 }
 
 [[nodiscard]]
@@ -1049,13 +1057,6 @@ auto UISystem::instance() -> UISystem * {
 
 void QtUISystem::renderInternally() {
 	WSW_PROFILER_SCOPE();
-
-	/*
-	if( m_hudSandbox ) {
-		const auto before = Sys_Microseconds();
-		m_hudSandbox->m_engine->collectGarbage();
-		uiNotice() << "Collecting garbage took" << ( Sys_Microseconds() - before ) << "micros";
-	}*/
 
 	if( m_menuSandbox && m_menuSandbox->requestsRendering() ) {
 		enterUIRenderingMode();
@@ -1533,6 +1534,25 @@ void QtUISystem::drawBackgroundMapIfNeeded() {
 	EndDrawingScenes();
 }
 
+void QtUISystem::runGCIfNeeded( int64_t clientRealTime ) {
+	WSW_PROFILER_SCOPE();
+
+	bool shouldStartSandboxGCSequence = updateGCThreshold();
+	if( updateGCThreshold() ) {
+		if( m_lastGCClientTime + 1000 < clientRealTime ) {
+			shouldStartSandboxGCSequence = true;
+		}
+	}
+
+	if( shouldStartSandboxGCSequence ) {
+		m_menuSandbox->m_engine->collectGarbage();
+		m_hasStartedSandboxGCSequence = true;
+	} else if( m_hasStartedSandboxGCSequence ) {
+		m_hudSandbox->m_engine->collectGarbage();
+		m_hasStartedSandboxGCSequence = false;
+	}
+}
+
 void QtUISystem::beginRegistration() {
 }
 
@@ -1921,8 +1941,6 @@ void QtUISystem::refreshProperties() {
 		const char *const playlist = "sounds/music/menu.m3u";
 		SoundSystem::instance()->startBackgroundTrack( playlist, playlist, 3 );
 	}
-
-	updateGCThreshold();
 }
 
 bool QtUISystem::handleMouseMovement( float frameTime, int dx, int dy ) {

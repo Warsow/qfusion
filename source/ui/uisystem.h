@@ -43,6 +43,8 @@ public:
 	virtual void drawHudPartInMainContext() = 0;
 	virtual void drawCursorInMainContext() = 0;
 
+	virtual void runGCIfNeeded( int64_t clientRealTime ) = 0;
+
 	virtual void beginRegistration() = 0;
 	virtual void endRegistration() = 0;
 
