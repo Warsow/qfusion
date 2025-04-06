@@ -1941,6 +1941,11 @@ void QtUISystem::refreshProperties() {
 	const auto timestamp = getFrameTimestamp();
 	VideoPlaybackSystem::instance()->update( timestamp );
 	m_hudCommonDataModel.checkPropertyChanges( timestamp );
+
+	const auto oldPovPlayerNum  = m_hudPovDataModel.getPlayerNum();
+	const bool wasPovAlive      = m_hudPovDataModel.isPovAlive();
+	const bool wasUsingChasePov = m_hudPovDataModel.isUsingChasePov();
+
 	if( CG_IsViewAttachedToPlayer() ) {
 		const unsigned viewStateIndex = CG_GetPrimaryViewStateIndex();
 		m_hudPovDataModel.setViewStateIndex( viewStateIndex );
@@ -1953,7 +1958,21 @@ void QtUISystem::refreshProperties() {
 		m_hudPovDataModel.setViewStateIndex( CG_GetOurClientViewStateIndex() );
 		m_hudPovDataModel.clearPlayerNum();
 	}
+
 	m_hudPovDataModel.checkPropertyChanges( timestamp );
+
+	if( m_hudPovDataModel.isUsingChasePov() != wasUsingChasePov ) {
+		m_hasPendingAdviseGCRequest = true;
+	} else if( m_hudPovDataModel.isUsingChasePov() ) {
+		if( m_hudPovDataModel.getPlayerNum() != oldPovPlayerNum ) {
+			m_hasPendingAdviseGCRequest = true;
+		}
+	} else {
+		// Don't trigger GC unless we are really resuming gameplay.
+		if( m_hudPovDataModel.isPovAlive() && !wasPovAlive ) {
+			m_hasPendingForceGCRequest = true;
+		}
+	}
 
 	updateCVarAwareControls();
 	updateHudOccluders();

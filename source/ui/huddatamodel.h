@@ -367,6 +367,10 @@ public:
 	void setPlayerNum( unsigned playerNum );
 	[[nodiscard]]
 	auto getPlayerNum() const -> std::optional<unsigned>;
+	[[nodiscard]]
+	bool isPovAlive() const { return m_isPovAlive; }
+	[[nodiscard]]
+	bool isUsingChasePov() const { return m_isUsingChasePov; }
 	void clearPlayerNum();
 private:
 	[[nodiscard]]
