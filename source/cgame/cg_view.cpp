@@ -1423,7 +1423,7 @@ static void prepareDrawSceneRequests( DrawSceneRequest **drawSceneRequests, unsi
 	// Let worker threads execute while we are running GC in the main thread.
 	// We must note that this approach is benefitial only for small GC threshold values
 	// (otherwise, the spike is way too large to be hidden anyway).
-	wsw::ui::UISystem::instance()->runGCIfNeeded( cls.realtime );
+	wsw::ui::UISystem::instance()->runGCIfNeeded();
 
 	EndProcessingOfTasks();
 }

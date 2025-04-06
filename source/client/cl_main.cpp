@@ -1455,7 +1455,7 @@ void SCR_UpdateScreen( void ) {
 	}
 
 	if( !cgRenderViewResult.hasRunGCIfNeeded ) {
-		uiSystem->runGCIfNeeded( cls.realtime );
+		uiSystem->runGCIfNeeded();
 	}
 
 	if( !hasRenderedUI ) {

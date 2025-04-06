@@ -157,7 +157,7 @@ public:
 	void drawHudPartInMainContext() override;
 	void drawCursorInMainContext() override;
 
-	void runGCIfNeeded( int64_t clientRealTime ) override;
+	void runGCIfNeeded() override;
 
 	void beginRegistration() override;
 	void endRegistration() override;
@@ -642,7 +642,7 @@ private:
 	bool m_hasStartedSandboxGCSequence { false };
 	bool m_hasPendingAdviseGCRequest { false };
 	bool m_hasPendingForceGCRequest { false };
-	int64_t m_lastGCClientTime { 0 };
+	int64_t m_lastGCTimestamp { 0 };
 
 	static void initPersistentPart( int logicalUnitsToPixelRatio );
 	static void registerFonts();
@@ -1536,19 +1536,21 @@ void QtUISystem::drawBackgroundMapIfNeeded() {
 	EndDrawingScenes();
 }
 
-void QtUISystem::runGCIfNeeded( int64_t clientRealTime ) {
+void QtUISystem::runGCIfNeeded() {
 	WSW_PROFILER_SCOPE();
 
 	// Update the threshold every frame
 	[[maybe_unused]]
 	const bool shouldStartGCDueToThresholdChange = updateGCThreshold();
+	[[maybe_unused]]
+	const auto currTimestamp = getFrameTimestamp();
 
 	bool shouldStartSandboxGCSequence = false;
 	if( m_hasPendingForceGCRequest ) {
 		shouldStartSandboxGCSequence = true;
 	} else if( shouldStartGCDueToThresholdChange || m_hasPendingAdviseGCRequest ) {
 		// Apply cooldown if the request is advisory, not forceful
-		if( m_lastGCClientTime + 1000 < clientRealTime ) {
+		if( m_lastGCTimestamp + 1000 < currTimestamp ) {
 			shouldStartSandboxGCSequence = true;
 		}
 	}
@@ -1558,7 +1560,7 @@ void QtUISystem::runGCIfNeeded( int64_t clientRealTime ) {
 	if( shouldStartSandboxGCSequence ) {
 		m_menuSandbox->m_engine->collectGarbage();
 		m_hasStartedSandboxGCSequence = true;
-		m_lastGCClientTime = clientRealTime;
+		m_lastGCTimestamp = currTimestamp;
 	} else if( m_hasStartedSandboxGCSequence ) {
 		m_hudSandbox->m_engine->collectGarbage();
 		m_hasStartedSandboxGCSequence = false;
