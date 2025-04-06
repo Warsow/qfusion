@@ -640,6 +640,8 @@ private:
 	VarModificationTracker m_debugNativelyDrawnItemsChangesTracker { &v_debugNativelyDrawnItems };
 
 	bool m_hasStartedSandboxGCSequence { false };
+	bool m_hasPendingAdviseGCRequest { false };
+	bool m_hasPendingForceGCRequest { false };
 	int64_t m_lastGCClientTime { 0 };
 
 	static void initPersistentPart( int logicalUnitsToPixelRatio );
@@ -1537,16 +1539,26 @@ void QtUISystem::drawBackgroundMapIfNeeded() {
 void QtUISystem::runGCIfNeeded( int64_t clientRealTime ) {
 	WSW_PROFILER_SCOPE();
 
-	bool shouldStartSandboxGCSequence = updateGCThreshold();
-	if( updateGCThreshold() ) {
+	// Update the threshold every frame
+	[[maybe_unused]]
+	const bool shouldStartGCDueToThresholdChange = updateGCThreshold();
+
+	bool shouldStartSandboxGCSequence = false;
+	if( m_hasPendingForceGCRequest ) {
+		shouldStartSandboxGCSequence = true;
+	} else if( shouldStartGCDueToThresholdChange || m_hasPendingAdviseGCRequest ) {
+		// Apply cooldown if the request is advisory, not forceful
 		if( m_lastGCClientTime + 1000 < clientRealTime ) {
 			shouldStartSandboxGCSequence = true;
 		}
 	}
 
+	m_hasPendingForceGCRequest = m_hasPendingAdviseGCRequest = false;
+
 	if( shouldStartSandboxGCSequence ) {
 		m_menuSandbox->m_engine->collectGarbage();
 		m_hasStartedSandboxGCSequence = true;
+		m_lastGCClientTime = clientRealTime;
 	} else if( m_hasStartedSandboxGCSequence ) {
 		m_hudSandbox->m_engine->collectGarbage();
 		m_hasStartedSandboxGCSequence = false;
@@ -1605,6 +1617,8 @@ void QtUISystem::closeChatPopup() {
 	if( wasShowingTeamChatPopup ) {
 		Q_EMIT isShowingTeamChatPopupChanged( false );
 	}
+
+	m_hasPendingAdviseGCRequest = true;
 }
 
 void QtUISystem::setActiveMenuMask( unsigned activeMask ) {
@@ -1651,6 +1665,11 @@ void QtUISystem::setActiveMenuMask( unsigned activeMask ) {
 
 	if( m_activeMenuMask && !oldActiveMask ) {
 		CL_ClearInputState();
+	}
+
+	// Force GC upon switching from the menu back to gameplay
+	if( !( m_activeMenuMask & ~DemoPlaybackMenu ) && ( oldActiveMask & ~DemoPlaybackMenu ) ) {
+		m_hasPendingForceGCRequest = true;
 	}
 }
 
@@ -1808,16 +1827,20 @@ void QtUISystem::refreshProperties() {
 
 	if( m_isShowingScoreboard != shouldShowScoreboard ) {
 		m_isShowingScoreboard = shouldShowScoreboard;
+		m_hasPendingAdviseGCRequest |= !shouldShowScoreboard;
 		Q_EMIT isShowingScoreboardChanged( m_isShowingScoreboard );
 	}
-
+	// Note: This code is simular to the scoreboard handling code for consistency reasons,
+	// but the actual work for closing popups is performed by closeChatPopup()
 	if( m_isShowingChatPopup != shouldShowChatPopup ) {
 		m_isShowingChatPopup = shouldShowChatPopup;
+		m_hasPendingAdviseGCRequest |= !shouldShowChatPopup;
 		Q_EMIT isShowingChatPopupChanged( m_isShowingChatPopup );
 	}
 
 	if( m_isShowingTeamChatPopup != shouldShowTeamChatPopup ) {
 		m_isShowingTeamChatPopup = shouldShowTeamChatPopup;
+		m_hasPendingAdviseGCRequest |= !shouldShowTeamChatPopup;
 		Q_EMIT isShowingTeamChatPopupChanged( m_isShowingTeamChatPopup );
 	}
 
