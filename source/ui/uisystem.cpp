@@ -91,8 +91,11 @@ static BoolConfigVar v_debugNativelyDrawnItems { "ui_debugNativelyDrawnItems"_as
 };
 
 // Let the upper bound be exclusive, so the limit fits 32 bits
-static UnsignedConfigVar v_heapSizeGCThreshold { "ui_heapSizeGCThreshold"_asView, {
+static UnsignedConfigVar v_heapSizeGCThresholdInGame { "ui_heapSizeGCThresholdInGame"_asView, {
 	.byDefault = 512u, .min = inclusive( 4u ), .max = exclusive( 4096u ), .flags = CVAR_ARCHIVE },
+};
+static UnsignedConfigVar v_heapSizeGCThresholdMenu { "ui_heapSizeGCThresholdMenu"_asView, {
+	.byDefault = 4u, .min = inclusive( 4u ), .max = exclusive( 32u ), .flags = CVAR_ARCHIVE },
 };
 
 namespace wsw::ui {
@@ -651,7 +654,7 @@ private:
 	static void registerCustomQmlTypes();
 	static void retrieveVideoModes();
 	[[maybe_unused]]
-	static bool updateGCThreshold();
+	bool updateGCThreshold();
 
 	enum SandboxKind { MenuSandbox, HudSandbox };
 	void registerContextProperties( QQmlContext *context, SandboxKind sandboxKind );
@@ -757,9 +760,27 @@ private:
 };
 
 bool QtUISystem::updateGCThreshold() {
+	unsigned varValue;
+	// Note: Don't switch to the "menu" GC behavior while just using scoreboard
+	if( ( m_activeMenuMask & ~DemoPlaybackMenu ) || m_isShowingChatPopup || m_isShowingTeamChatPopup ) {
+		varValue = v_heapSizeGCThresholdMenu.get();
+	} else {
+		varValue = v_heapSizeGCThresholdInGame.get();
+	}
+
 	const auto oldGCTreshold  = qt_wswHeapSizeGCThreshold;
-	qt_wswHeapSizeGCThreshold = (size_t)( 1024 * 1024 ) * (size_t)v_heapSizeGCThreshold.get();
-	return oldGCTreshold > qt_wswHeapSizeGCThreshold;
+	qt_wswHeapSizeGCThreshold = (size_t)( 1024 * 1024 ) * (size_t)varValue;
+	// Don't make GC advisory if the new actual threshold is greater than old one
+	if( oldGCTreshold <= qt_wswHeapSizeGCThreshold ) {
+		return false;
+	}
+	// Don't make immediate GC advisory if it looks like we are switching from gameplay to the menu.
+	// Let the first following allocation trigger it naturally.
+	// This idea is experimental.
+	if( oldGCTreshold == v_heapSizeGCThresholdInGame.get() && qt_wswHeapSizeGCThreshold == v_heapSizeGCThresholdMenu.get() ) {
+		return false;
+	}
+	return true;
 }
 
 [[nodiscard]]
@@ -800,7 +821,8 @@ void QtUISystem::initPersistentPart( int pixelsPerLogicalUnit ) {
 
 		retrieveVideoModes();
 
-		updateGCThreshold();
+		// Set some reasonable default prior to initialization of Qml engines
+		qt_wswHeapSizeGCThreshold = v_heapSizeGCThresholdMenu.get();
 	}
 }
 
