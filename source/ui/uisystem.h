@@ -45,6 +45,11 @@ public:
 
 	virtual void runGCIfNeeded() = 0;
 
+	// These "safepoints" have little to no relation to JVM safepoints, but we like the name.
+	// Consider game states when it is relatively safe to trigger GC without irritating users "safepoints".
+	enum class GCSafepointKind { Respawn, Teleport };
+	virtual void handleGCSafepoint( GCSafepointKind kind ) = 0;
+
 	virtual void beginRegistration() = 0;
 	virtual void endRegistration() = 0;
 

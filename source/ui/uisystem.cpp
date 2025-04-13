@@ -98,6 +98,10 @@ static UnsignedConfigVar v_heapSizeGCThresholdMenu { "ui_heapSizeGCThresholdMenu
 	.byDefault = 4u, .min = inclusive( 4u ), .max = exclusive( 32u ), .flags = CVAR_ARCHIVE },
 };
 
+static BoolConfigVar v_runGCOnTeleportEvent { "ui_runGCOnTeleportEvent"_asView, {
+	.byDefault = true, .flags = CVAR_ARCHIVE, },
+};
+
 namespace wsw::ui {
 
 class CustomQuickRenderControl : public QQuickRenderControl {
@@ -161,6 +165,7 @@ public:
 	void drawCursorInMainContext() override;
 
 	void runGCIfNeeded() override;
+	void handleGCSafepoint( GCSafepointKind kind ) override;
 
 	void beginRegistration() override;
 	void endRegistration() override;
@@ -1586,6 +1591,19 @@ void QtUISystem::runGCIfNeeded() {
 	} else if( m_hasStartedSandboxGCSequence ) {
 		m_hudSandbox->m_engine->collectGarbage();
 		m_hasStartedSandboxGCSequence = false;
+	}
+}
+
+void QtUISystem::handleGCSafepoint( GCSafepointKind kind ) {
+	switch( kind ) {
+		case GCSafepointKind::Respawn: {
+			m_hasPendingAdviseGCRequest = true;
+		} break;
+		case GCSafepointKind::Teleport: {
+			if( v_runGCOnTeleportEvent.get() ) {
+				m_hasPendingAdviseGCRequest = true;
+			}
+		} break;
 	}
 }
 

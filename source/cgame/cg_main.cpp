@@ -2219,6 +2219,9 @@ static void handlePlayerRespawnEvent( entity_state_t *ent, int parm, bool predic
 			CG_ResetKickAngles( viewState );
 			CG_ResetColorBlend( viewState );
 			CG_ResetDamageIndicator( viewState );
+			if( viewState == getPrimaryViewState() ) {
+				wsw::ui::UISystem::instance()->handleGCSafepoint( wsw::ui::UISystem::GCSafepointKind::Respawn );
+			}
 		}
 
 		cg_entities[ent->ownerNum].localEffects[LOCALEFFECT_EV_PLAYER_TELEPORT_IN] = cg.time;
@@ -2234,6 +2237,9 @@ static void handlePlayerTeleportInEvent( entity_state_t *ent, int parm, bool pre
 	if( ent->ownerNum && ent->ownerNum < cggs->maxclients + 1 ) {
 		cg_entities[ent->ownerNum].localEffects[LOCALEFFECT_EV_PLAYER_TELEPORT_IN] = cg.time;
 		VectorCopy( ent->origin, cg_entities[ent->ownerNum].teleportedTo );
+		if( getViewStateForEntity( ent->ownerNum ) == getPrimaryViewState() ) {
+			wsw::ui::UISystem::instance()->handleGCSafepoint( wsw::ui::UISystem::GCSafepointKind::Teleport );
+		}
 	}
 }
 
@@ -2245,6 +2251,9 @@ static void handlePlayerTeleportOutEvent( entity_state_t *ent, int parm, bool pr
 	if( ent->ownerNum && ent->ownerNum < cggs->maxclients + 1 ) {
 		cg_entities[ent->ownerNum].localEffects[LOCALEFFECT_EV_PLAYER_TELEPORT_OUT] = cg.time;
 		VectorCopy( ent->origin, cg_entities[ent->ownerNum].teleportedFrom );
+		if( getViewStateForEntity( ent->ownerNum ) == getPrimaryViewState() ) {
+			wsw::ui::UISystem::instance()->handleGCSafepoint( wsw::ui::UISystem::GCSafepointKind::Teleport );
+		}
 	}
 }
 
