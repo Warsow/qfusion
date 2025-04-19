@@ -1566,32 +1566,38 @@ void QtUISystem::drawBackgroundMapIfNeeded() {
 void QtUISystem::runGCIfNeeded() {
 	WSW_PROFILER_SCOPE();
 
-	// Update the threshold every frame
-	[[maybe_unused]]
-	const bool shouldStartGCDueToThresholdChange = updateGCThreshold();
 	[[maybe_unused]]
 	const auto currTimestamp = getFrameTimestamp();
 
-	bool shouldStartSandboxGCSequence = false;
-	if( m_hasPendingForceGCRequest ) {
-		shouldStartSandboxGCSequence = true;
-	} else if( shouldStartGCDueToThresholdChange || m_hasPendingAdviseGCRequest ) {
-		// Apply cooldown if the request is advisory, not forceful
-		if( m_lastGCTimestamp + 1000 < currTimestamp ) {
+	// Update the threshold every frame
+	const bool shouldStartGCDueToThresholdChange = updateGCThreshold();
+	if( shouldStartGCDueToThresholdChange ) {
+		// In this case, trying to distribute updates over frames does not make sense
+		// (it's very likely that the updated threshold is going to trigger GC in both engines ASAP)
+		m_menuSandbox->m_engine->collectGarbage();
+		m_hudSandbox->m_engine->collectGarbage();
+		m_lastGCTimestamp = currTimestamp;
+	} else {
+		bool shouldStartSandboxGCSequence = false;
+		if( m_hasPendingForceGCRequest ) {
 			shouldStartSandboxGCSequence = true;
+		} else if( m_hasPendingAdviseGCRequest ) {
+			// Apply cooldown if the request is advisory, not forceful
+			if( m_lastGCTimestamp + 1000 < currTimestamp ) {
+				shouldStartSandboxGCSequence = true;
+			}
+		}
+		if( shouldStartSandboxGCSequence ) {
+			m_menuSandbox->m_engine->collectGarbage();
+			m_hasStartedSandboxGCSequence = true;
+			m_lastGCTimestamp = currTimestamp;
+		} else if( m_hasStartedSandboxGCSequence ) {
+			m_hudSandbox->m_engine->collectGarbage();
+			m_hasStartedSandboxGCSequence = false;
 		}
 	}
 
 	m_hasPendingForceGCRequest = m_hasPendingAdviseGCRequest = false;
-
-	if( shouldStartSandboxGCSequence ) {
-		m_menuSandbox->m_engine->collectGarbage();
-		m_hasStartedSandboxGCSequence = true;
-		m_lastGCTimestamp = currTimestamp;
-	} else if( m_hasStartedSandboxGCSequence ) {
-		m_hudSandbox->m_engine->collectGarbage();
-		m_hasStartedSandboxGCSequence = false;
-	}
 }
 
 void QtUISystem::handleGCSafepoint( GCSafepointKind kind ) {
