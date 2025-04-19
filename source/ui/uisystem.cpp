@@ -1576,24 +1576,29 @@ void QtUISystem::runGCIfNeeded() {
 		// (it's very likely that the updated threshold is going to trigger GC in both engines ASAP)
 		m_menuSandbox->m_engine->collectGarbage();
 		m_hudSandbox->m_engine->collectGarbage();
+		// Reset the current GC sequence, if any. We don't care if it's unfinished and
+		// we're doing some redundant GC work, as configuration changes should be rare.
+		m_hasStartedSandboxGCSequence = false;
 		m_lastGCTimestamp = currTimestamp;
 	} else {
-		bool shouldStartSandboxGCSequence = false;
-		if( m_hasPendingForceGCRequest ) {
-			shouldStartSandboxGCSequence = true;
-		} else if( m_hasPendingAdviseGCRequest ) {
-			// Apply cooldown if the request is advisory, not forceful
-			if( m_lastGCTimestamp + 1000 < currTimestamp ) {
-				shouldStartSandboxGCSequence = true;
-			}
-		}
-		if( shouldStartSandboxGCSequence ) {
-			m_menuSandbox->m_engine->collectGarbage();
-			m_hasStartedSandboxGCSequence = true;
-			m_lastGCTimestamp = currTimestamp;
-		} else if( m_hasStartedSandboxGCSequence ) {
+		if( m_hasStartedSandboxGCSequence ) {
 			m_hudSandbox->m_engine->collectGarbage();
 			m_hasStartedSandboxGCSequence = false;
+		} else {
+			bool shouldStartSandboxGCSequence = false;
+			if( m_hasPendingForceGCRequest ) {
+				shouldStartSandboxGCSequence = true;
+			} else if( m_hasPendingAdviseGCRequest ) {
+				// Apply cooldown if the request is advisory, not forceful
+				if( m_lastGCTimestamp + 1000 < currTimestamp ) {
+					shouldStartSandboxGCSequence = true;
+				}
+			}
+			if( shouldStartSandboxGCSequence ) {
+				m_menuSandbox->m_engine->collectGarbage();
+				m_hasStartedSandboxGCSequence = true;
+				m_lastGCTimestamp = currTimestamp;
+			}
 		}
 	}
 
