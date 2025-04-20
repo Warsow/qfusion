@@ -727,7 +727,7 @@ bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned thre
 		unsigned startFromTapeIndex = 0;
 		for(;; ) {
 			std::optional<std::pair<size_t, unsigned>> chosenIndex;
-			bool isInNonPendingSpan = true;
+			bool hasPendingWork = false;
 			do {
 				[[maybe_unused]] volatile wsw::ScopedLock<wsw::Mutex> lock( &impl->globalMutex );
 
@@ -748,6 +748,7 @@ bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned thre
 					const size_t numEntries = tape->numEntriesSoFar;
 					// This is similar to scanning the monotonic array-based heap in the AAS routing subsystem
 					size_t entryIndex       = tape->startScanFrom;
+					bool isInNonPendingSpan = true;
 					for( size_t entryScanJump; entryIndex < numEntries; entryIndex += entryScanJump ) {
 						auto &entry       = ( (TaskSystemImpl::TaskEntry *)tape->memOfEntries.get() )[entryIndex];
 						entryScanJump     = 1;
@@ -769,6 +770,7 @@ bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned thre
 								entryScanJump += entry.extraScanJump;
 							}
 						} else if( tapeIndex == 1 && status == TaskSystemImpl::TaskEntry::Busy ) {
+							// This kind of entries needs re-checking even in busy state
 							if( isInNonPendingSpan ) {
 								// Start scanning this tape later from this position
 								tape->startScanFrom = entryIndex;
@@ -781,9 +783,11 @@ bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned thre
 						}
 						assert( entryScanJump > 0 );
 					}
+					// Note: Setting chosenIndex supersedes setting hasPendingWork (see the condition below)
 					if( chosenIndex != std::nullopt ) {
 						break;
 					}
+					hasPendingWork |= !isInNonPendingSpan;
 				}
 				// The global mutex unlocks here
 			} while( false );
@@ -803,8 +807,8 @@ bool TaskSystem::threadExecTasks( TaskSystemImpl *__restrict impl, unsigned thre
 					pendingCompletionIndex = chosenIndex;
 				}
 			} else {
-				// If all tasks are completed or busy
-				if( isInNonPendingSpan ) {
+				// If all tasks are completed or busy (and checking their dynamic completion status is not needed)
+				if( !hasPendingWork ) {
 					// If it's an actual worker thread
 					if( threadNumber != ~0u ) {
 						// It's fine if we do another loop attempt, so a relaxed load could be used here,
