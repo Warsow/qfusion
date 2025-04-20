@@ -89,6 +89,16 @@ file(GLOB EXECOMMON_SOURCES
 file(GLOB EXECOMMON_HEADERS
      "*.h")
 
+if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    file(GLOB EXECOMMON_PLATFORM_SOURCES "win32/*.cpp")
+    file(GLOB EXECOMMON_PLATFORM_HEADERS "win32/*.h")
+endif()
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    file(GLOB EXECOMMON_PLATFORM_SOURCES "linux/*.cpp")
+    file(GLOB EXECOMMON_PLATFORM_HEADERS "linux/*.h")
+endif()
+
 if (MSVC)
     set_source_files_properties("../common/cm_trace_avx.cpp" PROPERTIES COMPILE_FLAGS "/arch:AVX")
 else()
@@ -96,6 +106,12 @@ else()
     set_source_files_properties("../common/cm_trace_avx.cpp" PROPERTIES COMPILE_FLAGS "-mavx")
 endif()
 
-add_library(execommon ${EXECOMMON_SOURCES} ${EXECOMMON_HEADERS} ${GAME_SOURCES} ${GAME_HEADERS})
+add_library(execommon
+    ${EXECOMMON_SOURCES}
+    ${EXECOMMON_HEADERS}
+    ${EXECOMMON_PLATFORM_SOURCES}
+    ${EXECOMMON_PLATFORM_HEADERS}
+    ${GAME_SOURCES}
+    ${GAME_HEADERS})
 target_link_libraries(execommon PRIVATE angelscript ${CURL_LIBRARY} ${ZLIB_LIBRARY})
 qf_set_output_dir(execommon "")

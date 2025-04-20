@@ -287,8 +287,8 @@ const char *S_GetConfigString( int index ) {
 }
 
 unsigned S_SuggestNumExtraThreadsForComputations() {
-	unsigned numPhysicalProcessors = 0, numLogicalProcessors = 0;
-	if( Sys_GetNumberOfProcessors( &numPhysicalProcessors, &numLogicalProcessors ) ) {
+	if( const auto maybeNumberOfProcessors = Sys_GetNumberOfProcessors() ) {
+		const auto [numPhysicalProcessors, numLogicalProcessors] = *maybeNumberOfProcessors;
 		const unsigned chosenNumProcessors = developer->integer ? numLogicalProcessors : numPhysicalProcessors;
 		if( chosenNumProcessors ) {
 			// Take the current thread (which also acts as a worker thread for the task system) into account.

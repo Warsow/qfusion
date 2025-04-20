@@ -781,12 +781,13 @@ void BeginDrawingScenes() {
 auto suggestNumExtraWorkerThreads( const SuggestNumWorkerThreadsArgs &args ) -> unsigned {
 	if( cl_multithreading->integer ) {
 		// This should be cheap to query as it's cached.
-		unsigned numPhysicalProcessors = 0, numLogicalProcessors = 0;
-		Sys_GetNumberOfProcessors( &numPhysicalProcessors, &numLogicalProcessors );
-		// Take the main thread into account as well (hence the +1)
-		if( numPhysicalProcessors > ( args.numExcludedCores + 1 ) ) {
-			// Disallow more than 3 worker threads.
-			return wsw::min<unsigned>( 3, numPhysicalProcessors - ( args.numExcludedCores + 1 ) );
+		if( const auto maybeNumberOfProcessors = Sys_GetNumberOfProcessors() ) {
+			const auto numPhysicalProcessors = maybeNumberOfProcessors->first;
+			// Take the main thread into account as well (hence the +1)
+			if( numPhysicalProcessors > ( args.numExcludedCores + 1 ) ) {
+				// Disallow more than 3 worker threads.
+				return wsw::min<unsigned>( 3, numPhysicalProcessors - ( args.numExcludedCores + 1 ) );
+			}
 		}
 	}
 	return 0;

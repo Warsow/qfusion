@@ -619,10 +619,10 @@ CPU FEATURES
 #define Q_CPU_FEATURE_SSE42   ( 0x4u )
 #define Q_CPU_FEATURE_AVX     ( 0x8u )
 
+[[nodiscard]]
 unsigned Sys_GetProcessorFeatures();
-void Sys_InitProcessorFeatures();
-
-bool Sys_GetNumberOfProcessors( unsigned *physical, unsigned *logical );
+[[nodiscard]]
+auto Sys_GetNumberOfProcessors() -> std::optional<std::pair<unsigned, unsigned>>;
 
 /*
 ==============================================================

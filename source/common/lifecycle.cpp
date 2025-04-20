@@ -339,10 +339,6 @@ void Qcommon_Init( int argc, char **argv ) {
 	g_clCmdPipe = QBufPipe_Create( 16 * 1024, 1 );
 #endif
 
-	// Force doing this early as this could fork for executing shell commands on UNIX.
-	// Required being able to call Com_Printf().
-	Sys_InitProcessorFeatures();
-
 	// initialize cmd/cvar tries
 	Cmd_PreInit();
 	Cvar_PreInit();
