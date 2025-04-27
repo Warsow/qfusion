@@ -29,3 +29,12 @@ void CL_Sys_Init( void ) {
 
 void CL_Sys_Shutdown( void ) {
 }
+
+char **Sys_GetEnvironmentVariables() {
+	return environ;
+}
+
+void Sys_DeleteEnvironmentVariable( const char *name ) {
+	(void)_putenv_s( name, "" );
+	assert( !getenv( name ) );
+}

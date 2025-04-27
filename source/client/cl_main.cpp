@@ -5709,6 +5709,27 @@ static void CL_CheckForUpdate() {
 	}
 }
 
+static void sanitizeEnvironment( std::initializer_list<wsw::StringView> disallowedVarPrefixes ) {
+	wsw::StringSpanStorage<size_t, size_t> qtVarNames;
+
+	for( char **envPair = Sys_GetEnvironmentVariables(); *envPair; ++envPair ) {
+		const wsw::StringView envPairView( *envPair );
+		if( const auto maybeIndex = envPairView.indexOf( '=' ) ) {
+			const wsw::StringView name( envPairView.take( *maybeIndex ) );
+			if( wsw::any_of( disallowedVarPrefixes, [&]( const wsw::StringView &prefix ) {
+				return name.startsWith( prefix, wsw::IgnoreCase );
+			})) {
+				qtVarNames.add( name );
+			}
+		}
+	}
+
+	for( const wsw::StringView &name: qtVarNames ) {
+		assert( name.isZeroTerminated() );
+		Sys_DeleteEnvironmentVariable( name.data() );
+	}
+}
+
 void CL_Init( void ) {
 
 	assert( !cl_initialized );
@@ -5723,6 +5744,8 @@ void CL_Init( void ) {
 	CL_ProfilerHud_Init();
 
 	CL_Sys_Init();
+
+	sanitizeEnvironment( { "QT"_asView, "QML"_asView, "QSG"_asView, "QV4"_asView, "Q_"_asView } );
 
 	VID_Init();
 

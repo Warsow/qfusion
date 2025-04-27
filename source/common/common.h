@@ -594,6 +594,10 @@ bool Sys_SetClipboardData( const char *data );
 void    Sys_FreeClipboardData( char *data );
 const char *Sys_GetPreferredLanguage( void );
 
+// TODO: Use a Java-like iterator
+char    **Sys_GetEnvironmentVariables();
+void    Sys_DeleteEnvironmentVariable( const char *name );
+
 bool    Sys_IsBrowserAvailable( void );
 void    Sys_OpenURLInBrowser( const char *url );
 

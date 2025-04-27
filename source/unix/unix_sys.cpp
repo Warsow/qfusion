@@ -48,6 +48,8 @@ FIXME:  This will be remidied once a native Mac port is complete
 #endif
 
 #include "../common/common.h"
+#include "../common/stringspanstorage.h"
+#include "../common/wswalgorithm.h"
 #include "glob.h"
 
 #if !defined( USE_SDL2 ) || defined( DEDICATED_ONLY )
@@ -257,6 +259,14 @@ const char *Sys_GetPreferredLanguage( void ) {
 		return APP_DEFAULT_LANGUAGE;
 	}
 	return Q_strlwr( lang );
+}
+
+char **Sys_GetEnvironmentVariables() {
+	return environ;
+}
+
+void Sys_DeleteEnvironmentVariable( const char *name ) {
+	unsetenv( name );
 }
 
 #if !defined( USE_SDL2 ) || defined( DEDICATED_ONLY )
