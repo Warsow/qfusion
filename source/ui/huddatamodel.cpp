@@ -1,9 +1,8 @@
 #include "huddatamodel.h"
 #include "local.h"
 #include "cgameimports.h"
-#include "../common/common.h"
-#include "../common/configvars.h"
 #include "../common/gs_public.h"
+#include "../common/wswalgorithm.h"
 #include "../client/client.h"
 #include "../cgame/mediacache.h"
 
@@ -337,7 +336,7 @@ void TeamListModel::fillEntries( const ReplicatedScoreboardData &scoreboardData,
 	const auto cmp = []( const Entry &lhs, const Entry &rhs ) {
 		return lhs.playerNum < rhs.playerNum;
 	};
-	std::sort( entries.begin(), entries.end(), cmp );
+	wsw::sortPodNonSpeedCritical( entries.begin(), entries.end(), cmp );
 }
 
 void TeamListModel::update( const ReplicatedScoreboardData &scoreboardData, unsigned povPlayerNum ) {

@@ -3,7 +3,7 @@
 
 #include "../common/common.h"
 #include "../common/wswstaticstring.h"
-#include "../common/wswvector.h"
+#include "../common/wswpodvector.h"
 
 #include <QAbstractListModel>
 #include <QQuickItem>
@@ -169,13 +169,13 @@ protected:
 		-> std::optional<wsw::StringView>;
 
 	[[nodiscard]]
-	auto deserialize( const wsw::StringView &data ) -> std::optional<wsw::Vector<FileEntry>>;
+	auto deserialize( const wsw::StringView &data ) -> std::optional<wsw::PodVector<FileEntry>>;
 
 	[[nodiscard]]
 	auto parseEntry( const wsw::StringView &line ) -> std::optional<FileEntry>;
 
 	[[nodiscard]]
-	virtual bool acceptDeserializedEntries( wsw::Vector<FileEntry> &&entries ) = 0;
+	virtual bool acceptDeserializedEntries( wsw::PodVector<FileEntry> &&entries ) = 0;
 
 	[[nodiscard]]
 	auto parseVersion( const wsw::StringView &line ) -> std::optional<unsigned>;
@@ -232,7 +232,7 @@ class HudEditorLayoutModel : public HudLayoutModel {
 	void writeAnchor( wsw::StaticString<32> *tmp, int anchor );
 
 	[[nodiscard]]
-	bool acceptDeserializedEntries( wsw::Vector<FileEntry> &&fileEntries ) override;
+	bool acceptDeserializedEntries( wsw::PodVector<FileEntry> &&fileEntries ) override;
 
 	[[nodiscard]]
 	bool isDraggable( int index ) const;
@@ -250,7 +250,7 @@ class HudEditorLayoutModel : public HudLayoutModel {
 
 	explicit HudEditorLayoutModel( Flavor flavor ) : HudLayoutModel( flavor ) {}
 
-	wsw::Vector<Entry> m_entries;
+	wsw::PodVector<Entry> m_entries;
 
 	static inline const QVector<int> kDisplayedAnchorRoles { DisplayedAnchors, DisplayedAnchorItemIndex, Draggable };
 	static inline const QVector<int> kOriginRoleAsVector { Origin };
@@ -275,7 +275,7 @@ class HudEditorToolboxModel : public QAbstractListModel {
 		int displayedAnchors { false };
 	};
 
-	wsw::Vector<Entry> m_entries;
+	wsw::PodVector<Entry> m_entries;
 
 	static inline QVector<int> kMutableRoles { DisplayedAnchors };
 
@@ -418,11 +418,11 @@ private:
 		Flags, SelfAnchors, AnchorItemIndex, AnchorItemAnchors, IndividualMask, IsHidden,
 	};
 
-	wsw::Vector<Entry> m_entries;
+	wsw::PodVector<Entry> m_entries;
 	QString m_fileName;
 
 	[[nodiscard]]
-	bool acceptDeserializedEntries( wsw::Vector<FileEntry> &&fileEntries ) override;
+	bool acceptDeserializedEntries( wsw::PodVector<FileEntry> &&fileEntries ) override;
 
 	[[nodiscard]]
 	auto roleNames() const -> QHash<int, QByteArray> override;

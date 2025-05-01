@@ -104,8 +104,30 @@ constexpr auto max_element( It begin, It end ) -> It {
 	return end;
 }
 
+template <typename T, typename Less>
+void sortPodNonSpeedCritical( T *begin, T *end, const Less &less ) {
+	assert( begin <= end );
+	// Inspired by https://deplinenoise.wordpress.com/2014/02/23/using-c11-capturing-lambdas-w-vanilla-c-api-functions/
+#ifndef WIN32
+	auto qsortfn = ::qsort_r;
+	auto cmp     = []( const void *lp, const void *rp, void *lessp ) -> int {
+#else
+	auto qsortfn = ::qsort_s;
+	auto cmp     = []( void *lessp, const void *lp, const void *rp ) -> int {
+#endif
+		const T &l       = *( (const T *)lp );
+		const T &r       = *( (const T *)rp );
+		const Less &less = *( (const Less *)lessp );
+		if( less( l, r ) ) { return -1; }
+		if( less( r, l ) ) { return +1; }
+		return 0;
+	};
+	qsortfn( begin, (size_t)( end - begin ), sizeof( T ), cmp, (void *)&less );
+}
+
 template <typename T>
 void sortPodNonSpeedCritical( T *begin, T *end ) {
+	// TODO: Should we implement it using sortPodNonSpeedCritical<T, std::less<T>>?
 	::qsort( begin, (size_t)( end - begin ), sizeof( T ), []( const void *lp, const void *rp ) -> int {
 		const T &l = *( (const T *)lp );
 		const T &r = *( (const T *)rp );

@@ -10,8 +10,6 @@
 #include <QSizeF>
 #include <QQmlEngine>
 
-#include <array>
-
 using wsw::operator""_asView;
 
 namespace wsw::ui {
@@ -361,8 +359,8 @@ const HudLayoutModel::AnchorPair HudLayoutModel::kMatchingItemAndFieldAnchorPair
 // TODO: Share the static instance over the codebase
 static const wsw::CharLookup kNewlineChars( "\r\n"_asView );
 
-auto HudLayoutModel::deserialize( const wsw::StringView &data ) -> std::optional<wsw::Vector<FileEntry>> {
-	wsw::Vector<FileEntry> entries;
+auto HudLayoutModel::deserialize( const wsw::StringView &data ) -> std::optional<wsw::PodVector<FileEntry>> {
+	wsw::PodVector<FileEntry> entries;
 	wsw::StringSplitter lineSplitter( data );
 	std::optional<unsigned> parsedVersion;
 	while( const auto maybeNextLine = lineSplitter.getNext( kNewlineChars ) ) {
@@ -695,14 +693,14 @@ void HudEditorToolboxModel::setDisplayedAnchorsForKind( int kind, int /*anchors*
 	Q_EMIT dataChanged( modelIndex, modelIndex, kMutableRoles );
 }
 
-bool HudEditorLayoutModel::acceptDeserializedEntries( wsw::Vector<FileEntry> &&fileEntries ) {
+bool HudEditorLayoutModel::acceptDeserializedEntries( wsw::PodVector<FileEntry> &&fileEntries ) {
 	const QMetaEnum metaKinds( QMetaEnum::fromType<Kind>() );
 
 	// Discover what kinds are missing from the layout
 	unsigned presentKindsMask = 0;
 	assert( metaKinds.keyCount() < 32 );
 
-	wsw::Vector<Entry> entries;
+	wsw::PodVector<Entry> entries;
 	for( FileEntry &fileEntry: fileEntries ) {
 		const auto &props = kEditorPropsForKind[fileEntry.selfKind - 1];
 		assert( fileEntry.selfKind == props.kind );
@@ -1320,7 +1318,7 @@ bool InGameHudLayoutModel::load( const wsw::StringView &fileName ) {
 	return result;
 }
 
-bool InGameHudLayoutModel::acceptDeserializedEntries( wsw::Vector<FileEntry> &&fileEntries ) {
+bool InGameHudLayoutModel::acceptDeserializedEntries( wsw::PodVector<FileEntry> &&fileEntries ) {
 	const QMetaEnum metaKinds( QMetaEnum::fromType<Kind>() );
 
 	// Discover what kinds are missing from the layout
@@ -1381,7 +1379,10 @@ bool InGameHudLayoutModel::acceptDeserializedEntries( wsw::Vector<FileEntry> &&f
 		}
 	}
 
-	std::sort( m_entries.begin(), m_entries.end(), []( const Entry &a, const Entry &b ) { return a.kind < b.kind; } );
+	wsw::sortPodNonSpeedCritical( m_entries.begin(), m_entries.end(), []( const Entry &a, const Entry &b ) {
+		return a.kind < b.kind;
+	});
+
 	// Patch item indices after sorting
 	for( Entry &entry: m_entries ) {
 		// If it was in the file layout

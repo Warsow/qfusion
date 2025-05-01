@@ -1,9 +1,8 @@
 #include "tacticalspotsproblemsolver.h"
 #include "spotsproblemsolverslocal.h"
+#include "../../../common/wswalgorithm.h"
 #include "../navigation/aaselementsmask.h"
 #include "../groundtracecache.h"
-
-#include <algorithm>
 
 void TacticalSpotsProblemSolver::selectCandidateSpots( const SpotsQueryVector &spotsFromQuery,
 													   SpotsAndScoreVector &candidates ) {
@@ -402,7 +401,9 @@ void TacticalSpotsProblemSolver::sortImpl( SpotLikeVector &v ) {
 		return false;
 	};
 
-	std::sort( v.begin(), v.end(), cmp );
+	// Note: sorting here is "speed-critical" but the actual comparison cost
+	// does not make the template-based inlining of std::sort<>() benefocial
+	wsw::sortPodNonSpeedCritical( v.begin(), v.end(), cmp );
 }
 
 void TacticalSpotsProblemSolver::sort( SpotsAndScoreVector &v ) {

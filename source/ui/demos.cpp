@@ -458,7 +458,7 @@ void DemosResolver::updateDefaultDisplayedList() {
 	const auto cmp = []( const MetadataEntry *lhs, const MetadataEntry *rhs ) {
 		return lhs->rawTimestamp < rhs->rawTimestamp;
 	};
-	std::sort( m_entries.begin(), m_entries.end(), cmp );
+	wsw::sortPodNonSpeedCritical( m_entries.begin(), m_entries.end(), cmp );
 }
 
 void DemosResolver::runQuery() {
