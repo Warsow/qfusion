@@ -1,6 +1,6 @@
 #include "playersmodel.h"
-#include "scoreboard.h"
 #include "local.h"
+#include "../common/wswalgorithm.h"
 
 namespace wsw::ui {
 
@@ -40,7 +40,7 @@ void PlayersModel::update( const ReplicatedScoreboardData &scoreboardData ) {
 		}
 	}
 
-	std::sort( currPlayerNums.begin(), currPlayerNums.end() );
+	wsw::sortPodNonSpeedCritical( currPlayerNums.begin(), currPlayerNums.end() );
 
 	wsw::StaticVector<unsigned, MAX_CLIENTS> modifiedRows;
 	const bool fullReset = currPlayerNums.size() != m_players.size();

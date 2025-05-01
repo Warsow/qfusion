@@ -23,7 +23,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "cm_local.h"
 #include "cm_trace.h"
 
-#include <iterator> // std::size()
+#ifdef CM_SELF_TEST
+#include "../common/wswalgorithm.h"
+#endif
 
 static inline void CM_SetBuiltinBrushBounds( vec_bounds_t mins, vec_bounds_t maxs ) {
 	for( int i = 0; i < (int)( sizeof( vec_bounds_t ) / sizeof( vec_t ) ); ++i ) {
@@ -1124,8 +1126,8 @@ CMShapeList *CM_BuildShapeList( cmodel_state_t *cms, CMShapeList *list, const fl
 	std::memcpy( tmp2, list->shapes, list->numShapes * 8 );
 
 	// We're free to reorder shapes, make sure they're sorted for comparison
-	std::sort( tmp1, tmp1 + list->numShapes );
-	std::sort( tmp2, tmp2 + list->numShapes );
+	wsw::sortPodNonSpeedCritical( tmp1, tmp1 + list->numShapes );
+	wsw::sortPodNonSpeedCritical( tmp2, tmp2 + list->numShapes );
 	if( std::memcmp( tmp1, tmp2, list->numShapes * 8 ) ) abort();
 #endif
 
@@ -1152,8 +1154,8 @@ void CM_ClipShapeList( cmodel_state_t *cms, CMShapeList *list,
 	std::memcpy( tmp2, list->shapes, list->numShapes * 8 );
 
 	// We're free to reorder shapes, make sure they're sorted for comparison
-	std::sort( tmp1, tmp1 + list->numShapes );
-	std::sort( tmp2, tmp2 + list->numShapes );
+	wsw::sortPodNonSpeedCritical( tmp1, tmp1 + list->numShapes );
+	wsw::sortPodNonSpeedCritical( tmp2, tmp2 + list->numShapes );
 	if( std::memcmp( tmp1, tmp2, list->numShapes * 8 ) ) abort();
 #endif
 
