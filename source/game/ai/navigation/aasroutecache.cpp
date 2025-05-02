@@ -24,11 +24,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../../../common/links.h"
 #include "../../../common/md5.h"
+#include "../../../common/wswalgorithm.h"
 
 #include <cstdlib>
 #include <limits>
 #include <cmath>
-#include <algorithm>
 
 template <typename T> inline T *CastCheckingAlignment( void *ptr ) {
 	assert( !( ( (uintptr_t)ptr ) % alignof( T ) ) );
@@ -1391,7 +1391,7 @@ void AiAasRouteCache::UpdatePortalRoutingCache( AreaOrPortalCacheTable *portalCa
 
 	//while there are updates in the current list
 	while( !updateHeap.empty() ) {
-		std::pop_heap( updateHeap.begin(), updateHeap.end() );
+		wsw::pop_heap( updateHeap.begin(), updateHeap.end() );
 		currNode = &portalPathFindingNodes[updateHeap.back().index];
 		currNode->dijkstraLabel = SCANNED;
 		updateHeap.pop_back();
@@ -1444,7 +1444,7 @@ void AiAasRouteCache::UpdatePortalRoutingCache( AreaOrPortalCacheTable *portalCa
 
 			nextNode->dijkstraLabel = LABELED;
 			updateHeap.push_back( RoutingUpdateRef( portalNum, nextNode->tmpTravelTime ) );
-			std::push_heap( updateHeap.begin(), updateHeap.end() );
+			wsw::push_heap( updateHeap.begin(), updateHeap.end() );
 		}
 	}
 }

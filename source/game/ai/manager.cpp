@@ -8,8 +8,6 @@
 #include "../../common/wswstringview.h"
 #include "../../common/wswalgorithm.h"
 
-#include <algorithm>
-
 using wsw::operator""_asView;
 using wsw::operator""_asHView;
 
@@ -404,13 +402,13 @@ void AiManager::FindHubAreas() {
 		}
 
 		bestAreasHeap.push_back( AreaAndScore( (int)i, (float)usefulReachCount ) );
-		std::push_heap( bestAreasHeap.begin(), bestAreasHeap.end() );
+		wsw::push_heap( bestAreasHeap.begin(), bestAreasHeap.end() );
 
 		// bestAreasHeap size should be always less than its capacity:
 		// 1) to ensure that there is a free room for next area;
 		// 2) to ensure that hubAreas capacity will not be exceeded.
 		if( bestAreasHeap.full() ) {
-			std::pop_heap( bestAreasHeap.begin(), bestAreasHeap.end() );
+			wsw::pop_heap( bestAreasHeap.begin(), bestAreasHeap.end() );
 			bestAreasHeap.pop_back();
 		}
 	}

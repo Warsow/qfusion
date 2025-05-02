@@ -24,8 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "snd_local.h"
 #include "snd_env_effects.h"
 #include "snd_env_sampler.h"
-
-#include <algorithm>
+#include "../common/wswalgorithm.h"
 
 src_t srclist[MAX_SRC];
 int src_count = 0;
@@ -572,7 +571,7 @@ static void S_ProcessZombieSources( src_t **zombieSources, int numZombieSources,
 		return lhs->sfx->props.processingQualityHint > rhs->sfx->props.processingQualityHint;
 	};
 
-	std::make_heap( zombieSources, zombieSources + numZombieSources, zombieSourceComparator );
+	wsw::make_heap( zombieSources, zombieSources + numZombieSources, zombieSourceComparator );
 
 	// Cache results of Effect::ShouldKeepLingering() calls
 	bool keepEffectLingering[MAX_SRC];
@@ -590,7 +589,7 @@ static void S_ProcessZombieSources( src_t **zombieSources, int numZombieSources,
 			break;
 		}
 
-		std::pop_heap( zombieSources, zombieSources + numZombieSources, zombieSourceComparator );
+		wsw::pop_heap( zombieSources, zombieSources + numZombieSources, zombieSourceComparator );
 		src_t *const src = zombieSources[numZombieSources - 1];
 		numZombieSources--;
 
@@ -646,7 +645,7 @@ static void S_ProcessZombieSources( src_t **zombieSources, int numZombieSources,
 		return sourceScores[lhs - srcBegin] > sourceScores[rhs - srcBegin];
 	};
 
-	std::make_heap( disableEffectCandidates, disableEffectCandidates + numDisableEffectCandidates, disableEffectComparator );
+	wsw::make_heap( disableEffectCandidates, disableEffectCandidates + numDisableEffectCandidates, disableEffectComparator );
 
 	for(;; ) {
 		if( numActiveEffects <= effectsNumberThreshold ) {
@@ -656,7 +655,7 @@ static void S_ProcessZombieSources( src_t **zombieSources, int numZombieSources,
 			break;
 		}
 
-		std::pop_heap( disableEffectCandidates, disableEffectCandidates + numDisableEffectCandidates, disableEffectComparator );
+		wsw::pop_heap( disableEffectCandidates, disableEffectCandidates + numDisableEffectCandidates, disableEffectComparator );
 		src_t *src = disableEffectCandidates[numDisableEffectCandidates - 1];
 		numDisableEffectCandidates--;
 

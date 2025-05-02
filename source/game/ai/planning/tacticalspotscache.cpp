@@ -4,8 +4,6 @@
 #include "../combat/coverproblemsolver.h"
 #include "../combat/dodgehazardproblemsolver.h"
 
-#include <algorithm>
-
 inline const AiAasRouteCache *BotTacticalSpotsCache::RouteCache() {
 	return m_bot->RouteCache();
 }

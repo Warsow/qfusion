@@ -4,8 +4,7 @@
 #include "../navigation/aaselementsmask.h"
 #include "../navigation/aasstaticroutetable.h"
 #include "../manager.h"
-
-#include <algorithm>
+#include "../../../common/wswalgorithm.h"
 
 class WeaponJumpableSpotDetector: public BestJumpableSpotDetector {
 public:
@@ -342,7 +341,7 @@ int ScheduleWeaponJumpAction::GetCandidatesForJumpingToTarget( PredictionContext
 					continue;
 				}
 				// Evict a worst area
-				std::pop_heap( heap.begin(), heap.end() );
+				wsw::pop_heap( heap.begin(), heap.end() );
 				heap.pop_back();
 			} else {
 				farthestPresentDistance = wsw::max( squareDistance, farthestPresentDistance );
@@ -350,7 +349,7 @@ int ScheduleWeaponJumpAction::GetCandidatesForJumpingToTarget( PredictionContext
 			// Note: AreaAndScore::operator< puts best by score areas first,
 			// so far areas get a huge negative score and are evicted first in the max-heap.
 			heap.emplace_back( AreaAndScore( areaNum, -squareDistance ) );
-			std::push_heap( heap.begin(), heap.end() );
+			wsw::push_heap( heap.begin(), heap.end() );
 		}
 
 		for( unsigned i = 0; i < heap.size(); ++i ) {
@@ -695,7 +694,7 @@ void WeaponJumpWeaponsTester::SetupForWeapon( int weaponNum ) {
 
 		// Closest to the target spots get greater score
 		spots.emplace_back( SpotAndScore( targets[i], -travelTimes[i], areaNums[i], i ) );
-		std::push_heap( spots.begin(), spots.end() );
+		wsw::push_heap( spots.begin(), spots.end() );
 	}
 
 	detector.spots = spots.begin();

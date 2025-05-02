@@ -25,8 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "materiallocal.h"
 #include "../common/profilerscope.h"
 #include "../common/wswsortbyfield.h"
-
-#include <algorithm>
+#include "../common/wswalgorithm.h"
 
 #ifdef DEBUG_OCCLUDERS
 // See frontendcull.inc
@@ -222,11 +221,11 @@ auto Frontend::collectVisibleLights( StateForCamera *stateForCamera, Scene *scen
 			const float squareDistance = DistanceSquared( light->origin, viewOrigin );
 			const float score = light->programRadius * Q_RSqrt( squareDistance );
 			lightsHeap.emplace_back( { index, score } );
-			std::push_heap( lightsHeap.begin(), lightsHeap.end(), cmp );
+			wsw::push_heap( lightsHeap.begin(), lightsHeap.end(), cmp );
 		}
 		unsigned numVisibleProgramLights = 0;
 		do {
-			std::pop_heap( lightsHeap.begin(), lightsHeap.end(), cmp );
+			wsw::pop_heap( lightsHeap.begin(), lightsHeap.end(), cmp );
 			const unsigned lightIndex = lightsHeap.back().first;
 			stateForCamera->visibleProgramLightIndices[numVisibleProgramLights++] = lightIndex;
 			lightsHeap.pop_back();

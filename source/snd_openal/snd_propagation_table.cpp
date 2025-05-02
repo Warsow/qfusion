@@ -2,6 +2,7 @@
 
 #include "../common/links.h"
 #include "../common/singletonholder.h"
+#include "../common/wswalgorithm.h"
 
 #include <limits>
 #include <random>
@@ -44,7 +45,7 @@ public:
 	 */
 	void Push( int leaf, float distance, float heapCost ) {
 		new( m_buffer + m_size++ )HeapEntry( leaf, distance, heapCost );
-		std::push_heap( m_buffer, m_buffer + m_size );
+		wsw::push_heap( m_buffer, m_buffer + m_size );
 	}
 
 	bool IsEmpty() const { return !m_size; }
@@ -57,7 +58,7 @@ public:
 	 * @return a reference to the newly popped entry.
 	 */
 	const HeapEntry &PopInPlace() {
-		std::pop_heap( m_buffer, m_buffer + m_size );
+		wsw::pop_heap( m_buffer, m_buffer + m_size );
 		return m_buffer[--m_size];
 	}
 

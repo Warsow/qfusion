@@ -1304,7 +1304,7 @@ void QtUISystem::drawMenuPartInMainContext() {
 			if( item->isVisible() ) {
 				if( nativelyDrawn->m_nativeZ < 0 ) {
 					m_nativelyDrawnUnderlayHeap.push_back( nativelyDrawn );
-					std::push_heap( m_nativelyDrawnUnderlayHeap.begin(), m_nativelyDrawnUnderlayHeap.end(), cmp );
+					wsw::push_heap( m_nativelyDrawnUnderlayHeap.begin(), m_nativelyDrawnUnderlayHeap.end(), cmp );
 				} else {
 					// Don't draw natively drawn items on top of occluders.
 					// TODO: We either draw everything or draw nothing, a proper clipping/
@@ -1320,7 +1320,7 @@ void QtUISystem::drawMenuPartInMainContext() {
 					}
 					if( !occluded ) {
 						m_nativelyDrawnOverlayHeap.push_back( nativelyDrawn );
-						std::push_heap( m_nativelyDrawnOverlayHeap.begin(), m_nativelyDrawnOverlayHeap.end(), cmp );
+						wsw::push_heap( m_nativelyDrawnOverlayHeap.begin(), m_nativelyDrawnOverlayHeap.end(), cmp );
 					}
 				}
 			}
@@ -1331,7 +1331,7 @@ void QtUISystem::drawMenuPartInMainContext() {
 		// Considering the low number of items of this kind the performance impact should be negligible.
 
 		while( !m_nativelyDrawnUnderlayHeap.empty() ) {
-			std::pop_heap( m_nativelyDrawnUnderlayHeap.begin(), m_nativelyDrawnUnderlayHeap.end(), cmp );
+			wsw::pop_heap( m_nativelyDrawnUnderlayHeap.begin(), m_nativelyDrawnUnderlayHeap.end(), cmp );
 			// Note: each drawSelfNatively() call manages 2D/scene mode on its own
 			m_nativelyDrawnUnderlayHeap.back()->drawSelfNatively( timestamp, delta, m_pixelsPerLogicalUnit );
 			m_nativelyDrawnUnderlayHeap.pop_back();
@@ -1348,7 +1348,7 @@ void QtUISystem::drawMenuPartInMainContext() {
 		}
 
 		while( !m_nativelyDrawnOverlayHeap.empty() ) {
-			std::pop_heap( m_nativelyDrawnOverlayHeap.begin(), m_nativelyDrawnOverlayHeap.end(), cmp );
+			wsw::pop_heap( m_nativelyDrawnOverlayHeap.begin(), m_nativelyDrawnOverlayHeap.end(), cmp );
 			// Note: each drawSelfNatively() call manages 2D/scene mode on its own
 			m_nativelyDrawnOverlayHeap.back()->drawSelfNatively( timestamp, delta, m_pixelsPerLogicalUnit );
 			m_nativelyDrawnOverlayHeap.pop_back();

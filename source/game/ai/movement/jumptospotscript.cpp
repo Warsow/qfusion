@@ -4,9 +4,7 @@
 #include "environmenttracecache.h"
 #include "bestjumpablespotdetector.h"
 #include "../manager.h"
-#include "../bot.h"
-
-#include <algorithm>
+#include "../../../common/wswalgorithm.h"
 
 void JumpToSpotScript::Activate( const vec3_t startOrigin_,
 								 const vec3_t targetOrigin_,
@@ -265,7 +263,7 @@ void BestAreaCenterJumpableSpotDetector::GetCandidateSpots( SpotAndScore **begin
 		FillCandidateSpotsWithoutRoutingTest( boxAreaNums );
 	}
 
-	std::make_heap( spotsHeap.begin(), spotsHeap.end() );
+	wsw::make_heap( spotsHeap.begin(), spotsHeap.end() );
 
 	*begin = spotsHeap.begin();
 	*end = spotsHeap.end();
@@ -629,7 +627,7 @@ void BestConnectedToHubAreasJumpableSpotDetector::GetCandidateSpots( SpotAndScor
 	}
 
 	// FindBestJumpableSpot assumes candidates to be a max-heap
-	std::make_heap( spotsHeap.begin(), spotsHeap.end() );
+	wsw::make_heap( spotsHeap.begin(), spotsHeap.end() );
 	*begin = spotsHeap.begin();
 	*end = spotsHeap.end();
 }

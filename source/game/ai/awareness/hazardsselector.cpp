@@ -1,9 +1,7 @@
 #include "hazardsselector.h"
 #include "awarenessmodule.h"
 #include "../bot.h"
-#include "../../../common/links.h"
-
-#include <algorithm>
+#include "../../../common/wswalgorithm.h"
 
 void HazardsSelector::BeginUpdate() {
 	if( primaryHazard ) {
@@ -198,7 +196,7 @@ bool SameDirBeamsList::tryAddingProjectile( const edict_t *projectile ) {
 					.entNum = projectile->s.number, .t = calcLineEquationParam( projectile )
 				};
 				// TODO: Add/use specialized subroutines for using heaps (similar to wsw::sortByField())
-				std::push_heap( m_projectilesHeap, m_projectilesHeap + m_projectilesCount );
+				wsw::push_heap( m_projectilesHeap, m_projectilesHeap + m_projectilesCount );
 			}
 			return true;
 		}
@@ -213,7 +211,7 @@ void SameDirBeamsList::buildBeams() {
 		const edict_t *const gameEnts = game.edicts;
 
 		// Get the projectile that has a maximal line equation parameter
-		std::pop_heap( m_projectilesHeap, m_projectilesHeap + m_projectilesCount );
+		wsw::pop_heap( m_projectilesHeap, m_projectilesHeap + m_projectilesCount );
 		--m_projectilesCount;
 		const edict_t *prevProjectile = gameEnts + m_projectilesHeap[m_projectilesCount].entNum;
 
@@ -221,7 +219,7 @@ void SameDirBeamsList::buildBeams() {
 
 		while( m_projectilesCount > 0 ) {
 			// Get the projectile with the maximal line parameter remaining so far
-			std::pop_heap( m_projectilesHeap, m_projectilesHeap + m_projectilesCount );
+			wsw::pop_heap( m_projectilesHeap, m_projectilesHeap + m_projectilesCount );
 			--m_projectilesCount;
 			const edict_t *currProjectile = gameEnts + m_projectilesHeap[m_projectilesCount].entNum;
 

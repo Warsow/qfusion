@@ -1,8 +1,7 @@
 #include "floorclusterareascache.h"
 #include "movementlocal.h"
 #include "../combat/tacticalspotsregistry.h"
-
-#include <algorithm>
+#include "../../../common/wswalgorithm.h"
 
 bool FloorClusterAreasCache::AreaPassesCollisionTest( PredictionContext *context, int areaNum ) const {
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
@@ -177,7 +176,7 @@ int SameFloorClusterAreasCache::FindClosestToTargetPoint( PredictionContext *con
 	}
 
 	while( !candidateAreasHeap.empty() ) {
-		std::pop_heap( candidateAreasHeap.begin(), candidateAreasHeap.end() );
+		wsw::pop_heap( candidateAreasHeap.begin(), candidateAreasHeap.end() );
 		int areaNum = candidateAreasHeap.back().areaNum;
 		int travelTime = (int)( -candidateAreasHeap.back().score );
 		candidateAreasHeap.pop_back();
@@ -291,12 +290,12 @@ void FloorClusterAreasCache::PrepareAreasForLargeCluster( PredictionContext *__r
 
 		if( distanceHeap.full() ) {
 			// Evict the farthest area
+			wsw::pop_heap( distanceHeap.begin(), distanceHeap.end() );
 			distanceHeap.pop_back();
-			std::pop_heap( distanceHeap.begin(), distanceHeap.end() );
 		}
 
 		new( distanceHeap.unsafe_grow_back() )AreaAndScore( areaNum, score );
-		std::push_heap( distanceHeap.begin(), distanceHeap.end() );
+		wsw::push_heap( distanceHeap.begin(), distanceHeap.end() );
 	}
 
 	const int toAreaNum = context->NavTargetAasAreaNum();
@@ -331,7 +330,7 @@ void FloorClusterAreasCache::BuildCandidateAreasHeap( PredictionContext *context
 	}
 
 	// Candidates written in `result` are not arranged in a heap (but must have feasible scores)
-	std::make_heap( result.begin(), result.end() );
+	wsw::make_heap( result.begin(), result.end() );
 }
 
 bool NextFloorClusterAreasCache::NeedsToBeComputed( PredictionContext *context ) const {
@@ -408,7 +407,7 @@ int NextFloorClusterAreasCache::FindClosestToTargetPoint( PredictionContext *con
 	}
 
 	while( !candidateAreasHeap.empty() ) {
-		std::pop_heap( candidateAreasHeap.begin(), candidateAreasHeap.end() );
+		wsw::pop_heap( candidateAreasHeap.begin(), candidateAreasHeap.end() );
 		int areaNum = candidateAreasHeap.back().areaNum;
 		int travelTime = (int)( -candidateAreasHeap.back().score );
 		candidateAreasHeap.pop_back();
