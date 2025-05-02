@@ -5,10 +5,9 @@
 #include "snd_effect_sampler.h"
 #include "snd_effects_allocator.h"
 #include "snd_propagation.h"
-
 #include "../common/q_comref.h"
+#include "../common/wswalgorithm.h"
 
-#include <algorithm>
 #include <limits>
 
 ListenerProps listenerProps;
@@ -253,7 +252,7 @@ void SourcesUpdatePriorityQueue::AddSource( src_t *src, float urgencyScale ) {
 	void *mem = heap + numSourcesInHeap++;
 	new( mem )ComparableSource( src );
 	// Update the heap
-	std::push_heap( heap, heap + numSourcesInHeap );
+	wsw::push_heap( heap, heap + numSourcesInHeap );
 }
 
 src_t *SourcesUpdatePriorityQueue::PopSource() {
@@ -262,7 +261,7 @@ src_t *SourcesUpdatePriorityQueue::PopSource() {
 	}
 
 	// Pop the max element from the heap
-	std::pop_heap( heap, heap + numSourcesInHeap );
+	wsw::pop_heap( heap, heap + numSourcesInHeap );
 	// Chop last heap array element (it does not belong to the heap anymore)
 	numSourcesInHeap--;
 	// Return the just truncated element

@@ -1,7 +1,6 @@
 #include "bestjumpablespotdetector.h"
 #include "movementlocal.h"
-
-#include <algorithm>
+#include "../../../common/wswalgorithm.h"
 
 typedef BestJumpableSpotDetector::SpotAndScore SpotAndScore;
 
@@ -14,14 +13,14 @@ const SpotAndScore *BestJumpableSpotDetector::Exec( const vec3_t startOrigin_, u
 	GetCandidateSpots( &spotsBegin, &spotsEnd );
 
 #ifndef PUBLIC_BUILD
-	if( !std::is_heap( spotsBegin, spotsEnd ) ) {
+	if( !wsw::is_heap( spotsBegin, spotsEnd ) ) {
 		AI_FailWith( "BestJumpableSpotsDetector::Exec()", "A given spots range must point to a max-heap\n" );
 	}
 #endif
 
 	while( spotsBegin != spotsEnd ) {
 		// Evict the best candidate from the heap
-		std::pop_heap( spotsBegin, spotsEnd );
+		wsw::pop_heap( spotsBegin, spotsEnd );
 		const SpotAndScore *spotAndScore = spotsEnd - 1;
 		spotsEnd--;
 

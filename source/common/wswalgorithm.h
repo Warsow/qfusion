@@ -104,6 +104,116 @@ constexpr auto max_element( It begin, It end ) -> It {
 	return end;
 }
 
+template <typename It, typename Less>
+[[nodiscard]]
+bool is_heap( It begin, It end, const Less &less ) {
+	assert( begin <= end );
+	auto data = begin;
+	std::make_unsigned_t<decltype( end - begin )> size = end - begin;
+	for( decltype( size ) index = 1; index < size; ++index ) {
+		auto parentIndex = ( index - 1 ) / 2;
+		if( less( data[parentIndex], data[index] ) ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+template <typename It>
+[[nodiscard]]
+bool is_heap( It begin, It end ) {
+	const auto less = []( const decltype( *begin ) &l, const decltype( *begin ) &r ) -> bool { return l < r; };
+	return wsw::is_heap( begin, end, less );
+}
+
+template <typename It, typename Less>
+void push_heap( It begin, It end, const Less &less ) {
+	assert( begin < end );
+	std::make_unsigned_t<decltype( end - begin )> currIndex = ( end - begin ) - 1;
+	assert( currIndex >= 0 );
+	It data = begin;
+	for(;; ) {
+		if( currIndex < 1 ) [[unlikely]] {
+			break;
+		}
+		const auto parentIndex = ( currIndex - 1 ) / 2;
+		if( less( data[parentIndex], data[currIndex] ) ) {
+			std::swap( data[currIndex], data[parentIndex] );
+		} else {
+			break;
+		}
+		currIndex = parentIndex;
+	}
+#if 0
+	assert( wsw::is_heap( begin, end, less ) );
+#endif
+}
+
+template <typename It>
+void push_heap( It begin, It end ) {
+	const auto less = []( const decltype( *begin ) &l, const decltype( *begin ) &r ) -> bool { return l < r; };
+	wsw::push_heap( begin, end, less );
+}
+
+template <typename It, typename Less>
+void pop_heap( It begin, It end, const Less &less ) {
+	assert( begin < end );
+	std::make_unsigned_t<decltype( end - begin )> size = end - begin;
+	assert( size > 0 );
+	auto data = begin;
+	size -= 1;
+	std::swap( data[0], data[size] );
+	decltype( size ) currIndex = 0;
+	for(;; ) {
+		const auto leftChildIndex = currIndex * 2 + 1;
+		// Check overflow
+		assert( leftChildIndex > currIndex );
+		if( leftChildIndex >= size ) [[unlikely]] {
+			break;
+		}
+		auto childIndex            = leftChildIndex;
+		const auto rightChildIndex = leftChildIndex + 1;
+		assert( rightChildIndex > currIndex );
+		if( rightChildIndex < size ) [[likely]] {
+			if( less( data[leftChildIndex], data[rightChildIndex] ) ) {
+				childIndex = rightChildIndex;
+			}
+		}
+		if( less( data[currIndex], data[childIndex] ) ) {
+			std::swap( data[currIndex], data[childIndex] );
+		} else {
+			break;
+		}
+		currIndex = childIndex;
+	}
+#if 0
+	assert( wsw::is_heap( begin, end - 1, less ) );
+#endif
+}
+
+template <typename It>
+void pop_heap( It begin, It end ) {
+	const auto less = []( const decltype( *begin ) &l, const decltype( *begin ) &r ) -> bool { return l < r; };
+	wsw::pop_heap( begin, end, less );
+}
+
+template <typename It, typename Less>
+void make_heap( It begin, It end, const Less &less ) {
+	assert( begin <= end );
+	for( auto it = begin + 1; it <= end; ++it ) {
+		wsw::push_heap( begin, it, less );
+	}
+#if 0
+	assert( wsw::is_heap( begin, end, less ) );
+#endif
+}
+
+template <typename It>
+void make_heap( It begin, It end ) {
+	const auto less = []( const decltype( *begin ) &l, const decltype( *begin ) &r ) -> bool { return l < r; };
+	wsw::make_heap( begin, end, less );
+}
+
 template <typename T, typename Less>
 void sortPodNonSpeedCritical( T *begin, T *end, const Less &less ) {
 	assert( begin <= end );
