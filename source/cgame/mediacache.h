@@ -185,6 +185,7 @@ public:
 	CachedMaterial shaderElectroCloudTrailParticle { this, wsw::StringView( "gfx/effects/electro_cloud_trail_particle" ) };
 	CachedMaterial shaderElectroIonsTrailParticle { this, wsw::StringView( "gfx/effects/electro_ions_trail_particle" ) };
 	CachedMaterial shaderElectroPolyTrail { this, wsw::StringView( "gfx/effects/electro_poly_trail" ) };
+	CachedMaterial shaderElectroTrace { this, wsw::StringView( "gfx/effects/electro_trace" ) };
 
 	CachedMaterial shaderPlasmaLingeringTrailParticle { this, wsw::StringView( "gfx/effects/pg/pg_lingering_trail_particle" ) };
 

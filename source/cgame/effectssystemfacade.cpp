@@ -2874,10 +2874,6 @@ bool getElectroboltTeamColor( int team, float *color ) {
 }
 
 void EffectsSystemFacade::spawnElectroboltBeam( const vec3_t start, const vec3_t end, int team ) {
-	if( v_ebBeamTime.get() <= 0.0f || v_ebBeamWidth.get() <= 0.0f ) {
-		return;
-	}
-
 	vec4_t color;
 	if( !getElectroboltTeamColor( team, color ) ) {
 		Vector4Copy( colorWhite, color );
@@ -2892,7 +2888,7 @@ void EffectsSystemFacade::spawnElectroboltBeam( const vec3_t start, const vec3_t
 		}
 	}
 
-	const auto timeoutSeconds = wsw::clamp( v_ebBeamTime.get(), 0.1f, 1.0f );
+	const auto timeoutSeconds = v_ebBeamTime.get();
 	const auto timeoutMillis  = (unsigned)( 1.00f * 1000 * timeoutSeconds );
 	const auto lightTimeout   = (unsigned)( 0.25f * 1000 * timeoutSeconds );
 
@@ -2919,7 +2915,7 @@ void EffectsSystemFacade::spawnElectroboltBeam( const vec3_t start, const vec3_t
 				},
 			}
 		},
-		.width      = wsw::clamp( v_ebBeamWidth.get(), 0.0f, 48.0f ),
+		.width      = v_ebBeamWidth.get(),
 		.tileLength = 128.0f,
 		.timeout    = (unsigned)( timeoutMillis ),
 		.numPlanes  = 3,
@@ -2936,16 +2932,12 @@ bool getInstagunTeamColor( int team, float *color ) {
 }
 
 void EffectsSystemFacade::spawnInstagunBeam( const vec3_t start, const vec3_t end, int team ) {
-	if( v_instaBeamTime.get() <= 0.0f || v_instaBeamWidth.get() <= 0.0f ) {
-		return;
-	}
-
 	vec4_t color;
 	if( !getInstagunTeamColor( team, color ) ) {
 		Vector4Set( color, 1.0f, 0.0f, 0.4f, 0.35f );
 	}
 
-	const auto timeoutSeconds = wsw::clamp( v_instaBeamTime.get(), 0.1f, 1.0f );
+	const auto timeoutSeconds = v_instaBeamTime.get();
 	const auto timeoutMillis  = (unsigned)( 1.00f * 1000 * timeoutSeconds );
 	const auto lightTimeout   = (unsigned)( 0.25f * 1000 * timeoutSeconds );
 
@@ -2972,7 +2964,7 @@ void EffectsSystemFacade::spawnInstagunBeam( const vec3_t start, const vec3_t en
 				},
 			}
 		},
-		.width      = wsw::clamp( v_instaBeamWidth.get(), 0.0f, 48.0f ),
+		.width      = v_instaBeamWidth.get(),
 		.tileLength = 128.0f,
 		.timeout    = timeoutMillis,
 		.numPlanes  = 3,

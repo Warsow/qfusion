@@ -120,8 +120,8 @@ public:
 	void touchBlastTrail( int entNum, const float *origin, const float *velocity, int64_t currTime ) {
 		m_trackedEffectsSystem.touchBlastTrail( entNum, origin, velocity, currTime );
 	}
-	void touchElectroTrail( int entNum, int ownerNum, const float *origin, int64_t currTime ) {
-		m_trackedEffectsSystem.touchElectroTrail( entNum, ownerNum, origin, currTime );
+	void touchElectroTrail( int entNum, int ownerNum, const float *spawnOrigin, const float *currOrigin, int64_t currTime ) {
+		m_trackedEffectsSystem.touchElectroTrail( entNum, ownerNum, spawnOrigin, currOrigin, currTime );
 	}
 	void touchStrongPlasmaTrail( int entNum, const float *origin, const float *velocity, int64_t currTime ) {
 		m_trackedEffectsSystem.touchStrongPlasmaTrail( entNum, origin, velocity, currTime );

@@ -133,10 +133,11 @@ BoolConfigVar v_showMessageFeed( "cg_showMessageFeed"_asView, { .byDefault = tru
 BoolConfigVar v_showCaptureAreas( "cg_showCaptureAreas"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } );
 
 // TODO: Default width values are way too large (even if they don't visually look like that), clip the image
-FloatConfigVar v_ebBeamWidth( "cg_ebBeamWidth"_asView, { .byDefault = 48.0f, .flags = CVAR_ARCHIVE } );
-FloatConfigVar v_ebBeamTime( "cg_ebBeamTime"_asView, { .byDefault = 0.4f, .flags = CVAR_ARCHIVE } );
-FloatConfigVar v_instaBeamWidth( "cg_instaBeamWidth"_asView, { .byDefault = 48.0f, .flags = CVAR_ARCHIVE } );
-FloatConfigVar v_instaBeamTime( "cg_instaBeamTime"_asView, { .byDefault = 0.4f, .flags = CVAR_ARCHIVE } );
+// TODO: Implement OptionalFloatVar, allow turning beams off in a regular fashion
+FloatConfigVar v_ebBeamWidth( "cg_ebBeamWidth"_asView, { .byDefault = 32.0f, .min = inclusive( 12.0f ), .max = inclusive( 48.0f ), .flags = CVAR_ARCHIVE } );
+FloatConfigVar v_ebBeamTime( "cg_ebBeamTime"_asView, { .byDefault = 0.4f, .min = inclusive( 0.1f ), .max = inclusive( 1.0f ), .flags = CVAR_ARCHIVE } );
+FloatConfigVar v_instaBeamWidth( "cg_instaBeamWidth"_asView, { .byDefault = 48.0f, .min = inclusive( 12.0f ), .max = inclusive( 48.0f ), .flags = CVAR_ARCHIVE } );
+FloatConfigVar v_instaBeamTime( "cg_instaBeamTime"_asView, { .byDefault = 0.4f, .min = inclusive( 0.1f ), .max = inclusive( 1.0f ), .flags = CVAR_ARCHIVE } );
 
 static IntConfigVar v_weaponAutoSwitch( "cg_weaponAutoSwitch"_asView, { .byDefault = 2, .flags = CVAR_ARCHIVE } );
 
@@ -4438,7 +4439,8 @@ void CG_AddEntities( DrawSceneRequest *drawSceneRequest, ViewState *drawFromView
 				cent->ent.frame =  cent->ent.oldframe = 0;
 
 				CG_AddGenericEnt( cent, drawSceneRequest, drawFromViewState );
-				cg.effectsSystem.touchElectroTrail( cent->current.number, cent->current.ownerNum, cent->ent.origin, cg.time );
+				cg.effectsSystem.touchElectroTrail( cent->current.number, cent->current.ownerNum,
+													cent->current.linearMovementBegin, cent->ent.origin, cg.time );
 				CG_EntityLoopSound( state, ATTN_STATIC, drawFromViewState );
 				drawSceneRequest->addLight( cent->ent.origin, 192.0f, 144.0f, 0.9f, 0.9f, 1.0f );
 				break;
