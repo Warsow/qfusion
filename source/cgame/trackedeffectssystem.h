@@ -69,7 +69,7 @@ public:
 	}
 
 	void touchBlastTrail( int entNum, const float *origin, const float *velocity, int64_t currTime );
-	void touchElectroTrail( int entNum, int ownerNum, const float *origin, int64_t currTime );
+	void touchElectroTrail( int entNum, int ownerNum, const float *spawnOrigin, const float *currOrigin, int64_t currTime );
 
 	void touchStrongPlasmaTrail( int entNum, const float *origin, const float *velocity, int64_t currTime );
 	void touchWeakPlasmaTrail( int entNum, const float *origin, const float *velocity, int64_t currTime );
@@ -149,6 +149,29 @@ private:
 		std::optional<uint16_t> attachedToEntNum;
 	};
 
+	struct TraceEffectParams {
+		shader_s *material { nullptr };
+		float fromColor[4] { 1.0f, 1.0f, 1.0f, 1.0f };
+		float toColor[4] { 1.0f, 1.0f, 1.0f, 1.0f };
+		float width { 16.0f };
+		float tileLength { 0.0f };
+		float minDisplayedLength { 384.0f };
+		unsigned timeout { 500 };
+		unsigned numPlanes { 1 };
+	};
+
+	struct TraceEffect {
+		int64_t spawnedAt { 0 };
+		int64_t touchedAt { 0 };
+		TraceEffect *prev { nullptr }, *next { nullptr };
+		// TODO: Should we handle it via PolyEffectsSystem? Currently, it does not seem to be worth it.
+		QuadPoly poly;
+		float minDisplayedLength { 0 };
+		unsigned timeout { 0 };
+
+		std::optional<uint16_t> attachedToEntNum;
+	};
+
 	struct TeleEffect {
 		TeleEffect *prev { nullptr }, *next { nullptr };
 		int64_t spawnTime { 0 };
@@ -178,6 +201,7 @@ private:
 		ParticleTrail *particleTrails[2] { nullptr, nullptr };
 		StraightPolyTrail *straightPolyTrail { nullptr };
 		CurvedPolyTrail *curvedPolyTrail { nullptr };
+		TraceEffect *traceEffect { nullptr };
 	};
 
 	void makeParticleTrailLingering( ParticleTrail *trail );
@@ -192,6 +216,7 @@ private:
 	void unlinkAndFree( ParticleTrail *particleTrail );
 	void unlinkAndFree( StraightPolyTrail *polyTrail );
 	void unlinkAndFree( CurvedPolyTrail *polyTrail );
+	void unlinkAndFree( TraceEffect *traceEffect );
 	void unlinkAndFree( TeleEffect *teleEffect );
 
 	void touchRocketTrail( int entNum, const float *origin, int64_t currTime, bool useCurvedTrail );
@@ -216,6 +241,13 @@ private:
 
 	void updateAttachedCurvedPolyTrail( CurvedPolyTrail *trail, const float *origin, int64_t currTime );
 
+	[[nodiscard]]
+	auto allocTraceEffect( int entNum, int64_t currTime, TraceEffectParams &&params ) -> TraceEffect *;
+
+	void updateAttachedTraceEffect( TraceEffect *effect, const float *spawnOrigin, const float *currOrigin, int64_t currTime );
+	void tryMakingTraceEffectLingering( TraceEffect *effect );
+	void detachTraceEffect( TraceEffect *effect, int entNum );
+
 	void spawnPlayerTeleEffect( int entNum, int64_t currTime, const TeleEffectParams &params, int inOrOutIndex );
 
 	static constexpr unsigned kClippedTrailsBin = ParticleSystem::kClippedTrailFlocksBin;
@@ -230,12 +262,16 @@ private:
 	CurvedPolyTrail *m_attachedCurvedPolyTrailsHead { nullptr };
 	CurvedPolyTrail *m_lingeringCurvedPolyTrailsHead { nullptr };
 
+	TraceEffect *m_attachedTraceEffectsHead { nullptr };
+	TraceEffect *m_lingeringTraceEffectsHead { nullptr };
+
 	TeleEffect *m_teleEffectsHead { nullptr };
 
 	wsw::HeapBasedFreelistAllocator m_particleTrailsAllocator { sizeof( ParticleTrail ), 4 * MAX_CLIENTS };
 	wsw::HeapBasedFreelistAllocator m_straightPolyTrailsAllocator { sizeof( StraightPolyTrail ), MAX_CLIENTS };
 	wsw::HeapBasedFreelistAllocator m_curvedPolyTrailsAllocator { sizeof( CurvedPolyTrail ), 4 * MAX_CLIENTS };
 	wsw::HeapBasedFreelistAllocator m_teleEffectsAllocator { sizeof( TeleEffect ), 2 * MAX_CLIENTS };
+	wsw::HeapBasedFreelistAllocator m_traceEffectsAllocator { sizeof( TraceEffect ), 4 * MAX_CLIENTS };
 
 	AttachedEntityEffects m_attachedEntityEffects[MAX_EDICTS];
 	AttachedClientEffects m_attachedClientEffects[MAX_CLIENTS];

@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../common/configvars.h"
 #include "../common/profilerscope.h"
 
+#include <sanitizer/asan_interface.h>
+
 static BoolConfigVar v_projectileLingeringTrails( wsw::StringView( "cg_projectileLingeringTrails"), { .byDefault = true, .flags = CVAR_ARCHIVE } );
 
 struct StraightPolyTrailProps {
@@ -53,6 +55,10 @@ void TrackedEffectsSystem::clear() {
 	unlinkAndFreeItemsInList( m_attachedCurvedPolyTrailsHead );
 	unlinkAndFreeItemsInList( m_lingeringCurvedPolyTrailsHead );
 	assert( !m_attachedCurvedPolyTrailsHead && !m_lingeringCurvedPolyTrailsHead );
+
+	unlinkAndFreeItemsInList( m_attachedTraceEffectsHead );
+	unlinkAndFreeItemsInList( m_lingeringTraceEffectsHead );
+	assert( !m_attachedTraceEffectsHead && !m_lingeringTraceEffectsHead );
 
 	unlinkAndFreeItemsInList( m_teleEffectsHead );
 	assert( !m_teleEffectsHead );
@@ -105,6 +111,18 @@ void TrackedEffectsSystem::unlinkAndFree( CurvedPolyTrail *polyTrail ) {
 	cg.polyEffectsSystem.destroyCurvedBeamEffect( polyTrail->beam );
 	polyTrail->~CurvedPolyTrail();
 	m_curvedPolyTrailsAllocator.free( polyTrail );
+}
+
+void TrackedEffectsSystem::unlinkAndFree( TraceEffect *traceEffect ) {
+	if( traceEffect->attachedToEntNum ) {
+		wsw::unlink( traceEffect, &m_attachedTraceEffectsHead );
+		detachTraceEffect( traceEffect, *traceEffect->attachedToEntNum );
+	} else {
+		wsw::unlink( traceEffect, &m_lingeringTraceEffectsHead );
+	}
+
+	traceEffect->~TraceEffect();
+	m_traceEffectsAllocator.free( traceEffect );
 }
 
 void TrackedEffectsSystem::unlinkAndFree( TeleEffect *teleEffect ) {
@@ -345,6 +363,79 @@ void TrackedEffectsSystem::updateAttachedCurvedPolyTrail( CurvedPolyTrail *trail
 	cg.polyEffectsSystem.updateCurvedBeamEffect( trail->beam, props.fromColor, props.toColor,
 												 props.width, PolyEffectsSystem::UvModeFit {},
 												 trail->lastPointsSpan );
+}
+
+auto TrackedEffectsSystem::allocTraceEffect( int entNum, int64_t currTime, TraceEffectParams &&params ) -> TraceEffect * {
+	if( void *mem = m_traceEffectsAllocator.allocOrNull() ) {
+		auto *effect = new( mem )TraceEffect;
+		effect->spawnedAt       = currTime;
+		effect->poly.material   = params.material;
+		effect->poly.animFrac   = 0.0f;
+		// Make sure it's hidden by default
+		effect->poly.halfExtent = 0.0f;
+
+		effect->poly.appearanceRules = QuadPoly::ViewAlignedBeamRules {
+			.width      = params.width,
+			.tileLength = params.tileLength,
+			.fromColor  = { params.fromColor[0], params.fromColor[1], params.fromColor[2], params.fromColor[3] },
+			.toColor    = { params.toColor[0], params.toColor[1], params.toColor[2], params.toColor[3] },
+			.numPlanes  = params.numPlanes,
+		};
+
+		effect->timeout            = params.timeout;
+		effect->minDisplayedLength = params.minDisplayedLength;
+
+		assert( entNum && entNum < MAX_EDICTS );
+		assert( !m_attachedEntityEffects[entNum].traceEffect );
+		effect->attachedToEntNum                    = entNum;
+		m_attachedEntityEffects[entNum].traceEffect = effect;
+
+		wsw::link( effect, &m_attachedTraceEffectsHead );
+		return effect;
+	}
+
+	return nullptr;
+}
+
+void TrackedEffectsSystem::updateAttachedTraceEffect( TraceEffect *effect, const float *spawnOrigin, const float *currOrigin, int64_t currTime ) {
+	effect->touchedAt = currTime;
+
+	const float squareDistance = DistanceSquared( spawnOrigin, currOrigin );
+	assert( effect->minDisplayedLength > 0.0f );
+	if( squareDistance >= wsw::square( effect->minDisplayedLength ) ) {
+		auto *const appearanceRules = std::get_if<QuadPoly::ViewAlignedBeamRules>( &effect->poly.appearanceRules );
+		const float rcpDistance     = Q_RSqrt( squareDistance );
+		VectorSubtract( currOrigin, spawnOrigin, appearanceRules->dir );
+		VectorScale( appearanceRules->dir, rcpDistance, appearanceRules->dir );
+		VectorAvg( spawnOrigin, currOrigin, effect->poly.origin );
+		// That's our current assumption (we don't support non-linear trajectories)
+		assert( squareDistance >= wsw::square( effect->poly.halfExtent ) );
+		effect->poly.halfExtent = 0.5f * ( squareDistance * rcpDistance );
+	} else {
+		effect->poly.halfExtent = 0.0f;
+	}
+}
+
+void TrackedEffectsSystem::tryMakingTraceEffectLingering( TraceEffect *effect ) {
+	assert( effect->minDisplayedLength > 0.0f );
+	assert( effect->attachedToEntNum != std::nullopt );
+	if( effect->poly.halfExtent >= 0.5f * effect->minDisplayedLength ) {
+		wsw::unlink( effect, &m_attachedTraceEffectsHead );
+		wsw::link( effect, &m_lingeringTraceEffectsHead );
+		detachTraceEffect( effect, *effect->attachedToEntNum );
+	} else {
+		unlinkAndFree( effect );
+	}
+}
+
+void TrackedEffectsSystem::detachTraceEffect( TraceEffect *effect, int entNum ) {
+	assert( entNum >= 0 && entNum < MAX_EDICTS );
+	assert( effect->attachedToEntNum == std::optional( entNum ) );
+
+	AttachedEntityEffects *const entityEffects = &m_attachedEntityEffects[entNum];
+
+	entityEffects->traceEffect = nullptr;
+	effect->attachedToEntNum   = std::nullopt;
 }
 
 static const RgbaLifespan kRocketSmokeTrailColors[1] {
@@ -730,7 +821,8 @@ static const StraightPolyTrailProps kElectroPolyTrailProps {
 	.width     = 20.0f,
 };
 
-void TrackedEffectsSystem::touchElectroTrail( int entNum, int ownerNum, const float *origin, int64_t currTime ) {
+void TrackedEffectsSystem::touchElectroTrail( int entNum, int ownerNum, const float *spawnOrigin,
+											  const float *currOrigin, int64_t currTime ) {
 	std::span<const RgbaLifespan> cloudColors, ionsColors;
 
 	bool useTeamColors = false;
@@ -756,7 +848,7 @@ void TrackedEffectsSystem::touchElectroTrail( int entNum, int ownerNum, const fl
 	AttachedEntityEffects *const __restrict effects = &m_attachedEntityEffects[entNum];
 
 	if( !effects->particleTrails[1] ) [[unlikely]] {
-		effects->particleTrails[1] = allocParticleTrail( entNum, 1, origin, kNonClippedTrailsBin,
+		effects->particleTrails[1] = allocParticleTrail( entNum, 1, currOrigin, kNonClippedTrailsBin,
 														 &::g_electroIonsParticlesFlockParams, {
 			.materials     = cgs.media.shaderElectroIonsTrailParticle.getAddressOfHandle(),
 			.colors        = ionsColors,
@@ -767,15 +859,36 @@ void TrackedEffectsSystem::touchElectroTrail( int entNum, int ownerNum, const fl
 	}
 	if( ParticleTrail *trail = effects->particleTrails[1] ) [[likely]] {
 		trail->dropDistance = 16.0f;
-		updateAttachedParticleTrail( trail, origin, currTime );
+		updateAttachedParticleTrail( trail, currOrigin, currTime );
 	}
 
 	if( !effects->straightPolyTrail ) [[unlikely]] {
 		effects->straightPolyTrail = allocStraightPolyTrail( entNum, cgs.media.shaderElectroPolyTrail,
-															 origin, &kElectroPolyTrailProps );
+															 currOrigin, &kElectroPolyTrailProps );
 	}
 	if( StraightPolyTrail *trail = effects->straightPolyTrail ) [[likely]] {
-		updateAttachedStraightPolyTrail( trail, origin, currTime );
+		updateAttachedStraightPolyTrail( trail, currOrigin, currTime );
+	}
+
+	if( !effects->traceEffect ) [[unlikely]] {
+		const float *fromColor, *toColor;
+		if( useTeamColors ) {
+			fromColor = toColor = teamColor;
+		} else {
+			fromColor = toColor = colorWhite;
+		}
+		effects->traceEffect = allocTraceEffect( entNum, currTime, TraceEffectParams {
+			.material           = cgs.media.shaderElectroTrace,
+			.fromColor          = { fromColor[0], fromColor[1], fromColor[2], fromColor[3] },
+			.toColor            = { toColor[0], toColor[1], toColor[2], toColor[3] },
+			.width              = v_ebBeamWidth.get(),
+			.minDisplayedLength = 256.0f,
+			.timeout            = (unsigned)( 1000.0f * v_ebBeamTime.get() ),
+			.numPlanes          = 3,
+		});
+	}
+	if( TraceEffect *effect = effects->traceEffect ) [[likely]] {
+		updateAttachedTraceEffect( effect, spawnOrigin, currOrigin, currTime );
 	}
 }
 
@@ -1167,6 +1280,10 @@ void TrackedEffectsSystem::resetEntityEffects( int entNum ) {
 		tryMakingCurvedPolyTrailLingering( effects->curvedPolyTrail );
 		assert( !effects->curvedPolyTrail );
 	}
+	if( effects->traceEffect ) {
+		tryMakingTraceEffectLingering( effects->traceEffect );
+		assert( !effects->traceEffect );
+	}
 }
 
 static void getLaserColorOverlayForOwner( int ownerNum, vec4_t color ) {
@@ -1242,6 +1359,7 @@ void TrackedEffectsSystem::simulateFrame( int64_t currTime ) {
 	if( currTime != m_lastTime ) {
 		assert( currTime > m_lastTime );
 		// Collect orphans.
+		// Note: don't expect that detachEntityEffects() get called for linear projectiles
 
 		// The actual drawing of trails is performed by the particle system.
 		for( ParticleTrail *trail = m_attachedParticleTrailsHead, *next = nullptr; trail; trail = next ) {
@@ -1317,6 +1435,23 @@ void TrackedEffectsSystem::simulateFrame( int64_t currTime ) {
 			}
 		}
 
+		// Note: Attached (non-lingering) trace effects are held until the owner destruction,
+		// even if they get hidden, so no attempts to attach trails again are made.
+
+		for( TraceEffect *effect = m_attachedTraceEffectsHead, *next = nullptr; effect; effect = next ) {
+			next = effect->next;
+			if( effect->touchedAt + effect->timeout <= currTime ) {
+				tryMakingTraceEffectLingering( effect );
+			}
+		}
+
+		for( TraceEffect *effect = m_lingeringTraceEffectsHead, *next = nullptr; effect; effect = next ) {
+			next = effect->next;
+			if( effect->spawnedAt + effect->timeout <= currTime ) {
+				unlinkAndFree( effect );
+			}
+		}
+
 		for( TeleEffect *effect = m_teleEffectsHead, *next = nullptr; effect; effect = next ) {
 			next = effect->next;
 			if( effect->spawnTime + effect->lifetime <= currTime ) [[unlikely]] {
@@ -1348,6 +1483,29 @@ void TrackedEffectsSystem::simulateFrame( int64_t currTime ) {
 
 void TrackedEffectsSystem::submitToScene( int64_t currTime, DrawSceneRequest *drawSceneRequest ) {
 	assert( currTime == m_lastTime );
+
+	for( TraceEffect *effect = m_attachedTraceEffectsHead; effect; effect = effect->next ) {
+		// If it is no longer hidden
+		if( effect->poly.halfExtent > 0.0f && effect->poly.material ) {
+			// If it does not just hold the owner trail slot (see the remark in the simulation method)
+			if( effect->spawnedAt + effect->timeout > currTime ) {
+				const float lifetimeFrac = (float)( currTime - effect->spawnedAt ) * Q_Rcp( (float)effect->timeout );
+				assert( lifetimeFrac >= 0.0f && lifetimeFrac <= 1.0f );
+				effect->poly.animFrac = lifetimeFrac;
+				drawSceneRequest->addPoly( &effect->poly );
+			}
+		}
+	}
+
+	for( TraceEffect *effect = m_lingeringTraceEffectsHead; effect; effect = effect->next ) {
+		assert( effect->spawnedAt + effect->timeout > currTime );
+		if( effect->poly.halfExtent > 0.0f && effect->poly.material ) {
+			const float lifetimeFrac = (float)( currTime - effect->spawnedAt ) * Q_Rcp( (float)effect->timeout );
+			assert( lifetimeFrac >= 0.0f && lifetimeFrac <= 1.0f );
+			effect->poly.animFrac = lifetimeFrac;
+			drawSceneRequest->addPoly( &effect->poly );
+		}
+	}
 
 	for( TeleEffect *effect = m_teleEffectsHead; effect; effect = effect->next ) {
 		assert( effect->spawnTime + effect->lifetime > currTime );
