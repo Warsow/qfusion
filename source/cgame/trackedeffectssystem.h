@@ -156,18 +156,17 @@ private:
 		float width { 16.0f };
 		float tileLength { 0.0f };
 		float minDisplayedLength { 384.0f };
-		unsigned timeout { 500 };
+		unsigned decayTime { 500 };
 		unsigned numPlanes { 1 };
 	};
 
 	struct TraceEffect {
-		int64_t spawnedAt { 0 };
 		int64_t touchedAt { 0 };
 		TraceEffect *prev { nullptr }, *next { nullptr };
 		// TODO: Should we handle it via PolyEffectsSystem? Currently, it does not seem to be worth it.
 		QuadPoly poly;
 		float minDisplayedLength { 0 };
-		unsigned timeout { 0 };
+		unsigned decayTime { 0 };
 
 		std::optional<uint16_t> attachedToEntNum;
 	};

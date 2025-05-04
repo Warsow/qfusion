@@ -367,8 +367,7 @@ void TrackedEffectsSystem::updateAttachedCurvedPolyTrail( CurvedPolyTrail *trail
 
 auto TrackedEffectsSystem::allocTraceEffect( int entNum, int64_t currTime, TraceEffectParams &&params ) -> TraceEffect * {
 	if( void *mem = m_traceEffectsAllocator.allocOrNull() ) {
-		auto *effect = new( mem )TraceEffect;
-		effect->spawnedAt       = currTime;
+		auto *effect            = new( mem )TraceEffect;
 		effect->poly.material   = params.material;
 		effect->poly.animFrac   = 0.0f;
 		// Make sure it's hidden by default
@@ -382,7 +381,7 @@ auto TrackedEffectsSystem::allocTraceEffect( int entNum, int64_t currTime, Trace
 			.numPlanes  = params.numPlanes,
 		};
 
-		effect->timeout            = params.timeout;
+		effect->decayTime          = params.decayTime;
 		effect->minDisplayedLength = params.minDisplayedLength;
 
 		assert( entNum && entNum < MAX_EDICTS );
@@ -883,7 +882,7 @@ void TrackedEffectsSystem::touchElectroTrail( int entNum, int ownerNum, const fl
 			.toColor            = { toColor[0], toColor[1], toColor[2], toColor[3] },
 			.width              = v_ebBeamWidth.get(),
 			.minDisplayedLength = 256.0f,
-			.timeout            = (unsigned)( 1000.0f * v_ebBeamTime.get() ),
+			.decayTime          = (unsigned)( 1000.0f * v_ebBeamTime.get() ),
 			.numPlanes          = 3,
 		});
 	}
@@ -1440,14 +1439,14 @@ void TrackedEffectsSystem::simulateFrame( int64_t currTime ) {
 
 		for( TraceEffect *effect = m_attachedTraceEffectsHead, *next = nullptr; effect; effect = next ) {
 			next = effect->next;
-			if( effect->touchedAt + effect->timeout <= currTime ) {
+			if( effect->touchedAt < currTime ) {
 				tryMakingTraceEffectLingering( effect );
 			}
 		}
 
 		for( TraceEffect *effect = m_lingeringTraceEffectsHead, *next = nullptr; effect; effect = next ) {
 			next = effect->next;
-			if( effect->spawnedAt + effect->timeout <= currTime ) {
+			if( effect->touchedAt + effect->decayTime <= currTime ) {
 				unlinkAndFree( effect );
 			}
 		}
@@ -1487,22 +1486,18 @@ void TrackedEffectsSystem::submitToScene( int64_t currTime, DrawSceneRequest *dr
 	for( TraceEffect *effect = m_attachedTraceEffectsHead; effect; effect = effect->next ) {
 		// If it is no longer hidden
 		if( effect->poly.halfExtent > 0.0f && effect->poly.material ) {
-			// If it does not just hold the owner trail slot (see the remark in the simulation method)
-			if( effect->spawnedAt + effect->timeout > currTime ) {
-				const float lifetimeFrac = (float)( currTime - effect->spawnedAt ) * Q_Rcp( (float)effect->timeout );
-				assert( lifetimeFrac >= 0.0f && lifetimeFrac <= 1.0f );
-				effect->poly.animFrac = lifetimeFrac;
-				drawSceneRequest->addPoly( &effect->poly );
-			}
+			// Keep showing the first anim frame
+			effect->poly.animFrac = 0.0f;
+			drawSceneRequest->addPoly( &effect->poly );
 		}
 	}
 
 	for( TraceEffect *effect = m_lingeringTraceEffectsHead; effect; effect = effect->next ) {
-		assert( effect->spawnedAt + effect->timeout > currTime );
+		assert( effect->touchedAt + effect->decayTime > currTime );
 		if( effect->poly.halfExtent > 0.0f && effect->poly.material ) {
-			const float lifetimeFrac = (float)( currTime - effect->spawnedAt ) * Q_Rcp( (float)effect->timeout );
-			assert( lifetimeFrac >= 0.0f && lifetimeFrac <= 1.0f );
-			effect->poly.animFrac = lifetimeFrac;
+			const float decayFrac = (float)( currTime - effect->touchedAt ) * Q_Rcp( (float)effect->decayTime );
+			assert( decayFrac >= 0.0f && decayFrac <= 1.0f );
+			effect->poly.animFrac = decayFrac;
 			drawSceneRequest->addPoly( &effect->poly );
 		}
 	}
