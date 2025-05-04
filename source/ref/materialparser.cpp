@@ -193,6 +193,8 @@ bool MaterialParser::parsePassKey() {
 			case PassKey::AnimClampMap: return parseAnimClampMap();
 			case PassKey::TimelineMap: return parseTimelineMap();
 			case PassKey::TimelineClampMap: return parseTimelineClampMap();
+			case PassKey::TimelineMap2: return parseTimelineMap2();
+			case PassKey::TimelineClampMap2: return parseTimelineClampMap2();
 			case PassKey::Material: return parseMaterial();
 			case PassKey::Distortion: return parseDistortion();
 			case PassKey::CelShade: return parseCelshade();
@@ -573,9 +575,14 @@ bool MaterialParser::parseTimelineMapExt( int addFlags ) {
 	for(;; ) {
 		if( tokenNum % 2 ) {
 			if( const std::optional<float> maybeFrac = m_lexer->getFloat() ) {
-				if( *maybeFrac > lastFrac && *maybeFrac < 1.0f ) {
-					pass->timelineFracs[1 + tokenNum / 2] = *maybeFrac;
-					lastFrac = *maybeFrac;
+				if( pass->anim_numframes < MAX_SHADER_IMAGES ) {
+					if( *maybeFrac > lastFrac && *maybeFrac < 1.0f ) {
+						pass->timelineFracs[1 + tokenNum / 2] = *maybeFrac;
+						lastFrac = *maybeFrac;
+					} else {
+						areParamsValid = false;
+						break;
+					}
 				} else {
 					areParamsValid = false;
 					break;
@@ -585,11 +592,17 @@ bool MaterialParser::parseTimelineMapExt( int addFlags ) {
 			}
 		} else {
 			if( const std::optional<wsw::StringView> maybeToken = m_lexer->getNextTokenInLine() ) {
-				if( !( pass->images[tokenNum / 2] = findImage( *maybeToken, imageFlags ) ) ) {
+				if( pass->anim_numframes < MAX_SHADER_IMAGES ) {
+					if( !( pass->images[tokenNum / 2] = findImage( *maybeToken, imageFlags ) ) ) {
+						areParamsValid = false;
+						break;
+					} else {
+						pass->anim_numframes++;
+					}
+				} else {
 					areParamsValid = false;
 					break;
 				}
-				pass->anim_numframes++;
 			} else {
 				break;
 			}
@@ -600,6 +613,38 @@ bool MaterialParser::parseTimelineMapExt( int addFlags ) {
 	areParamsValid |= tokenNum >= 3 && tokenNum % 2 && !m_lexer->getNextTokenInLine();
 	if( !areParamsValid ) {
 		pass->anim_numframes = 0;
+	}
+
+	return true;
+}
+
+bool MaterialParser::parseTimelineMap2Ext( int addFlags ) {
+	const auto imageFlags = getImageFlags() | addFlags | IT_SRGB;
+
+	auto *const pass = currPass();
+	pass->tcgen = TC_GEN_BASE;
+	pass->flags &= ~( SHADERPASS_LIGHTMAP | SHADERPASS_PORTALMAP );
+	pass->timelineFracs[0] = 0.0f;
+	pass->anim_numframes   = 0;
+	pass->anim_fps         = 0.0f;
+
+	for(;; ) {
+		if( const std::optional<wsw::StringView> maybeToken = m_lexer->getNextTokenInLine() ) {
+			if( pass->anim_numframes < MAX_SHADER_IMAGES ) {
+				pass->images[pass->anim_numframes++] = findImage( *maybeToken, imageFlags );
+			} else {
+				pass->anim_numframes = 0;
+				break;
+			}
+		} else {
+			break;
+		}
+	}
+
+	if( pass->anim_numframes ) {
+		for( unsigned i = 0; i < pass->anim_numframes; ++i ) {
+			pass->timelineFracs[i] = (float)i / ( (float)pass->anim_numframes );
+		}
 	}
 
 	return true;
@@ -653,6 +698,14 @@ bool MaterialParser::parseTimelineMap() {
 
 bool MaterialParser::parseTimelineClampMap() {
 	return parseTimelineMapExt( IT_CLAMP );
+}
+
+bool MaterialParser::parseTimelineMap2() {
+	return parseTimelineMap2Ext( 0 );
+}
+
+bool MaterialParser::parseTimelineClampMap2() {
+	return parseTimelineMap2Ext( IT_CLAMP );
 }
 
 bool MaterialParser::parseMaterial() {

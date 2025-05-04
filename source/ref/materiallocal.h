@@ -33,6 +33,8 @@ enum class PassKey {
 	AnimClampMap,
 	TimelineMap,
 	TimelineClampMap,
+	TimelineMap2,
+	TimelineClampMap2,
 	Material,
 	Distortion,
 	CelShade,
@@ -817,6 +819,10 @@ class MaterialParser {
 	[[nodiscard]]
 	bool parseTimelineClampMap();
 	[[nodiscard]]
+	bool parseTimelineMap2();
+	[[nodiscard]]
+	bool parseTimelineClampMap2();
+	[[nodiscard]]
 	bool parseMaterial();
 	[[nodiscard]]
 	bool parseDistortion();
@@ -847,6 +853,8 @@ class MaterialParser {
 	bool parseAnimMapExt( int addFlags );
 	[[nodiscard]]
 	bool parseTimelineMapExt( int addFlags );
+	[[nodiscard]]
+	bool parseTimelineMap2Ext( int addFlags );
 	[[nodiscard]]
 	bool parseCubeMapExt( int addFlags, int tcGen );
 
