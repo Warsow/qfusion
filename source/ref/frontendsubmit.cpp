@@ -1111,16 +1111,16 @@ void Frontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *workload ) {
 				const float degreesPerStep    = numDrawnPlanes > 1 ? 180.0f / (float)numDrawnPlanes : 0.0f;
 				unsigned planeNum             = 0;
 				do {
-					float rotationDegrees = 0.0f;
+					float planeRotationDegrees = 0.0f;
 					if( numDrawnPlanes % 2 ) {
 						if( planeNum > 0 ) {
 							const unsigned extraPlaneNum = planeNum - 1;
 							const float stepSign         = ( extraPlaneNum % 2 ) ? -1.0f : +1.0f;
-							rotationDegrees              = stepSign * degreesPerStep * (float)( 1 + extraPlaneNum / 2 );
+							planeRotationDegrees         = stepSign * degreesPerStep * (float)( 1 + extraPlaneNum / 2 );
 						}
 					} else {
 						// Add rotation to the first (zero) plane as well
-						rotationDegrees = degreesPerStep * ( (float)planeNum + 0.5f );
+						planeRotationDegrees = degreesPerStep * ( (float)planeNum + 0.5f );
 					}
 
 					const float halfWidth = 0.5f * beamRules->width;
@@ -1129,19 +1129,35 @@ void Frontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *workload ) {
 					VectorMA( poly->origin, -poly->halfExtent, beamRules->dir, from );
 					VectorMA( poly->origin, +poly->halfExtent, beamRules->dir, to );
 
-					vec3_t tmpRight;
-					const float *right;
-					if( rotationDegrees == 0.0f ) {
-						right = originalRight;
-					} else {
-						RotatePointAroundVector( tmpRight, beamRules->dir, originalRight, rotationDegrees );
-						right = tmpRight;
+					vec3_t tmpRight, tmpFromRight, tmpToRight;
+
+					const float *fromRight          = originalRight;
+					const float *toRight            = originalRight;
+					const float fromRotationDegrees = planeRotationDegrees + beamRules->fromRotation;
+					const float toRotationDegrees   = planeRotationDegrees + beamRules->toRotation;
+					const bool hasFromRotation      = fromRotationDegrees != 0.0f;
+					const bool hasToRotation        = toRotationDegrees != 0.0f;
+					if( hasFromRotation | hasToRotation ) {
+						// Save a RotatePointAroundVector() call whenever possible
+						if( fromRotationDegrees == toRotationDegrees ) {
+							RotatePointAroundVector( tmpRight, beamRules->dir, originalRight, fromRotationDegrees );
+							fromRight = toRight = tmpRight;
+						} else {
+							if( hasFromRotation ) {
+								RotatePointAroundVector( tmpFromRight, beamRules->dir, originalRight, fromRotationDegrees );
+								fromRight = tmpFromRight;
+							}
+							if( hasToRotation ) {
+								RotatePointAroundVector( tmpToRight, beamRules->dir, originalRight, toRotationDegrees );
+								toRight = tmpToRight;
+							}
+						}
 					}
 
-					VectorMA( from, +halfWidth, right, positions[0] );
-					VectorMA( from, -halfWidth, right, positions[1] );
-					VectorMA( to, -halfWidth, right, positions[2] );
-					VectorMA( to, +halfWidth, right, positions[3] );
+					VectorMA( from, +halfWidth, fromRight, positions[0] );
+					VectorMA( from, -halfWidth, fromRight, positions[1] );
+					VectorMA( to, -halfWidth, toRight, positions[2] );
+					VectorMA( to, +halfWidth, toRight, positions[3] );
 
 					float stx = 1.0f;
 					if( beamRules->tileLength > 0 ) {

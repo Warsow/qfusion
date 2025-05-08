@@ -481,6 +481,8 @@ struct QuadPoly {
 		float dir[3];
 		float width;
 		float tileLength { 0.0f };
+		float fromRotation { 0.0f };
+		float toRotation { 0.0f };
 		float fromColor[4] { 1.0f, 1.0f, 1.0f, 1.0f };
 		float toColor[4] { 1.0f, 1.0f, 1.0f, 1.0f };
 		unsigned numPlanes { 1 };
