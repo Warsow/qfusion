@@ -434,6 +434,7 @@ auto getCoronaSpanStorageRequirements( std::span<const sortedDrawSurf_t> batchSp
 }
 
 static constexpr unsigned kMaxNumDrawnPlanesForBeam = 7;
+static constexpr unsigned kMaxTwistedBeamSegments   = 9;
 
 [[nodiscard]]
 static inline auto getNumDrawnPlanesForBeam( const QuadPoly::ViewAlignedBeamRules *beamRules ) -> unsigned {
@@ -450,6 +451,19 @@ static inline auto getNumDrawnPlanesForBeam( const QuadPoly::ViewAlignedBeamRule
 }
 
 [[nodiscard]]
+static inline auto getNumSegmentsForBeam( const QuadPoly::ViewAlignedBeamRules *beamRules ) -> unsigned {
+	if( beamRules->fromRotation != beamRules->toRotation ) {
+		const float fromRotation = AngleNormalize180( beamRules->fromRotation );
+		const float toRotation   = AngleNormalize180( beamRules->toRotation );
+		const float angularDelta = AngleDelta( fromRotation, toRotation );
+		constexpr float angularStep    = 5.0f;
+		constexpr float rcpAngularStep = 1.0f / angularStep;
+		return wsw::clamp( (unsigned)( angularDelta * rcpAngularStep ), 1u, kMaxTwistedBeamSegments );
+	}
+	return 1;
+}
+
+[[nodiscard]]
 auto getQuadPolySpanStorageRequirements( std::span<const sortedDrawSurf_t> batchSpan ) -> std::optional<std::pair<unsigned, unsigned>> {
 	unsigned numVertices = 0;
 	unsigned numIndices  = 0;
@@ -457,8 +471,10 @@ auto getQuadPolySpanStorageRequirements( std::span<const sortedDrawSurf_t> batch
 		const auto *const poly = (const QuadPoly *)surf.drawSurf;
 		if( const auto *const beamRules = std::get_if<QuadPoly::ViewAlignedBeamRules>( &poly->appearanceRules ) ) {
 			const unsigned numDrawnPlanes = getNumDrawnPlanesForBeam( beamRules );
-			numVertices += 4 * numDrawnPlanes;
-			numIndices += 6 * numDrawnPlanes;
+			const unsigned numSegments    = getNumSegmentsForBeam( beamRules );
+			const unsigned numQuads       = numDrawnPlanes * numSegments;
+			numVertices += 4 * numQuads;
+			numIndices += 6 * numQuads;
 		} else {
 			numVertices += 4;
 			numIndices += 6;
@@ -1077,7 +1093,7 @@ void Frontend::prepareBatchedCoronas( PrepareBatchedSurfWorkload *workload ) {
 
 void Frontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *workload ) {
 	MeshBuilder *const meshBuilder = &tl_meshBuilder;
-	meshBuilder->reserveForNumQuads( kMaxNumDrawnPlanesForBeam * workload->batchSpan.size() );
+	meshBuilder->reserveForNumQuads( kMaxTwistedBeamSegments * kMaxNumDrawnPlanesForBeam * workload->batchSpan.size() );
 
 	[[maybe_unused]] const float *const viewOrigin = workload->stateForCamera->viewOrigin;
 	[[maybe_unused]] const float *const viewAxis   = workload->stateForCamera->viewAxis;
@@ -1107,88 +1123,120 @@ void Frontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *workload ) {
 				const float rcpLength = Q_RSqrt( squareLength );
 				VectorScale( originalRight, rcpLength, originalRight );
 
+				const unsigned numSegments    = getNumSegmentsForBeam( beamRules );
+				const float rcpNumSegments    = numSegments > 1 ? ( 1.0f / (float)numSegments ) : 1.0f;
+
 				const unsigned numDrawnPlanes = getNumDrawnPlanesForBeam( beamRules );
 				const float degreesPerStep    = numDrawnPlanes > 1 ? 180.0f / (float)numDrawnPlanes : 0.0f;
 				unsigned planeNum             = 0;
 				do {
-					float planeRotationDegrees = 0.0f;
+					float planeRotation = 0.0f;
 					if( numDrawnPlanes % 2 ) {
 						if( planeNum > 0 ) {
 							const unsigned extraPlaneNum = planeNum - 1;
 							const float stepSign         = ( extraPlaneNum % 2 ) ? -1.0f : +1.0f;
-							planeRotationDegrees         = stepSign * degreesPerStep * (float)( 1 + extraPlaneNum / 2 );
+							planeRotation                = stepSign * degreesPerStep * (float)( 1 + extraPlaneNum / 2 );
 						}
 					} else {
 						// Add rotation to the first (zero) plane as well
-						planeRotationDegrees = degreesPerStep * ( (float)planeNum + 0.5f );
+						planeRotation = degreesPerStep * ( (float)planeNum + 0.5f );
 					}
 
 					const float halfWidth = 0.5f * beamRules->width;
+					const float rcpTileLength = beamRules->tileLength > 0.0f ? 1.0f / beamRules->tileLength : 0.0f;
 
-					vec3_t from, to;
-					VectorMA( poly->origin, -poly->halfExtent, beamRules->dir, from );
-					VectorMA( poly->origin, +poly->halfExtent, beamRules->dir, to );
+					const float fromRotation = AngleNormalize180( planeRotation + beamRules->fromRotation );
+					const float toRotation   = AngleNormalize180( planeRotation + beamRules->toRotation );
 
-					vec3_t tmpRight, tmpFromRight, tmpToRight;
+					unsigned segmentNum = 0;
+					// TODO: Don't compute all 4 vertices on every iteration (refer to the curved LG beam code)
+					// At this moment we don't care as the primary code path for non-segmented beams
+					// is optimized and segmented beams are not that common.
+					// TODO: QuadPolys grew way beyond actual quads...
+					do {
+						const float segStartFrac = rcpNumSegments * (float)( segmentNum + 0 );
+						const float segEndFrac   = rcpNumSegments * (float)( segmentNum + 1 );
+						assert( segStartFrac >= 0.0f && segStartFrac <= 1.0f );
+						assert( segEndFrac >= 0.0f && segEndFrac <= 1.0f );
+						assert( segStartFrac < segEndFrac );
 
-					const float *fromRight          = originalRight;
-					const float *toRight            = originalRight;
-					const float fromRotationDegrees = planeRotationDegrees + beamRules->fromRotation;
-					const float toRotationDegrees   = planeRotationDegrees + beamRules->toRotation;
-					const bool hasFromRotation      = fromRotationDegrees != 0.0f;
-					const bool hasToRotation        = toRotationDegrees != 0.0f;
-					if( hasFromRotation | hasToRotation ) {
-						// Save a RotatePointAroundVector() call whenever possible
-						if( fromRotationDegrees == toRotationDegrees ) {
-							RotatePointAroundVector( tmpRight, beamRules->dir, originalRight, fromRotationDegrees );
-							fromRight = toRight = tmpRight;
-						} else {
-							if( hasFromRotation ) {
-								RotatePointAroundVector( tmpFromRight, beamRules->dir, originalRight, fromRotationDegrees );
-								fromRight = tmpFromRight;
-							}
-							if( hasToRotation ) {
-								RotatePointAroundVector( tmpToRight, beamRules->dir, originalRight, toRotationDegrees );
-								toRight = tmpToRight;
+						const float segStartLengthOffset = 2.0f * poly->halfExtent * segStartFrac;
+						const float segEndLengthOffset   = 2.0f * poly->halfExtent * segEndFrac;
+
+						vec3_t from, to;
+						VectorMA( poly->origin, -poly->halfExtent + segStartLengthOffset, beamRules->dir, from );
+						VectorMA( poly->origin, -poly->halfExtent + segEndLengthOffset, beamRules->dir, to );
+
+						vec3_t tmpRight, tmpFromRight, tmpToRight;
+
+						const float segStartRotation = LerpAngle( fromRotation, toRotation, segStartFrac );
+						const float segEndRotation   = LerpAngle( fromRotation, toRotation, segEndFrac );
+
+						const float *fromRight      = originalRight;
+						const float *toRight        = originalRight;
+						const bool hasStartRotation = segStartRotation != 0.0f;
+						const bool hasEndRotation   = segEndRotation != 0.0f;
+						if( hasStartRotation | hasEndRotation ) {
+							// Save a RotatePointAroundVector() call whenever possible
+							if( segStartRotation == segEndRotation ) {
+								RotatePointAroundVector( tmpRight, beamRules->dir, originalRight, segStartRotation );
+								fromRight = toRight = tmpRight;
+							} else {
+								if( hasStartRotation ) {
+									RotatePointAroundVector( tmpFromRight, beamRules->dir, originalRight, segStartRotation );
+									fromRight = tmpFromRight;
+								}
+								if( hasEndRotation ) {
+									RotatePointAroundVector( tmpToRight, beamRules->dir, originalRight, segEndRotation );
+									toRight = tmpToRight;
+								}
 							}
 						}
-					}
 
-					VectorMA( from, +halfWidth, fromRight, positions[0] );
-					VectorMA( from, -halfWidth, fromRight, positions[1] );
-					VectorMA( to, -halfWidth, toRight, positions[2] );
-					VectorMA( to, +halfWidth, toRight, positions[3] );
+						VectorMA( from, +halfWidth, fromRight, positions[0] );
+						VectorMA( from, -halfWidth, fromRight, positions[1] );
+						VectorMA( to, -halfWidth, toRight, positions[2] );
+						VectorMA( to, +halfWidth, toRight, positions[3] );
 
-					float stx = 1.0f;
-					if( beamRules->tileLength > 0 ) {
-						const float fullExtent = 2.0f * poly->halfExtent;
-						stx = fullExtent * Q_Rcp( beamRules->tileLength );
-					}
+						float segStxStart, segStxEnd;
+						if( beamRules->tileLength > 0 ) {
+							segStxStart = segStartLengthOffset * rcpTileLength;
+							segStxEnd   = segEndLengthOffset * rcpTileLength;
+						} else {
+							segStxStart = segStartFrac;
+							segStxEnd   = segEndFrac;
+						}
 
-					Vector2Set( texCoords[0], 0.0f, 0.0f );
-					Vector2Set( texCoords[1], 0.0f, 1.0f );
-					Vector2Set( texCoords[2], stx, 1.0f );
-					Vector2Set( texCoords[3], stx, 0.0f );
+						Vector2Set( texCoords[0], segStxStart, 0.0f );
+						Vector2Set( texCoords[1], segStxStart, 1.0f );
+						Vector2Set( texCoords[2], segStxEnd, 1.0f );
+						Vector2Set( texCoords[3], segStxEnd, 0.0f );
 
-					const byte_vec4_t fromColorAsBytes {
-						(uint8_t)( beamRules->fromColor[0] * 255 ),
-						(uint8_t)( beamRules->fromColor[1] * 255 ),
-						(uint8_t)( beamRules->fromColor[2] * 255 ),
-						(uint8_t)( beamRules->fromColor[3] * 255 ),
-					};
-					const byte_vec4_t toColorAsBytes {
-						(uint8_t)( beamRules->toColor[0] * 255 ),
-						(uint8_t)( beamRules->toColor[1] * 255 ),
-						(uint8_t)( beamRules->toColor[2] * 255 ),
-						(uint8_t)( beamRules->toColor[3] * 255 ),
-					};
+						vec4_t segStartColor, segEndColor;
+						// TODO: Lerp colors correctly
+						Vector4Lerp( beamRules->fromColor, segStartFrac, beamRules->toColor, segStartColor );
+						Vector4Lerp( beamRules->fromColor, segEndFrac, beamRules->toColor, segEndColor );
 
-					Vector4Copy( fromColorAsBytes, colors[0] );
-					Vector4Copy( fromColorAsBytes, colors[1] );
-					Vector4Copy( toColorAsBytes, colors[2] );
-					Vector4Copy( toColorAsBytes, colors[3] );
+						const byte_vec4_t startColorAsBytes {
+							(uint8_t)( segStartColor[0] * 255 ),
+							(uint8_t)( segStartColor[1] * 255 ),
+							(uint8_t)( segStartColor[2] * 255 ),
+							(uint8_t)( segStartColor[3] * 255 ),
+						};
+						const byte_vec4_t endColorAsBytes {
+							(uint8_t)( segEndColor[0] * 255 ),
+							(uint8_t)( segEndColor[1] * 255 ),
+							(uint8_t)( segEndColor[2] * 255 ),
+							(uint8_t)( segEndColor[3] * 255 ),
+						};
 
-					meshBuilder->appendQuad( positions, texCoords, colors, indices );
+						Vector4Copy( startColorAsBytes, colors[0] );
+						Vector4Copy( startColorAsBytes, colors[1] );
+						Vector4Copy( endColorAsBytes, colors[2] );
+						Vector4Copy( endColorAsBytes, colors[3] );
+
+						meshBuilder->appendQuad( positions, texCoords, colors, indices );
+					} while( ++segmentNum < numSegments );
 				} while( ++planeNum < numDrawnPlanes );
 			}
 		} else {
