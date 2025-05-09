@@ -128,11 +128,13 @@ struct TaskSystemImpl {
 	};
 
 	// In bytes
-	static constexpr size_t kCapacityOfMemOfCallables = 256 * 1024;
-	static constexpr size_t kCapacityOfMemOfCoroTasks = 128 * 1024;
-	static constexpr size_t kMaxTaskEntries           = TaskSystem::kMaxTaskEntries;
+	static constexpr size_t kCapacityOfMemOfCallables  = 256 * 1024;
+	static constexpr size_t kCapacityOfMemOfCoroTasks  = 128 * 1024;
+	static constexpr size_t kCapacityOfMemOfCoroFrames = 128 * 1024;
+
+	static constexpr size_t kMaxTaskEntries       = TaskSystem::kMaxTaskEntries;
 	// Let us assume the average number of dependencies to be 16
-	static constexpr size_t kMaxDependencyIndices     = 16 * kMaxTaskEntries;
+	static constexpr size_t kMaxDependencyIndices = 16 * kMaxTaskEntries;
 
 	// Sanity checks
 	// Note: We have decided that introduction of another tape should not lead to updating limits, as that tape is small
@@ -152,6 +154,7 @@ struct TaskSystemImpl {
 	std::unique_ptr<int16_t[]> dependencyHandles { new int16_t[kMaxDependencyIndices] };
 
 	std::unique_ptr<uint8_t[]> memOfCoroTasks { new uint8_t[kCapacityOfMemOfCoroTasks] };
+	std::unique_ptr<uint8_t[]> memOfCoroFrames { new uint8_t[kCapacityOfMemOfCoroFrames] };
 
 	struct Tape {
 		std::unique_ptr<uint8_t[]> memOfEntries { new uint8_t[sizeof( TaskEntry ) * kMaxTaskEntries] };
@@ -170,6 +173,7 @@ struct TaskSystemImpl {
 	unsigned savedNumEntriesInTapesSoFar[2] { 0, 0 };
 
 	unsigned sizeOfUsedMemOfCoroTasks { 0 };
+	unsigned sizeOfUsedMemOfCoroFrames { 0 };
 
 	wsw::PodVector<uint16_t> tmpOffsetsOfCallables;
 
@@ -261,6 +265,40 @@ auto TaskSystem::addResumeCoroTask( int tapeIndex, std::span<const TaskHandle> d
 	// TODO: Won't be rolled back on failure if enclosing state guard rolls back,
 	// but it seems to be harmless (not talking about being considered unreachable in practice)
 	new( memForCallable )TaskSystemImpl::ResumeCoroCallable( handle );
+	return result;
+}
+
+static thread_local TaskSystem *tl_taskSystem;
+
+void TaskSystem::prepareForCoroFrameAllocation() {
+	// Despite the fact that we call this method under the global lock,
+	// there could perfectly be multiple tasks systems running in parallel,
+	// hence we cannot just use a global variable and it has to be thread local.
+	tl_taskSystem = this;
+}
+
+auto CoroTask::promise_type::operator new( size_t size ) -> void * {
+	return tl_taskSystem->allocMemForCoroFrame( size );
+}
+
+void CoroTask::promise_type::operator delete( void *p ) {
+	// No-op
+}
+
+auto TaskSystem::allocMemForCoroFrame( size_t size ) -> void * {
+	// Sanity check
+	assert( size < ( 1u << 16 ) );
+	size_t alignmentBytes = 0;
+	// TODO: Branchless
+	if( auto rem = m_impl->sizeOfUsedMemOfCoroFrames % alignof( void * ) ) {
+		alignmentBytes = alignof( void * ) - rem;
+	}
+	if( m_impl->sizeOfUsedMemOfCoroFrames + size + alignmentBytes > TaskSystemImpl::kCapacityOfMemOfCoroFrames ) {
+		wsw::failWithRuntimeError( "The storage of coro frames has been exhausted" );
+	}
+	void *result = m_impl->memOfCoroFrames.get() + m_impl->sizeOfUsedMemOfCoroFrames + alignmentBytes;
+	assert( ( ( (uintptr_t)result ) % alignof( void * ) ) == 0 );
+	m_impl->sizeOfUsedMemOfCoroFrames += alignmentBytes + size;
 	return result;
 }
 
@@ -623,6 +661,7 @@ void TaskSystem::clear() {
 	}
 
 	m_impl->sizeOfUsedMemOfCoroTasks  = 0;
+	m_impl->sizeOfUsedMemOfCoroFrames = 0;
 	m_impl->numDependencyEntriesSoFar = 0;
 }
 
