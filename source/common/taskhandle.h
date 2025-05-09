@@ -118,6 +118,10 @@ public:
 		void return_void() noexcept {}
 		void unhandled_exception() { assert( false ); }
 
+		[[nodiscard]]
+		auto operator new( size_t size ) -> void *;
+		void operator delete( void * );
+
 		template <typename... Args>
 		promise_type( const StartInfo &startInfo, Args... args ) : m_startInfo( startInfo ) {}
 

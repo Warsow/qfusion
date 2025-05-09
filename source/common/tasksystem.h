@@ -104,6 +104,8 @@ public:
 	auto addCoro( CoroProducerFn &&producerFn ) -> TaskHandle {
 		[[maybe_unused]] volatile TapeStateGuard tapeStateGuard( m_impl );
 
+		prepareForCoroFrameAllocation();
+
 		CoroTask coroTask = producerFn();
 		void *coroTaskMem = allocMemForCoroTask();
 
@@ -240,6 +242,11 @@ private:
 
 	[[nodiscard]]
 	auto allocMemForCoroTask() -> void *;
+
+	[[nodiscard]]
+	auto allocMemForCoroFrame( size_t size ) -> void *;
+
+	void prepareForCoroFrameAllocation();
 
 	[[nodiscard]]
 	auto addResumeCoroTask( int tapeIndex, std::span<const TaskHandle> deps, std::coroutine_handle<CoroTask::promise_type> handle ) -> TaskHandle;
