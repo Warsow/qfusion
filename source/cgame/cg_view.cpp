@@ -1382,6 +1382,8 @@ static auto coPrepareDrawSceneRequests( CoroTask::StartInfo si, DrawSceneRequest
 	// Perform UI rendering in the main thread, while the actual set of views gets prepared in background
 	wsw::ui::UISystem::instance()->renderInternally();
 
+	cg.delayedExecutionSystem.run();
+
 	// Make sure all possible effects in this frame are submitted prior to simulation
 	// (A simulation timestamp of an effect must match its submission timestamp).
 	cg.effectsSystem.simulateFrame( cg.time );

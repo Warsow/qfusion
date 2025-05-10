@@ -32,6 +32,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../ref/ref.h"
 
 #include "cg_public.h"
+#include "delayedexecutionsystem.h"
 #include "../ui/cgameimports.h"
 
 #include <cmath>
@@ -624,6 +625,7 @@ typedef struct cg_state_s {
 	char *motd;
 	int64_t motd_time;
 
+	DelayedExecutionSystem delayedExecutionSystem;
 	ParticleSystem particleSystem;
 	SimulatedHullsSystem simulatedHullsSystem;
 	PolyEffectsSystem polyEffectsSystem;
