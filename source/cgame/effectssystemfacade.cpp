@@ -1941,7 +1941,7 @@ void EffectsSystemFacade::spawnBulletImpactEffect( unsigned delay, const SolidIm
 	}
 
 	if( sound ) {
-		startSoundForImpactUsingLimiter( sound, groupTag, impact, EventRateLimiterParams {
+		startSoundForImpactUsingLimiter( delay, sound, groupTag, impact, EventRateLimiterParams {
 			.dropChanceAtZeroDistance = 0.5f,
 			.startDroppingAtDistance  = 144.0f,
 			.dropChanceAtZeroTimeDiff = 1.0f,
@@ -2413,7 +2413,7 @@ void EffectsSystemFacade::spawnBulletLiquidImpactEffect( unsigned delay, const L
 
 	spawnWaterImpactRing( delay, impact.origin );
 
-	startSoundForImpactUsingLimiter( cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
+	startSoundForImpactUsingLimiter( delay, cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
 }
 
 void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const SolidImpact> impacts,
@@ -2478,24 +2478,21 @@ void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const Soli
 				spawnPelletImpactModel( delay, impact.origin, impact.normal );
 				numRosetteImpactsSoFar++;
 			}
-		}
-		for( const SolidImpact &impact: impacts ) {
+
 			const unsigned group     = getImpactSfxGroupForMaterial( decodeSurfImpactMaterial( impact.surfFlags ) );
 			const uintptr_t groupTag = group;
-			const SoundSet *sound       = getSfxForImpactGroup( group );
-			startSoundForImpactUsingLimiter( sound, groupTag, impact, limiterParams );
+			const SoundSet *sound    = getSfxForImpactGroup( group );
+			startSoundForImpactUsingLimiter( delay, sound, groupTag, impact, limiterParams );
 		}
 	} else {
+		const auto groupTag = (uintptr_t)cgs.media.sndImpactSolid.getAddressOfHandle();
 		for( unsigned i = 0; i < impacts.size(); ++i ) {
 			const SolidImpact &impact = impacts[i];
 			const unsigned delay      = delays[i];
 			const FlockOrientation orientation = makeRicochetFlockOrientation( impact, &m_rng );
 			spawnBulletGenericImpactRosette( delay, orientation, 0.1f, 0.5f, i, impacts.size() );
 			spawnBulletImpactModel( delay, impact.origin, impact.normal );
-		}
-		const auto groupTag = (uintptr_t)cgs.media.sndImpactSolid.getAddressOfHandle();
-		for( const SolidImpact &impact: impacts ) {
-			startSoundForImpactUsingLimiter( cgs.media.sndImpactSolid, groupTag, impact, limiterParams );
+			startSoundForImpactUsingLimiter( delay, cgs.media.sndImpactSolid, groupTag, impact, limiterParams );
 		}
 	}
 }
@@ -2526,8 +2523,9 @@ void EffectsSystemFacade::spawnMultipleExplosionImpactEffects( std::span<const S
 	for( const SolidImpact &impact: impacts ) {
 		const unsigned group     = getImpactSfxGroupForMaterial( decodeSurfImpactMaterial( impact.surfFlags ) );
 		const uintptr_t groupTag = group;
-		const SoundSet *sound       = getSfxForImpactGroup( group );
-		startSoundForImpactUsingLimiter( sound, groupTag, impact, limiterParams );
+		const SoundSet *sound    = getSfxForImpactGroup( group );
+		constexpr unsigned delay = 100;
+		startSoundForImpactUsingLimiter( delay, sound, groupTag, impact, limiterParams );
 	}
 }
 
@@ -2569,12 +2567,10 @@ void EffectsSystemFacade::spawnMultipleLiquidImpactEffects( std::span<const Liqu
 	// It's better to keep loops split for a better instruction cache utilization
 	assert( scaledDelays.size() == impacts.size() );
 	for( size_t i = 0; i < impacts.size(); ++i ) {
-		spawnWaterImpactRing( scaledDelays[i], impacts[i].origin );
-	}
-
-	// TODO: Add delays to sounds?
-	for( const LiquidImpact &impact: impacts ) {
-		startSoundForImpactUsingLimiter( cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
+		const unsigned delay       = scaledDelays[i];
+		const LiquidImpact &impact = impacts[i];
+		spawnWaterImpactRing( delay, impact.origin );
+		startSoundForImpactUsingLimiter( delay, cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
 	}
 }
 
@@ -2607,28 +2603,34 @@ void EffectsSystemFacade::spawnWaterImpactRing( unsigned delay, const float *ori
 	}
 }
 
-void EffectsSystemFacade::startSoundForImpactUsingLimiter( const SoundSet *sound, uintptr_t group, const SolidImpact &impact,
-														   const EventRateLimiterParams &params ) {
+void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound, uintptr_t group,
+														   const SolidImpact &impact, const EventRateLimiterParams &params ) {
 	assert( std::fabs( VectorLengthFast( impact.normal ) - 1.0f ) < 1e-2f );
 	if( sound ) {
-		vec3_t soundOrigin;
-		VectorAdd( impact.origin, impact.normal, soundOrigin );
-		assert( !( CG_PointContents( soundOrigin ) & MASK_SOLID ) );
-		if( m_solidImpactSoundsRateLimiter.acquirePermission( cg.time, soundOrigin, group, params ) ) {
-			startSound( sound, soundOrigin );
-		}
+		Vec3 capturedSoundOrigin( Vec3( impact.origin ) + Vec3( impact.normal ) );
+		assert( !( CG_PointContents( capturedSoundOrigin.Data() ) & MASK_SOLID ) );
+		EventRateLimiterParams capturedParams = params;
+		cg.delayedExecutionSystem.post( delay, [=, this] {
+			// Check the quotum during the actual execution
+			if( m_solidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), group, capturedParams ) ) {
+				startSound( sound, capturedSoundOrigin.Data() );
+			}
+		});
 	}
 }
 
-void EffectsSystemFacade::startSoundForImpactUsingLimiter( const SoundSet *sound, const LiquidImpact &impact,
-														   const EventRateLimiterParams &params ) {
+void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound,
+														   const LiquidImpact &impact, const EventRateLimiterParams &params ) {
 	if( sound ) {
-		vec3_t soundOrigin;
-		VectorAdd( impact.origin, impact.burstDir, soundOrigin );
-		assert( !( CG_PointContents( soundOrigin ) & MASK_SOLID ) );
-		if( m_liquidImpactSoundsRateLimiter.acquirePermission( cg.time, soundOrigin, params ) ) {
-			startSound( sound, soundOrigin );
-		}
+		Vec3 capturedSoundOrigin( Vec3( impact.origin ) + Vec3( impact.burstDir ) );
+		assert( !( CG_PointContents( capturedSoundOrigin.Data() ) & MASK_SOLID ) );
+		EventRateLimiterParams capturedParams = params;
+		cg.delayedExecutionSystem.post( delay, [=, this]() {
+			// Check the quotum during the actual execution
+			if( m_liquidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), capturedParams ) ) {
+				startSound( sound, capturedSoundOrigin.Data() );
+			}
+		});
 	}
 }
 

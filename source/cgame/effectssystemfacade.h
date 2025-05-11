@@ -269,9 +269,9 @@ private:
 
 	void spawnBulletLikeImpactRingUsingLimiter( unsigned delay, const SolidImpact &impact );
 
-	void startSoundForImpactUsingLimiter( const SoundSet *sound, uintptr_t groupTag, const SolidImpact &impact,
-										  const EventRateLimiterParams &params );
-	void startSoundForImpactUsingLimiter( const SoundSet *sound, const LiquidImpact &impact,
+	void startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound, uintptr_t groupTag,
+										  const SolidImpact &impact, const EventRateLimiterParams &params );
+	void startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound, const LiquidImpact &impact,
 										  const EventRateLimiterParams &params );
 
 	void spawnLiquidImpactParticleEffect( unsigned delay, const LiquidImpact &impact, float percentageScale,
