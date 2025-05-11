@@ -2516,6 +2516,9 @@ void EffectsSystemFacade::spawnMultipleExplosionImpactEffects( std::span<const S
 			numRosetteImpactsSoFar++;
 		}
 	}
+
+	// Note: Contrary to these solid impacts, we have decided to keep playback of water impact sounds
+#if 0
 	const EventRateLimiterParams limiterParams {
 		.startDroppingAtDistance = 192.0f,
 		.startDroppingAtTimeDiff = 333,
@@ -2527,6 +2530,7 @@ void EffectsSystemFacade::spawnMultipleExplosionImpactEffects( std::span<const S
 		constexpr unsigned delay = 100;
 		startSoundForImpactUsingLimiter( delay, sound, groupTag, impact, limiterParams );
 	}
+#endif
 }
 
 void EffectsSystemFacade::spawnMultipleLiquidImpactEffects( std::span<const LiquidImpact> impacts, float percentageScale,
