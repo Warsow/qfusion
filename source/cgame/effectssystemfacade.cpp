@@ -1122,6 +1122,20 @@ void addRotationToDir( float *dir, float coneAngleCosine, float angleAlongCone )
 	VectorCopy( result, dir );
 }
 
+void EffectsSystemFacade::spawnBulletImpactModel( unsigned delay, const float *origin, const float *normal ) {
+	Vec3 capturedOrigin( origin ), capturedNormal( normal );
+	cg.delayedExecutionSystem.post( delay, [=, this]() {
+		m_transientEffectsSystem.spawnBulletImpactModel( capturedOrigin.Data(), capturedNormal.Data() );
+	});
+}
+
+void EffectsSystemFacade::spawnPelletImpactModel( unsigned delay, const float *origin, const float *normal ) {
+	Vec3 capturedOrigin( origin ), capturedNormal( normal );
+	cg.delayedExecutionSystem.post( delay, [=, this]() {
+		m_transientEffectsSystem.spawnPelletImpactModel( capturedOrigin.Data(), capturedNormal.Data() );
+	});
+}
+
 template <typename FlockParams>
 static inline void assignUpShiftAndModifyBaseSpeed( FlockParams *flockParams, float upShiftScale,
 													float minShiftSpeed, float maxShiftSpeed ) {
@@ -1911,8 +1925,7 @@ void EffectsSystemFacade::spawnBulletImpactEffect( unsigned delay, const SolidIm
 			spawnBulletGenericImpactRosette( delay, flockOrientation, 0.3f, 1.0f );
 		}
 		if( impactMaterial == IM::Metal || impactMaterial == IM::Stone || impactMaterial == IM::Unknown ) {
-			// TODO: Postpone if needed
-			m_transientEffectsSystem.spawnBulletImpactModel( impact.origin, impact.normal );
+			spawnBulletImpactModel( delay, impact.origin, impact.normal );
 		}
 		if( impactMaterial == IM::Metal || impactMaterial == IM::Glass ) {
 			spawnBulletLikeImpactRingUsingLimiter( delay, impact );
@@ -1922,8 +1935,7 @@ void EffectsSystemFacade::spawnBulletImpactEffect( unsigned delay, const SolidIm
 		groupTag = group;
 	} else {
 		spawnBulletGenericImpactRosette( delay, flockOrientation, 0.5f, 1.0f );
-		// TODO: Postpone if needed
-		m_transientEffectsSystem.spawnBulletImpactModel( impact.origin, impact.normal );
+		spawnBulletImpactModel( delay, impact.origin, impact.normal );
 		sound    = cgs.media.sndImpactSolid;
 		groupTag = 0;
 	}
@@ -1936,6 +1948,14 @@ void EffectsSystemFacade::spawnBulletImpactEffect( unsigned delay, const SolidIm
 			.startDroppingAtTimeDiff  = 250,
 		});
 	}
+}
+
+void EffectsSystemFacade::spawnUnderwaterBulletImpactEffect( unsigned delay, const float *origin, const float *normal ) {
+	spawnBulletImpactModel( delay, origin, normal );
+}
+
+void EffectsSystemFacade::spawnUnderwaterPelletImpactEffect( unsigned delay, const float *origin, const float *normal ) {
+	spawnPelletImpactModel( delay, origin, normal );
 }
 
 void EffectsSystemFacade::spawnBulletImpactParticleEffectForMaterial( unsigned delay,
@@ -2455,8 +2475,7 @@ void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const Soli
 					spawnBulletGlassImpactRosette( delay, orientation, 0.1f, 0.5f, lightAffinityIndex, lightAffinityModulo );
 				}
 
-				// TODO: Postpone if needed
-				m_transientEffectsSystem.spawnPelletImpactModel( impact.origin, impact.normal );
+				spawnPelletImpactModel( delay, impact.origin, impact.normal );
 				numRosetteImpactsSoFar++;
 			}
 		}
@@ -2472,8 +2491,7 @@ void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const Soli
 			const unsigned delay      = delays[i];
 			const FlockOrientation orientation = makeRicochetFlockOrientation( impact, &m_rng );
 			spawnBulletGenericImpactRosette( delay, orientation, 0.1f, 0.5f, i, impacts.size() );
-			// TODO: Postpone if needed
-			m_transientEffectsSystem.spawnPelletImpactModel( impact.origin, impact.normal );
+			spawnBulletImpactModel( delay, impact.origin, impact.normal );
 		}
 		const auto groupTag = (uintptr_t)cgs.media.sndImpactSolid.getAddressOfHandle();
 		for( const SolidImpact &impact: impacts ) {

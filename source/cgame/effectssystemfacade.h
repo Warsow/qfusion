@@ -69,15 +69,8 @@ public:
 
 	void spawnBulletImpactEffect( unsigned delay, const SolidImpact &impact );
 
-	void spawnUnderwaterBulletImpactEffect( unsigned delay, const float *origin, const float *normal ) {
-		// TODO: Postpone if needed
-		m_transientEffectsSystem.spawnBulletImpactModel( origin, normal );
-	}
-
-	void spawnUnderwaterPelletImpactEffect( unsigned delay, const float *origin, const float *normal ) {
-		// TODO: Postpone if needed
-		m_transientEffectsSystem.spawnPelletImpactModel( origin, normal );
-	}
+	void spawnUnderwaterBulletImpactEffect( unsigned delay, const float *origin, const float *normal );
+	void spawnUnderwaterPelletImpactEffect( unsigned delay, const float *origin, const float *normal );
 
 	void spawnMultiplePelletImpactEffects( std::span<const SolidImpact> impacts, std::span<const unsigned> delays );
 
@@ -175,6 +168,9 @@ private:
 	void spawnExplosionEffect( const float *origin, const float *dir, const SoundSet *sound, float radius, bool addSoundLfe );
 
 	void spawnDustImpactEffect( const float *origin, const float *dir, float radius );
+
+	void spawnBulletImpactModel( unsigned delay, const float *origin, const float *normal );
+	void spawnPelletImpactModel( unsigned delay, const float *origin, const float *normal );
 
 	void spawnBulletGenericImpactRosette( unsigned delay, const FlockOrientation &orientation,
 										  float minPercentage, float maxPercentage,
