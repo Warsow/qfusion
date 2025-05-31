@@ -569,7 +569,7 @@ NON-PORTABLE SYSTEM SERVICES
 #define SFF_SUBDIR  0x08
 #define SFF_SYSTEM  0x10
 
-void    Sys_Init( void );
+void    Sys_Init( int, char ** );
 
 void    Sys_AppActivate( void );
 
@@ -592,7 +592,6 @@ __declspec( noreturn ) void Sys_Quit( void );
 char    *Sys_GetClipboardData( void );
 bool Sys_SetClipboardData( const char *data );
 void    Sys_FreeClipboardData( char *data );
-const char *Sys_GetPreferredLanguage( void );
 
 // TODO: Use a Java-like iterator
 char    **Sys_GetEnvironmentVariables();
@@ -600,9 +599,6 @@ void    Sys_DeleteEnvironmentVariable( const char *name );
 
 bool    Sys_IsBrowserAvailable( void );
 void    Sys_OpenURLInBrowser( const char *url );
-
-void    *Sys_AcquireWakeLock( void );
-void    Sys_ReleaseWakeLock( void *wl );
 
 int     Sys_GetCurrentProcessId( void );
 

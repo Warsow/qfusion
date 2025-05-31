@@ -12,15 +12,9 @@ file(GLOB SERVER_SOURCES
     "../common/lifecycle.cpp")
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    file(GLOB SERVER_PLATFORM_SOURCES 
-        "../win32/win_fs.cpp"
-        "../win32/win_net.cpp"
-        "../win32/win_sys.cpp"
-        "../win32/win_console.cpp"
-        "../win32/win_time.cpp"
-        "../win32/win_lib.cpp"
-        "../win32/win_threads.cpp"
-        "../win32/conproc.cpp"
+    file(GLOB SERVER_PLATFORM_SOURCES
+        "win32/conproc.cpp"
+        "win32/win_server.cpp"
     )
 
     # Link Ole32.lib for CoCreateGUID()
@@ -28,13 +22,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     set(SERVER_BINARY_TYPE WIN32)
 else()
     file(GLOB SERVER_PLATFORM_SOURCES 
-        "../unix/unix_fs.cpp"
-        "../unix/unix_net.cpp"
-        "../unix/unix_sys.cpp"
-        "../unix/unix_console.cpp"
-        "../unix/unix_time.cpp"
-        "../unix/unix_lib.cpp"
-        "../unix/unix_threads.cpp"
+        "unix/unix_main.cpp"
     )
 
     # Link libuuid

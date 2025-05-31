@@ -23,13 +23,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "sys_net.h"
 
 #ifdef _WIN32
-#include "../win32/winquake.h"
-#ifdef min
-#undef min
-#endif
-#ifdef max
-#undef max
-#endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #else

@@ -53,14 +53,6 @@ typedef vec_t instancePoint_t[8]; // quaternion for rotation + xyz pos + uniform
 #include "refmath.h"
 #include "vattribs.h"
 
-#ifdef min
-#undef min
-#endif
-
-#ifdef max
-#undef max
-#endif
-
 typedef struct superLightStyle_s {
 	vattribmask_t vattribs;
 	int lightmapNum[MAX_LIGHTMAPS];
@@ -1222,14 +1214,6 @@ uint8_t     *Mod_ClusterPVS( int cluster, model_t *model );
 void        Mod_StripLODSuffix( char *name );
 
 //#include "program.h"
-
-#ifdef min
-#undef min
-#endif
-
-#ifdef max
-#undef max
-#endif
 
 #ifdef CGAMEGETLIGHTORIGIN
 #define SHADOW_MAPPING          2

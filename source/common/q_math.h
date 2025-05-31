@@ -488,14 +488,6 @@ public:
 #endif
 };
 
-#ifdef min
-#undef min
-#endif
-
-#ifdef max
-#undef max
-#endif
-
 template <unsigned N>
 class BoundingDopBuilder {
 	static_assert( ( N == 14 || N == 26 ) );

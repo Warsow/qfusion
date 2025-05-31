@@ -418,7 +418,7 @@ void Qcommon_Init( int argc, char **argv ) {
 	Cvar_Get( "gamename", APPLICATION, CVAR_READONLY );
 	versioncvar = Cvar_Get( "version", APP_VERSION_STR " " CPUSTRING " " __DATE__ " " BUILDSTRING, CVAR_SERVERINFO | CVAR_READONLY );
 
-	Sys_Init();
+	Sys_Init( argc, argv );
 
 	NET_Init();
 	Netchan_Init();

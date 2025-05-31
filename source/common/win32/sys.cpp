@@ -2,7 +2,6 @@
 #include "../common.h"
 #include "../podbufferholder.h"
 
-#define NOMINMAX
 #include <windows.h>
 
 #if ( defined( _M_IX86 ) || defined( _M_AMD64 ) || defined( _M_X64 ) )

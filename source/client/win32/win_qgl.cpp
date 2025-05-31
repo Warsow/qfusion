@@ -52,14 +52,6 @@ and Zephaniah E. Hull. Adapted by Victor Luchits for qfusion project.
 #include <common/common.h>
 #include "win_glw.h"
 
-#ifdef min
-#undef min
-#endif
-
-#ifdef max
-#undef max
-#endif
-
 #define QGL_EXTERN
 
 #define QGL_FUNC( type, name, params ) QGL_FUNC_VAR( type, name, params );

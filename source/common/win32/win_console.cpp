@@ -1,5 +1,6 @@
 #include <common/common.h>
-#include "winquake.h"
+
+#include <windows.h>
 
 HANDLE hinput = NULL;
 HANDLE houtput = NULL;

@@ -1,3 +1,23 @@
+/*
+Copyright (C) 2015 SiPlus, Chasseur de bots
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
+*/
+
 #include <SDL.h>
 #include <client/client.h>
 
@@ -12,7 +32,10 @@
 
 int64_t sys_frame_time;
 
-void Sys_InitTime( void );
+void Sys_InitTime( void ) {}
+
+void CL_Sys_Init() {}
+void CL_Sys_Shutdown() {}
 
 void Sys_Sleep( unsigned int millis ) {
 	SDL_Delay( millis );
@@ -34,7 +57,7 @@ void Sys_Error( const char *format, ... ) {
 /*
 * Sys_Init
 */
-void Sys_Init( void ) {
+void Sys_Init( int, char ** ) {
 	Sys_InitTime();
 }
 
@@ -51,19 +74,6 @@ void Sys_Quit( void ) {
 	Qcommon_Shutdown();
 
 	exit( 0 );
-}
-
-/*
-* Sys_AcquireWakeLock
-*/
-void *Sys_AcquireWakeLock( void ) {
-	return NULL;
-}
-
-/*
-* Sys_ReleaseWakeLock
-*/
-void Sys_ReleaseWakeLock( void *wl ) {
 }
 
 /*
@@ -92,7 +102,7 @@ int main( int argc, char **argv ) {
 #endif
 
 #if defined( __WIN32__ )
-#if defined( _DEBUG )
+	#if defined( _DEBUG )
 	SDL_SetHint( SDL_HINT_ALLOW_TOPMOST, "0" );
 #endif
 #endif
@@ -122,4 +132,28 @@ int main( int argc, char **argv ) {
 	}
 
 	SDL_Quit();
+}
+
+/*
+* Sys_GetClipboardData
+*/
+char *Sys_GetClipboardData( void ) {
+	if( SDL_HasClipboardText() == SDL_TRUE ) {
+		return SDL_GetClipboardText();
+	}
+	return NULL;
+}
+
+/*
+* Sys_SetClipboardData
+*/
+bool Sys_SetClipboardData( const char *data ) {
+	return SDL_SetClipboardText( data );
+}
+
+/*
+* Sys_FreeClipboardData
+*/
+void Sys_FreeClipboardData( char *data ) {
+	SDL_free( data );
 }

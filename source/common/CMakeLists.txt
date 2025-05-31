@@ -95,8 +95,12 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 endif()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    file(GLOB EXECOMMON_PLATFORM_SOURCES "linux/*.cpp")
-    file(GLOB EXECOMMON_PLATFORM_HEADERS "linux/*.h")
+    file(GLOB EXECOMMON_PLATFORM_SOURCES
+         "linux/*.cpp"
+         "unix/*.cpp")
+    file(GLOB EXECOMMON_PLATFORM_HEADERS
+         "linux/*.h"
+         "unix/*.h")
 endif()
 
 if (MSVC)

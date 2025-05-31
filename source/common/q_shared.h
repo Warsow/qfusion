@@ -291,14 +291,6 @@ char *va_r( char *dst, size_t size, _Printf_format_string_ const char *format, .
 
 #include <cerrno>
 
-#ifdef min
-#undef min
-#endif
-
-#ifdef max
-#undef max
-#endif
-
 //
 // key / value info strings
 //

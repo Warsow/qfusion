@@ -74,7 +74,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
         "../libsrcs/src/SDL2/include"
     )
 
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS -DCURL_STATICLIB -DWIN32 -D_WINDOWS)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS -DCURL_STATICLIB -DWIN32 -D_WINDOWS -DNOMINMAX)
 
     if (MSVC)
         set(CMAKE_LIBRARY_PATH "../libsrcs/lib/win32/${QFUSION_WINDOWS_ARCH}/debug")

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2015 SiPlus, Chasseur de bots
+Copyright (C) 1997-2001 Id Software, Inc.
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -17,12 +17,31 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
+// winquake.h: Win32-specific Quake header file
 
-#include <SDL.h>
-#include <client/client.h>
+#ifndef WINQUAKE_H_
+#define WINQUAKE_H_
 
-void CL_Sys_Init( void ) {
-}
+// This is a fairly common method to fix the strict requirement of winsock2.h inclusion before windows.h
+#define _WINSOCKAPI_
 
-void CL_Sys_Shutdown( void ) {
-}
+#include <windows.h>
+#ifdef HAVE_MMSYSTEM
+#include <mmsystem.h>
+#endif
+
+
+//#include "win_input.h"
+
+enum {
+	MWHEEL_UNKNOWN,
+	MWHEEL_DINPUT,
+	MWHEEL_WM
+};
+
+extern HINSTANCE global_hInstance;
+
+extern HWND cl_hwnd, cl_parent_hwnd;
+extern int ActiveApp, Minimized, AppFocused;
+
+#endif

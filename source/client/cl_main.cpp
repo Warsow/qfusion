@@ -1976,11 +1976,6 @@ void CL_ClearState( void ) {
 	cls.lastPacketSentTime = 0;
 	cls.lastPacketReceivedTime = 0;
 	cls.lastReceivedRealServerTime = 0;
-
-	if( cls.wakelock ) {
-		Sys_ReleaseWakeLock( cls.wakelock );
-		cls.wakelock = NULL;
-	}
 }
 
 /*
@@ -3275,8 +3270,6 @@ static void CL_ParseServerData( msg_t *msg ) {
 #ifdef PURE_CHEAT
 	cls.sv_pure = cls.pure_restart = false;
 #endif
-
-	cls.wakelock = Sys_AcquireWakeLock();
 
 	if( !cls.demoPlayer.playing && ( cls.serveraddress.type == NA_IP ) ) {
 		Steam_AdvertiseGame( cls.serveraddress.address.ipv4.ip, NET_GetAddressPort( &cls.serveraddress ) );

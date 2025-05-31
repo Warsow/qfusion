@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <common/sys_net.h>
 
-#include "winquake.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <io.h>

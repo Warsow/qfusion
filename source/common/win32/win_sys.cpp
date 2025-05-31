@@ -23,8 +23,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/cmdargs.h>
 #include <client/keys.h>
 
-#include "winquake.h"
-#include "resource.h"
+#include <windows.h>
+
 #include <errno.h>
 #include <float.h>
 #include <fcntl.h>
@@ -33,12 +33,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <conio.h>
 #include <limits.h>
 
-#include "../win32/conproc.h"
-
-#if !defined( DEDICATED_ONLY )
-extern "C" QF_DLL_EXPORT DWORD NvOptimusEnablement = 0x00000001;
-extern "C" QF_DLL_EXPORT int AmdPowerXpressRequestHighPerformance = 1;
-#endif
+#include <server/win32/conproc.h>
 
 #if !defined( USE_SDL2 ) || defined( DEDICATED_ONLY )
 
@@ -50,56 +45,37 @@ int AppFocused;
 int64_t sys_msg_time;
 
 #define MAX_NUM_ARGVS   128
-int argc;
-char *argv[MAX_NUM_ARGVS];
+static int parsedArgc;
+static char *parsedArgv[MAX_NUM_ARGVS];
 
 void Sys_InitTime( void );
 
-/*
-===============================================================================
+static LARGE_INTEGER hwTimerFrequency;
+static LARGE_INTEGER startupTimestamp;
 
-SYSTEM IO
-
-===============================================================================
-*/
-
-void Sys_Error( const char *format, ... ) {
-	va_list argptr;
-	char msg[1024];
-
-	va_start( argptr, format );
-	Q_vsnprintfz( msg, sizeof( msg ), format, argptr );
-	va_end( argptr );
-
-	MessageBox( NULL, msg, "Error", 0 /* MB_OK */ );
-
-	// shut down QHOST hooks if necessary
-	DeinitConProc();
-
-	exit( 1 );
+void Sys_InitTime() {
+	(void)::QueryPerformanceFrequency( &hwTimerFrequency );
+	(void)::QueryPerformanceCounter( &startupTimestamp );
 }
 
-void Sys_Quit( void ) {
-	timeEndPeriod( 1 );
-
-	SV_Shutdown( "Server quit\n" );
-#ifndef DEDICATED_ONLY
-	CL_Shutdown();
-#endif
-
-	if( ( dedicated && dedicated->integer ) || ( developer && developer->integer ) ) {
-		FreeConsole();
-	}
-
-	// shut down QHOST hooks if necessary
-	DeinitConProc();
-
-	Qcommon_Shutdown();
-
-	exit( 0 );
+int64_t Sys_Milliseconds() {
+	LARGE_INTEGER counter;
+	(void)::QueryPerformanceCounter( &counter );
+	// Isn't really needed as the return value is 64-bit but should make stuff more robust
+	counter.QuadPart -= startupTimestamp.QuadPart;
+	counter.QuadPart *= 1000LL;
+	counter.QuadPart /= hwTimerFrequency.QuadPart;
+	return counter.QuadPart;
 }
 
-//================================================================
+uint64_t Sys_Microseconds() {
+	LARGE_INTEGER counter;
+	(void)::QueryPerformanceCounter( &counter );
+	counter.QuadPart -= startupTimestamp.QuadPart;
+	counter.QuadPart *= 1000LL * 1000LL;
+	counter.QuadPart /= hwTimerFrequency.QuadPart;
+	return (uint64_t)counter.QuadPart;
+}
 
 void Sys_Sleep( unsigned int millis ) {
 	Sleep( millis );
@@ -107,47 +83,14 @@ void Sys_Sleep( unsigned int millis ) {
 
 //===============================================================================
 
-/*
-* Sys_Init
-*/
-void Sys_Init( void ) {
-	timeBeginPeriod( 1 );
 
-	Sys_InitTime();
-
-	if( dedicated->integer || developer->integer ) {
-		SetPriorityClass( GetCurrentProcess(), HIGH_PRIORITY_CLASS );
-
-		if( !AllocConsole() ) {
-			Sys_Error( "Couldn't create a system console" );
-		}
-
-		// let QHOST hook in
-		InitConProc( argc, argv );
-	}
-}
 
 /*
 * myTranslateMessage
 * A wrapper around TranslateMessage to avoid garbage if the toggleconsole
 * key happens to be a dead key (like in the German layout)
 */
-#ifdef DEDICATED_ONLY
-#define myTranslateMessage( msg ) TranslateMessage( msg )
-#else
-int IN_MapKey( int key );
-static BOOL myTranslateMessage( MSG *msg ) {
-	if( msg->message == WM_KEYDOWN ) {
-		int key = IN_MapKey( msg->lParam );
-		if( auto *system = wsw::cl::KeyHandlingSystem::instance(); system && system->isAToggleConsoleKey( key ) ) {
-			return TRUE;
-		} else {
-			return TranslateMessage( msg );
-		}
-	}
-	return TranslateMessage( msg );
-}
-#endif
+BOOL myTranslateMessage( MSG *msg );
 
 /*
 * Sys_SendKeyEvents
@@ -190,87 +133,7 @@ int Sys_GetCurrentProcessId( void ) {
 	return GetCurrentProcessId();
 }
 
-/*
-* Sys_GetPreferredLanguage
-* Get the preferred language through the MUI API. Works on Vista and newer.
-*/
-const char *Sys_GetPreferredLanguage( void ) {
-	typedef BOOL ( WINAPI * GetUserPreferredUILanguages_t )( DWORD, PULONG, PWSTR, PULONG );
-	BOOL hr;
-	ULONG numLanguages = 0;
-	DWORD cchLanguagesBuffer = 0;
-	HINSTANCE kernel32Dll;
-	GetUserPreferredUILanguages_t GetUserPreferredUILanguages_f;
-	static char lang[10];
-
-// mingw doesn't define this
-#ifndef MUI_LANGUAGE_NAME
-# define MUI_LANGUAGE_NAME 0x8
-#endif
-
-	lang[0] = '\0';
-
-	kernel32Dll = LoadLibrary( "kernel32.dll" );
-
-	hr = FALSE;
-	GetUserPreferredUILanguages_f = ( decltype( GetUserPreferredUILanguages_f ) )(void *)GetProcAddress( kernel32Dll, "GetUserPreferredUILanguages" );
-	if( GetUserPreferredUILanguages_f ) {
-		hr = GetUserPreferredUILanguages_f( MUI_LANGUAGE_NAME, &numLanguages, NULL, &cchLanguagesBuffer );
-	}
-
-	if( hr ) {
-		WCHAR *pwszLanguagesBuffer;
-
-		pwszLanguagesBuffer = (WCHAR *)Q_malloc( sizeof( WCHAR ) * cchLanguagesBuffer );
-		hr = GetUserPreferredUILanguages_f( MUI_LANGUAGE_NAME, &numLanguages, pwszLanguagesBuffer, &cchLanguagesBuffer );
-
-		if( hr ) {
-			char *p;
-
-			WideCharToMultiByte( CP_ACP, 0, pwszLanguagesBuffer, cchLanguagesBuffer, lang, sizeof( lang ), NULL, NULL );
-			lang[sizeof( lang ) - 1] = '\0';
-
-			p = strchr( lang, '-' );
-			if( p ) {
-				*p = '_';
-			}
-		}
-
-		Q_free( pwszLanguagesBuffer );
-	}
-
-	FreeLibrary( kernel32Dll );
-
-	if( !lang[0] ) {
-		return APP_DEFAULT_LANGUAGE;
-	}
-	return Q_strlwr( lang );
-}
-
 #if !defined( USE_SDL2 ) || defined( DEDICATED_ONLY )
-
-/*
-* Sys_AcquireWakeLock
-*/
-void *Sys_AcquireWakeLock( void ) {
-	return NULL;
-}
-
-/*
-* Sys_ReleaseWakeLock
-*/
-void Sys_ReleaseWakeLock( void *wl ) {
-}
-
-/*
-* Sys_AppActivate
-*/
-void Sys_AppActivate( void ) {
-#ifndef DEDICATED_ONLY
-	ShowWindow( cl_hwnd, SW_RESTORE );
-	SetForegroundWindow( cl_hwnd );
-#endif
-}
 
 //========================================================================
 
@@ -280,17 +143,17 @@ static char exe[4] = "exe";
 * ParseCommandLine
 */
 static void ParseCommandLine( LPSTR lpCmdLine ) {
-	argc = 1;
-	argv[0] = exe;
+	parsedArgc = 1;
+	parsedArgv[0] = exe;
 
-	while( *lpCmdLine && ( argc < MAX_NUM_ARGVS ) ) {
+	while( *lpCmdLine && ( parsedArgc < MAX_NUM_ARGVS ) ) {
 		while( *lpCmdLine && ( *lpCmdLine <= 32 || *lpCmdLine > 126 ) )
 			lpCmdLine++;
 
 		if( *lpCmdLine ) {
 			char quote = ( ( '"' == *lpCmdLine || '\'' == *lpCmdLine ) ? *lpCmdLine++ : 0 );
 
-			argv[argc++] = lpCmdLine;
+			parsedArgv[parsedArgc++] = lpCmdLine;
 			if( quote ) {
 				while( *lpCmdLine && *lpCmdLine != quote && *lpCmdLine >= 32 && *lpCmdLine <= 126 )
 					lpCmdLine++;
@@ -323,7 +186,7 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
 	ParseCommandLine( lpCmdLine );
 
-	Qcommon_Init( argc, argv );
+	Qcommon_Init( parsedArgc, parsedArgv );
 
 	oldtime = Sys_Milliseconds();
 

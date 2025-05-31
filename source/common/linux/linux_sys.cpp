@@ -1,5 +1,5 @@
-#include "../common.h"
-#include "../local.h"
+#include <common/common.h>
+#include <common/local.h>
 
 #include <stdio.h>
 #include <unistd.h>

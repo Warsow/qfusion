@@ -78,16 +78,16 @@ file(GLOB CLIENT_COMMON_SOURCES
 
 if (USE_SDL2)
 	file(GLOB REF_PLATFORM_SOURCES
-			"../sdl/sdl_glw.cpp"
-			"../sdl/sdl_qgl.cpp"
+			"sdl/sdl_glw.cpp"
+			"sdl/sdl_qgl.cpp"
 			)
 
 	set(REF_PLATFORM_LIBRARIES ${SDL2_LIBRARY})
 else()
 	if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 		file(GLOB REF_PLATFORM_SOURCES
-				"../win32/win_glw.cpp"
-				"../win32/win_qgl.cpp"
+				"win32/win_glw.cpp"
+				"win32/win_qgl.cpp"
 				)
 
 		set(REF_PLATFORM_LIBRARIES "")
@@ -96,56 +96,19 @@ endif()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	file(GLOB CLIENT_PLATFORM_HEADERS
-		"../win32/resource.h"
-		"../win32/conproc.h"
-		"../win32/winquake.h"
-		"../win32/win_input.h"
+		"win32/resource.h"
+		"win32/conproc.h"
+		"win32/winquake.h"
+		"win32/win_input.h"
 	)
 
-    if (USE_SDL2)
-        file(GLOB CLIENT_PLATFORM_SOURCES
-            "../win32/win_fs.cpp"
-            "../win32/win_net.cpp"
-            "../win32/win_sys.cpp"
-            "../win32/win_console.cpp"
-            "../win32/win_threads.cpp"
+    file(GLOB CLIENT_PLATFORM_SOURCES
+        "win32/*.cpp"
+        "win32/qfusion.rc"
+    )
 
-            "../sdl/sdl_input.cpp"
-            "../sdl/sdl_input_joy.cpp"
-            "../sdl/sdl_vid.cpp"
-            "../sdl/sdl_sys.cpp"
-            "../sdl/sdl_clipboard.cpp"
-            "../sdl/sdl_time.cpp"
-            "../sdl/sdl_lib.cpp"
-            "../sdl/sdl_client.cpp"
-
-            "../win32/qfusion.rc"
-        )
-
-		# TODO: Setup UI dependencies if SDL gets eventually used
-        set(CLIENT_PLATFORM_LIBRARIES ${SDL2_LIBRARY} ${SDL2MAIN_LIBRARY} "ws2_32.lib" "winmm.lib" "Ole32.lib")
-    else()
-        file(GLOB CLIENT_PLATFORM_SOURCES
-            "../win32/win_fs.cpp"
-            "../win32/win_lib.cpp"
-            "../win32/win_net.cpp"
-            "../win32/win_sys.cpp"
-            "../win32/win_console.cpp"
-            "../win32/win_clipboard.cpp"
-            "../win32/win_time.cpp"
-            "../win32/win_threads.cpp"
-
-            "../win32/win_client.cpp"
-            "../win32/win_input.cpp"
-            "../win32/win_vid.cpp"
-            "../win32/conproc.cpp"
-
-            "../win32/qfusion.rc"
-        )
-
-		# TODO: Get rid of the automation stuff
-        set(CLIENT_PLATFORM_LIBRARIES "ws2_32.lib" "winmm.lib" "Ole32.lib" "qwindows" "Wtsapi32" Qt5WindowsUIAutomationSupport)
-    endif()
+	# TODO: Get rid of the automation stuff
+    set(CLIENT_PLATFORM_LIBRARIES "ws2_32.lib" "winmm.lib" "Ole32.lib" "qwindows" "Wtsapi32" Qt5WindowsUIAutomationSupport)
 
     set(CLIENT_BINARY_TYPE WIN32)
 
@@ -154,25 +117,10 @@ endif()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 	set(CLIENT_PLATFORM_HEADERS "")
-	
+
+	# TODO
     file(GLOB CLIENT_PLATFORM_SOURCES
-        "../unix/unix_fs.cpp"
-        "../unix/unix_net.cpp"
-        "../unix/unix_sys.cpp"
-        "../unix/unix_console.cpp"
-        "../unix/unix_threads.cpp"
-
-        "../sdl/sdl_input.cpp"
-        "../sdl/sdl_input_joy.cpp"
-        "../sdl/sdl_input_osx.m"
-        "../sdl/sdl_vid.cpp"
-        "../sdl/sdl_sys.cpp"
-        "../sdl/sdl_clipboard.cpp"
-        "../sdl/sdl_time.cpp"
-        "../sdl/sdl_lib.cpp"
-        "../sdl/sdl_client.cpp"
-
-        "../mac/mac_sys.m"
+        "sdl/*.cpp"
         "${QFUSION_MAC_INFO_PLIST}"
     )
 
@@ -195,21 +143,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	set(CLIENT_PLATFORM_HEADERS "")
 
 	file(GLOB CLIENT_PLATFORM_SOURCES
-		"../unix/unix_fs.cpp"
-		"../unix/unix_net.cpp"
-		"../unix/unix_sys.cpp"
-		"../unix/unix_console.cpp"
-		"../unix/unix_threads.cpp"
-
-		"../sdl/sdl_input.cpp"
-		"../sdl/sdl_input_joy.cpp"
-		"../sdl/sdl_vid.cpp"
-		"../sdl/sdl_sys.cpp"
-		"../sdl/sdl_clipboard.cpp"
-		"../sdl/sdl_time.cpp"
-		"../sdl/sdl_lib.cpp"
-		"../sdl/sdl_client.cpp"
-		)
+		"sdl/*.cpp")
 
 	# TODO: Discover how to get rid of all of this?
 	set(QT_XCB_DEPENDENCY_LIBRARIES

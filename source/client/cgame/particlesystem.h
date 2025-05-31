@@ -15,14 +15,6 @@ template <typename> class SingletonHolder;
 
 #include <span>
 
-#ifdef min
-#undef min
-#endif
-
-#ifdef max
-#undef max
-#endif
-
 // Few notes on these value ranges:
 // They are ad-hoc structs for now, as we don't need more complicated stuff at this stage.
 // Distributions are obviously assumed to be uniform.
