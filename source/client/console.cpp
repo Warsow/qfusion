@@ -20,17 +20,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // console.c
 
 #include "client.h"
-#include "../common/cmdargs.h"
-#include "../common/cmdcompat.h"
-#include "../common/cmdsystem.h"
-#include "../common/freelistallocator.h"
-#include "../common/podbufferholder.h"
-#include "../common/profilerscope.h"
-#include "../common/singletonholder.h"
-#include "../common/wswstringsplitter.h"
-#include "../common/wswstaticstring.h"
-#include "../common/wswvector.h"
-#include "../common/wswfs.h"
+#include <common/cmdargs.h>
+#include <common/cmdcompat.h>
+#include <common/cmdsystem.h>
+#include <common/freelistallocator.h>
+#include <common/podbufferholder.h>
+#include <common/profilerscope.h>
+#include <common/singletonholder.h>
+#include <common/wswstringsplitter.h>
+#include <common/wswstaticstring.h>
+#include <common/wswvector.h>
+#include <common/wswfs.h>
 
 #include <cctype>
 #include <tuple>

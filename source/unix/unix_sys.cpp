@@ -47,9 +47,9 @@ FIXME:  This will be remidied once a native Mac port is complete
 #include <machine/param.h>
 #endif
 
-#include "../common/common.h"
-#include "../common/stringspanstorage.h"
-#include "../common/wswalgorithm.h"
+#include <common/common.h>
+#include <common/stringspanstorage.h>
+#include <common/wswalgorithm.h>
 #include "glob.h"
 
 #if !defined( USE_SDL2 ) || defined( DEDICATED_ONLY )

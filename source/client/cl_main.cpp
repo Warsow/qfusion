@@ -21,22 +21,22 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "client.h"
 
-#include "../common/asyncstream.h"
-#include "../common/cmdsystem.h"
-#include "../common/demometadata.h"
-#include "../common/singletonholder.h"
-#include "../common/pipeutils.h"
-#include "../common/maplist.h"
-#include "../common/mmcommon.h"
-#include "../common/hash.h"
-#include "../common/profilerscope.h"
-#include "../common/q_trie.h"
-#include "../common/textstreamwriterextras.h"
-#include "../common/wswalgorithm.h"
-#include "../common/wswtonum.h"
-#include "../common/wswfs.h"
-#include "../ui/uisystem.h"
-#include "../server/server.h"
+#include <common/asyncstream.h>
+#include <common/cmdsystem.h>
+#include <common/demometadata.h>
+#include <common/singletonholder.h>
+#include <common/pipeutils.h>
+#include <common/maplist.h>
+#include <common/mmcommon.h>
+#include <common/hash.h>
+#include <common/profilerscope.h>
+#include <common/q_trie.h>
+#include <common/textstreamwriterextras.h>
+#include <common/wswalgorithm.h>
+#include <common/wswtonum.h>
+#include <common/wswfs.h>
+#include "ui/uisystem.h"
+#include <server/server.h>
 
 #include "serverlist.h"
 

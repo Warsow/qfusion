@@ -18,7 +18,7 @@
 
  */
 
-#include "../client/client.h"
+#include <client/client.h>
 #include "sdl_glw.h"
 
 SDL_Window *sdl_window;

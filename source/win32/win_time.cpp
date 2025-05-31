@@ -1,4 +1,4 @@
-#include "../common/common.h"
+#include <common/common.h>
 #include <windows.h>
 
 // TODO: Should we just use std::high_precision_clock for every platform? Its fairly good nowadays...

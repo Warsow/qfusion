@@ -1,5 +1,5 @@
 #include <SDL.h>
-#include "../client/client.h"
+#include <client/client.h>
 
 /*
 * Sys_GetClipboardData

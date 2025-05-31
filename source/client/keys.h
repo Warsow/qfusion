@@ -21,9 +21,9 @@
 #ifndef WSW_43c64bed_a1ec_442c_a8cb_2fa107edfa89_H
 #define WSW_43c64bed_a1ec_442c_a8cb_2fa107edfa89_H
 
-#include "../common/q_keycodes.h"
-#include "../common/wswpodvector.h"
-#include "../common/wswstaticvector.h"
+#include <common/q_keycodes.h>
+#include <common/wswpodvector.h>
+#include <common/wswstaticvector.h>
 
 template <typename> class SingletonHolder;
 

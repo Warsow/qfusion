@@ -30,8 +30,8 @@
 **
 */
 #include <assert.h>
-#include "../ref/local.h"
-#include "../common/common.h"
+#include <client/renderer/local.h>
+#include <common/common.h>
 #include "win_glw.h"
 
 #include <QVariant>

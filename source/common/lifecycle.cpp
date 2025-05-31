@@ -31,9 +31,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "wswprofiler.h"
 #include "local.h"
 #include "textstreamwriterextras.h"
-#include "../server/server.h"
+#include <server/server.h>
 #ifndef DEDICATED_ONLY
-#include "../client/client.h"
+#include <client/client.h>
 #endif
 
 #include <atomic>

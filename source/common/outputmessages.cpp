@@ -4,7 +4,6 @@
 #include "freelistallocator.h"
 #include "wswstaticvector.h"
 #include "common.h"
-#include "../server/server.h"
 
 using wsw::operator""_asView;
 

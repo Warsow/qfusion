@@ -1,8 +1,8 @@
 #include <SDL.h>
 #include <dlfcn.h>
 
-#include "../common/common.h"
-#include "../common/sys_library.h"
+#include <common/common.h>
+#include <common/sys_library.h>
 
 /*
 * Sys_Library_Close

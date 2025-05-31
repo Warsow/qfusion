@@ -58,33 +58,23 @@ file(GLOB CLIENT_HEADERS
 	"*.h"
 	"../common/*.h"
 	"../angelwrap/qas_public.h"
-	"../ref/r_public.h"
-	"../cgame/cg_public.h"
-	"../cgame/ref.h"
-	"../game/g_public.h"
-	"../ui/*.h"
-	"../cgame/*.h"
-	"../ftlib/*.h"
+	"cgame/cg_public.h"
+	"renderer/*.h"
+	"ui/*.h"
 	"../server/*.h"
-	"../snd_openal/*.h"
+	"sound/*.h"
 )
 
 file(GLOB CLIENT_COMMON_SOURCES
 	"../common/lifecycle.cpp"
 	"../common/noise.cpp"
 	"*.cpp"
-	"../ui/*.cpp"
-	"../cgame/*.cpp"
-	"../ftlib/*.cpp"
-	"../snd_openal/*.cpp"
+	"ui/*.cpp"
+	"cgame/*.cpp"
+	"renderer/*.cpp"
+	"sound/*.cpp"
 	"../../third-party/recastnavigation/Recast/Source/*.cpp"
 )
-
-file(GLOB REF_HEADERS
-		"../ref/*.h")
-
-file(GLOB REF_COMMON_SOURCES
-		"../ref/*.cpp")
 
 if (USE_SDL2)
 	file(GLOB REF_PLATFORM_SOURCES
@@ -159,7 +149,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 
     set(CLIENT_BINARY_TYPE WIN32)
 
-    set(BUNDLE_RESOURCES "../ui/ui.qrc")
+    set(BUNDLE_RESOURCES "ui/ui.qrc")
 endif()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -233,15 +223,15 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 		${QT_PLATFORM_DEPENDENCY_LIBRARIES})
     set(CLIENT_BINARY_TYPE "")
 
-    set(BUNDLE_RESOURCES "../ui/ui.qrc")
+    set(BUNDLE_RESOURCES "ui/ui.qrc")
 endif()
 
 if (MSVC)
-	set_source_files_properties("../ref/frontendavx.cpp" PROPERTIES COMPILE_FLAGS "/arch:AVX")
+	set_source_files_properties("renderer/frontendavx.cpp" PROPERTIES COMPILE_FLAGS "/arch:AVX")
 	set_source_files_properties("../common/cm_trace_avx.cpp" PROPERTIES COMPILE_FLAGS "/arch:AVX")
 else()
-	set_source_files_properties("../ref/frontendsse41.cpp" PROPERTIES COMPILE_FLAGS "-msse4.1")
-	set_source_files_properties("../ref/frontendavx.cpp" PROPERTIES COMPILE_FLAGS "-mavx")
+	set_source_files_properties("renderer/frontendsse41.cpp" PROPERTIES COMPILE_FLAGS "-msse4.1")
+	set_source_files_properties("renderer/frontendavx.cpp" PROPERTIES COMPILE_FLAGS "-mavx")
 	set_source_files_properties("../common/cm_trace_sse42.cpp" PROPERTIES COMPILE_FLAGS "-msse4.2")
 	set_source_files_properties("../common/cm_trace_avx.cpp" PROPERTIES COMPILE_FLAGS "-mavx")
 endif()
@@ -251,8 +241,6 @@ add_executable(${QFUSION_CLIENT_NAME} ${CLIENT_BINARY_TYPE}
 		       ${CLIENT_PLATFORM_HEADERS}
 		       ${CLIENT_COMMON_SOURCES}
 		       ${CLIENT_PLATFORM_SOURCES}
-		       ${REF_HEADERS}
-		       ${REF_COMMON_SOURCES}
 		       ${REF_PLATFORM_SOURCES}
 		       ${BUNDLE_RESOURCES}
 )

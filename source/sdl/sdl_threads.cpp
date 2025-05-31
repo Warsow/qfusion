@@ -19,8 +19,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include <SDL.h>
-#include "../common/common.h"
-#include "../common/sys_threads.h"
+#include <common/common.h>
+#include <common/sys_threads.h>
 
 struct qthread_s {
 	SDL_Thread *t;

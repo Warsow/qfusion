@@ -47,7 +47,7 @@ and Zephaniah E. Hull. Adapted by Victor Luchits for qfusion project.
 
 #include <SDL.h>
 
-#include "../common/common.h"
+#include <common/common.h>
 #include "sdl_glw.h"
 
 #define QGL_EXTERN
@@ -62,7 +62,7 @@ and Zephaniah E. Hull. Adapted by Victor Luchits for qfusion project.
 #define QGL_EGL( type, name, params )
 #define QGL_EGL_EXT( type, name, params )
 
-#include "../ref/qgl.h"
+#include <client/renderer/qgl.h>
 
 #undef QGL_EGL_EXT
 #undef QGL_EGL
@@ -97,7 +97,7 @@ void QGL_Shutdown( void ) {
 #define QGL_EGL( type, name, params )
 #define QGL_EGL_EXT( type, name, params )
 
-#include "../ref/qgl.h"
+#include <client/renderer/qgl.h>
 
 #undef QGL_EGL_EXT
 #undef QGL_EGL
@@ -160,7 +160,7 @@ qgl_initerr_t QGL_Init( const char *dllname ) {
 #define QGL_EGL( type, name, params )
 #define QGL_EGL_EXT( type, name, params )
 
-#include "../ref/qgl.h"
+#include <client/renderer/qgl.h>
 
 #undef QGL_EGL_EXT
 #undef QGL_EGL

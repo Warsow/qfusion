@@ -1,5 +1,5 @@
 #include <SDL.h>
-#include "../client/client.h"
+#include <client/client.h>
 
 #if defined( _WIN32 )
 #include "../win32/resource.h"

@@ -1,8 +1,8 @@
 #ifndef WSW_SERVERINFOPARSER_H
 #define WSW_SERVERINFOPARSER_H
 
-#include "../common/wswstaticstring.h"
-#include "../common/wswstaticvector.h"
+#include <common/wswstaticstring.h>
+#include <common/wswstaticvector.h>
 
 class ServerInfo;
 struct msg_s;

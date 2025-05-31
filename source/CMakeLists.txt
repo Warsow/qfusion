@@ -12,6 +12,8 @@ message(STATUS "CMAKE_SYSTEM_PROCESSOR: " ${CMAKE_SYSTEM_PROCESSOR})
 set(CMAKE_MODULE_PATH ${CMAKE_HOME_DIRECTORY}/cmake)
 include(QfusionUtils)
 
+include_directories("${CMAKE_SOURCE_DIR}")
+
 if (QFUSION_GAME)
     if (${QFUSION_GAME} MATCHES "Warsow")
         set(QFUSION_GAME_DIR basewsw)

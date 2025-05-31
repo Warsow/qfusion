@@ -19,18 +19,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "server.h"
-#include "../common/cmdsystem.h"
-#include "../common/maplist.h"
-#include "../common/singletonholder.h"
-#include "../common/pipeutils.h"
-#include "../common/compression.h"
-#include "../common/demometadata.h"
-#include "../common/profilerscope.h"
-#include "../common/wswtonum.h"
-#include "../common/wswfs.h"
-#include "../common/wswalgorithm.h"
-#include "../common/wswstringsplitter.h"
-#include "../common/gs_public.h"
+#include <common/cmdsystem.h>
+#include <common/maplist.h>
+#include <common/singletonholder.h>
+#include <common/pipeutils.h>
+#include <common/compression.h>
+#include <common/demometadata.h>
+#include <common/profilerscope.h>
+#include <common/wswtonum.h>
+#include <common/wswfs.h>
+#include <common/wswalgorithm.h>
+#include <common/wswstringsplitter.h>
+#include <common/gs_public.h>
 
 #include <variant>
 #include <string>

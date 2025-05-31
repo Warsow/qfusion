@@ -18,13 +18,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 #include "client.h"
-#include "../ui/uisystem.h"
-#include "../common/wswstaticvector.h"
-#include "../common/wswstaticstring.h"
-#include "../common/wswalgorithm.h"
-#include "../common/singletonholder.h"
-#include "../common/cmdargs.h"
-#include "../common/cmdcompat.h"
+#include "ui/uisystem.h"
+#include <common/wswstaticvector.h>
+#include <common/wswstaticstring.h>
+#include <common/wswalgorithm.h>
+#include <common/singletonholder.h>
+#include <common/cmdargs.h>
+#include <common/cmdcompat.h>
 
 using wsw::operator""_asView;
 

@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "cm_trace.h"
 
 #ifdef CM_SELF_TEST
-#include "../common/wswalgorithm.h"
+#include <common/wswalgorithm.h>
 #endif
 
 static inline void CM_SetBuiltinBrushBounds( vec_bounds_t mins, vec_bounds_t maxs ) {

@@ -27,7 +27,7 @@
 #include <SDL.h>
 #include <SDL_syswm.h>
 
-#include "../ref/local.h"
+#include <client/renderer/local.h>
 #include "sdl_glw.h"
 
 extern SDL_Window *sdl_window;

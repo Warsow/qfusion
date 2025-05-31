@@ -22,13 +22,13 @@
 #ifndef QFUSION_SERVER_H
 #define QFUSION_SERVER_H
 
-#include "../common/common.h"
-#include "../common/cmdcompat.h"
-#include "../common/configstringstorage.h"
-#include "../common/wswstaticstring.h"
-#include "../common/mmcommon.h"
-#include "../common/outputmessages.h"
-#include "../game/g_public.h"
+#include <common/common.h>
+#include <common/cmdcompat.h>
+#include <common/configstringstorage.h>
+#include <common/wswstaticstring.h>
+#include <common/mmcommon.h>
+#include <common/outputmessages.h>
+#include "game/g_public.h"
 
 #include <cstdlib>
 #include <cmath>

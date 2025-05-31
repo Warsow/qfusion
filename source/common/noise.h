@@ -2,7 +2,7 @@
 #define WSW_0466bd6c_f805_44e2_8c02_6483b82a1ff7_H
 
 // TODO: Lift it to the top level
-#include "../game/ai/vec3.h"
+#include <server/game/ai/vec3.h>
 
 [[nodiscard]]
 auto calcSimplexNoise2D( float x, float y ) -> float;

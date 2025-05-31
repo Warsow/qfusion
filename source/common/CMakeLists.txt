@@ -8,28 +8,28 @@ link_directories(${ANGELSCRIPT_DIR}/lib)
 include_directories(${ZLIB_INCLUDE_DIR} ${CURL_INCLUDE_DIR})
 
 file(GLOB GAME_HEADERS
-    "../game/*.h"
-    "../game/ai/*.h"
-    "../game/ai/awareness/*.h"
-    "../game/ai/combat/*.h"
-    "../game/ai/movement/*.h"
-    "../game/ai/navigation/*.h"
-    "../game/ai/planning/*.h"
-    "../game/ai/teamplay/*.h"
-    "../game/ascript/*.h"
-    "../game/ascript/addon/*.h")
+    "../server/game/*.h"
+    "../server/game/ai/*.h"
+    "../server/game/ai/awareness/*.h"
+    "../server/game/ai/combat/*.h"
+    "../server/game/ai/movement/*.h"
+    "../server/game/ai/navigation/*.h"
+    "../server/game/ai/planning/*.h"
+    "../server/game/ai/teamplay/*.h"
+    "../server/game/ascript/*.h"
+    "../server/game/ascript/addon/*.h")
 
 file(GLOB GAME_SOURCES
-    "../game/*.cpp"
-    "../game/ai/*.cpp"
-    "../game/ai/awareness/*.cpp"
-    "../game/ai/combat/*.cpp"
-    "../game/ai/movement/*.cpp"
-    "../game/ai/navigation/*.cpp"
-    "../game/ai/planning/*.cpp"
-    "../game/ai/teamplay/*.cpp"
-    "../game/ascript/*.cpp"
-    "../game/ascript/addon/*.cpp")
+    "../server/game/*.cpp"
+    "../server/game/ai/*.cpp"
+    "../server/game/ai/awareness/*.cpp"
+    "../server/game/ai/combat/*.cpp"
+    "../server/game/ai/movement/*.cpp"
+    "../server/game/ai/navigation/*.cpp"
+    "../server/game/ai/planning/*.cpp"
+    "../server/game/ai/teamplay/*.cpp"
+    "../server/game/ascript/*.cpp"
+    "../server/game/ascript/addon/*.cpp")
 
 file(GLOB EXECOMMON_SOURCES
      "asyncstream.cpp"

@@ -2,7 +2,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "../common/common.h"
+#include <common/common.h>
 
 bool stdin_active = true;
 cvar_t *nostdout = NULL;

@@ -1,6 +1,6 @@
 #include "imageloading.h"
-#include "../common/wswexceptions.h"
-#include "../ref/ref.h"
+#include <common/wswexceptions.h>
+#include "renderer/ref.h"
 
 #include <QSvgRenderer>
 #include <QPainter>
