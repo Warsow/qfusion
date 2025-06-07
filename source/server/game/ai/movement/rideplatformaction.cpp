@@ -1,7 +1,7 @@
 #include "rideplatformaction.h"
 #include "movementlocal.h"
 #include "../ailocal.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 void RidePlatformAction::BeforePlanning() {
 	BaseAction::BeforePlanning();

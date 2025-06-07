@@ -3,9 +3,9 @@
 #include "teamplaylocal.h"
 #include "../groundtracecache.h"
 #include "../bot.h"
-#include <common/links.h>
-#include <common/wswalgorithm.h>
-#include <common/wswsortbyfield.h>
+#include <common/helpers/links.h>
+#include <common/helpers/algorithm.h>
+#include <common/helpers/sortbyfield.h>
 
 #include <limits>
 #include <cmath>

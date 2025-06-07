@@ -1,8 +1,8 @@
 #include "huddatamodel.h"
 #include "local.h"
 #include "cgameimports.h"
-#include <common/gs_public.h>
-#include <common/wswalgorithm.h>
+#include <common/facilities/gs_public.h>
+#include <common/helpers/algorithm.h>
 #include <client/client.h>
 #include <client/cgame/mediacache.h>
 

@@ -20,15 +20,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // cg_local.h -- local definitions for client game module
 
-#include <common/q_arch.h>
-#include <common/q_math.h>
-#include <common/q_shared.h>
-#include <common/q_cvar.h>
-#include <common/q_comref.h>
-#include <common/q_collision.h>
-
-#include <common/gs_public.h>
-#include <common/outputmessages.h>
+#include <common/helpers/q_arch.h>
+#include <common/helpers/q_math.h>
+#include <common/facilities/q_shared.h>
+#include <common/facilities/q_cvar.h>
+#include <common/facilities/q_comref.h>
+#include <common/facilities/q_collision.h>
+#include <common/facilities/gs_public.h>
+#include <common/facilities/outputmessages.h>
 #include <client/renderer/ref.h>
 
 #include "cg_public.h"
@@ -465,7 +464,7 @@ enum {
 	VIEWDEF_MAXTYPES
 };
 
-#include <common/configstringstorage.h>
+#include <common/facilities/configstringstorage.h>
 
 // this is not exactly "static" but still...
 typedef struct {

@@ -22,9 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../ailocal.h"
 #include "../bot.h"
 
-#include <common/links.h>
-#include <common/md5.h>
-#include <common/wswalgorithm.h>
+#include <common/helpers/links.h>
+#include <common/helpers/md5.h>
+#include <common/helpers/algorithm.h>
 
 #include <cstdlib>
 #include <limits>

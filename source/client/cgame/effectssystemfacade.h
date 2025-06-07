@@ -24,9 +24,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "trackedeffectssystem.h"
 #include "transienteffectssystem.h"
-#include <common/randomgenerator.h>
-#include <common/wswstaticdeque.h>
-#include <common/smallassocarray.h>
+#include <common/helpers/randomgenerator.h>
+#include <common/types/staticdeque.h>
+#include <common/types/smallassocarray.h>
 
 class DrawSceneRequest;
 struct SoundSet;

@@ -22,19 +22,19 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-#include <common/wswstaticstring.h>
-#include <common/cmdargs.h>
+#include <common/types/staticstring.h>
+#include <common/facilities/cmdargs.h>
 #include <client/client.h>
-#include <common/configvars.h>
-#include <common/wswtonum.h>
-#include <common/cmdargssplitter.h>
-#include <common/cmdcompat.h>
+#include <common/facilities/configvars.h>
+#include <common/helpers/tonum.h>
+#include <common/facilities/cmdargssplitter.h>
+#include <common/facilities/cmdcompat.h>
 #include <client/ui/uisystem.h>
-#include <common/gs_public.h>
+#include <common/facilities/gs_public.h>
 #include <client/snd_public.h>
 #include "cg_local.h"
 #include <client/ui/huddatamodel.h>
-#include <common/noise.h>
+#include <common/helpers/noise.h>
 #include <client/renderer/local.h>
 
 using wsw::operator""_asView;

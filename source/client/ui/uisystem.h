@@ -5,9 +5,9 @@
 #include <optional>
 #include <span>
 
-#include <common/q_shared.h>
-#include <common/q_math.h>
-#include <common/q_comref.h>
+#include <common/helpers/q_math.h>
+#include <common/facilities/q_shared.h>
+#include <common/facilities/q_comref.h>
 #include "cgameimports.h"
 
 struct MessageFault;

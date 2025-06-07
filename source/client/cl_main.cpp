@@ -21,20 +21,21 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "client.h"
 
-#include <common/asyncstream.h>
-#include <common/cmdsystem.h>
-#include <common/demometadata.h>
-#include <common/singletonholder.h>
-#include <common/pipeutils.h>
-#include <common/maplist.h>
-#include <common/mmcommon.h>
-#include <common/hash.h>
-#include <common/profilerscope.h>
-#include <common/q_trie.h>
-#include <common/textstreamwriterextras.h>
-#include <common/wswalgorithm.h>
-#include <common/wswtonum.h>
-#include <common/wswfs.h>
+#include <common/facilities/asyncstream.h>
+#include <common/facilities/cmdsystem.h>
+#include <common/facilities/demometadata.h>
+#include <common/helpers/mmuuid.h>
+#include <common/helpers/singletonholder.h>
+#include <common/helpers/pipeutils.h>
+#include <common/facilities/maplist.h>
+#include <common/helpers/hash.h>
+#include <common/facilities/profilerscope.h>
+#include <common/types/q_trie.h>
+#include <common/helpers/textstreamwriterextras.h>
+#include <common/helpers/algorithm.h>
+#include <common/helpers/tonum.h>
+#include <common/facilities/wswfs.h>
+#include <common/facilities/wswcurl.h>
 #include "ui/uisystem.h"
 #include <server/server.h>
 
@@ -3271,10 +3272,6 @@ static void CL_ParseServerData( msg_t *msg ) {
 	cls.sv_pure = cls.pure_restart = false;
 #endif
 
-	if( !cls.demoPlayer.playing && ( cls.serveraddress.type == NA_IP ) ) {
-		Steam_AdvertiseGame( cls.serveraddress.address.ipv4.ip, NET_GetAddressPort( &cls.serveraddress ) );
-	}
-
 	clNotice() << wsw::StringView( cl.servermessage );
 }
 
@@ -4882,10 +4879,6 @@ void CL_SetClientState( int state ) {
 	cls.state = (connstate_t)state;
 	Com_SetClientState( state );
 
-	if( state <= CA_DISCONNECTED ) {
-		Steam_AdvertiseGame( NULL, 0 );
-	}
-
 	switch( state ) {
 		case CA_DISCONNECTED:
 			SCR_CloseConsole();
@@ -5818,8 +5811,6 @@ void CL_Shutdown( void ) {
 		CL_ShutdownLocal();
 
 		SCR_ShutdownScreen();
-
-		Steam_Shutdown();
 
 		CL_Sys_Shutdown();
 

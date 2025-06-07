@@ -1,5 +1,5 @@
 #include "snd_propagation.h"
-#include <common/singletonholder.h>
+#include <common/helpers/singletonholder.h>
 
 #include <random>
 

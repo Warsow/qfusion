@@ -40,9 +40,6 @@ FIXME:  This will be remidied once a native Mac port is complete
 #endif
 
 #include <common/common.h>
-#include <common/stringspanstorage.h>
-#include <common/wswalgorithm.h>
-#include "glob.h"
 
 // TODO... This does not make sense for dedicated server
 bool Sys_IsBrowserAvailable( void ) {

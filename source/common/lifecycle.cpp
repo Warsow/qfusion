@@ -19,18 +19,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // common.c -- misc functions used in client and server
 #include "common.h"
-#include "cmdargs.h"
-#include "cmdcompat.h"
-#include "configvars.h"
-#include "wswcurl.h"
-#include "steam.h"
-#include "mmcommon.h"
-#include "compression.h"
-#include "cmdsystem.h"
-#include "pipeutils.h"
-#include "wswprofiler.h"
+#include <common/facilities/cmdargs.h>
+#include <common/facilities/cmdcompat.h>
+#include <common/facilities/configvars.h>
+#include <common/facilities/cmdsystem.h>
+#include <common/helpers/pipeutils.h>
 #include "local.h"
-#include "textstreamwriterextras.h"
+#include <common/facilities/profiler.h>
+#include <common/facilities/wswcurl.h>
+#include <common/helpers/compression.h>
+#include <common/helpers/textstreamwriterextras.h>
 #include <server/server.h>
 #ifndef DEDICATED_ONLY
 #include <client/client.h>
@@ -425,10 +423,6 @@ void Qcommon_Init( int argc, char **argv ) {
 
 	CM_Init();
 
-#if APP_STEAMID
-	Steam_LoadLibrary();
-#endif
-
 	SV_Init();
 #ifdef DEDICATED_ONLY
 	wsw::ProfilingSystem::attachToThisThread( wsw::ProfilingSystem::ServerGroup );
@@ -512,8 +506,6 @@ void Qcommon_Frame( unsigned realMsec, unsigned *gameMsec, float *extraTime ) {
 
 	FS_Frame();
 
-	Steam_RunFrame();
-
 #ifdef DEDICATED_ONLY
 	CmdSystem *svCmdSystem = SV_GetCmdSystem();
 	for(;; ) {
@@ -570,8 +562,6 @@ void Qcommon_Shutdown( void ) {
 #ifndef DEDICATED_ONLY
 	Key_Shutdown();
 #endif
-
-	Steam_UnloadLibrary();
 
 #ifdef DEDICATED_ONLY
 	SV_GetCmdSystem()->unregisterCommand( wsw::StringView( "quit" ) );

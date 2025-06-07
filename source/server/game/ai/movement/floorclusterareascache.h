@@ -2,7 +2,7 @@
 #define WSW_cc16b7d1_99a4_45dc_a87a_adfafb158177_H
 
 #include "../ailocal.h"
-#include <common/wswstaticvector.h>
+#include <common/types/staticvector.h>
 
 class Bot;
 struct Hazard;

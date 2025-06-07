@@ -1,6 +1,6 @@
 #include "playersmodel.h"
 #include "local.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 namespace wsw::ui {
 

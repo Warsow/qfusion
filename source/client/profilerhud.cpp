@@ -19,11 +19,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "client.h"
-#include <common/cmdargs.h>
-#include <common/profilerscope.h>
-#include <common/singletonholder.h>
-#include <common/wswalgorithm.h>
-#include <common/wswtonum.h>
+#include <common/facilities/cmdargs.h>
+#include <common/facilities/profilerscope.h>
+#include <common/helpers/singletonholder.h>
+#include <common/helpers/algorithm.h>
+#include <common/helpers/tonum.h>
 
 #include <unordered_map>
 

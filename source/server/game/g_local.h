@@ -19,20 +19,20 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // g_local.h -- local definitions for game module
 
-#include <common/q_arch.h>
-#include <common/q_math.h>
-#include <common/q_shared.h>
-#include <common/q_cvar.h>
-#include <common/q_comref.h>
-#include <common/q_collision.h>
+#include <common/helpers/q_arch.h>
+#include <common/helpers/q_math.h>
+#include <common/facilities/q_shared.h>
+#include <common/facilities/q_cvar.h>
+#include <common/facilities/q_comref.h>
+#include <common/facilities/q_collision.h>
+#include <common/facilities/gs_public.h>
 
-#include <common/gs_public.h>
 #include "g_public.h"
 #include "g_gametypes.h"
 
-#include <common/mmcommon.h>
-#include <common/cmdargs.h>
-#include <common/outputmessages.h>
+#include <common/helpers/mmuuid.h>
+#include <common/facilities/cmdargs.h>
+#include <common/facilities/outputmessages.h>
 
 #include <array>
 #include <cmath>
@@ -1055,9 +1055,9 @@ typedef struct {
 #define G_MAX_TIME_DELTAS   8
 #define G_MAX_TIME_DELTAS_MASK ( G_MAX_TIME_DELTAS - 1 )
 
-#include <common/userinfo.h>
-#include <common/wswstaticstring.h>
-#include <common/wswtonum.h>
+#include <common/types/staticstring.h>
+#include <common/helpers/userinfo.h>
+#include <common/helpers/tonum.h>
 
 class FloodState {
 	int64_t m_timestamps[MAX_FLOOD_MESSAGES] {};

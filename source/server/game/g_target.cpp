@@ -18,7 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 #include "g_local.h"
-#include <common/cvar.h>
+#include <common/facilities/cvar.h>
 
 //QUAKED target_temp_entity (1 0 0) (-8 -8 -8) (8 8 8)
 //Fire an origin based temp entity event to the clients.

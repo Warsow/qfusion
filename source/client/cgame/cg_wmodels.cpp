@@ -31,7 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "cg_local.h"
 #include <common/common.h>
-#include <common/configvars.h>
+#include <common/facilities/configvars.h>
 #include <client/snd_public.h>
 
 using wsw::operator""_asView;

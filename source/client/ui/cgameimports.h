@@ -1,7 +1,7 @@
 #ifndef WSW_1468775f_9a19_4e35_9daf_d703cb9288ef_H
 #define WSW_1468775f_9a19_4e35_9daf_d703cb9288ef_H
 
-#include <common/wswstringview.h>
+#include <common/types/stringview.h>
 #include <span>
 
 struct BasicObjectiveIndicatorState {

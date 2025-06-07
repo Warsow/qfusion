@@ -3,11 +3,9 @@
 
 #include <QObject>
 
-#include <common/q_arch.h>
-
-#include <common/wswstringview.h>
-#include <common/wswfs.h>
-#include <common/stringspanstorage.h>
+#include <common/types/stringview.h>
+#include <common/facilities/wswfs.h>
+#include <common/types/stringspanstorage.h>
 
 namespace wsw::ui {
 

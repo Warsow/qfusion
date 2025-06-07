@@ -6,9 +6,9 @@
 
 #include <array>
 
-#include <common/configvars.h>
-#include <common/wswstaticvector.h>
-#include <common/wswstaticstring.h>
+#include <common/facilities/configvars.h>
+#include <common/types/staticvector.h>
+#include <common/types/staticstring.h>
 #include "hudlayoutmodel.h"
 #include "cgameimports.h"
 

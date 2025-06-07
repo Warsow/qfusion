@@ -4,7 +4,7 @@
 #include "planning/planner.h"
 #include "component.h"
 #include "planning/goalentities.h"
-#include <common/wswstaticvector.h>
+#include <common/types/staticvector.h>
 
 class Bot;
 

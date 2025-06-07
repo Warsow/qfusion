@@ -1,8 +1,8 @@
 #include "snd_propagation.h"
 
-#include <common/links.h>
-#include <common/singletonholder.h>
-#include <common/wswalgorithm.h>
+#include <common/helpers/links.h>
+#include <common/helpers/singletonholder.h>
+#include <common/helpers/algorithm.h>
 
 #include <limits>
 #include <random>

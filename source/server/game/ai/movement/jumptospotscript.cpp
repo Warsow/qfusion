@@ -4,7 +4,7 @@
 #include "environmenttracecache.h"
 #include "bestjumpablespotdetector.h"
 #include "../manager.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 void JumpToSpotScript::Activate( const vec3_t startOrigin_,
 								 const vec3_t targetOrigin_,

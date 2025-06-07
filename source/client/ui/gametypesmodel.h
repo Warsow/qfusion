@@ -2,7 +2,7 @@
 #define WSW_1f9eb3bf_27b2_4e92_8390_0a58a3f5ecbd_H
 
 #include "gametypedefparser.h"
-#include <common/wswvector.h>
+#include <common/types/vector.h>
 
 #include <QAbstractListModel>
 #include <QJsonArray>

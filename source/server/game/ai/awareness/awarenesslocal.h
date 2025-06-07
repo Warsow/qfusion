@@ -2,8 +2,8 @@
 #define WSW_f4175f6d_87ed_4203_82d7_b598e2124068_H
 
 #include "entitiespvscache.h"
-#include <common/wswstaticvector.h>
-#include <common/wswsortbyfield.h>
+#include <common/types/staticvector.h>
+#include <common/helpers/sortbyfield.h>
 
 [[nodiscard]]
 static inline bool isGenericEntityInPvs( const edict_t *self, const edict_t *ent ) {

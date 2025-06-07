@@ -21,8 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "materiallocal.h"
 
-#include <common/links.h>
-#include <common/enumtokenmatcher.h>
+#include <common/helpers/links.h>
+#include <common/helpers/enumtokenmatcher.h>
 
 using wsw::operator""_asView;
 

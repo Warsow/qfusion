@@ -20,10 +20,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "trackedeffectssystem.h"
-#include <common/links.h>
+#include <common/helpers/links.h>
 #include "cg_local.h"
-#include <common/configvars.h>
-#include <common/profilerscope.h>
+#include <common/facilities/configvars.h>
+#include <common/facilities/profilerscope.h>
 
 static BoolConfigVar v_projectileLingeringTrails( wsw::StringView( "cg_projectileLingeringTrails"), { .byDefault = true, .flags = CVAR_ARCHIVE } );
 

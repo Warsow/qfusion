@@ -4,8 +4,8 @@
 #include "snd_propagation.h"
 #include "efxpresetsregistry.h"
 
-#include <common/wswstaticvector.h>
-#include <common/wswstringsplitter.h>
+#include <common/types/staticvector.h>
+#include <common/helpers/stringsplitter.h>
 
 #include <limits>
 #include <random>

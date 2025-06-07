@@ -26,10 +26,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <client/input.h>
 #include <client/keys.h>
 #include <client/client.h>
-#include <common/cmdargs.h>
-#include <common/configvars.h>
-#include <common/wswtonum.h>
-#include <common/wswalgorithm.h>
+#include <common/facilities/cmdargs.h>
+#include <common/facilities/configvars.h>
+#include <common/helpers/tonum.h>
+#include <common/helpers/algorithm.h>
 
 using wsw::operator""_asView;
 

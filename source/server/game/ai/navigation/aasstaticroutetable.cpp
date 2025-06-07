@@ -3,8 +3,8 @@
 #include "aasworld.h"
 #include "../bot.h"
 #include "../rewriteme.h"
-#include <common/singletonholder.h>
-#include <common/wswvector.h>
+#include <common/helpers/singletonholder.h>
+#include <common/types/vector.h>
 #include <cinttypes>
 
 #ifdef WSW_USE_SSE2

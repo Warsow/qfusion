@@ -1,5 +1,5 @@
 #include "materiallocal.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 auto MaterialSource::preparePlaceholders() -> std::optional<Placeholders> {
 	wsw::PodVector<PlaceholderSpan> buffer;

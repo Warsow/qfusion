@@ -1,12 +1,12 @@
 #include "snd_leaf_props_cache.h"
 #include "snd_effect_sampler.h"
-#include <common/glob.h>
-#include <common/singletonholder.h>
-#include <common/tasksystem.h>
-#include <common/wswstringview.h>
-#include <common/wswstringsplitter.h>
-#include <common/wswstaticstring.h>
-#include <common/wswfs.h>
+#include <common/helpers/glob.h>
+#include <common/helpers/singletonholder.h>
+#include <common/facilities/tasksystem.h>
+#include <common/types/stringview.h>
+#include <common/helpers/stringsplitter.h>
+#include <common/types/staticstring.h>
+#include <common/facilities/wswfs.h>
 
 #include <new>
 #include <limits>

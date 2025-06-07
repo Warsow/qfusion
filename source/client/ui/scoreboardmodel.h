@@ -2,8 +2,8 @@
 #define WSW_95e07a0d_69fa_4239_9546_1fa5a5580f55_H
 
 #include "scoreboard.h"
-#include <common/configvars.h>
-#include <common/gs_public.h>
+#include <common/facilities/configvars.h>
+#include <common/facilities/gs_public.h>
 
 #include <QAbstractListModel>
 #include <QJsonArray>

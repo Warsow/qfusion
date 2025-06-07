@@ -10,7 +10,7 @@
 #include <QUrlQuery>
 
 #include "local.h"
-#include <common/wswfs.h>
+#include <common/facilities/wswfs.h>
 #include <client/imageloading.h>
 #include <client/renderer/ref.h>
 

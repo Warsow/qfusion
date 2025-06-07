@@ -1,5 +1,5 @@
 #include "eventstracker.h"
-#include <common/smallassocarray.h>
+#include <common/types/smallassocarray.h>
 #include "../bot.h"
 
 void EventsTracker::TryGuessingBeamOwnersOrigins( const EntNumsVector &dangerousEntsNums, float failureChance ) {

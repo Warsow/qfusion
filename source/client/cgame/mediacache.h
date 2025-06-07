@@ -1,14 +1,13 @@
 #ifndef WSW_7f020248_88b8_40f2_ae59_1e97c51e2f82_H
 #define WSW_7f020248_88b8_40f2_ae59_1e97c51e2f82_H
 
-#include <common/q_shared.h>
-#include <common/q_comref.h>
-#include <common/q_math.h>
-#include <common/gs_public.h>
+#include <common/facilities/q_shared.h>
+#include <common/facilities/q_comref.h>
+#include <common/facilities/gs_public.h>
 
-#include <common/wswstringview.h>
-#include <common/wswpodvector.h>
-#include <common/stringspanstorage.h>
+#include <common/types/stringview.h>
+#include <common/types/podvector.h>
+#include <common/types/stringspanstorage.h>
 #include <client/snd_public.h>
 
 struct model_s;

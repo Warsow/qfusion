@@ -24,8 +24,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "cg_local.h"
 #include <common/common.h>
 #include <client/snd_public.h>
-#include <common/configvars.h>
-#include <common/profilerscope.h>
+#include <common/facilities/configvars.h>
+#include <common/facilities/profilerscope.h>
 
 void EffectsSystemFacade::startSound( const SoundSet *sound, const float *origin, float attenuation ) {
 	// TODO: We can save plenty of computations if we do this check earlier in the call stack

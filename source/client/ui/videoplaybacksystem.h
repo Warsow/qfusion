@@ -5,8 +5,8 @@
 #include <QAbstractVideoSurface>
 #include <QVideoFrame>
 
-#include <common/wswfs.h>
-#include <common/wswvector.h>
+#include <common/facilities/wswfs.h>
+#include <common/types/vector.h>
 
 extern "C" struct plm_t;
 extern "C" struct plm_buffer_t;

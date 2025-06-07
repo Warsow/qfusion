@@ -23,13 +23,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "local.h"
 #include "program.h"
-#include <common/hash.h>
-#include <common/links.h>
-#include <common/memspecbuilder.h>
-#include <common/singletonholder.h>
-#include <common/wswalgorithm.h>
-#include <common/wswstringsplitter.h>
-#include <common/wswfs.h>
+#include <common/helpers/hash.h>
+#include <common/helpers/links.h>
+#include <common/helpers/memspecbuilder.h>
+#include <common/helpers/singletonholder.h>
+#include <common/helpers/algorithm.h>
+#include <common/helpers/stringsplitter.h>
+#include <common/facilities/wswfs.h>
 #include "materiallocal.h"
 
 using wsw::operator""_asView;

@@ -5,7 +5,7 @@
 #include "goalentities.h"
 #include "pool.h"
 #include "../component.h"
-#include <common/wswstaticvector.h>
+#include <common/types/staticvector.h>
 #include "../navigation/aasroutecache.h"
 #include "worldstate.h"
 

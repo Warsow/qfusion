@@ -1,6 +1,6 @@
-#include <common/q_math.h>
+#include <common/helpers/q_math.h>
 #include <client/snd_public.h>
-#include <common/wswstaticvector.h>
+#include <common/types/staticvector.h>
 
 #include "backend.h"
 #include "snd_local.h"

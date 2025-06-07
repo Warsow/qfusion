@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "chat.h"
 #include "commandshandler.h"
 
-#include <common/singletonholder.h>
+#include <common/helpers/singletonholder.h>
 #include "ai/navigation/aasworld.h"
 
 #include <sstream>

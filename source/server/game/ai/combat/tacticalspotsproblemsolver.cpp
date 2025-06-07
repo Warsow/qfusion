@@ -1,6 +1,6 @@
 #include "tacticalspotsproblemsolver.h"
 #include "spotsproblemsolverslocal.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 #include "../navigation/aaselementsmask.h"
 #include "../groundtracecache.h"
 

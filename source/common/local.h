@@ -1,7 +1,7 @@
 #ifndef WSW_bac442f1_f64d_4f40_a306_2fe44f42499c_H
 #define WSW_bac442f1_f64d_4f40_a306_2fe44f42499c_H
 
-#include "outputmessages.h"
+#include <common/facilities/outputmessages.h>
 
 #include <optional>
 #include <utility>

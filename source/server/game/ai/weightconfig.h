@@ -3,8 +3,8 @@
 
 #include <tuple>
 #include "ailocal.h"
-#include <common/wswstaticvector.h>
-#include <common/hash.h>
+#include <common/types/staticvector.h>
+#include <common/helpers/hash.h>
 
 void GT_asRegisterScriptWeightConfig( class AiWeightConfig *weightConfig, const edict_t *configOwner );
 void GT_asReleaseScriptWeightConfig( class AiWeightConfig *weightConfig, const edict_t *configOwner );

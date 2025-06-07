@@ -1,7 +1,7 @@
 #include "alsystemfacade.h"
 
-#include <common/singletonholder.h>
-#include <common/pipeutils.h>
+#include <common/helpers/singletonholder.h>
+#include <common/helpers/pipeutils.h>
 
 #include "snd_local.h"
 #include "snd_env_sampler.h"

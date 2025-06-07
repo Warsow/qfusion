@@ -1,8 +1,8 @@
 #ifndef WSW_046c64e4_0cf8_4378_bbe0_4b2b3394c273_H
 #define WSW_046c64e4_0cf8_4378_bbe0_4b2b3394c273_H
 
-#include <common/q_math.h>
-#include <common/wswexceptions.h>
+#include <common/helpers/q_math.h>
+#include <common/helpers/exceptions.h>
 
 #include <optional>
 

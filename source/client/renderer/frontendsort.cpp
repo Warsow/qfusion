@@ -23,8 +23,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "frontend.h"
 #include "program.h"
 #include "materiallocal.h"
-#include <common/smallassocarray.h>
-#include <common/wswsortbyfield.h>
+#include <common/types/smallassocarray.h>
+#include <common/helpers/sortbyfield.h>
 
 static unsigned R_PackOpaqueOrder( const mfog_t *fog, const shader_t *shader, int numLightmaps, bool dlight ) {
 	unsigned order = 0;

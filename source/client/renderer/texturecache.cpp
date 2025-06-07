@@ -17,8 +17,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-#include <common/singletonholder.h>
-#include <common/links.h>
+#include <common/helpers/singletonholder.h>
+#include <common/helpers/links.h>
 #include "local.h"
 
 using wsw::operator""_asView;

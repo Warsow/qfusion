@@ -1,6 +1,6 @@
 #include "snd_cached_computation.h"
 
-#include <common/q_comref.h>
+#include <common/facilities/q_comref.h>
 
 #include <initializer_list>
 

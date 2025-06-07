@@ -24,7 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "snd_local.h"
 #include "snd_env_effects.h"
 #include "snd_env_sampler.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 src_t srclist[MAX_SRC];
 int src_count = 0;

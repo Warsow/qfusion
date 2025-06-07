@@ -2,7 +2,7 @@
 #define WSW_62ef46e7_ee5e_4416_975c_b09cfb45ce73_H
 
 #include "../ailocal.h"
-#include <common/wswstaticvector.h>
+#include <common/types/staticvector.h>
 #include "../vec3.h"
 
 enum class NavEntityFlags : unsigned {

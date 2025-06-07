@@ -21,9 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "local.h"
 #include "frontend.h"
 #include "materiallocal.h"
-#include <common/singletonholder.h>
-#include <common/links.h>
-#include <common/profilerscope.h>
+#include <common/helpers/singletonholder.h>
+#include <common/helpers/links.h>
+#include <common/facilities/profilerscope.h>
 
 /*
 * R_Set2DMode

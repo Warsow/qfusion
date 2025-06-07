@@ -2,8 +2,8 @@
 #define WSW_c12756b8_723a_43bd_b7dc_ddea74468e39_H
 
 #include "../planning/planner.h"
-#include <common/wswstaticdeque.h>
-#include <common/randomgenerator.h>
+#include <common/types/staticdeque.h>
+#include <common/helpers/randomgenerator.h>
 #include "awarenesslocal.h"
 
 class EventsTracker : public AiComponent {

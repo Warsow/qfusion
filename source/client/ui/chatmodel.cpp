@@ -4,7 +4,7 @@
 
 #include "local.h"
 #include <client/client.h>
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 namespace wsw::ui {
 

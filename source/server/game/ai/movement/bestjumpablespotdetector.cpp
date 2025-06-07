@@ -1,6 +1,6 @@
 #include "bestjumpablespotdetector.h"
 #include "movementlocal.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 typedef BestJumpableSpotDetector::SpotAndScore SpotAndScore;
 
