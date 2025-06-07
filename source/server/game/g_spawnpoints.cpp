@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "g_local.h"
-#include <common/cvar.h>
+#include <common/facilities/cvar.h>
 
 //QUAKED info_player_start (1 0 0) (-16 -16 -24) (16 16 32)
 //The normal starting point for a level.

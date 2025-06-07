@@ -23,8 +23,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define WSW_424d6447_3887_491d_8150_c80cf50fd066_H
 
 #include <client/renderer/ref.h>
-#include <common/randomgenerator.h>
-#include <common/freelistallocator.h>
+#include <common/helpers/randomgenerator.h>
+#include <common/helpers/freelistallocator.h>
 
 class DrawSceneRequest;
 

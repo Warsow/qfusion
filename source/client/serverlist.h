@@ -2,8 +2,8 @@
 #define WSW_SERVERLIST_H
 
 #include <common/common.h>
-#include <common/wswstaticstring.h>
-#include <common/wswstaticvector.h>
+#include <common/types/staticstring.h>
+#include <common/types/staticvector.h>
 #include "serverinfoparser.h"
 
 class PlayerInfo {

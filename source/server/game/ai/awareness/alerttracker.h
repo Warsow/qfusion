@@ -2,7 +2,7 @@
 #define WSW_48432071_bb5e_4cae_8342_f3d800ee9d60_H
 
 #include "../ailocal.h"
-#include <common/wswstaticvector.h>
+#include <common/types/staticvector.h>
 #include "../component.h"
 
 /**

@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "delayedexecutionsystem.h"
 #include "cg_local.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 DelayedExecutionSystem::DelayedExecutionSystem() {
 	constexpr unsigned step     = ( kMaxBlockSize - kMinBlockSize ) / kNumAllocators;

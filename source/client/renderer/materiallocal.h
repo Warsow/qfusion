@@ -1,17 +1,17 @@
 #ifndef WSW_0778b312_c4f6_4400_bcec_132900009562_H
 #define WSW_0778b312_c4f6_4400_bcec_132900009562_H
 
-#include <common/q_shared.h>
-#include <common/memspecbuilder.h>
-#include <common/wswtonum.h>
+#include <common/facilities/q_shared.h>
+#include <common/helpers/memspecbuilder.h>
+#include <common/helpers/tonum.h>
 #include <common/common.h>
 
 #include "vattribs.h"
 #include "shader.h"
 #include "glimp.h"
-#include <common/wswstaticvector.h>
-#include <common/stringspanstorage.h>
-#include <common/freelistallocator.h>
+#include <common/types/staticvector.h>
+#include <common/types/stringspanstorage.h>
+#include <common/helpers/freelistallocator.h>
 
 #include <optional>
 #include <span>

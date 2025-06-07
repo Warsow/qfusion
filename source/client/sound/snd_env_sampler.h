@@ -1,7 +1,7 @@
 #ifndef QFUSION_SND_ENV_SAMPLER_H
 #define QFUSION_SND_ENV_SAMPLER_H
 
-#include <common/q_collision.h>
+#include <common/facilities/q_collision.h>
 
 struct src_s;
 

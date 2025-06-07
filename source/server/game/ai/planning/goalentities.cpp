@@ -1,5 +1,5 @@
 #include "goalentities.h"
-#include <common/links.h>
+#include <common/helpers/links.h>
 
 float NavEntity::CostInfluence() const {
 	// Usually these kinds of nav entities are CTF flags or bomb spots,

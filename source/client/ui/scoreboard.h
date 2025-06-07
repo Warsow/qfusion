@@ -2,11 +2,11 @@
 #define WSW_955f6ab1_1bd9_4796_8984_0f1b743c660c_H
 
 #include <common/common.h>
-#include <common/q_shared.h>
-#include <common/q_comref.h>
-#include <common/wswstaticstring.h>
-#include <common/wswstaticvector.h>
-#include <common/stringspanstorage.h>
+#include <common/facilities/q_shared.h>
+#include <common/facilities/q_comref.h>
+#include <common/types/staticstring.h>
+#include <common/types/staticvector.h>
+#include <common/types/stringspanstorage.h>
 
 #include <array>
 

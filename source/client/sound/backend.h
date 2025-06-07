@@ -3,9 +3,9 @@
 
 // TODO: lift it to the top level
 #include <server/game/ai/vec3.h>
-#include <common/wswstaticvector.h>
-#include <common/freelistallocator.h>
-#include <common/randomgenerator.h>
+#include <common/types/staticvector.h>
+#include <common/helpers/freelistallocator.h>
+#include <common/helpers/randomgenerator.h>
 #include "snd_local.h"
 #include <array>
 

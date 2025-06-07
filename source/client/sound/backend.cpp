@@ -22,8 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "snd_local.h"
 #include "snd_env_sampler.h"
 #include "alsystemfacade.h"
-#include <common/links.h>
-#include <common/wswalgorithm.h>
+#include <common/helpers/links.h>
+#include <common/helpers/algorithm.h>
 #include <span>
 
 extern int s_registration_sequence;

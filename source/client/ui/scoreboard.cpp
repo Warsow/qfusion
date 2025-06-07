@@ -1,11 +1,11 @@
 #include "scoreboard.h"
 
 #include "local.h"
-#include <common/q_shared.h>
-#include <common/gs_public.h>
-#include <common/wswalgorithm.h>
-#include <common/wswstringsplitter.h>
-#include <common/wswtonum.h>
+#include <common/facilities/q_shared.h>
+#include <common/facilities/gs_public.h>
+#include <common/helpers/algorithm.h>
+#include <common/helpers/stringsplitter.h>
+#include <common/helpers/tonum.h>
 #include <client/client.h>
 
 using wsw::operator""_asView;

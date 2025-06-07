@@ -1,5 +1,5 @@
 #include "snd_effects_allocator.h"
-#include <common/singletonholder.h>
+#include <common/helpers/singletonholder.h>
 
 static SingletonHolder<EffectsAllocator> instanceHolder;
 

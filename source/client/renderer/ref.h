@@ -21,10 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef WSW_ac367414_9635_4452_b2fc_9477f5254db5_H
 #define WSW_ac367414_9635_4452_b2fc_9477f5254db5_H
 
-#include <common/wswstaticvector.h>
-#include <common/q_math.h>
+#include <common/types/staticvector.h>
+#include <common/helpers/q_math.h>
 #include <client/animatedvalues.h>
-#include <common/tasksystem.h>
+#include <common/facilities/tasksystem.h>
 
 #include <optional>
 #include <span>

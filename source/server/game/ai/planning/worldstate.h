@@ -7,7 +7,7 @@
 #include <optional>
 #include <utility>
 
-#include <common/wswexceptions.h>
+#include <common/helpers/exceptions.h>
 #include "../vec3.h"
 
 class WorldState {

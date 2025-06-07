@@ -2,7 +2,7 @@
 
 #include "../rewriteme.h"
 #include "../bot.h"
-#include <common/links.h>
+#include <common/helpers/links.h>
 
 typedef TacticalSpotsRegistry::SpotsQueryVector SpotsQueryVector;
 

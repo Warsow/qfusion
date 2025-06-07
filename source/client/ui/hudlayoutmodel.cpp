@@ -1,10 +1,10 @@
 #include "hudlayoutmodel.h"
 #include "local.h"
-#include <common/wswalgorithm.h>
-#include <common/wswfs.h>
-#include <common/wswtonum.h>
-#include <common/wswstaticvector.h>
-#include <common/wswstringsplitter.h>
+#include <common/helpers/algorithm.h>
+#include <common/facilities/wswfs.h>
+#include <common/helpers/tonum.h>
+#include <common/types/staticvector.h>
+#include <common/helpers/stringsplitter.h>
 
 #include <QPointF>
 #include <QSizeF>

@@ -4,8 +4,8 @@
 #include "snd_local.h"
 #include "snd_cached_computation.h"
 
-#include <common/podbufferholder.h>
-#include <common/tasksystem.h>
+#include <common/types/podbufferholder.h>
+#include <common/facilities/tasksystem.h>
 
 #include <limits>
 

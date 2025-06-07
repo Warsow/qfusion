@@ -1,8 +1,8 @@
 #include "chat.h"
 #include "g_local.h"
-#include <common/singletonholder.h>
-#include <common/wswstringview.h>
-#include <common/wswvector.h>
+#include <common/helpers/singletonholder.h>
+#include <common/types/stringview.h>
+#include <common/types/vector.h>
 
 #include <cstdint>
 #include <sstream>

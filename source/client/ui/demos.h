@@ -2,8 +2,8 @@
 #define WSW_86716366_baac_4acf_9b1c_cb6d22b28663_H
 
 #include <common/common.h>
-#include <common/stringspanstorage.h>
-#include <common/wswvector.h>
+#include <common/types/stringspanstorage.h>
+#include <common/types/vector.h>
 #include "local.h"
 
 #include <QAbstractListModel>

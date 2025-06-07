@@ -4,10 +4,10 @@
 #include <span>
 
 #include <client/renderer/ref.h>
-#include <common/randomgenerator.h>
-#include <common/freelistallocator.h>
-#include <common/podbufferholder.h>
-#include <common/wswpodvector.h>
+#include <common/helpers/randomgenerator.h>
+#include <common/helpers/freelistallocator.h>
+#include <common/types/podbufferholder.h>
+#include <common/types/podvector.h>
 
 struct CMShapeList;
 

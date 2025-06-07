@@ -25,8 +25,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "program.h"
 #include "materiallocal.h"
 #include "frontend.h"
-#include <common/textstreamwriterextras.h>
-#include <common/profilerscope.h>
+#include <common/helpers/textstreamwriterextras.h>
+#include <common/facilities/profilerscope.h>
 
 r_globals_t rf;
 

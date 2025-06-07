@@ -1,10 +1,10 @@
 #include "particlesystem.h"
-#include <common/links.h>
+#include <common/helpers/links.h>
 #include <client/client.h>
-#include <common/noise.h>
+#include <common/helpers/noise.h>
 #include "cg_local.h"
-#include <common/configvars.h>
-#include <common/profilerscope.h>
+#include <common/facilities/configvars.h>
+#include <common/facilities/profilerscope.h>
 
 using wsw::operator""_asView;
 

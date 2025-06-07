@@ -25,12 +25,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <client/client.h>
 #include <client/ui/uisystem.h>
 #include <common/common.h>
-#include <common/cmdargs.h>
-#include <common/cmdcompat.h>
-#include <common/wswalgorithm.h>
-#include <common/wswfs.h>
-#include <common/profilerscope.h>
-#include <common/configvars.h>
+#include <common/facilities/cmdargs.h>
+#include <common/facilities/cmdcompat.h>
+#include <common/helpers/algorithm.h>
+#include <common/facilities/wswfs.h>
+#include <common/facilities/profilerscope.h>
+#include <common/facilities/configvars.h>
 
 using wsw::operator""_asView;
 using wsw::operator""_asHView;

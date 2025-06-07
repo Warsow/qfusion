@@ -1,6 +1,6 @@
-#include <common/hash.h>
+#include <common/helpers/hash.h>
 #include <common/common.h>
-#include <common/wswtonum.h>
+#include <common/helpers/tonum.h>
 #include "serverinfoparser.h"
 #include "serverlist.h"
 #include "client.h"

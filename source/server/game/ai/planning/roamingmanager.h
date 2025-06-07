@@ -2,7 +2,7 @@
 #define WSW_3b769ef7_93e4_4e4a_8593_27a2be5b7485_H
 
 #include "../ailocal.h"
-#include <common/wswstaticvector.h>
+#include <common/types/staticvector.h>
 
 class BotRoamingManager {
 	// Note: very large values lead to all spots being considered as visited

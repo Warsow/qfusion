@@ -4,10 +4,10 @@
 #include <QAbstractListModel>
 
 #include <common/common.h>
-#include <common/wswstringview.h>
-#include <common/wswstaticstring.h>
-#include <common/wswpodvector.h>
-#include <common/wswstaticvector.h>
+#include <common/types/stringview.h>
+#include <common/types/staticstring.h>
+#include <common/types/podvector.h>
+#include <common/types/staticvector.h>
 
 namespace wsw::ui {
 

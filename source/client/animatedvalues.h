@@ -3,7 +3,7 @@
 
 #include <cassert>
 
-#include <common/q_math.h>
+#include <common/helpers/q_math.h>
 
 struct RgbaLifespan {
 	float initial[4] { 1.0f, 1.0f, 1.0f, 0.0f };

@@ -4,8 +4,8 @@
 #include "../teamplay/baseteam.h"
 #include "../groundtracecache.h"
 #include "../navigation/aasworld.h"
-#include <common/q_collision.h>
-#include <common/wswalgorithm.h>
+#include <common/facilities/q_collision.h>
+#include <common/helpers/algorithm.h>
 
 PlannerNode *AiAction::newNodeForRecord( AiActionRecord *record, const WorldState &worldState, float cost ) {
 	if( !record ) {

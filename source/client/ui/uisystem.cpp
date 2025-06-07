@@ -1,9 +1,9 @@
 #include "uisystem.h"
-#include <common/configvars.h>
-#include <common/links.h>
-#include <common/profilerscope.h>
-#include <common/singletonholder.h>
-#include <common/wswstaticvector.h>
+#include <common/facilities/configvars.h>
+#include <common/helpers/links.h>
+#include <common/facilities/profilerscope.h>
+#include <common/helpers/singletonholder.h>
+#include <common/types/staticvector.h>
 #include <common/common.h>
 #include <client/client.h>
 #include "actionrequestmodel.h"
@@ -43,7 +43,7 @@
 #include <clocale>
 #include <span>
 #include <common/common.h>
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 #ifdef _WIN32
 Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin);

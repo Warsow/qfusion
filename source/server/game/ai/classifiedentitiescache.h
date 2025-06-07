@@ -1,7 +1,7 @@
 #ifndef WSW_367671cf_02ef_4de7_9728_36bbe2aeab04_H
 #define WSW_367671cf_02ef_4de7_9728_36bbe2aeab04_H
 
-#include <common/wswstaticvector.h>
+#include <common/types/staticvector.h>
 #include "ailocal.h"
 
 #include <bitset>

@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "iqm.h"
 
 #include "../../../third-party/recastnavigation/Recast/Include/Recast.h"
-#include <common/gs_qrespath.h>
+#include <common/facilities/gs_qrespath.h>
 #include <server/game/ai/vec3.h>
 
 #include <algorithm>

@@ -18,15 +18,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "local.h"
-#include <common/hash.h>
-#include <common/links.h>
+#include <common/helpers/hash.h>
+#include <common/helpers/links.h>
 #include <common/common.h>
-#include <common/wswfs.h>
-#include <common/singletonholder.h>
+#include <common/facilities/wswfs.h>
+#include <common/helpers/singletonholder.h>
 #include <client/imageloading.h>
 
 #ifdef DEBUG_NOISE
-#include <common/noise.h>
+#include <common/helpers/noise.h>
 #endif
 
 using wsw::operator""_asView;

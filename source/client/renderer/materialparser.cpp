@@ -3,8 +3,8 @@
 #include "program.h"
 #include "shader.h"
 
-#include <common/hash.h>
-#include <common/wswalgorithm.h>
+#include <common/helpers/hash.h>
+#include <common/helpers/algorithm.h>
 
 static bool isANumber( const wsw::StringView &view ) {
 	for( char ch: view ) {

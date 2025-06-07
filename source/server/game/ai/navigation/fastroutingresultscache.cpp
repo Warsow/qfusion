@@ -1,6 +1,6 @@
 #include "fastroutingresultscache.h"
-#include <common/links.h>
-#include <common/wswalgorithm.h>
+#include <common/helpers/links.h>
+#include <common/helpers/algorithm.h>
 
 void FastRoutingResultsCache::reset() {
 	wsw::fill( std::begin( m_nodes ), std::end( m_nodes ), Node {} );

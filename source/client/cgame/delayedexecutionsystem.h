@@ -21,9 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef WSW_7616b4db_a476_495a_bb0a_0fdaadc45935_H
 #define WSW_7616b4db_a476_495a_bb0a_0fdaadc45935_H
 
-#include <common/freelistallocator.h>
-#include <common/wswpodvector.h>
-#include <common/wswstaticvector.h>
+#include <common/helpers/freelistallocator.h>
+#include <common/types/podvector.h>
+#include <common/types/staticvector.h>
 
 #include <utility>
 

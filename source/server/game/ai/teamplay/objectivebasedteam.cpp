@@ -4,7 +4,7 @@
 #include "../navigation/aasroutecache.h"
 #include "../combat/advantageproblemsolver.h"
 #include "../bot.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 #include <cmath>
 

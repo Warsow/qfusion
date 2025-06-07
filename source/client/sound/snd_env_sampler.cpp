@@ -5,8 +5,7 @@
 #include "snd_effect_sampler.h"
 #include "snd_effects_allocator.h"
 #include "snd_propagation.h"
-#include <common/q_comref.h>
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 #include <limits>
 

@@ -1,7 +1,7 @@
 #include "hazardsselector.h"
 #include "awarenessmodule.h"
 #include "../bot.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 void HazardsSelector::BeginUpdate() {
 	if( primaryHazard ) {

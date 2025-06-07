@@ -1,9 +1,9 @@
 #ifndef WSW_27e919d8_dea3_4667_b05f_118b4ade67d0_H
 #define WSW_27e919d8_dea3_4667_b05f_118b4ade67d0_H
 
-#include <common/q_shared.h>
-#include <common/wswbasicmath.h>
-#include <common/wswpodvector.h>
+#include <common/facilities/q_shared.h>
+#include <common/helpers/wswbasicmath.h>
+#include <common/types/podvector.h>
 
 #include <bitset>
 #include <cstdlib>

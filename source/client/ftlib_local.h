@@ -21,10 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef _FTLIB_LOCAL_H_
 #define _FTLIB_LOCAL_H_
 
-#include <common/q_arch.h>
-#include <common/q_math.h>
-#include <common/q_shared.h>
-#include <common/q_cvar.h>
+#include <common/helpers/q_arch.h>
+#include <common/helpers/q_math.h>
+#include <common/facilities/q_shared.h>
+#include <common/facilities/q_cvar.h>
 
 #include "ftlib.h"
 

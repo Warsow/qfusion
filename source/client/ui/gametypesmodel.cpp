@@ -1,9 +1,9 @@
 #include "gametypesmodel.h"
 
-#include <common/stringspanstorage.h>
-#include <common/wswstringview.h>
-#include <common/wswstaticvector.h>
-#include <common/maplist.h>
+#include <common/types/stringspanstorage.h>
+#include <common/types/stringview.h>
+#include <common/types/staticvector.h>
+#include <common/facilities/maplist.h>
 
 #include <QJsonObject>
 

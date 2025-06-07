@@ -1,5 +1,5 @@
 #include "groundtracecache.h"
-#include <common/wswstaticvector.h>
+#include <common/types/staticvector.h>
 #include "ailocal.h"
 
 struct CachedTrace {

@@ -1,11 +1,11 @@
 #include "simulatedhullssystem.h"
 
-#include <common/links.h>
+#include <common/helpers/links.h>
 #include <client/client.h>
-#include <common/memspecbuilder.h>
-#include <common/mmcommon.h>
-#include <common/profilerscope.h>
-#include <common/wswalgorithm.h>
+#include <common/helpers/memspecbuilder.h>
+#include <common/helpers/mmuuid.h>
+#include <common/facilities/profilerscope.h>
+#include <common/helpers/algorithm.h>
 #include "cg_local.h"
 
 #include <memory>

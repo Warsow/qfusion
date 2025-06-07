@@ -1,7 +1,7 @@
 #ifndef WSW_20b581f0_0ddd_42e4_8f61_c3ae781fcc6b_H
 #define WSW_20b581f0_0ddd_42e4_8f61_c3ae781fcc6b_H
 
-#include <common/q_collision.h>
+#include <common/facilities/q_collision.h>
 
 class AiGroundTraceCache {
 	/**

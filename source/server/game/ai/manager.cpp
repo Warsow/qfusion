@@ -4,9 +4,9 @@
 #include "evolutionmanager.h"
 #include "bot.h"
 #include "combat/tacticalspotsregistry.h"
-#include <common/links.h>
-#include <common/wswstringview.h>
-#include <common/wswalgorithm.h>
+#include <common/helpers/links.h>
+#include <common/types/stringview.h>
+#include <common/helpers/algorithm.h>
 
 using wsw::operator""_asView;
 using wsw::operator""_asHView;

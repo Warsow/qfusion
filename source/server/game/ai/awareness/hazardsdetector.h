@@ -2,7 +2,7 @@
 #define WSW_76bfcd28_24f1_4001_b4b4_d7abbc68722e_H
 
 #include "../ailocal.h"
-#include <common/wswstaticvector.h>
+#include <common/types/staticvector.h>
 
 #include "awarenesslocal.h"
 

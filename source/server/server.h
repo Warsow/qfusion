@@ -23,11 +23,11 @@
 #define QFUSION_SERVER_H
 
 #include <common/common.h>
-#include <common/cmdcompat.h>
-#include <common/configstringstorage.h>
-#include <common/wswstaticstring.h>
-#include <common/mmcommon.h>
-#include <common/outputmessages.h>
+#include <common/facilities/cmdcompat.h>
+#include <common/facilities/configstringstorage.h>
+#include <common/types/staticstring.h>
+#include <common/helpers/mmuuid.h>
+#include <common/facilities/outputmessages.h>
 #include "game/g_public.h"
 
 #include <cstdlib>

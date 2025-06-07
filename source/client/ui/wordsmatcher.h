@@ -2,9 +2,9 @@
 #define WSW_04250cc2_5bf4_40d6_8c1b_b5305692255f_H
 
 #include <common/common.h>
-#include <common/wswstaticvector.h>
-#include <common/wswpodvector.h>
-#include <common/wswstringview.h>
+#include <common/types/staticvector.h>
+#include <common/types/podvector.h>
+#include <common/types/stringview.h>
 
 #include <functional>
 

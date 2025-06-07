@@ -1,7 +1,7 @@
 #include "snd_env_effects.h"
 #include "snd_effect_sampler.h"
 #include "snd_propagation.h"
-#include <common/gs_public.h>
+#include <common/facilities/gs_public.h>
 
 #include <limits>
 #include <cmath>

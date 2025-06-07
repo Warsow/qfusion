@@ -1,13 +1,13 @@
 #ifndef WSW_7ed480ad_c97e_4b99_914c_d01a9cf6c8e3_H
 #define WSW_7ed480ad_c97e_4b99_914c_d01a9cf6c8e3_H
 
-#include <common/q_math.h>
-#include <common/q_shared.h>
-#include <common/q_comref.h>
+#include <common/helpers/q_math.h>
+#include <common/facilities/q_shared.h>
+#include <common/facilities/q_comref.h>
 
-#include <common/wswstaticvector.h>
-#include <common/wswstringview.h>
-#include <common/stringspanstorage.h>
+#include <common/types/staticvector.h>
+#include <common/types/stringview.h>
+#include <common/types/stringspanstorage.h>
 
 struct Client;
 

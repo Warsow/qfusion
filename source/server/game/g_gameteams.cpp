@@ -19,8 +19,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "g_local.h"
-#include <common/cmdargssplitter.h>
-#include <common/cvar.h>
+#include <common/facilities/cmdargssplitter.h>
+#include <common/facilities/cvar.h>
 #include "chat.h"
 
 //==========================================================

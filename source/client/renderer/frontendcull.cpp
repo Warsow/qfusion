@@ -23,9 +23,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "frontend.h"
 #include "program.h"
 #include "materiallocal.h"
-#include <common/profilerscope.h>
-#include <common/wswsortbyfield.h>
-#include <common/wswalgorithm.h>
+#include <common/facilities/profilerscope.h>
+#include <common/helpers/sortbyfield.h>
+#include <common/helpers/algorithm.h>
 
 #ifdef DEBUG_OCCLUDERS
 // See frontendcull.inc

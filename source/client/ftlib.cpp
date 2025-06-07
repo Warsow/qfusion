@@ -21,9 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "ftlib_local.h"
 
-#include <common/wswstringview.h>
-#include <common/wswstaticstring.h>
-#include <common/wswfs.h>
+#include <common/types/stringview.h>
+#include <common/types/staticstring.h>
+#include <common/facilities/wswfs.h>
 #include <client/client.h>
 
 using wsw::operator""_asView;

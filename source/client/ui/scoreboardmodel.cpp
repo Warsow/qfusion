@@ -1,6 +1,6 @@
 #include "scoreboardmodel.h"
-#include <common/enumtokenmatcher.h>
-#include <common/configvars.h>
+#include <common/helpers/enumtokenmatcher.h>
+#include <common/facilities/configvars.h>
 #include "uisystem.h"
 #include "local.h"
 

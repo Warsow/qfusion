@@ -20,14 +20,13 @@
 // client.h -- primary header for client
 
 #include <common/common.h>
-#include <common/cmdcompat.h>
-#include <common/configstringstorage.h>
-#include <common/outputmessages.h>
+#include <common/facilities/cmdcompat.h>
+#include <common/facilities/configstringstorage.h>
+#include <common/facilities/outputmessages.h>
 #include "renderer/ref.h"
 #include "cgame/cg_public.h"
 #include "ftlib.h"
 #include "snd_public.h"
-#include <common/steam.h>
 
 #include "vid.h"
 #include "input.h"

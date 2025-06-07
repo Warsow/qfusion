@@ -4,7 +4,7 @@
 #include "../navigation/aaselementsmask.h"
 #include "../navigation/aasstaticroutetable.h"
 #include "../manager.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 class WeaponJumpableSpotDetector: public BestJumpableSpotDetector {
 public:

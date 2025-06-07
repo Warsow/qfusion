@@ -24,8 +24,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "scoreboard.h"
 #include "chat.h"
 #include "commandshandler.h"
-#include <common/configvars.h>
-#include <common/cvar.h>
+#include <common/facilities/configvars.h>
+#include <common/facilities/cvar.h>
 
 game_locals_t game;
 level_locals_t level;

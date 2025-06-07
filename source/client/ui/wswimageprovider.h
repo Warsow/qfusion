@@ -6,7 +6,7 @@
 #include <QRunnable>
 
 #include <common/common.h>
-#include <common/wswstaticstring.h>
+#include <common/types/staticstring.h>
 
 namespace wsw::ui {
 

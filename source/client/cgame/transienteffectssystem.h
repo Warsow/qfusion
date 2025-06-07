@@ -22,8 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef WSW_c583803c_d204_40e4_8883_36cdfe1ccf20_H
 #define WSW_c583803c_d204_40e4_8883_36cdfe1ccf20_H
 
-#include <common/freelistallocator.h>
-#include <common/randomgenerator.h>
+#include <common/helpers/freelistallocator.h>
+#include <common/helpers/randomgenerator.h>
 #include <client/renderer/ref.h>
 
 #include "simulatedhullssystem.h"

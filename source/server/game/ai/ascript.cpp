@@ -6,7 +6,7 @@
 #include "../g_as_local.h"
 #include "../ascript/addon/addon_any.h"
 #include "manager.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 // We have to declare a prototype first (GCC cannot apply attributes to a definition)
 #ifndef _MSC_VER

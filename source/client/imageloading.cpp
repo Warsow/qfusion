@@ -1,5 +1,5 @@
 #include "imageloading.h"
-#include <common/wswexceptions.h>
+#include <common/helpers/exceptions.h>
 #include "renderer/ref.h"
 
 #include <QSvgRenderer>

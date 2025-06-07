@@ -21,12 +21,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "g_local.h"
 #include "chat.h"
-#include <common/wswstringsplitter.h>
-#include <common/wswstaticstring.h>
-#include <common/wswstaticvector.h>
-#include <common/cvar.h>
+#include <common/helpers/stringsplitter.h>
+#include <common/types/staticstring.h>
+#include <common/types/staticvector.h>
+#include <common/facilities/cvar.h>
 #include <common/common.h>
-#include <common/profilerscope.h>
+#include <common/facilities/profilerscope.h>
 #include "ai/vec3.h"
 
 #include <chrono>

@@ -27,8 +27,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 //===============================================================
 
-#include <common/wswstringview.h>
-#include <common/stringspanstorage.h>
+#include <common/types/stringview.h>
+#include <common/types/stringspanstorage.h>
 #include <initializer_list>
 #include <variant>
 

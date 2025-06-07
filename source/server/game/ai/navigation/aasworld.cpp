@@ -19,14 +19,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "aasworld.h"
 #include "aaselementsmask.h"
 #include "aasareaswalker.h"
-#include <common/wswalgorithm.h>
-#include <common/wswsortbyfield.h>
-#include <common/wswvector.h>
-#include <common/wswfs.h>
+#include <common/helpers/algorithm.h>
+#include <common/helpers/sortbyfield.h>
+#include <common/types/vector.h>
+#include <common/facilities/wswfs.h>
 #include "../ailocal.h"
 #include "../rewriteme.h"
-#include <common/md5.h>
-#include <common/base64.h>
+#include <common/helpers/md5.h>
+#include <common/helpers/base64.h>
 
 #include <cmath>
 #include <cstdlib>

@@ -23,17 +23,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef __QCOMMON_H
 #define __QCOMMON_H
 
-#include "q_arch.h"
-#include "q_math.h"
-#include "q_shared.h"
-#include "q_cvar.h"
-#include "q_comref.h"
-#include "q_collision.h"
+#include <common/helpers/q_arch.h>
+#include <common/helpers/q_math.h>
+#include <common/facilities/q_shared.h>
+#include <common/facilities/q_cvar.h>
+#include <common/facilities/q_collision.h>
 
-#include "qfiles.h"
-#include "cmodel.h"
+#include <common/facilities/qfiles.h>
 #include "version.h"
-#include "bsp.h"
+#include <common/facilities/q_comref.h>
+#include <common/facilities/bsp.h>
+#include <common/facilities/cmodel.h>
 
 //#define	PARANOID			// speed sapping error checking
 
@@ -333,8 +333,8 @@ CVAR
 ==============================================================
 */
 
-#include "cvar.h"
-#include "net.h"
+#include <common/facilities/cvar.h>
+#include <common/facilities/net.h>
 
 //============================================================================
 
@@ -401,7 +401,7 @@ int         FS_Rescan( void );
 void        FS_Frame( void );
 void        FS_Shutdown( void );
 
-#include "wswstringview.h"
+#include <common/types/stringview.h>
 
 static inline const wsw::StringView kDataDirectory( "basewsw" );
 
@@ -655,6 +655,6 @@ MULTITHREADING
 
 ==============================================================
 */
-#include "qthreads.h"
+#include <common/helpers/qthreads.h>
 
 #endif // __QCOMMON_H

@@ -1,7 +1,7 @@
 #include "floorclusterareascache.h"
 #include "movementlocal.h"
 #include "../combat/tacticalspotsregistry.h"
-#include <common/wswalgorithm.h>
+#include <common/helpers/algorithm.h>
 
 bool FloorClusterAreasCache::AreaPassesCollisionTest( PredictionContext *context, int areaNum ) const {
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;

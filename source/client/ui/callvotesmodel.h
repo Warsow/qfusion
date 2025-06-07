@@ -5,9 +5,9 @@
 #include <QJsonArray>
 
 #include <common/common.h>
-#include <common/wswstringview.h>
-#include <common/wswvector.h>
-#include <common/stringspanstorage.h>
+#include <common/types/stringview.h>
+#include <common/types/vector.h>
+#include <common/types/stringspanstorage.h>
 
 namespace wsw::ui {
 

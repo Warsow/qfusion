@@ -32,57 +32,9 @@ file(GLOB GAME_SOURCES
     "../server/game/ascript/addon/*.cpp")
 
 file(GLOB EXECOMMON_SOURCES
-     "asyncstream.cpp"
-     "base64.cpp"
-     "bsp.cpp"
-     "cm_main.cpp"
-     "cm_q3bsp.cpp"
-     "cm_sample.cpp"
-     "cm_trace.cpp"
-     "cm_trace_avx.cpp"
-     "cm_trace_sse42.cpp"
-     "cmdargssplitter.cpp"
-     "cmdsystem.cpp"
-     "common.cpp"
-     "compression.cpp"
-     "configstringstorage.cpp"
-     "configvars.cpp"
-     "cvar.cpp"
-     "files.cpp"
-     "glob.cpp"
-     "gs_gameteams.cpp"
-     "gs_items.cpp"
-     "gs_misc.cpp"
-     "gs_pmove.cpp"
-     "gs_slidebox.cpp"
-     "gs_weapondefs.cpp"
-     "gs_weapons.cpp"
-     "half_float.cpp"
-     "hash.cpp"
-     "library.cpp"
-     "maplist.cpp"
-     "md5.cpp"
-     "mmcommon.cpp"
-     "msg.cpp"
-     "net.cpp"
-     "net_chan.cpp"
-     "outputmessages.cpp"
-     "patch.cpp"
-     "q_math.cpp"
-     "q_shared.cpp"
-     "q_trie.cpp"
-     "snap_demos.cpp"
-     "tasksystem.cpp"
-     "textstreamwriter.cpp"
-     "threads.cpp"
-     "userinfo.cpp"
-     "wswcurl.cpp"
-     "wswexceptions.cpp"
-     "wswfs.cpp"
-     "wswpodvector.cpp"
-     "wswprofiler.cpp"
-     "wswsortbyfield.cpp"
-     "wswstringview.cpp"
+     "facilities/*.cpp"
+     "helpers/*.cpp"
+     "types/*.cpp"
      "../server/sv_web.cpp"
      "../server/sv_main.cpp")
 
@@ -104,10 +56,10 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 endif()
 
 if (MSVC)
-    set_source_files_properties("../common/cm_trace_avx.cpp" PROPERTIES COMPILE_FLAGS "/arch:AVX")
+    set_source_files_properties("facilities/cm_trace_avx.cpp" PROPERTIES COMPILE_FLAGS "/arch:AVX")
 else()
-    set_source_files_properties("../common/cm_trace_sse42.cpp" PROPERTIES COMPILE_FLAGS "-msse4.2")
-    set_source_files_properties("../common/cm_trace_avx.cpp" PROPERTIES COMPILE_FLAGS "-mavx")
+    set_source_files_properties("facilities/cm_trace_sse42.cpp" PROPERTIES COMPILE_FLAGS "-msse4.2")
+    set_source_files_properties("facilities/cm_trace_avx.cpp" PROPERTIES COMPILE_FLAGS "-mavx")
 endif()
 
 add_library(execommon

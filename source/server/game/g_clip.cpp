@@ -18,7 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 #include "g_local.h"
-#include <common/cvar.h>
+#include <common/facilities/cvar.h>
 
 //
 // g_clip.c - entity contact detection. (high level object sorting to reduce interaction tests)

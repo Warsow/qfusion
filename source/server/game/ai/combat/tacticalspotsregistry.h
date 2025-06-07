@@ -3,10 +3,10 @@
 
 #include "../ailocal.h"
 #include "../navigation/aasroutecache.h"
-#include <common/wswstaticvector.h>
+#include <common/types/staticvector.h>
 #include "../bot.h"
-#include <common/links.h>
-#include <common/podbufferholder.h>
+#include <common/helpers/links.h>
+#include <common/types/podbufferholder.h>
 
 enum class SpotSortCriterion {
 	GenericScore,

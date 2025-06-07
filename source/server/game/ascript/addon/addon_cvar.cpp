@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <server/game/ascript/local.h>
 #include "addon_string.h"
 #include "addon_cvar.h"
-#include <common/cvar.h>
+#include <common/facilities/cvar.h>
 
 //#define CVAR_FORCESET
 

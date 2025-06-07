@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <cstdlib>
 #include <utility>
 
-#include <common/mmcommon.h>
+#include <common/helpers/mmuuid.h>
 
 //g_gametypes.c
 extern cvar_t *g_warmup_timelimit;

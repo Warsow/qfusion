@@ -27,8 +27,8 @@ in NO WAY supported by Steve Yeager.
 #define WSW_6e462ea5_4ee8_482b_a00a_74ab3719bacf_H
 
 #include "../g_local.h"
-#include <common/configvars.h>
-#include <common/q_collision.h>
+#include <common/facilities/configvars.h>
+#include <common/facilities/q_collision.h>
 
 // First try to include <math.h> for M_* defines
 #ifndef __USE_MATH_DEFINES
