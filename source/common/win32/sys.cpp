@@ -1,6 +1,7 @@
 #include "../local.h"
 #include "../common.h"
 #include <common/types/podbufferholder.h>
+#include <common/facilities/syspublic.h>
 
 #include <windows.h>
 

@@ -1,5 +1,6 @@
 #include <common/helpers/q_math.h>
 #include <client/snd_public.h>
+#include <common/helpers/qthreads.h>
 #include <common/types/staticvector.h>
 
 #include "backend.h"

@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "snd_decoder.h"
 
+#include <common/facilities/fscompat.h>
+
 typedef struct snd_wav_stream_s snd_wav_stream_t;
 
 struct snd_wav_stream_s {

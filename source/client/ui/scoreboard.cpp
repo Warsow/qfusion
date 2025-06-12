@@ -1,7 +1,6 @@
 #include "scoreboard.h"
 
 #include "local.h"
-#include <common/facilities/q_shared.h>
 #include <common/facilities/gs_public.h>
 #include <common/helpers/algorithm.h>
 #include <common/helpers/stringsplitter.h>

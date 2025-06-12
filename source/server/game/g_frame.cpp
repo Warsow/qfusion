@@ -25,8 +25,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/types/staticstring.h>
 #include <common/types/staticvector.h>
 #include <common/facilities/cvar.h>
-#include <common/common.h>
 #include <common/facilities/profilerscope.h>
+#include <common/facilities/sysclock.h>
+#include <common/facilities/gs_qrespath.h>
 #include "ai/vec3.h"
 
 #include <chrono>

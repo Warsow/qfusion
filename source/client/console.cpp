@@ -20,9 +20,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // console.c
 
 #include "client.h"
+#include <common/version.h>
 #include <common/facilities/cmdargs.h>
 #include <common/facilities/cmdcompat.h>
 #include <common/facilities/cmdsystem.h>
+#include <common/facilities/cvar.h>
 #include <common/helpers/freelistallocator.h>
 #include <common/types/podbufferholder.h>
 #include <common/facilities/profilerscope.h>
@@ -33,6 +35,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/wswfs.h>
 
 #include <cctype>
+#include <ctime>
 #include <tuple>
 #include <typeinfo>
 

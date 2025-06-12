@@ -19,8 +19,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // net_wins.c
 
-#include <common/common.h>
 #include <common/syslocal.h>
+#include <common/common.h>
+#include <common/facilities/messagestreams.h>
+#include <common/facilities/syspublic.h>
 
 #include <winsock2.h>
 #include <ws2tcpip.h>

@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/singletonholder.h>
 #include <common/facilities/cmdargs.h>
 #include <common/facilities/cmdcompat.h>
+#include <common/facilities/cvar.h>
 
 using wsw::operator""_asView;
 

@@ -1,5 +1,7 @@
 #include <SDL.h>
 #include <client/client.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/sysclock.h>
 
 cvar_t *in_grabinconsole;
 cvar_t *in_disablemacosxmouseaccel;

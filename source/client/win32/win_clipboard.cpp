@@ -1,5 +1,5 @@
-#include <common/common.h>
 #include <windows.h>
+#include <common/helpers/q_libc.h>
 
 /*
 * Sys_GetClipboardData

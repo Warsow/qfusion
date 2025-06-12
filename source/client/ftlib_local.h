@@ -23,12 +23,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <common/helpers/q_arch.h>
 #include <common/helpers/q_math.h>
-#include <common/facilities/q_shared.h>
-#include <common/facilities/q_cvar.h>
 
 #include "ftlib.h"
 
-#include <common/common.h>
 #include "renderer/ref.h"
 
 typedef struct shader_s shader_t;

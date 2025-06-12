@@ -1,9 +1,9 @@
 #ifndef WSW_8c488c22_5afd_4fad_9e25_9304dd129d10_H
 #define WSW_8c488c22_5afd_4fad_9e25_9304dd129d10_H
 
-#include <common/common.h>
 #include <common/types/staticstring.h>
 #include <common/types/podvector.h>
+#include <common/facilities/q_comref.h>
 
 #include <QAbstractListModel>
 #include <QQuickItem>

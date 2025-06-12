@@ -1,10 +1,12 @@
 #include "uisystem.h"
+#include <common/version.h>
 #include <common/facilities/configvars.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/syspublic.h>
 #include <common/helpers/links.h>
 #include <common/facilities/profilerscope.h>
 #include <common/helpers/singletonholder.h>
 #include <common/types/staticvector.h>
-#include <common/common.h>
 #include <client/client.h>
 #include "actionrequestmodel.h"
 #include "callvotesmodel.h"
@@ -42,7 +44,6 @@
 
 #include <clocale>
 #include <span>
-#include <common/common.h>
 #include <common/helpers/algorithm.h>
 
 #ifdef _WIN32

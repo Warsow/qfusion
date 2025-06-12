@@ -20,7 +20,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <signal.h>
 #include <fcntl.h>
 
-#include <common/common.h>
+#include <common/local.h>
+#include <common/syslocal.h>
+#include <common/facilities/syspublic.h>
+#include <common/facilities/sysclock.h>
+#include <common/helpers/q_libc.h>
 
 void Sys_Quit( void ) {
 	fcntl( 0, F_SETFL, fcntl( 0, F_GETFL, 0 ) & ~O_NONBLOCK );

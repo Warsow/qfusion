@@ -26,9 +26,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "../../../third-party/recastnavigation/Recast/Include/Recast.h"
 #include <common/facilities/gs_qrespath.h>
+#include <common/facilities/fscompat.h>
 #include <server/game/ai/vec3.h>
 
 #include <algorithm>
+#include <climits>
 #include <numeric>
 #include <span>
 #include <unordered_map>

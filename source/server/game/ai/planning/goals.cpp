@@ -1,8 +1,6 @@
 #include "planninglocal.h"
 #include "goals.h"
 #include "../bot.h"
-#include <cmath>
-#include <cstdlib>
 
 BotGoal::BotGoal( BotPlanningModule *module_, const char *name_, int debugColor_, unsigned updatePeriod_ )
 	: AiGoal( module_->bot, name_, updatePeriod_ ), module( module_ ) {

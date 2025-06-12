@@ -1,6 +1,7 @@
 #include "snd_cached_computation.h"
 
 #include <common/facilities/q_comref.h>
+#include <common/facilities/cvar.h>
 
 #include <initializer_list>
 

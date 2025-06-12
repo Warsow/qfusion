@@ -21,9 +21,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "client.h"
 
+#include <common/version.h>
+#include <common/common.h>
+#include <common/local.h>
 #include <common/facilities/asyncstream.h>
 #include <common/facilities/cmdsystem.h>
-#include <common/facilities/demometadata.h>
+#include <common/facilities/protocol.h>
 #include <common/helpers/mmuuid.h>
 #include <common/helpers/singletonholder.h>
 #include <common/helpers/pipeutils.h>
@@ -36,11 +39,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/tonum.h>
 #include <common/facilities/wswfs.h>
 #include <common/facilities/wswcurl.h>
+#include <common/facilities/sysclock.h>
+#include <common/facilities/syspublic.h>
 #include "ui/uisystem.h"
 #include <server/server.h>
 
 #include "serverlist.h"
 
+#include <ctime>
 #include <random>
 #include <unordered_map>
 
@@ -620,8 +626,8 @@ auto SoundSystem::getPathForName( const wsw::StringView &name ) -> wsw::PodVecto
 	}
 
 	wsw::StaticVector<wsw::StringView, 4> allowedExtensions;
-	for( size_t i = 0; i < NUM_SOUND_EXTENSIONS; ++i ) {
-		allowedExtensions.push_back( wsw::StringView( SOUND_EXTENSIONS[i] ) );
+	for( const char *ext: SOUND_EXTENSIONS ) {
+		allowedExtensions.push_back( wsw::StringView( ext ) );
 	}
 
 	const wsw::StringView ztName( result.data(), result.size() - 1, wsw::StringView::ZeroTerminated );
@@ -678,7 +684,7 @@ bool SoundSystem::getPathListForPattern( const wsw::StringView &pattern, wsw::St
 				wsw::StaticString<MAX_QPATH> fullNameBuffer;
 				fullNameBuffer << dirName << '/' << fileName;
 				if( extension.empty() ) {
-					if( const char *foundExtension = FS_FirstExtension( fullNameBuffer.data(), SOUND_EXTENSIONS, NUM_SOUND_EXTENSIONS ) ) {
+					if( const char *foundExtension = FS_FirstExtension( fullNameBuffer.data(), SOUND_EXTENSIONS, std::size( SOUND_EXTENSIONS ) ) ) {
 						if( const char *existingExtension = COM_FileExtension( fullNameBuffer.data() ) ) {
 							fullNameBuffer.erase( (unsigned)( existingExtension - fullNameBuffer.data() ) );
 							fullNameBuffer << wsw::StringView( foundExtension );
@@ -3554,6 +3560,26 @@ static void CL_ParseServerCommand( msg_t *msg ) {
 	Com_Printf( "Unknown server command: %s\n", cmdArgs[0].data() );
 }
 
+const char * const svc_strings[256] =
+	{
+		"svc_bad",
+		"svc_nop",
+		"svc_servercmd",
+		"svc_serverdata",
+		"svc_spawnbaseline",
+		"svc_download",
+		"svc_playerinfo",
+		"svc_packetentities",
+		"svc_gamecommands",
+		"svc_match",
+		"svc_clcack",
+		"svc_servercs", // reliable command as unreliable for demos
+		"svc_frame",
+		"svc_demoinfo",
+		"svc_extension"
+	};
+
+
 void CL_ParseServerMessage( msg_t *msg ) {
 	if( cl_shownet->integer == 1 ) {
 		Com_Printf( "%" PRIu64 " ", (uint64_t)msg->cursize );
@@ -3706,25 +3732,6 @@ void CL_ParseServerMessage( msg_t *msg ) {
 		CL_WriteDemoMessage( msg );
 	}
 }
-
-const char * const svc_strings[256] =
-	{
-		"svc_bad",
-		"svc_nop",
-		"svc_servercmd",
-		"svc_serverdata",
-		"svc_spawnbaseline",
-		"svc_download",
-		"svc_playerinfo",
-		"svc_packetentities",
-		"svc_gamecommands",
-		"svc_match",
-		"svc_clcack",
-		"svc_servercs", // reliable command as unreliable for demos
-		"svc_frame",
-		"svc_demoinfo",
-		"svc_extension"
-	};
 
 void _SHOWNET( msg_t *msg, const char *s, int shownet ) {
 	if( shownet >= 2 ) {
@@ -4633,7 +4640,7 @@ static bool TryStartingSoundDownloadIfNeeded() {
 				char tempname[MAX_QPATH + 4];
 				Q_strncpyz( tempname, string.data(), sizeof( tempname ) );
 				if( !COM_FileExtension( tempname ) ) {
-					if( !FS_FirstExtension( tempname, SOUND_EXTENSIONS, NUM_SOUND_EXTENSIONS ) ) {
+					if( !FS_FirstExtension( tempname, SOUND_EXTENSIONS, std::size( SOUND_EXTENSIONS ) ) ) {
 						COM_DefaultExtension( tempname, ".wav", sizeof( tempname ) );
 						if( !CL_CheckOrDownloadFile( tempname ) ) {
 							return true; // started a download

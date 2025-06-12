@@ -21,8 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/q_arch.h>
 #include "q_trie.h"
 
-#include <assert.h>
-#include <string.h>
+#include <cassert>
+#include <cstring>
+#include <cctype>
 
 /* Trie structure definitions */
 

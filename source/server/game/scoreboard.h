@@ -2,7 +2,6 @@
 #define WSW_7ed480ad_c97e_4b99_914c_d01a9cf6c8e3_H
 
 #include <common/helpers/q_math.h>
-#include <common/facilities/q_shared.h>
 #include <common/facilities/q_comref.h>
 
 #include <common/types/staticvector.h>

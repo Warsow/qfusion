@@ -21,37 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef GAME_QARCH_H
 #define GAME_QARCH_H
 
-// global preprocessor defines
-#include <common/config.h>
-
-// q_shared.h -- included first by ALL program modules
-#include <assert.h>
-#include <ctype.h>
-#include <limits.h>
-// MSVC hacks
-#ifdef _MSC_VER
-#define _USE_MATH_DEFINES
-#endif
-#include <math.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <string.h>
-#ifndef _MSC_VER
-#include <strings.h>
-#endif
-#include <stdlib.h>
-#include <time.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <stddef.h>
-
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS 1
 #endif
-#include <inttypes.h>
-#include <type_traits>
-#include <limits>
-#include <cmath>
+#include <cinttypes>
 
 //==============================================
 
@@ -270,8 +243,6 @@ typedef uintptr_t socket_handle_t;
 
 #define VAR( x ) # x
 
-#include <alloca.h>
-
 // wsw : aiwa : 64bit integers and integer-pointer types
 typedef int ioctl_param_t;
 
@@ -422,13 +393,13 @@ typedef int socket_handle_t;
 
 #ifdef HAVE__SNPRINTF
 #ifndef snprintf
-#define snprintf _snprintf
+//#define snprintf _snprintf
 #endif
 #endif
 
 #ifdef HAVE__VSNPRINTF
 #ifndef vsnprintf
-#define vsnprintf _vsnprintf
+//#define vsnprintf _vsnprintf
 #endif
 #endif
 
@@ -519,6 +490,11 @@ typedef int socket_handle_t;
 #define STR_TO_POINTER( str ) (void *)strtol( str,NULL,0 )
 #endif
 
+#ifndef STR_HELPER
+#define STR_HELPER( s )                 # s
+#define STR_TOSTR( x )                  STR_HELPER( x )
+#endif
+
 // The `malloc' attribute is used to tell the compiler that a function
 // may be treated as if it were the malloc function.  The compiler
 // assumes that calls to malloc result in a pointers that cannot
@@ -552,6 +528,25 @@ typedef int socket_handle_t;
 
 #ifndef NULL
 #define NULL ( (void *)0 )
+#endif
+
+#define ENDIAN_LITTLE
+
+// TODO: Use intrinsics
+inline short ShortSwap( short l ) {
+	uint8_t b1, b2;
+
+	b1 = l & 255;
+	b2 = ( l >> 8 ) & 255;
+
+	return ( b1 << 8 ) + b2;
+}
+
+#ifdef ENDIAN_LITTLE
+#define BigShort( l ) ShortSwap( l )
+#define LittleShort( l ) ( l )
+#define LittleLong( l ) ( l )
+#define LittleFloat( l ) ( l )
 #endif
 
 #endif // GAME_QARCH_H

@@ -3,6 +3,7 @@
 #include "g_local.h"
 
 #include <algorithm>
+#include <cctype>
 
 using wsw::operator""_asView;
 

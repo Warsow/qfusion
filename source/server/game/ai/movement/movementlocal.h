@@ -6,9 +6,6 @@
 #include "predictioncontext.h"
 #include "environmenttracecache.h"
 
-#include <cmath>
-#include <cstdlib>
-
 // Suppress assertions for Windows non-public builds
 #if !defined( PUBLIC_BUILD ) && !defined( _WIN32 )
 #define ENABLE_MOVEMENT_ASSERTIONS

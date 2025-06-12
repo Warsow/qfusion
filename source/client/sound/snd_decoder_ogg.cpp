@@ -24,7 +24,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define OV_EXCLUDE_STATIC_CALLBACKS
 
 #include "snd_decoder.h"
-#include <common/common.h>
+#include <common/helpers/library.h>
+#include <common/facilities/fscompat.h>
 #include <vorbis/vorbisfile.h>
 
 #ifdef VORBISLIB_RUNTIME

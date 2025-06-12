@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2002-2003 Victor Luchits
+Copyright (C) 1997-2001 Id Software, Inc.
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -18,15 +18,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#ifndef __GS_REF_H
-#define __GS_REF_H
+#ifndef WSW_4ab959c3_3993_4555_842a_64b99129bce7_H
+#define WSW_4ab959c3_3993_4555_842a_64b99129bce7_H
 
-#include "gs_qrespath.h"
+#include <cstdint>
 
-#define DEFAULT_TEAMALPHA_COLOR     "255 0 255"
-#define DEFAULT_TEAMBETA_COLOR      "0 255 0"
+int64_t    Sys_Milliseconds();
+uint64_t   Sys_Microseconds();
 
-#define MAX_CLANNAME_BYTES 16
-#define MAX_CLANNAME_CHARS 8
-
-#endif // __GS_REF_H
+#endif

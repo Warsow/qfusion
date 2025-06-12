@@ -1,6 +1,8 @@
 #include <windows.h>
 #include "conproc.h"
 #include <server/server.h>
+#include <common/local.h>
+#include <common/facilities/syspublic.h>
 
 void Sys_InitTime();
 

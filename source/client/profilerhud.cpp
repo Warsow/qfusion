@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/singletonholder.h>
 #include <common/helpers/algorithm.h>
 #include <common/helpers/tonum.h>
+#include <common/helpers/qthreads.h>
 
 #include <unordered_map>
 

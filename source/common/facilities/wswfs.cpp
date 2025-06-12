@@ -1,7 +1,7 @@
 #include "wswfs.h"
-#include <common/common.h>
 #include <common/types/staticstring.h>
 #include <common/helpers/exceptions.h>
+#include <common/facilities/fscompat.h>
 
 #include <array>
 

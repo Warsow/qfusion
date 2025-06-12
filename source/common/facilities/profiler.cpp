@@ -23,9 +23,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/exceptions.h>
 #include "profilerscope.h"
 #include <common/helpers/links.h>
-#include <common/local.h>
-#include <common/common.h>
+//#include <common/local.h>
+#include <common/syslocal.h>
 #include <common/helpers/qthreads.h>
+#include <common/facilities/sysclock.h>
 
 #include <unordered_map>
 #include <unordered_set>

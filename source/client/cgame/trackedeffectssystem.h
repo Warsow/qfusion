@@ -24,7 +24,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <common/helpers/freelistallocator.h>
 #include <common/helpers/randomgenerator.h>
-#include <common/facilities/q_shared.h>
 // TODO:!!!!!!!!! Lift it to the top level!
 #include <server/game/ai/vec3.h>
 #include "particlesystem.h"

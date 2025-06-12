@@ -6,7 +6,7 @@
 #include <QList>
 
 #include <common/helpers/q_arch.h>
-#include <common/facilities/q_shared.h>
+#include <common/facilities/q_comref.h>
 #include <common/types/staticstring.h>
 #include <common/types/podvector.h>
 #include <common/helpers/freelistallocator.h>

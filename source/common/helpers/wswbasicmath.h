@@ -35,13 +35,13 @@ constexpr wsw_forceinline auto cube( const T &v ) -> T {
 	return v * v * v;
 }
 
-template <std::integral T>
+template <typename T>
 [[nodiscard]]
 constexpr wsw_forceinline bool isPowerOf2( const T &v ) {
 	return ( v & ( v - 1 ) ) == 0;
 }
 
-template <std::unsigned_integral T>
+template <typename T>
 [[nodiscard]]
 constexpr wsw_forceinline auto ceilPowerOf2( const T &v ) -> T {
 	// TODO: Use arch-specific code for non-std::is_constant_evaluated() contexts

@@ -3,6 +3,7 @@
 
 #include "stringview.h"
 #include <cinttypes>
+#include <common/helpers/q_libc.h>
 
 namespace wsw {
 

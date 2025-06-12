@@ -6,6 +6,7 @@
 
 #include <common/types/staticvector.h>
 #include <common/helpers/stringsplitter.h>
+#include <common/facilities/cvar.h>
 
 #include <limits>
 #include <random>

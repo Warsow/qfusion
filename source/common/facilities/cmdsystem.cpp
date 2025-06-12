@@ -22,8 +22,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "cmdsystem.h"
 #include "cmdcompat.h"
 #include <common/local.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/fscompat.h>
+#include <common/facilities/q_comref.h>
 #include <common/helpers/links.h>
-#include <common/common.h>
 #include <common/types/staticstring.h>
 #include <common/helpers/exceptions.h>
 

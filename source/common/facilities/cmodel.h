@@ -18,10 +18,13 @@
 
  */
 
-typedef struct cmodel_state_s cmodel_state_t;
+#ifndef WSW_ce3abb22_0d05_48fa_8a0b_95466f85d7be_H
+#define WSW_ce3abb22_0d05_48fa_8a0b_95466f85d7be_H
 
-// Hack! Prevent inclusion of this C++ prototypes (that are convenient) in C code (that is still present somewhere)
-#ifdef __cplusplus
+#include <common/helpers/q_math.h>
+#include <common/facilities/q_collision.h>
+
+typedef struct cmodel_state_s cmodel_state_t;
 
 struct cmodel_s *CM_LoadMap( cmodel_state_t *cms, const char *name, bool clientload, unsigned *checksum );
 struct cmodel_s *CM_InlineModel( cmodel_state_t *cms, int num ); // 1, 2, etc

@@ -21,8 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <common/helpers/q_arch.h>
 #include <common/helpers/q_math.h>
-#include <common/facilities/q_shared.h>
-#include <common/facilities/q_cvar.h>
+#include <common/facilities/cvar.h>
 #include <common/facilities/q_comref.h>
 #include <common/facilities/q_collision.h>
 #include <common/facilities/gs_public.h>
@@ -32,13 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <common/helpers/mmuuid.h>
 #include <common/facilities/cmdargs.h>
-#include <common/facilities/outputmessages.h>
-
-#include <array>
-#include <cmath>
-#include <cstdlib>
-#include <new>
-#include <utility>
+#include <common/facilities/messagestreams.h>
 
 extern gs_state_t *ggs;
 
@@ -1092,6 +1085,9 @@ public:
 		m_timestamps[m_head] = realTime;
 	}
 };
+
+#define MAX_CLANNAME_BYTES 16
+#define MAX_CLANNAME_CHARS 8
 
 struct Client : public ServersideClientBase {
 	wsw::UserInfo m_userInfo;

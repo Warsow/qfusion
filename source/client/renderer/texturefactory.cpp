@@ -20,7 +20,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "local.h"
 #include <common/helpers/hash.h>
 #include <common/helpers/links.h>
-#include <common/common.h>
 #include <common/facilities/wswfs.h>
 #include <common/helpers/singletonholder.h>
 #include <client/imageloading.h>
@@ -309,7 +308,7 @@ auto TextureFactory::loadTextureDataFromFile( const wsw::StringView &name,
 											  const ImageOptions &options )
 											-> std::optional<std::pair<uint8_t *, BitmapProps>> {
 	assert( name.isZeroTerminated() );
-	assert( NUM_IMAGE_EXTENSIONS == 4 );
+	assert( std::size( IMAGE_EXTENSIONS ) == 4 );
 	// TODO: Adopt the sane FS interface over the codebase
 	const wsw::StringView extensions[4] = {
 		wsw::StringView( IMAGE_EXTENSIONS[0] ),

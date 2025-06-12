@@ -22,7 +22,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "scoreboard.h"
 #include <common/helpers/hash.h>
 #include <common/helpers/stringsplitter.h>
+#include <common/helpers/parsecompat.h>
 #include <common/facilities/cvar.h>
+#include <common/facilities/gs_qrespath.h>
+
+#include <ctime>
 
 using wsw::operator""_asView;
 

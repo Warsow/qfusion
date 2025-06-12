@@ -24,6 +24,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/q_arch.h>
 #include <common/helpers/wswbasicmath.h>
 
+// TODO: Use <numbers> or define our custom stuff
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES 1
+#endif
+#include <cmath>
+#include <cassert>
+
 //==============================================================
 //
 //MATHLIB
@@ -771,6 +778,13 @@ int BoxOnPlaneSide( const vec3_t emins, const vec3_t emaxs, const struct cplane_
 
 vec_t ColorNormalize( const vec_t *in, vec_t *out );
 
+#define COLOR_R( rgba )       ( ( rgba ) & 0xFF )
+#define COLOR_G( rgba )       ( ( ( rgba ) >> 8 ) & 0xFF )
+#define COLOR_B( rgba )       ( ( ( rgba ) >> 16 ) & 0xFF )
+#define COLOR_A( rgba )       ( ( ( rgba ) >> 24 ) & 0xFF )
+#define COLOR_RGB( r, g, b )    ( ( ( r ) << 0 ) | ( ( g ) << 8 ) | ( ( b ) << 16 ) )
+#define COLOR_RGBA( r, g, b, a ) ( ( ( r ) << 0 ) | ( ( g ) << 8 ) | ( ( b ) << 16 ) | ( ( a ) << 24 ) )
+
 #define ColorGrayscale( c ) ( 0.299 * ( c )[0] + 0.587 * ( c )[1] + 0.114 * ( c )[2] )
 
 float CalcFov( float fov_x, float width, float height );
@@ -884,7 +898,10 @@ class alignas( 16 ) MovingAverage {
 	unsigned m_tail { 0 };
 public:
 	void clear() {
-		memset( m_values, 0, sizeof( m_values ) );
+		for( Value &v: m_values ) {
+			v = 0;
+		}
+		//memset( m_values, 0, sizeof( m_values ) );
 		m_tail = 0;
 		m_head = N;
 		m_queueSum = 0;

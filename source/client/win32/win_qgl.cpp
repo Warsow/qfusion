@@ -49,8 +49,10 @@ and Zephaniah E. Hull. Adapted by Victor Luchits for qfusion project.
 
 #include <windows.h>
 #include <GL/gl.h>
-#include <common/common.h>
 #include "win_glw.h"
+
+#include <common/facilities/messagestreams.h>
+#include <common/helpers/q_libc.h>
 
 #define QGL_EXTERN
 

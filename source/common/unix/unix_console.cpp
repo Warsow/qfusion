@@ -3,6 +3,13 @@
 #include <unistd.h>
 
 #include <common/common.h>
+#include <common/helpers/q_libc.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/messagestreams.h>
+// TODO: Why do we need it for colors?
+#include <common/helpers/q_math.h>
+
+#include <cstdio>
 
 bool stdin_active = true;
 cvar_t *nostdout = NULL;

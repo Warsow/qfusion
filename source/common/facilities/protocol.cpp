@@ -18,8 +18,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#include <common/common.h>
+#include <common/version.h>
+#include <common/facilities/msg.h>
+#include <common/facilities/protocol.h>
 #include <common/facilities/configstringstorage.h>
+#include <common/facilities/fscompat.h>
+#include <common/facilities/messagestreams.h>
+
+#include <cctype>
 
 using wsw::operator""_asView;
 
@@ -412,4 +418,16 @@ size_t SNAP_ReadDemoMetaData( int demofile, char *meta_data, size_t meta_data_si
 	meta_data[wsw::min( (size_t)meta_data_realsize, meta_data_size - 1 )] = '\0'; // termination \0
 
 	return meta_data_realsize;
+}
+
+auto calcSoundGainForDistanceAndAttenuation( float distance, float attenuation ) -> float {
+	constexpr float refDistance = kSoundAttenuationRefDistance;
+	constexpr float maxDistance = kSoundAttenuationMaxDistance;
+
+	distance = wsw::min( wsw::max( distance, refDistance ), maxDistance );
+
+	// AL_INVERSE_DISTANCE_CLAMPED
+	// gain = AL_REFERENCE_DISTANCE / (AL_REFERENCE_DISTANCE + AL_ROLLOFF_FACTOR * (distance - AL_REFERENCE_DISTANCE));
+
+	return refDistance * Q_Rcp( refDistance + attenuation * ( distance - refDistance ) );
 }

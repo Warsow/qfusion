@@ -1,6 +1,8 @@
 #ifndef __WSWCURL_H
 #define __WSWCURL_H
 
+#include <cstdlib>
+
 #define WSWCURL_STATUS_NONE     0
 #define WSWCURL_STATUS_RUNNING  1
 #define WSWCURL_STATUS_FINISHED 2

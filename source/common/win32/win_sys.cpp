@@ -19,8 +19,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // sys_win.h
 
-#include <common/common.h>
 #include <common/facilities/cmdargs.h>
+#include <common/facilities/syspublic.h>
+#include <common/facilities/cvar.h>
+#include <common/common.h>
+#include <common/local.h>
 #include <client/keys.h>
 
 #include <windows.h>

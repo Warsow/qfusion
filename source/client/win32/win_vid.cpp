@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <assert.h>
 #include <float.h>
 #include <client/client.h>
+#include <common/facilities/cvar.h>
 #include "winquake.h"
 #include "win_input.h"
 #include "resource.h"

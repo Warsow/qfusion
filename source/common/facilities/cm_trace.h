@@ -1,7 +1,7 @@
 #ifndef QFUSION_CM_TRACE_H
 #define QFUSION_CM_TRACE_H
 
-#include <common/common.h>
+#include <common/facilities/q_collision.h>
 
 struct trace_s;
 struct cmodel_state_s;

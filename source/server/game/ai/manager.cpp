@@ -7,6 +7,9 @@
 #include <common/helpers/links.h>
 #include <common/types/stringview.h>
 #include <common/helpers/algorithm.h>
+#include <common/facilities/cvar.h>
+
+#include <ctime>
 
 using wsw::operator""_asView;
 using wsw::operator""_asHView;

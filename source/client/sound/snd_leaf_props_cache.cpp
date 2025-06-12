@@ -10,6 +10,7 @@
 
 #include <new>
 #include <limits>
+#include <cctype>
 #include <cstdlib>
 // TODO: Use our custom implementation
 #include <vector>

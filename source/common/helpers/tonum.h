@@ -4,11 +4,11 @@
 #include <cassert>
 #include <cerrno>
 #include <climits>
-#include <cmath>
 #include <optional>
 #include <type_traits>
 #include <common/types/stringview.h>
 #include <common/types/staticstring.h>
+#include <common/helpers/q_math.h>
 
 namespace wsw {
 

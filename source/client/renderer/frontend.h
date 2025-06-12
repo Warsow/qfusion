@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <common/types/podbufferholder.h>
 #include <common/types/function.h>
+#include <common/helpers/qthreads.h>
 #include <common/facilities/tasksystem.h>
 
 struct alignas( 32 )Frustum {

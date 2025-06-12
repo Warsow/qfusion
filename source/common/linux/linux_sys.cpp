@@ -1,7 +1,13 @@
-#include <common/common.h>
-#include <common/local.h>
+#include <common/syslocal.h>
+#include <common/helpers/q_math.h>
+#include <common/facilities/syspublic.h>
+#include <common/facilities/messagestreams.h>
 
-#include <stdio.h>
+#include <cassert>
+#include <cstdio>
+#include <limits>
+#include <cctype>
+
 #include <unistd.h>
 
 auto testProcessorFeatures() -> unsigned {

@@ -18,8 +18,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#include <common/common.h>
+#include <common/facilities/cvar.h>
 #include <common/facilities/maplist.h>
+#include <common/facilities/fscompat.h>
 #include "g_local.h"
 #include "g_as_local.h"
 #include "scoreboard.h"

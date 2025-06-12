@@ -23,6 +23,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "snd_local.h"
 
+#include <common/helpers/qthreads.h>
+#include <common/facilities/fscompat.h>
+#include <common/facilities/sysclock.h>
+
+#include <ctime>
+
 #define MUSIC_BUFFER_SIZE       8192
 
 #define MUSIC_PRELOAD_MSEC      200

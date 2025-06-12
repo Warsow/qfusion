@@ -1,6 +1,7 @@
 #include "snd_propagation.h"
 
 #include <common/helpers/links.h>
+#include <common/helpers/qthreads.h>
 #include <common/helpers/singletonholder.h>
 #include <common/helpers/algorithm.h>
 

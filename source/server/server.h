@@ -22,16 +22,20 @@
 #ifndef QFUSION_SERVER_H
 #define QFUSION_SERVER_H
 
-#include <common/common.h>
+#include <common/syslocal.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/net.h>
+#include <common/facilities/net_chan.h>
 #include <common/facilities/cmdcompat.h>
 #include <common/facilities/configstringstorage.h>
+#include <common/facilities/protocol.h>
 #include <common/types/staticstring.h>
 #include <common/helpers/mmuuid.h>
-#include <common/facilities/outputmessages.h>
+#include <common/helpers/userinfo.h>
+#include <common/facilities/messagestreams.h>
 #include "game/g_public.h"
 
 #include <cstdlib>
-#include <cmath>
 #include <new>
 #include <utility>
 
@@ -108,7 +112,7 @@ typedef struct {
 #define HTTP_CLIENT_SESSION_SIZE 16
 
 typedef struct client_s {
-	sv_client_state_t state;
+	int state;
 
 	char userinfo[MAX_INFO_STRING];         // name, etc
 	char userinfoLatched[MAX_INFO_STRING];  // flood prevention - actual userinfo updates are delayed
@@ -212,6 +216,13 @@ extern cvar_t *sv_uploads_http;
 extern cvar_t *sv_uploads_baseurl;
 extern cvar_t *sv_uploads_demos;
 extern cvar_t *sv_uploads_demos_baseurl;
+
+void SV_Init( void );
+void SV_Shutdown( const char *finalmsg );
+void SV_ShutdownGame( const char *finalmsg, bool reconnect );
+void SV_Frame( unsigned realMsec, unsigned gameMsec );
+bool SV_SendMessageToClient( struct client_s *client, msg_t *msg );
+void SV_ParseClientMessage( struct client_s *client, msg_t *msg );
 
 void SV_InitOperatorCommands( void );
 void SV_ShutdownOperatorCommands( void );

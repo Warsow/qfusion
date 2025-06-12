@@ -1,8 +1,6 @@
 #ifndef WSW_955f6ab1_1bd9_4796_8984_0f1b743c660c_H
 #define WSW_955f6ab1_1bd9_4796_8984_0f1b743c660c_H
 
-#include <common/common.h>
-#include <common/facilities/q_shared.h>
 #include <common/facilities/q_comref.h>
 #include <common/types/staticstring.h>
 #include <common/types/staticvector.h>

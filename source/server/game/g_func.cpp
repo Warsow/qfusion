@@ -20,6 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "g_local.h"
 
+#include <common/facilities/gs_qrespath.h>
+
 void G_AssignMoverSounds( edict_t *ent, const char *start, const char *move, const char *stop ) {
 	if( st.noise && Q_stricmp( st.noise, "default" ) ) {
 		if( Q_stricmp( st.noise, "silent" ) ) {

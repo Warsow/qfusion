@@ -52,6 +52,14 @@ if (QFUSION_APPLICATION_VERSION_HEADER)
     add_definitions(-DAPPLICATION_VERSION_HEADER=${QFUSION_APPLICATION_VERSION_HEADER})
 endif()
 
+# Note: Defining _USE_MATH_DEFINES in the code is preferable as Recast does it on it's own
+add_definitions(-DHALFLAMBERTLIGHTING
+                -DAREAPORTALS_MATRIX
+                -DTCP_SUPPORT
+                -DHTTP_SUPPORT
+                -DDOWNSCALE_ITEMS # Ugly hack for the release. Item models are way too big
+                -DELECTROBOLT_TEST)
+
 option(USE_SDL2 "Build using SDL2" OFF)
 option(GAME_MODULES_ONLY "Only build game modules" OFF)
 option(SERVER_ONLY "Only build server binaries and game modules" OFF)

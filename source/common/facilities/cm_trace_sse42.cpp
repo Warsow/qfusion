@@ -8,9 +8,11 @@
 #define WSW_USE_SSE3
 #endif
 
-#include <common/common.h>
+#include "cmodel.h"
 #include "cm_local.h"
 #include "cm_trace.h"
+
+#include <cstring>
 
 #ifdef CM_USE_SSE
 
@@ -68,7 +70,7 @@ __declspec( noinline ) int BuildSimdBrushsideData( const cbrushside_t *sides, in
 // TODO: This was just to get the stuff working, rewrite it
 int BuildSimdBrushsideData( const cbrushside_t *sides, int numSides, uint8_t *buffer ) {
 	if( numSides >= 256 ) {
-		printf( "Too many brushsides %d\n", numSides );
+		//printf( "Too many brushsides %d\n", numSides );
 		abort();
 	}
 	if( (uintptr_t)buffer % 32 ) {

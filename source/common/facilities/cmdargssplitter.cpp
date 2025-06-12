@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "cmdargssplitter.h"
-#include <common/facilities/q_shared.h>
+#include <common/helpers/parsecompat.h>
 
 auto CmdArgsSplitter::exec( const wsw::StringView &cmdString ) -> CmdArgs {
 	if( cmdString.empty() ) [[unlikely]] {

@@ -6,8 +6,6 @@
 #include "../bot.h"
 #include <common/helpers/algorithm.h>
 
-#include <cmath>
-
 template <typename Spot, unsigned N, typename ScriptSpot>
 AiObjectiveBasedTeam::SpotsContainer<Spot, N, ScriptSpot>::SpotsContainer( const char *itemName_ )
 	: itemName( itemName_ ) {

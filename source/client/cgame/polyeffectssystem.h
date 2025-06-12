@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <client/renderer/ref.h>
 #include <common/helpers/randomgenerator.h>
 #include <common/helpers/freelistallocator.h>
+#include <common/facilities/q_comref.h>
 
 class DrawSceneRequest;
 

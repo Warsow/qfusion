@@ -19,7 +19,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // cmodel.c -- model loading
 
-#include <common/common.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/fscompat.h>
+#include <common/helpers/q_libc.h>
+#include <common/helpers/parsecompat.h>
+#include <common/facilities/messagestreams.h>
+#include <common/facilities/syspublic.h>
+#include "cmodel.h"
 #include "cm_local.h"
 #include "cm_trace.h"
 #include <common/local.h>

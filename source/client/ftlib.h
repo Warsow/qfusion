@@ -24,6 +24,20 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 struct shader_s;
 struct qfontface_s;
 
+// font style flags
+typedef enum {
+	QFONT_STYLE_NONE            = 0,
+	QFONT_STYLE_ITALIC          = ( 1 << 0 ),
+	QFONT_STYLE_BOLD            = ( 1 << 1 ),
+	QFONT_STYLE_MASK            = ( 1 << 2 ) - 1
+} qfontstyle_t;
+
+// font drawing flags
+typedef enum {
+	TEXTDRAWFLAG_NO_COLORS  = 1 << 0,   // draw color codes instead of applying them
+	TEXTDRAWFLAG_KERNING    = 1 << 1
+} textdrawflag_t;
+
 typedef void ( *fdrawchar_t )( int x, int y, int w, int h, float s1, float t1, float s2, float t2, const vec4_t color, const struct shader_s *shader );
 
 bool FTLIB_Init( bool verbose );

@@ -47,7 +47,7 @@ and Zephaniah E. Hull. Adapted by Victor Luchits for qfusion project.
 
 #include <SDL.h>
 
-#include <common/common.h>
+#include <common/facilities/messagestreams.h>
 #include "sdl_glw.h"
 
 #define QGL_EXTERN

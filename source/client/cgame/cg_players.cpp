@@ -20,6 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "cg_local.h"
 #include <client/ui/uisystem.h>
+#include <common/facilities/fscompat.h>
+#include <common/helpers/userinfo.h>
 
 static const char *cg_defaultSexedSounds[] =
 {
@@ -91,7 +93,7 @@ static const SoundSet *CG_RegisterPmodelSexedSound( pmodelinfo_t *pmodelinfo, co
 
 	SoundSystem *soundSystem = SoundSystem::instance();
 	if( ( !COM_FileExtension( sexedFilename ) &&
-		FS_FirstExtension( sexedFilename, SOUND_EXTENSIONS, NUM_SOUND_EXTENSIONS ) ) ||
+		FS_FirstExtension( sexedFilename, SOUND_EXTENSIONS, std::size( SOUND_EXTENSIONS ) ) ) ||
 		FS_FOpenFile( sexedFilename, NULL, FS_READ ) != -1 ) {
 		sexedSfx->sfx = soundSystem->registerSound( { .name = SoundSetProps::Exact { wsw::StringView( sexedFilename ) } } );
 	} else {   // no, revert to default player sounds folders

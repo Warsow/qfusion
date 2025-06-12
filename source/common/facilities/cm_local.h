@@ -18,6 +18,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
+#include <common/helpers/q_math.h>
+#include <common/facilities/bsp.h>
+#include <common/facilities/qfiles.h>
+
+typedef struct cmodel_state_s cmodel_state_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif

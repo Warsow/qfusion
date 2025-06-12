@@ -6,7 +6,6 @@
 #include <QColor>
 #include <QRectF>
 
-#include <common/common.h>
 // TODO:
 #include <client/cgame/cg_local.h>
 

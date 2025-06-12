@@ -4,6 +4,9 @@
 
 #include "snd_local.h"
 
+#include <common/facilities/fscompat.h>
+#include <common/facilities/q_comref.h>
+
 class CachedComputation {
 	friend class CachedComputationIOHelper;
 
