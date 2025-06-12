@@ -19,6 +19,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include <client/client.h>
+#include <common/local.h>
+#include <server/server.h>
 #include "winquake.h"
 
 extern "C" QF_DLL_EXPORT DWORD NvOptimusEnablement = 0x00000001;

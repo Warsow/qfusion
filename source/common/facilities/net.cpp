@@ -18,7 +18,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#include <common/common.h>
+#include <common/facilities/msg.h>
+#include <common/facilities/messagestreams.h>
+#include <common/helpers/q_libc.h>
 #include <common/syslocal.h>
 
 #ifdef _WIN32
@@ -35,6 +37,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <sys/time.h>
 #endif
 
+#include <cstring>
 #include <utility>
 #include <tuple>
 

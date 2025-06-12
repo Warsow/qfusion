@@ -1,5 +1,5 @@
 // TODO: Use dynamic dispatch to hide OutputMessageWriter type
-#include <common/facilities/outputmessages.h>
+#include <common/facilities/messagestreams.h>
 #include "textstreamwriter.h"
 
 #include <cstring>

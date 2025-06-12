@@ -7,8 +7,6 @@
 #include <common/types/podbufferholder.h>
 #include <common/facilities/tasksystem.h>
 
-#include <limits>
-
 class GraphLike {
 	friend class CachedLeafsGraph;
 	friend class CachedGraphReader;

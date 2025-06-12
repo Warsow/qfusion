@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <cstdlib>
 #include <cstring>
+#include <tuple>
 
 extern BoolConfigVar v_explosionWave, v_explosionSmoke, v_explosionClusters;
 extern BoolConfigVar v_cartoonHitEffect;

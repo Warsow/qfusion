@@ -53,7 +53,7 @@ private:
 		Q_vsnprintfz( buffer, sizeof( buffer ), format, va );
 		va_end( va );
 
-		Sys_Error( "%s", buffer );
+		abort(); //Sys_Error( "%s", buffer );
 	}
 
 	inline static unsigned next_index( unsigned index ) {

@@ -18,10 +18,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // msg.c -- Message IO functions
-#include <common/common.h>
+#include <common/facilities/msg.h>
+#include <common/facilities/messagestreams.h>
+#include <common/helpers/q_libc.h>
 #include <common/helpers/half_float.h>
 
-#include <iterator> // std::begin(), std::end()
+#include <cstring>
+#include <array> // std::begin(), std::end()
 
 /*
 ==============================================================================

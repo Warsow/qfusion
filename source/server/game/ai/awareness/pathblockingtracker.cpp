@@ -3,8 +3,6 @@
 #include "../bot.h"
 #include "../navigation/aaselementsmask.h"
 
-#include <cmath>
-
 /**
  * A compact representation of {@code TrackedEnemy} that contains precomputed fields
  * required for determining blocking status of map areas in bulk fashion.

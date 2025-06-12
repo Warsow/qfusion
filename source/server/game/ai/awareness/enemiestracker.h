@@ -7,7 +7,6 @@
 #include <common/types/staticvector.h>
 #include "../vec3.h"
 #include <common/facilities/q_comref.h>
-#include <limits>
 
 inline bool HasQuad( const edict_t *ent ) {
 	return ent && ent->r.client && ent->r.client->ps.inventory[POWERUP_QUAD];

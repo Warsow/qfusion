@@ -22,9 +22,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // r_q3bsp.c -- Q3 BSP model loading
 
 #include "local.h"
-#include <common/common.h>
 #include "materiallocal.h"
 #include <array>
+
+#include <common/helpers/parsecompat.h>
 
 typedef struct {
 	vec3_t mins, maxs;

@@ -19,19 +19,28 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "server.h"
+#include <common/version.h>
+#include <common/common.h>
+#include <common/local.h>
 #include <common/facilities/cmdsystem.h>
+#include <common/facilities/qfiles.h>
 #include <common/facilities/maplist.h>
 #include <common/helpers/singletonholder.h>
 #include <common/helpers/pipeutils.h>
 #include <common/helpers/compression.h>
-#include <common/facilities/demometadata.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/cmodel.h>
+#include <common/facilities/fscompat.h>
 #include <common/facilities/profilerscope.h>
+#include <common/facilities/sysclock.h>
+#include <common/facilities/syspublic.h>
 #include <common/helpers/tonum.h>
 #include <common/facilities/wswfs.h>
 #include <common/helpers/algorithm.h>
 #include <common/helpers/stringsplitter.h>
 #include <common/facilities/gs_public.h>
 
+#include <ctime>
 #include <variant>
 #include <string>
 #include <span>
@@ -423,7 +432,7 @@ void SV_PureSound( const char *name ) {
 
 	bool hasExtension = COM_FileExtension( tempname ) != nullptr;
 	if( !hasExtension ) {
-		if( const char *extension = FS_FirstExtension( tempname, SOUND_EXTENSIONS, NUM_SOUND_EXTENSIONS ) ) {
+		if( const char *extension = FS_FirstExtension( tempname, SOUND_EXTENSIONS, std::size( SOUND_EXTENSIONS ) ) ) {
 			COM_ReplaceExtension( tempname, extension, sizeof( tempname ) );
 			hasExtension = true;
 		}
@@ -454,7 +463,7 @@ static void SV_AddPureShader( const char *name ) {
 
 	bool hasExtension = COM_FileExtension( tempname );
 	if( !hasExtension ) {
-		if( const char *extension = FS_FirstExtension( tempname, IMAGE_EXTENSIONS, NUM_IMAGE_EXTENSIONS ) ) {
+		if( const char *extension = FS_FirstExtension( tempname, IMAGE_EXTENSIONS, std::size( IMAGE_EXTENSIONS ) ) ) {
 			COM_ReplaceExtension( tempname, extension, sizeof( tempname ) );
 			hasExtension = true;
 		}

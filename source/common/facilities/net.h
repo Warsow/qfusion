@@ -1,13 +1,14 @@
 #ifndef QFUSION_NET_H
 #define QFUSION_NET_H
 
+#include <common/helpers/q_arch.h>
+
 // net.h -- quake's interface to the networking layer
 
 #define PACKET_HEADER           10          // two ints, and a short
 
 #define MAX_RELIABLE_COMMANDS   64          // max string commands buffered for restransmit
 #define MAX_PACKETLEN           1400        // max size of a network packet
-#define MAX_MSGLEN              32768       // max length of a message, which may be fragmented into multiple packets
 
 // wsw: Medar: doubled the MSGLEN as a temporary solution for multiview on bigger servers
 #define FRAGMENT_SIZE           ( MAX_PACKETLEN - 96 )
@@ -132,5 +133,6 @@ bool    NET_IsLocalAddress( const netadr_t *address );
 bool    NET_IsAnyAddress( const netadr_t *address );
 void    NET_InitAddress( netadr_t *address, netadrtype_t type );
 void    NET_BroadcastAddress( netadr_t *address, int port );
+uint32_t NET_AddressHash( const netadr_t & );
 
 #endif

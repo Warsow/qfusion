@@ -1,5 +1,8 @@
 #include "weightconfig.h"
 
+#include <common/facilities/fscompat.h>
+#include <common/helpers/parsecompat.h>
+
 template <typename T>
 inline void AiWeightConfigVarGroup::LinkItem( T *item, T **linkedItemsHead, T ***hashBins, unsigned *numItems ) {
 	item->nextSibling = ( *linkedItemsHead );

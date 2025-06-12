@@ -1,9 +1,9 @@
 #ifndef WSW_7f020248_88b8_40f2_ae59_1e97c51e2f82_H
 #define WSW_7f020248_88b8_40f2_ae59_1e97c51e2f82_H
 
-#include <common/facilities/q_shared.h>
 #include <common/facilities/q_comref.h>
 #include <common/facilities/gs_public.h>
+#include <common/facilities/gs_qrespath.h>
 
 #include <common/types/stringview.h>
 #include <common/types/podvector.h>
@@ -308,9 +308,9 @@ static void makeCrosshairFilePath( Container *container, const wsw::StringView &
 
 [[nodiscard]]
 auto getRegularCrosshairMaterial( const wsw::StringView &name, bool isForMiniview, unsigned size )
-	-> std::optional<std::tuple<shader_s *, unsigned, unsigned>>;
+	-> std::optional<std::pair<shader_s *, std::pair<unsigned, unsigned>>>;
 [[nodiscard]]
 auto getStrongCrosshairMaterial( const wsw::StringView &name, bool isForMiniview, unsigned size )
-	-> std::optional<std::tuple<shader_s *, unsigned, unsigned>>;
+	-> std::optional<std::pair<shader_s *, std::pair<unsigned, unsigned>>>;
 
 #endif

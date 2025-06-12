@@ -24,13 +24,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "taskhandle.h"
 #include <common/facilities/profiler.h>
 
-#include <cassert>
-#include <cstdlib>
-#include <limits>
-#include <span>
-#include <optional>
-#include <utility>
-
 class TaskSystem {
 	friend struct TaskSystemImpl;
 	friend class CoroTask;

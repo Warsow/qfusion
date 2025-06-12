@@ -22,6 +22,8 @@
 // console
 //
 
+#include <common/facilities/cmdargs.h>
+
 #define NUM_CON_TIMES 4
 
 // wsw : aiwa : global definition to activate case-sensitivity of console (1 == activated)

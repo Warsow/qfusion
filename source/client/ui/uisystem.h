@@ -6,7 +6,6 @@
 #include <span>
 
 #include <common/helpers/q_math.h>
-#include <common/facilities/q_shared.h>
 #include <common/facilities/q_comref.h>
 #include "cgameimports.h"
 

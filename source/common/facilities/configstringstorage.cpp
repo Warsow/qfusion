@@ -1,5 +1,6 @@
 #include "configstringstorage.h"
 #include <common/helpers/links.h>
+#include <common/helpers/q_libc.h>
 
 #include <cstddef>
 #include <stdexcept>

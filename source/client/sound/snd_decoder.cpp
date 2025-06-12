@@ -23,6 +23,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "snd_decoder.h"
 
+#include <common/facilities/q_comref.h>
+#include <common/facilities/fscompat.h>
+
 static snd_decoder_t *decoders;
 
 /*

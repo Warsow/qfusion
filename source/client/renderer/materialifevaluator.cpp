@@ -1,5 +1,7 @@
 #include "materiallocal.h"
 
+#include <common/facilities/messagestreams.h>
+
 auto MaterialIfEvaluator::withError( const char *fmt, ... ) -> std::nullopt_t {
 	if( m_hadError ) {
 		return std::nullopt;

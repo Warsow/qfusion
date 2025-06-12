@@ -7,10 +7,6 @@
 #include <common/helpers/algorithm.h>
 #include <common/helpers/sortbyfield.h>
 
-#include <limits>
-#include <cmath>
-#include <cstdlib>
-
 /**
  * While {@code AiAasRouteCache} is fairly efficient at retrieval of cached results,
  * we can use retrieval of a cached travel time at cost of a single branch for this specialized cache.

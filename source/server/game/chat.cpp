@@ -4,6 +4,7 @@
 #include <common/types/stringview.h>
 #include <common/types/vector.h>
 
+#include <array>
 #include <cstdint>
 #include <sstream>
 

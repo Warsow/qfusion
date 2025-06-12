@@ -6,7 +6,7 @@
 #include <array>
 
 #include <common/helpers/exceptions.h>
-#include <common/facilities/outputmessages.h>
+#include <common/facilities/messagestreams.h>
 #include "cgameimports.h"
 
 namespace wsw { class StringView; }

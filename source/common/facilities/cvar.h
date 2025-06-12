@@ -1,6 +1,45 @@
 #ifndef CVAR_H
 #define CVAR_H
 
+#include <cstdint>
+
+typedef int cvar_flag_t;
+
+// bit-masked cvar flags
+#define CVAR_ARCHIVE        1       // set to cause it to be saved to vars.rc
+#define CVAR_USERINFO       2       // added to userinfo  when changed
+#define CVAR_SERVERINFO     4       // added to serverinfo when changed
+#define CVAR_NOSET          8       // don't allow change from console at all,
+// but can be set from the command line
+#define CVAR_LATCH          16      // save changes until map restart
+#define CVAR_LATCH_VIDEO    32      // save changes until video restart
+#define CVAR_LATCH_SOUND    64      // save changes until video restart
+#define CVAR_CHEAT          128     // will be reset to default unless cheats are enabled
+#define CVAR_READONLY       256     // don't allow changing by user, ever
+#define CVAR_DEVELOPER      512     // allow changing in dev builds, hide in release builds
+
+class DeclaredConfigVar;
+
+// nothing outside the Cvar_*() functions should access these fields!!!
+typedef struct cvar_s {
+	// Must be read/written using atomic ops
+	volatile uint64_t modificationId;
+
+	DeclaredConfigVar *controller;
+
+	char *name;
+	// raw string TODO: Should be an atomic shared ptr
+	char *string;
+	// default value
+	char *dvalue;
+	// for CVAR_LATCH* vars
+	char *latched_string;
+	cvar_flag_t flags;
+	bool modified;          // set each time the cvar is changed
+	float value;
+	int integer;
+} cvar_t;
+
 /*
 
    cvar_t variables are used to hold scalar or string variables that can be changed or displayed at the console or prog code as well as accessed directly

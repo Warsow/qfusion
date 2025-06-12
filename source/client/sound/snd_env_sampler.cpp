@@ -6,7 +6,8 @@
 #include "snd_effects_allocator.h"
 #include "snd_propagation.h"
 #include <common/helpers/algorithm.h>
-
+#include <common/facilities/cvar.h>
+#include <common/facilities/sysclock.h>
 #include <limits>
 
 ListenerProps listenerProps;

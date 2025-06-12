@@ -23,8 +23,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "local.h"
 #include "iqm.h"
 #include "frontend.h"
-#include <common/common.h>
 #include <common/helpers/textstreamwriterextras.h>
+
+#include <climits>
 
 // typedefs
 typedef struct iqmheader iqmheader_t;

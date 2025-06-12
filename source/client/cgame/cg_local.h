@@ -22,22 +22,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <common/helpers/q_arch.h>
 #include <common/helpers/q_math.h>
-#include <common/facilities/q_shared.h>
-#include <common/facilities/q_cvar.h>
+#include <common/facilities/cvar.h>
 #include <common/facilities/q_comref.h>
 #include <common/facilities/q_collision.h>
 #include <common/facilities/gs_public.h>
-#include <common/facilities/outputmessages.h>
+#include <common/facilities/messagestreams.h>
 #include <client/renderer/ref.h>
 
 #include "cg_public.h"
 #include "delayedexecutionsystem.h"
 #include <client/ui/cgameimports.h>
-
-#include <cmath>
-#include <new>
-#include <tuple>
-#include <utility>
 
 extern gs_state_t *cggs;
 

@@ -1,3 +1,7 @@
+#include <common/facilities/messagestreams.h>
+#include <common/facilities/syspublic.h>
+#include <common/facilities/cvar.h>
+#include <common/helpers/q_libc.h>
 #include <common/common.h>
 
 #include <windows.h>

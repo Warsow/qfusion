@@ -3,7 +3,6 @@
 
 #include <QAbstractListModel>
 
-#include <common/common.h>
 #include <common/types/stringview.h>
 #include <common/types/staticstring.h>
 #include <common/types/podvector.h>

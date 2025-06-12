@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "commandshandler.h"
 
 #include <common/helpers/singletonholder.h>
+#include <common/facilities/gs_qrespath.h>
+#include <common/facilities/cvar.h>
 #include "ai/navigation/aasworld.h"
 
 #include <sstream>

@@ -21,7 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef __GS_PUBLIC_H
 #define __GS_PUBLIC_H
 
-#include "gs_ref.h"
+#include "q_comref.h"
+#include "q_collision.h"
 #include <common/types/podvector.h>
 
 //===============================================================

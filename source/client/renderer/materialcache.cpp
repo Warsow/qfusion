@@ -32,6 +32,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/wswfs.h>
 #include "materiallocal.h"
 
+#include <cctype>
+
 using wsw::operator""_asView;
 
 static SingletonHolder<MaterialCache> materialCacheInstanceHolder;

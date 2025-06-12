@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/singletonholder.h>
 #include <common/helpers/links.h>
 #include <common/facilities/profilerscope.h>
+#include <common/facilities/syspublic.h>
 
 /*
 * R_Set2DMode

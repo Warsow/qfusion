@@ -46,7 +46,6 @@ SOFTWARE.
 #include <QVideoSurfaceFormat>
 
 #include <common/helpers/links.h>
-#include <common/common.h>
 #include <common/helpers/singletonholder.h>
 #include <common/helpers/textstreamwriterextras.h>
 #include "local.h"

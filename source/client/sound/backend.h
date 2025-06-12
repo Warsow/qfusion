@@ -6,6 +6,7 @@
 #include <common/types/staticvector.h>
 #include <common/helpers/freelistallocator.h>
 #include <common/helpers/randomgenerator.h>
+#include <common/facilities/q_comref.h>
 #include "snd_local.h"
 #include <array>
 

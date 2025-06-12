@@ -5,7 +5,7 @@
 #include <optional>
 
 #include <common/helpers/q_arch.h>
-#include <common/facilities/q_shared.h>
+#include <common/facilities/q_comref.h>
 
 #include <common/types/function.h>
 #include <common/types/stringview.h>

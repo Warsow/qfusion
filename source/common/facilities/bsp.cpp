@@ -18,10 +18,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#include <common/facilities/q_shared.h>
 #include <common/facilities/q_collision.h>
 #include <common/helpers/glob.h>
 #include <common/facilities/qfiles.h>
+#include <common/facilities/messagestreams.h>
 #include "bsp.h"
 #include <common/helpers/algorithm.h>
 #include <common/types/stringview.h>
@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/tonum.h>
 #include <common/facilities/wswfs.h>
 
+#include <cctype>
 #include <optional>
 #include <string_view>
 #include <memory>

@@ -18,10 +18,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#include <common/common.h>
 #include <common/syslocal.h>
-#include <common/helpers/stringsplitter.h>
 #include <common/types/staticstring.h>
+#include <common/helpers/library.h>
+#include <common/helpers/stringsplitter.h>
+#include <common/facilities/messagestreams.h>
 
 /*
 * Com_UnloadLibrary

@@ -18,17 +18,24 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#include <common/common.h>
+#include <common/version.h>
 #include <common/facilities/cmdargs.h>
 #include <common/facilities/cmdcompat.h>
+#include <common/facilities/fscompat.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/q_comref.h>
 
 #include <common/syslocal.h>
+#include <common/facilities/syspublic.h>
 
 #include <common/helpers/compression.h>
 #include <common/helpers/md5.h>
+#include <common/helpers/parsecompat.h>
 #include <common/types/q_trie.h>
 #include <common/local.h>
 #include <common/helpers/textstreamwriterextras.h>
+
+#include <ctime>
 
 /*
 =============================================================================
@@ -3878,4 +3885,182 @@ void FS_Shutdown( void ) {
 	QMutex_Destroy( &fs_searchpaths_mutex );
 
 	fs_initialized = false;
+}
+
+/*
+* COM_SanitizeFilePath
+*
+* Changes \ character to / characters in the string
+* Does NOT validate the string at all
+* Must be used before other functions are aplied to the string (or those functions might function improperly)
+*/
+char *COM_SanitizeFilePath( char *path ) {
+	char *p;
+
+	assert( path );
+
+	p = path;
+	while( *p && ( p = strchr( p, '\\' ) ) ) {
+		*p = '/';
+		p++;
+	}
+
+	return path;
+}
+
+/*
+* COM_ValidateFilename
+*/
+bool COM_ValidateFilename( const char *filename ) {
+	assert( filename );
+
+	if( !filename || !filename[0] ) {
+		return false;
+	}
+
+	// we don't allow \ in filenames, all user inputted \ characters are converted to /
+	if( strchr( filename, '\\' ) ) {
+		return false;
+	}
+
+	return true;
+}
+
+/*
+* COM_ValidateRelativeFilename
+*/
+bool COM_ValidateRelativeFilename( const char *filename ) {
+	if( !COM_ValidateFilename( filename ) ) {
+		return false;
+	}
+
+	if( strstr( filename, ".." ) || strstr( filename, "//" ) ) {
+		return false;
+	}
+
+	if( *filename == '/' || *filename == '.' ) {
+		return false;
+	}
+
+	return true;
+}
+
+/*
+* COM_StripExtension
+*/
+void COM_StripExtension( char *filename ) {
+	char *src, *last = NULL;
+
+	last = strrchr( filename, '/' );
+	src = strrchr( last ? last : filename, '.' );
+	if( src && *( src + 1 ) ) {
+		*src = 0;
+	}
+}
+
+/*
+* COM_FileExtension
+*/
+const char *COM_FileExtension( const char *filename ) {
+	const char *src, *last;
+
+	last = strrchr( filename, '/' );
+	src = strrchr( last ? last : filename, '.' );
+	if( src && *( src + 1 ) ) {
+		return src;
+	}
+
+	return NULL;
+}
+
+/*
+* COM_DefaultExtension
+* If path doesn't have extension, appends one to it
+* If there is no room for it overwrites the end of the path
+*/
+void COM_DefaultExtension( char *path, const char *extension, size_t size ) {
+	const char *src, *last;
+	size_t extlen;
+
+	assert( extension && extension[0] && strlen( extension ) < size );
+
+	extlen = strlen( extension );
+
+	// if path doesn't have a .EXT, append extension
+	// (extension should include the .)
+	last = strrchr( path, '/' );
+	src = strrchr( last ? last : path, '.' );
+	if( src && *( src + 1 ) ) {
+		return;             // it has an extension
+
+	}
+	if( strlen( path ) + extlen >= size ) {
+		path[size - extlen - 1] = 0;
+	}
+	Q_strncatz( path, extension, size );
+}
+
+/*
+* COM_ReplaceExtension
+* Replaces current extension, if there is none appends one
+* If there is no room for it overwrites the end of the path
+*/
+void COM_ReplaceExtension( char *path, const char *extension, size_t size ) {
+	assert( path );
+	assert( extension && extension[0] && strlen( extension ) < size );
+
+	COM_StripExtension( path );
+	//COM_DefaultExtension( path, extension, size );
+
+	// Vic: using COM_DefaultExtension here breaks filenames with multiple dots
+	// and we have just stripped the extension in COM_StripExtension anyway
+	if( *path && path[strlen( path ) - 1] != '/' ) {
+		Q_strncatz( path, extension, size );
+	}
+}
+
+/*
+* COM_FileBase
+*/
+const char *COM_FileBase( const char *in ) {
+	const char *s;
+
+	s = strrchr( in, '/' );
+	if( s ) {
+		return s + 1;
+	}
+
+	return in;
+}
+
+/*
+* COM_StripFilename
+*
+* Cuts the string of, at the last / or erases the whole string if not found
+*/
+void COM_StripFilename( char *filename ) {
+	char *p;
+
+	p = strrchr( filename, '/' );
+	if( !p ) {
+		p = filename;
+	}
+
+	*p = 0;
+}
+
+/*
+* COM_FilePathLength
+*
+* Returns the length from start of string to the character before last /
+*/
+int COM_FilePathLength( const char *in ) {
+	const char *s;
+
+	s = strrchr( in, '/' );
+	if( !s ) {
+		s = in;
+	}
+
+	return s - in;
 }

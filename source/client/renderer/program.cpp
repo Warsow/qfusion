@@ -27,8 +27,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/memspecbuilder.h>
 #include <common/helpers/singletonholder.h>
 #include <common/facilities/wswfs.h>
+#include <common/helpers/parsecompat.h>
 #include <common/helpers/stringsplitter.h>
 #include <common/helpers/textstreamwriterextras.h>
+
+#include <cctype>
 
 using wsw::operator""_asView;
 

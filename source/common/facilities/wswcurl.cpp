@@ -20,6 +20,13 @@
 #include <openssl/crypto.h>
 #endif
 #include "wswcurl.h"
+
+#include <common/helpers/q_math.h>
+#include <common/helpers/qthreads.h>
+#include <common/helpers/library.h>
+#include <common/helpers/q_libc.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/messagestreams.h>
 #include <common/common.h>
 
 ///////////////////////

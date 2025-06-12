@@ -19,22 +19,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // cm_q3bsp.c -- Q3 BSP model loading
 
-#include <common/common.h>
 #include "cm_local.h"
 #include <common/helpers/patch.h>
+#include <common/helpers/q_libc.h>
+#include <common/facilities/q_collision.h>
 #include <common/facilities/qfiles.h>
-#include <common/helpers/glob.h>
-
-#include <common/facilities/wswfs.h>
-#include <common/types/staticstring.h>
-#include <common/helpers/stringsplitter.h>
-#include <common/helpers/tonum.h>
-#include <common/types/vector.h>
+#include <common/facilities/fscompat.h>
+#include <common/facilities/messagestreams.h>
 #include <common/helpers/memspecbuilder.h>
-
-#include <unordered_map>
-#include <unordered_set>
-#include <memory>
 
 #define MAX_FACET_PLANES 32
 

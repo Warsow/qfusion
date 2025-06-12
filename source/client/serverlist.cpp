@@ -20,15 +20,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "serverlist.h"
 #include <common/helpers/links.h>
+#include <common/helpers/qthreads.h>
+#include <common/helpers/parsecompat.h>
 #include <common/helpers/singletonholder.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/sysclock.h>
 #include "client.h"
 
 #include <atomic>
 #include <cinttypes>
 #include <cstdlib>
 #include <limits>
-
-uint32_t NET_AddressHash( const netadr_t & );
 
 static qmutex_t *resolverMutex;
 // An additional helper for the resolver thread

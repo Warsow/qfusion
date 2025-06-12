@@ -1,10 +1,14 @@
 #include "huddatamodel.h"
 #include "local.h"
 #include "cgameimports.h"
+#include <common/facilities/cvar.h>
 #include <common/facilities/gs_public.h>
 #include <common/helpers/algorithm.h>
 #include <client/client.h>
 #include <client/cgame/mediacache.h>
+
+#define IMPLEMENT_REMOVECOLORTOKENS
+#include <common/helpers/q_libc.h>
 
 #include <QColor>
 #include <QQmlEngine>

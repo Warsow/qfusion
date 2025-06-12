@@ -19,7 +19,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "mmuuid.h"
-#include <common/facilities/q_shared.h>
 #include <common/types/staticstring.h>
 
 auto Uuid_FromString( const wsw::StringView &string ) -> std::optional<mm_uuid_t> {

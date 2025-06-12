@@ -10,8 +10,8 @@
 #include <string>
 #include <unordered_map>
 
-#include <common/common.h>
 #include <common/types/podvector.h>
+#include <common/types/stringview.h>
 
 class QQuickItem;
 

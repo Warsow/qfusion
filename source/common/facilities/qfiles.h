@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef __Q_FILES__
 #define __Q_FILES__
 
+#include <common/facilities/q_comref.h>
+
 /*
 ========================================================================
 

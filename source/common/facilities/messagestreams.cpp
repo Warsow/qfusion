@@ -1,9 +1,16 @@
-#include "outputmessages.h"
+#include <common/facilities/messagestreams.h>
 #include <common/helpers/enumtokenmatcher.h>
 #include <common/facilities/configvars.h>
 #include <common/helpers/freelistallocator.h>
 #include <common/types/staticvector.h>
+#include <common/helpers/qthreads.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/fscompat.h>
+#include <common/local.h>
 #include <common/common.h>
+#include <common/syslocal.h>
+// TODO...
+#include <client/console.h>
 
 using wsw::operator""_asView;
 

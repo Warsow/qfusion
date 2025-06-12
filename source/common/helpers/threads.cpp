@@ -18,9 +18,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#include <common/common.h>
 #include "pipeutils.h"
+#include <common/facilities/messagestreams.h>
+#include <common/facilities/syspublic.h>
 #include <common/syslocal.h>
+
+#include <cstring>
 
 /*
 * QMutex_Create

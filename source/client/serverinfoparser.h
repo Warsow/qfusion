@@ -7,6 +7,8 @@
 class ServerInfo;
 struct msg_s;
 
+#include <cerrno>
+
 class ServerInfoParser {
 	// These fields are used to pass info during parsing
 	ServerInfo *m_info { nullptr };

@@ -23,7 +23,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <process.h>
 #include <windows.h>
 #include "conproc.h"
-#include <common/q_arch.h>
+#include <common/facilities/messagestreams.h>
+#include <common/facilities/syspublic.h>
 
 #define CCOM_WRITE_TEXT     0x2
 // Param1 : Text

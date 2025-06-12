@@ -22,6 +22,37 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define GAME_QCOMREF_H
 
 #include <common/helpers/q_arch.h>
+#include <common/helpers/q_math.h>
+
+#define MAX_CLIENTS                 32          // absolute limit
+#define MAX_EDICTS                  1024        // must change protocol to increase more
+#define MAX_LIGHTSTYLES             256
+#define MAX_MODELS                  1024        // these are sent over the net as shorts
+#define MAX_SOUNDS                  1024        // so they cannot be blindly increased
+#define MAX_IMAGES                  256
+#define MAX_SKINFILES               256
+#define MAX_ITEMS                   64          // 16x4
+#define MAX_CALLVOTES               32
+#define MAX_CALLVOTEINFOS           ( MAX_CALLVOTES * 5 )
+#define MAX_GAMETYPE_OPTIONS        16
+#define MAX_GENERAL                 128         // general config strings
+#define MAX_MMPLAYERINFOS           128
+
+#define MAX_QPATH                   64          // max length of a quake game pathname
+
+#define MAX_STRING_CHARS            1024        // max length of a string passed to Cmd_TokenizeString
+#define MAX_STRING_TOKENS           256         // max tokens resulting from Cmd_TokenizeString
+#define MAX_TOKEN_CHARS             1024        // max length of an individual token
+#define MAX_CONFIGSTRING_CHARS      MAX_QPATH   // max length of a configstring string
+
+constexpr const size_t kMaxNonFragmentedConfigStringLen  = MAX_STRING_CHARS - 16;
+constexpr const size_t kMaxConfigStringFragmentLen       = MAX_STRING_CHARS - 48;
+constexpr const size_t kMaxConfigStringFragments         = 32;
+
+#define MAX_NAME_BYTES              32          // max length of a player name, including trailing \0
+#define MAX_NAME_CHARS              15          // max visible characters in a name (color tokens and \0 not counted)
+
+#define MAX_CHAT_BYTES              151         // max length of a chat message, including color tokens and trailing \0
 
 //
 // button bits
@@ -261,6 +292,14 @@ protected:
 #define DEFAULT_TEAMBETA_MODEL             "padpork"
 
 #define DEFAULT_PLAYERSKIN                  "default"
+
+#define DEFAULT_TEAMALPHA_COLOR     "255 0 255"
+#define DEFAULT_TEAMBETA_COLOR      "0 255 0"
+
+// TODO: Replace by constexpr const char * (we have to modify FS_FirstExtension as well)
+inline const char *SOUND_EXTENSIONS[] { ".ogg", ".wav" };
+// TODO: Exclude .svg from server-side-acknowledged formats
+inline const char *IMAGE_EXTENSIONS[] { ".tga", ".jpg", ".png", ".svg" };
 
 // entity_state_t is the information conveyed from the server
 // in an update message about entities that the client will

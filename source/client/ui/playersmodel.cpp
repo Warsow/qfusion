@@ -1,6 +1,7 @@
 #include "playersmodel.h"
 #include "local.h"
 #include <common/helpers/algorithm.h>
+#include <common/facilities/q_comref.h>
 
 namespace wsw::ui {
 

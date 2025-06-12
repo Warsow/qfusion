@@ -20,6 +20,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <SDL.h>
 #include <client/client.h>
+#include <common/local.h>
+#include <common/version.h>
+#include <common/facilities/sysclock.h>
 
 #if defined( _WIN32 )
 #include "../win32/resource.h"

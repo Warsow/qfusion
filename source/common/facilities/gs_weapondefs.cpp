@@ -22,7 +22,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <common/helpers/q_arch.h>
 #include <common/helpers/q_math.h>
-#include "q_shared.h"
 #include "q_comref.h"
 #include "q_collision.h"
 #include "gs_public.h"

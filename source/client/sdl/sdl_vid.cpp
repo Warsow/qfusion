@@ -19,6 +19,8 @@
  */
 
 #include <client/client.h>
+#include <common/syslocal.h>
+#include <common/facilities/syspublic.h>
 #include "sdl_glw.h"
 
 #include <QVariant>

@@ -7,6 +7,7 @@
 #include <array>
 
 #include <common/facilities/configvars.h>
+#include <common/facilities/q_comref.h>
 #include <common/types/staticvector.h>
 #include <common/types/staticstring.h>
 #include "hudlayoutmodel.h"

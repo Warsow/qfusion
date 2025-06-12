@@ -21,11 +21,23 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //===============================================================
 
 #include <common/facilities/cmdsystem.h>
+#include <common/facilities/q_collision.h>
+#include <common/helpers/q_math.h>
 
 #define MAX_ENT_CLUSTERS    16
 
 typedef struct edict_s edict_t;
 typedef struct Client Client;
+
+// connection state of the client in the server
+typedef enum {
+	CS_FREE,            // can be reused for a new connection
+	CS_ZOMBIE,          // client has been disconnected, but don't reuse
+	// connection for a couple seconds
+	CS_CONNECTING,      // has send a "new" command, is awaiting for fetching configstrings
+	CS_CONNECTED,       // has been assigned to a client_t, but not in game yet
+	CS_SPAWNED          // client is fully in game
+} sv_client_state_t;
 
 struct ServersideClientBase {
 	int m_ping;
@@ -98,6 +110,11 @@ void G_ClientThink( edict_t *ent, usercmd_t *cmd, int timeDelta );
 
 int SVC_FakeConnect( const char *fakeUserinfo, const char *fakeSocketType, const char *fakeIP );
 void SV_LocateEntities( struct edict_s *edicts, int edict_size, int num_edicts, int max_edicts );
+
+// Compat definitions
+#define EXEC_NOW                    0           // don't return until completed
+#define EXEC_INSERT                 1           // insert at current position, but don't run yet
+#define EXEC_APPEND                 2           // add to end of the command buffer
 
 void SV_Cmd_Register( const char *name, CmdFunc cmdFunc, CompletionQueryFunc completionFunc = nullptr );
 void SV_Cmd_Unregister( const char *name );

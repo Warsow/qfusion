@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "refmath.h"
 
+#include <cstring>
+
 const mat4_t mat4x4_identity =
 {
 	1, 0, 0, 0,

@@ -1,9 +1,10 @@
 #ifndef WSW_SERVERLIST_H
 #define WSW_SERVERLIST_H
 
-#include <common/common.h>
 #include <common/types/staticstring.h>
 #include <common/types/staticvector.h>
+#include <common/facilities/net.h>
+#include <common/facilities/msg.h>
 #include "serverinfoparser.h"
 
 class PlayerInfo {

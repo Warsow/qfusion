@@ -25,6 +25,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "snd_env_effects.h"
 #include "snd_env_sampler.h"
 #include <common/helpers/algorithm.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/q_comref.h>
+#include <common/facilities/protocol.h>
+#include <common/facilities/sysclock.h>
 
 src_t srclist[MAX_SRC];
 int src_count = 0;

@@ -215,7 +215,7 @@ typedef struct shaderpass_s {
 	colorgen_t alphagen;
 
 	unsigned int tcgen;
-	vec_t               *tcgenVec;
+	float               *tcgenVec;
 
 	unsigned int numtcmods;
 	tcmod_t             *tcmods;

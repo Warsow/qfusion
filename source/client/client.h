@@ -19,10 +19,14 @@
  */
 // client.h -- primary header for client
 
-#include <common/common.h>
+#include <common/facilities/net_chan.h>
 #include <common/facilities/cmdcompat.h>
+#include <common/facilities/cmodel.h>
 #include <common/facilities/configstringstorage.h>
-#include <common/facilities/outputmessages.h>
+#include <common/facilities/protocol.h>
+#include <common/facilities/messagestreams.h>
+#include <common/facilities/fscompat.h>
+#include <common/helpers/userinfo.h>
 #include "renderer/ref.h"
 #include "cgame/cg_public.h"
 #include "ftlib.h"
@@ -32,13 +36,6 @@
 #include "input.h"
 #include "keys.h"
 #include "console.h"
-
-#include <array>
-#include <cmath>
-#include <cstdlib>
-#include <limits>
-#include <new>
-#include <utility>
 
 typedef struct shader_s shader_t;
 typedef struct qfontface_s qfontface_t;
@@ -334,6 +331,15 @@ struct ChatMessage {
 void CL_Init( void );
 void CL_Quit( void );
 
+void CL_Init( void );
+void CL_Disconnect( const char *message, bool isCalledByBuiltinServer = false );
+void CL_Shutdown( void );
+void CL_Frame( int realMsec, int gameMsec );
+void CL_ParseServerMessage( msg_t *msg );
+void CL_Netchan_Transmit( msg_t *msg );
+void Con_Print( const char *text );
+void SCR_BeginLoadingPlaque( void );
+
 void CL_Cmd_Register( const wsw::StringView &name, CmdFunc cmdFunc, CompletionQueryFunc completionQueryFunc = nullptr, const char *tag = nullptr );
 void CL_Cmd_Unregister( const wsw::StringView &name );
 void CL_Cmd_UnregisterByTag( const wsw::StringView &name );
@@ -453,6 +459,7 @@ size_t CL_ReadDemoMetaData( const char *demopath, char *meta_data, size_t meta_d
 // cl_parse.c
 //
 void CL_ParseServerMessage( msg_t *msg );
+void _SHOWNET( msg_t *msg, const char *s, int shownet );
 #define SHOWNET( msg,s ) _SHOWNET( msg,s,cl_shownet->integer );
 
 void CL_FreeDownloadList( void );
@@ -481,6 +488,17 @@ void SCR_ShutDownConsoleMedia( void );
 qfontface_t *SCR_RegisterFont( const char *family, int style, unsigned int size );
 size_t SCR_FontHeight( qfontface_t *font );
 size_t SCR_strWidth( const char *str, qfontface_t *font, size_t maxlen, int flags = 0 );
+
+#define ALIGN_LEFT_TOP              0
+#define ALIGN_CENTER_TOP            1
+#define ALIGN_RIGHT_TOP             2
+#define ALIGN_LEFT_MIDDLE           3
+#define ALIGN_CENTER_MIDDLE         4
+#define ALIGN_RIGHT_MIDDLE          5
+#define ALIGN_LEFT_BOTTOM           6
+#define ALIGN_CENTER_BOTTOM         7
+#define ALIGN_RIGHT_BOTTOM          8
+
 int SCR_DrawString( int x, int y, int align, const char *str, qfontface_t *font = nullptr, const float *color = colorWhite, int flags = 0 );
 int SCR_DrawString( int x, int y, int align, const wsw::StringView &str, qfontface_t *font = nullptr, const float *color = colorWhite, int flags = 0 );
 void SCR_DrawClampString( int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags = 0 );
@@ -517,6 +535,15 @@ void CL_Sys_Init( void );
  * Shuts down the client parts of the platform module.
  */
 void CL_Sys_Shutdown( void );
+
+
+#define DEFAULT_SYSTEM_FONT_FAMILY          "Droid Sans"
+#define DEFAULT_SYSTEM_FONT_FAMILY_FALLBACK "Droid Sans Fallback"
+#define DEFAULT_SYSTEM_FONT_FAMILY_MONO     "Droid Sans Mono"
+#define DEFAULT_SYSTEM_FONT_SMALL_SIZE      9
+#define DEFAULT_SYSTEM_FONT_MEDIUM_SIZE     16
+#define DEFAULT_SYSTEM_FONT_BIG_SIZE        24
+#define DEFAULT_SYSTEM_FONT_STYLE           0
 
 #define clDebug()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Client, wsw::MessageCategory::Debug ) ).getWriter()
 #define clNotice()  wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Client, wsw::MessageCategory::Notice ) ).getWriter()

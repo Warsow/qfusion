@@ -18,7 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // common.c -- misc functions used in client and server
-#include "common.h"
+#include "common/version.h"
 #include <common/facilities/cmdargs.h>
 #include <common/facilities/cmdcompat.h>
 #include <common/facilities/configvars.h>
@@ -27,11 +27,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "local.h"
 #include <common/facilities/profiler.h>
 #include <common/facilities/wswcurl.h>
+#include <common/facilities/syspublic.h>
+#include <common/facilities/sysclock.h>
 #include <common/helpers/compression.h>
 #include <common/helpers/textstreamwriterextras.h>
 #include <server/server.h>
 #ifndef DEDICATED_ONLY
 #include <client/client.h>
+#else
+#include <common/facilities/cmodel.h>
+#include <common/facilities/fscompat.h>
 #endif
 
 #include <atomic>

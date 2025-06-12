@@ -1,6 +1,7 @@
 #include "evolutionmanager.h"
 #include "bot.h"
 
+#include <ctime>
 #include <random>
 
 void *GT_asGetScriptBotEvolutionManager();

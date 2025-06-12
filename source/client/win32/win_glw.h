@@ -49,7 +49,8 @@ typedef struct {
 
 extern glwstate_t glw_state;
 
-extern cvar_t *vid_fullscreen;
-extern cvar_t *vid_displayfrequency;
+struct cvar_s;
+extern cvar_s *vid_fullscreen;
+extern cvar_s *vid_displayfrequency;
 
 #endif

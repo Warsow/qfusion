@@ -20,6 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "hash.h"
 
+#include <climits>
+
 namespace wsw {
 
 auto getHashAndLength( const char *str ) -> std::pair<uint32_t, size_t> {

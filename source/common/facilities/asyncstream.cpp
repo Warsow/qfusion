@@ -18,9 +18,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#include <common/common.h>
+#include <common/helpers/q_libc.h>
 #include <common/facilities/wswcurl.h>
+#include <common/facilities/messagestreams.h>
 #include "asyncstream.h"
+
+#include <cassert>
+#include <cstring>
+#include <cstdint>
 
 typedef struct async_stream_handler_s {
 	async_stream_read_cb_t read_cb;

@@ -3,10 +3,6 @@
 
 #include "tacticalspotsproblemsolver.h"
 
-// For macOS Clang
-#include <cmath>
-#include <cstdlib>
-
 typedef TacticalSpotsProblemSolver::SpotsAndScoreVector SpotsAndScoreVector;
 typedef TacticalSpotsProblemSolver::OriginAndScoreVector OriginAndScoreVector;
 

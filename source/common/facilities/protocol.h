@@ -4,7 +4,113 @@
 #include <common/types/staticvector.h>
 #include <common/types/stringview.h>
 #include <common/helpers/exceptions.h>
-#include <common/common.h>
+#include <common/facilities/q_comref.h>
+
+struct snapshot_s;
+
+struct ginfo_s;
+struct client_s;
+struct cmodel_state_s;
+struct client_entities_s;
+
+#define PORT_INFO_SERVER    27950
+#define PORT_SERVER         44400
+#define PORT_HTTP_SERVER    44444
+
+// serverdata flags
+#define SV_BITFLAGS_PURE            ( 1 << 0 )
+#define SV_BITFLAGS_RELIABLE        ( 1 << 1 )
+#define SV_BITFLAGS_HTTP            ( 1 << 3 )
+#define SV_BITFLAGS_HTTP_BASEURL    ( 1 << 4 )
+
+// framesnap flags
+#define FRAMESNAP_FLAG_DELTA        ( 1 << 0 )
+#define FRAMESNAP_FLAG_ALLENTITIES  ( 1 << 1 )
+#define FRAMESNAP_FLAG_MULTIPOV     ( 1 << 2 )
+
+//=========================================
+
+#define UPDATE_BACKUP   32  // copies of entity_state_t to keep buffered
+// must be power of two
+
+#define UPDATE_MASK ( UPDATE_BACKUP - 1 )
+
+#define SNAP_MAX_DEMO_META_DATA_SIZE    16 * 1024
+
+// define this 0 to disable compression of demo files
+#define SNAP_DEMO_GZ                    FS_GZ
+
+void SNAP_ParseBaseline( struct msg_s *msg, entity_state_t *baselines );
+void SNAP_SkipFrame( struct msg_s *msg, struct snapshot_s *header );
+struct snapshot_s *SNAP_ParseFrame( struct msg_s *msg, struct snapshot_s *lastFrame, struct snapshot_s *backup, entity_state_t *baselines, int showNet );
+
+void SNAP_WriteFrameSnapToClient( const struct ginfo_s *gi, struct client_s *client, struct msg_s *msg,
+								  int64_t frameNum, int64_t gameTime,
+								  const entity_state_t *baselines, const struct client_entities_s *client_entities,
+								  int numcmds, const gcommand_t *commands, const char *commandsData );
+
+void SNAP_BuildClientFrameSnap( struct cmodel_state_s *cms, struct ginfo_s *gi, int64_t frameNum, int64_t timeStamp,
+								const float *skyPortalPovOrigin, struct client_s *client, const game_state_t *gameState,
+								const ReplicatedScoreboardData *scoreboardData, struct client_entities_s *client_entities );
+
+void SNAP_FreeClientFrames( struct client_s *client );
+
+void SNAP_RecordDemoMessage( int demofile, struct msg_s *msg, int offset );
+int SNAP_ReadDemoMessage( int demofile, struct msg_s *msg );
+
+void SNAP_BeginDemoRecording( int demofile, unsigned int spawncount, unsigned int snapFrameTime,
+							  const char *sv_name, unsigned int sv_bitflags, struct purelist_s *purelist,
+							  char *configstrings, entity_state_t *baselines );
+
+namespace wsw { class ConfigStringStorage; }
+
+void SNAP_BeginDemoRecording( int demofile, unsigned int spawncount, unsigned int snapFrameTime,
+							  const char *sv_name, unsigned int sv_bitflags, struct purelist_s *purelist,
+							  const wsw::ConfigStringStorage &configStrings, entity_state_t *baselines );
+
+void SNAP_StopDemoRecording( int demofile );
+void SNAP_WriteDemoMetaData( const char *filename, const char *meta_data, size_t meta_data_realsize );
+size_t SNAP_ClearDemoMeta( char *meta_data, size_t meta_data_max_size );
+size_t SNAP_ReadDemoMetaData( int demofile, char *meta_data, size_t meta_data_size );
+
+//
+// server to client
+//
+enum svc_ops_e {
+	svc_bad,
+
+	// the rest are private to the client and server
+	svc_nop,
+	svc_servercmd,          // [string] string
+	svc_serverdata,         // [int] protocol ...
+	svc_spawnbaseline,
+	svc_download,           // [short] size [size bytes]
+	svc_playerinfo,         // variable
+	svc_packetentities,     // [...]
+	svc_gamecommands,
+	svc_match,
+	svc_scoreboard,
+	svc_clcack,
+	svc_servercs,           //tmp jalfixme : send reliable commands as unreliable
+	svc_frame,
+	svc_demoinfo,
+	svc_extension           // for future expansion
+};
+
+//==============================================
+
+//
+// client to server
+//
+enum clc_ops_e {
+	clc_bad,
+	clc_nop,
+	clc_move,               // [[usercmd_t]
+	clc_svcack,
+	clc_clientcommand,      // [string] message
+	clc_extension
+};
+
 
 namespace wsw {
 
@@ -174,5 +280,11 @@ public:
 };
 
 }
+
+constexpr const float kSoundAttenuationMaxDistance = 8000.0f;
+constexpr const float kSoundAttenuationRefDistance = 250.0f;
+
+[[nodiscard]]
+auto calcSoundGainForDistanceAndAttenuation( float distance, float attenuation ) -> float;
 
 #endif

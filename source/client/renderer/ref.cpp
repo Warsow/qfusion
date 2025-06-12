@@ -26,7 +26,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "materiallocal.h"
 #include "frontend.h"
 #include <common/helpers/textstreamwriterextras.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/fscompat.h>
 #include <common/facilities/profilerscope.h>
+#include <common/facilities/syspublic.h>
+#include <common/facilities/sysclock.h>
+#include <common/common.h>
 
 r_globals_t rf;
 

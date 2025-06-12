@@ -1,4 +1,5 @@
 #include "rewriteme.h"
+#include <common/facilities/fscompat.h>
 
 AiPrecomputedFileHandler::~AiPrecomputedFileHandler() {
 	if( data ) {

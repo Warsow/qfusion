@@ -5,6 +5,12 @@
 #include <common/types/smallassocarray.h>
 #include <common/types/stringview.h>
 
+#define MAX_INFO_KEY        64
+#define MAX_INFO_VALUE      64
+#define MAX_INFO_STRING     512
+
+
+
 namespace wsw {
 
 class UserInfo {
@@ -91,5 +97,12 @@ public:
 };
 
 }
+
+char *Info_ValueForKey( const char *s, const char *key );
+void Info_RemoveKey( char *s, const char *key );
+bool Info_SetValueForKey( char *s, const char *key, const char *value );
+bool Info_Validate( const char *s );
+void Info_CleanValue( const char *in, char *out, size_t outsize );
+void Info_Print( char *s );
 
 #endif

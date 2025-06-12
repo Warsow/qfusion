@@ -18,14 +18,20 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#include <common/common.h>
+#include <common/facilities/q_comref.h>
 #include <common/types/q_trie.h>
 #include <client/console.h>
 #include <common/facilities/cmdargs.h>
 #include <common/facilities/cmdcompat.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/fscompat.h>
 #include "configvars.h"
+#include <common/common.h>
 #include <common/local.h>
+#include <common/helpers/qthreads.h>
+#include <common/helpers/userinfo.h>
 #include <common/helpers/textstreamwriterextras.h>
+#include <common/facilities/messagestreams.h>
 
 #include <atomic>
 

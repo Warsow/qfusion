@@ -2,9 +2,10 @@
 #define WSW_e85f918d_1654_4d38_a893_87bdd3af22ad_H
 
 #include <common/helpers/q_math.h>
-#include <common/facilities/q_shared.h>
 #include <common/facilities/q_comref.h>
 #include <common/types/stringview.h>
+
+#include <cstdarg>
 
 class ChatHandlersChain;
 struct edict_s;

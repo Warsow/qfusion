@@ -88,6 +88,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define GAMMARAMP_STRIDE                4096
 
+#include <common/facilities/cvar.h>
+
 extern cvar_t *r_stencilbits;
 extern cvar_t *gl_driver;
 
@@ -226,8 +228,10 @@ void    GLimp_Shutdown( void );
 
 struct VidModeOptions;
 
-rserr_t GLimp_SetMode( int x, int y, int width, int height, int displayFrequency, const VidModeOptions &options );
-rserr_t GLimp_SetFullscreenMode( int displayFrequency, bool fullscreen );
+enum rserr_t : int;
+
+enum rserr_t GLimp_SetMode( int x, int y, int width, int height, int displayFrequency, const VidModeOptions &options );
+enum rserr_t GLimp_SetFullscreenMode( int displayFrequency, bool fullscreen );
 void    GLimp_AppActivate( bool active, bool minimize, bool destroy );
 bool    GLimp_GetGammaRamp( size_t stride, unsigned short *psize, unsigned short *ramp );
 void    GLimp_SetGammaRamp( size_t stride, unsigned short size, unsigned short *ramp );

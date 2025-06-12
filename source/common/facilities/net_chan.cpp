@@ -18,8 +18,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#include <common/common.h>
+#include <common/facilities/net_chan.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/msg.h>
+#include <common/facilities/net.h>
+#include <common/facilities/messagestreams.h>
+#include <common/facilities/sysclock.h>
 #include <common/helpers/compression.h>
+#include <common/helpers/q_libc.h>
+
+#include <cstring>
 
 #if defined ( __MACOSX__ )
 #include <arpa/inet.h>

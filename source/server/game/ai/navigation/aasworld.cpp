@@ -23,13 +23,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <common/helpers/sortbyfield.h>
 #include <common/types/vector.h>
 #include <common/facilities/wswfs.h>
+#include <common/facilities/fscompat.h>
 #include "../ailocal.h"
 #include "../rewriteme.h"
 #include <common/helpers/md5.h>
 #include <common/helpers/base64.h>
 
-#include <cmath>
-#include <cstdlib>
 #include <tuple>
 
 using wsw::operator""_asView;

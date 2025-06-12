@@ -96,7 +96,6 @@ struct model_s *CG_RegisterModel( const char *name ) {
 }
 
 void CG_RegisterLevelMinimap( void ) {
-	size_t i;
 	int file;
 	char minimap[MAX_QPATH];
 
@@ -104,8 +103,8 @@ void CG_RegisterLevelMinimap( void ) {
 
 	const char *name = cgs.configStrings.getMapName()->data();
 
-	for( i = 0; i < NUM_IMAGE_EXTENSIONS; i++ ) {
-		Q_snprintfz( minimap, sizeof( minimap ), "minimaps/%s%s", name, IMAGE_EXTENSIONS[i] );
+	for( const char *ext: IMAGE_EXTENSIONS ) {
+		Q_snprintfz( minimap, sizeof( minimap ), "minimaps/%s%s", name, ext );
 		file = FS_FOpenFile( minimap, NULL, FS_READ );
 		if( file != -1 ) {
 			cgs.shaderMiniMap = R_RegisterPic( minimap );
@@ -151,7 +150,8 @@ public:
 	explicit CrosshairMaterialCache( const wsw::StringView &pathPrefix ) noexcept : m_pathPrefix( pathPrefix ) {}
 
 	[[nodiscard]]
-	auto getMaterial( const wsw::StringView &name, bool isForMiniview, unsigned size ) -> std::optional<std::tuple<shader_s *, unsigned, unsigned>> {
+	auto getMaterial( const wsw::StringView &name, bool isForMiniview, unsigned size )
+		-> std::optional<std::pair<shader_s *, std::pair<unsigned, unsigned>>> {
 		assert( !name.empty() && size > 1u );
 		CacheEntry *foundEntry = nullptr;
 		// TODO: Isn't this design fragile?
@@ -180,7 +180,8 @@ public:
 				}
 			}
 			if( bin->material ) {
-				return std::make_tuple( bin->material, bin->cachedActualSize.first, bin->cachedActualSize.second );
+				return std::make_pair( bin->material,
+									   std::make_pair( bin->cachedActualSize.first, bin->cachedActualSize.second ) );
 			}
 		}
 		return std::nullopt;
@@ -246,12 +247,12 @@ auto getStrongCrosshairFiles() -> const wsw::StringSpanStorage<unsigned, unsigne
 }
 
 auto getRegularCrosshairMaterial( const wsw::StringView &name, bool isForMiniview, unsigned size )
-	-> std::optional<std::tuple<shader_s *, unsigned, unsigned>> {
+	-> std::optional<std::pair<shader_s *, std::pair<unsigned, unsigned>>> {
 	return g_regularCrosshairsMaterialCache.getMaterial( name, isForMiniview, size );
 }
 
 auto getStrongCrosshairMaterial( const wsw::StringView &name, bool isForMiniview, unsigned size )
-	-> std::optional<std::tuple<shader_s *, unsigned, unsigned>> {
+	-> std::optional<std::pair<shader_s *, std::pair<unsigned, unsigned>>> {
 	return g_strongCrosshairsMaterialCache.getMaterial( name, isForMiniview, size );
 }
 

@@ -24,6 +24,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "alsystemfacade.h"
 #include <common/helpers/links.h>
 #include <common/helpers/algorithm.h>
+#include <common/facilities/cvar.h>
+#include <common/facilities/q_comref.h>
+#include <common/facilities/sysclock.h>
 #include <span>
 
 extern int s_registration_sequence;

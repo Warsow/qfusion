@@ -19,9 +19,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // cmodel_trace.c
 
-#include <common/common.h>
+#include "cmodel.h"
 #include "cm_local.h"
 #include "cm_trace.h"
+
+#include <cstring>
 
 #ifdef CM_SELF_TEST
 #include <common/helpers/algorithm.h>

@@ -20,8 +20,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "q_math.h"
-#include <common/facilities/q_shared.h>
+#include <common/facilities/syspublic.h>
 
+#include <cstring>
 
 //============================================================================
 

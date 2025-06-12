@@ -1,11 +1,13 @@
 #include "demos.h"
-#include <common/facilities/demometadata.h>
+#include <common/facilities/protocol.h>
+#include <common/facilities/cvar.h>
 #include <common/common.h>
 #include <common/helpers/links.h>
 #include <common/helpers/algorithm.h>
 #include <common/helpers/tonum.h>
 #include <common/version.h>
 #include <common/facilities/wswfs.h>
+#include <common/facilities/sysclock.h>
 #include <client/client.h>
 #include "wordsmatcher.h"
 

@@ -2,6 +2,7 @@
 
 #include "keysandbindingsmodel.h"
 #include <common/helpers/exceptions.h>
+#include <common/helpers/q_math.h>
 #include <common/types/staticstring.h>
 #include <client/keys.h>
 

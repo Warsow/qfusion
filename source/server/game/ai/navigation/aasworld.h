@@ -20,10 +20,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define WSW_5dd29ec8_a176_43b0_b48a_b41c8ff11162_H
 
 #include <common/helpers/q_math.h>
-#include <common/facilities/q_shared.h>
+#include <common/facilities/q_comref.h>
 #include "../vec3.h"
 
-#include <common/common.h>
 #include <common/types/stringview.h>
 #include <common/types/staticstring.h>
 

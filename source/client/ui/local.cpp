@@ -1,5 +1,4 @@
 #include "local.h"
-#include <common/common.h>
 #include <client/renderer/ref.h>
 
 #include <QColor>

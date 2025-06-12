@@ -22,6 +22,7 @@
 #define __SDL_GLW_H_
 
 #include <SDL.h>
+#include <common/facilities/cvar.h>
 
 typedef int (* wndproc_t)( void *, int, int, int );
 

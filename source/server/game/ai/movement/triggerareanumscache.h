@@ -1,7 +1,7 @@
 #ifndef WSW_27e919d8_dea3_4667_b05f_118b4ade67d0_H
 #define WSW_27e919d8_dea3_4667_b05f_118b4ade67d0_H
 
-#include <common/facilities/q_shared.h>
+#include <common/facilities/q_comref.h>
 #include <common/helpers/wswbasicmath.h>
 #include <common/types/podvector.h>
 

@@ -9,7 +9,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-#include <common/facilities/q_shared.h>
+#include <common/helpers/q_libc.h>
 
 #ifdef _MSC_VER
 #pragma warning( disable : 4324 )       // structure was padded due to alignment specifier
@@ -54,7 +54,8 @@ private:
 		Q_vsnprintfz( buffer, sizeof( buffer ), format, va );
 		va_end( va );
 
-		Sys_Error( "%s", buffer );
+		//Sys_Error( "%s", buffer );
+		abort();
 	}
 
 	inline ptrdiff_t idx( const_iterator ptr ) { return ptr - basePointer; }

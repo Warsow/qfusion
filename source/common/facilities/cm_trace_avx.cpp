@@ -1,6 +1,7 @@
-#include <common/common.h>
 #include "cm_local.h"
 #include "cm_trace.h"
+
+#include <cstring>
 
 #define CM_USE_SSE
 #define CM_USE_AVX

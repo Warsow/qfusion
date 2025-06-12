@@ -24,13 +24,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "cg_local.h"
 #include <client/client.h>
 #include <client/ui/uisystem.h>
-#include <common/common.h>
 #include <common/facilities/cmdargs.h>
 #include <common/facilities/cmdcompat.h>
 #include <common/helpers/algorithm.h>
 #include <common/facilities/wswfs.h>
 #include <common/facilities/profilerscope.h>
 #include <common/facilities/configvars.h>
+#include <common/facilities/sysclock.h>
 
 using wsw::operator""_asView;
 using wsw::operator""_asHView;
@@ -2101,7 +2101,7 @@ static void drawCrosshair( int weapon, int fireMode, std::optional<float> minivi
 		nameVar  = &v_crosshairName;
 	}
 
-	std::optional<std::tuple<shader_s *, unsigned, unsigned>> materialAndDimensions;
+	std::optional<std::pair<shader_s *, std::pair<unsigned, unsigned>>> materialAndDimensions;
 	if( const wsw::StringView name = nameVar->get(); !name.empty() ) {
 		// Note: We use a fixed downscale factor as changing image size is very expensive and everything relies on caching
 		const unsigned sizeVarValue = sizeVar->get();
@@ -2115,7 +2115,8 @@ static void drawCrosshair( int weapon, int fireMode, std::optional<float> minivi
 	}
 
 	if( materialAndDimensions ) {
-		auto [material, imageWidth, imageHeight] = *materialAndDimensions;
+		auto [material, dimensions]    = *materialAndDimensions;
+		auto [imageWidth, imageHeight] = dimensions;
 
 		const int64_t damageTime      = wsw::max( cgs.snapFrameTime, v_crosshairDamageTime.get() );
 		const int64_t damageTimestamp = viewState->crosshairDamageTimestamp;
