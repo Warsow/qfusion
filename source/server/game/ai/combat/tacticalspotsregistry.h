@@ -6,7 +6,7 @@
 #include <common/types/staticvector.h>
 #include "../bot.h"
 #include <common/helpers/links.h>
-#include <common/types/podbufferholder.h>
+#include <common/types/podbuffer.h>
 
 enum class SpotSortCriterion {
 	GenericScore,
@@ -168,7 +168,7 @@ private:
 	mutable SpotsAndScoreVector spotsAndScoreVectorHolder;
 	mutable OriginAndScoreVector originAndScoreVectorHolder;
 	mutable CriteriaScoresVector criteriaScoresVectorHolder;
-	mutable PodBufferHolder<bool> excludedSpotsMaskHolder;
+	mutable PodBuffer<bool> excludedSpotsMaskHolder;
 
 	static constexpr uint16_t MAX_SPOTS_PER_QUERY = 768;
 	static constexpr uint16_t MIN_GRID_CELL_SIDE = 512;

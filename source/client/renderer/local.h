@@ -129,7 +129,7 @@ typedef struct {
 #include <common/types/podvector.h>
 #include <common/types/staticstring.h>
 #include <common/helpers/freelistallocator.h>
-#include <common/types/podbufferholder.h>
+#include <common/types/podbuffer.h>
 
 enum {
 	IT_NONE
@@ -405,7 +405,7 @@ private:
 	static constexpr unsigned kMaxNameLen = 63;
 	static constexpr unsigned kNameDataStride = kMaxNameLen + 1;
 
-	PodBufferHolder<char> m_nameDataStorage;
+	PodBuffer<char> m_nameDataStorage;
 
 	TextureFilter m_textureFilter { Trilinear };
 	int m_anisoLevel { 1 };

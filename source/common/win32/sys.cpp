@@ -1,6 +1,6 @@
 #include "../local.h"
 #include "../common.h"
-#include <common/types/podbufferholder.h>
+#include <common/types/podbuffer.h>
 #include <common/facilities/syspublic.h>
 
 #include <windows.h>
@@ -46,7 +46,7 @@ auto testNumberOfProcessors() -> std::optional<std::pair<unsigned, unsigned>> {
 	const unsigned numSlpiElems = bufferLenInBytes / sizeof( SYSTEM_LOGICAL_PROCESSOR_INFORMATION );
 	assert( bufferLen % sizeof( SYSTEM_LOGICAL_PROCESSOR_INFORMATION ) == 0 );
 
-	PodBufferHolder<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> bufferHolder;
+	PodBuffer<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> bufferHolder;
 	if( !bufferHolder.tryReserving( numSlpiElems ) ) {
 		return std::nullopt;
 	}

@@ -120,7 +120,7 @@ class FloodFillPathFinder {
 
 	UpdatesHeap m_heap;
 	PropagationGraphBuilder *m_graph;
-	PodBufferHolder<VertexUpdateStatus> m_updateStatus;
+	PodBuffer<VertexUpdateStatus> m_updateStatus;
 	int m_lastFillLeafNum { -1 };
 
 	void FloodFillForLeaf( int leafNum );
@@ -152,7 +152,7 @@ class BidirectionalPathFinder {
 
 	PropagationGraphBuilder *m_graph;
 
-	PodBufferHolder<VertexUpdateStatus> m_updateStatus;
+	PodBuffer<VertexUpdateStatus> m_updateStatus;
 
 	UpdatesHeap m_heaps[2];
 
@@ -362,7 +362,7 @@ protected:
 	PropagationProps *const m_table;
 	GraphType m_graph;
 
-	PodBufferHolder<int> m_tmpLeafNums;
+	PodBuffer<int> m_tmpLeafNums;
 
 	int m_total { -1 };
 	int m_executed { 0 };
@@ -490,7 +490,7 @@ protected:
 
 	PropagationGraphBuilder m_graphBuilder;
 
-	PodBufferHolder<PropagationTable::PropagationProps> m_table;
+	PodBuffer<PropagationTable::PropagationProps> m_table;
 
 	wsw::Mutex m_workloadMutex;
 	int m_executedWorkload { 0 };
@@ -524,7 +524,7 @@ public:
 
 	bool Build();
 
-	inline PodBufferHolder<PropagationTable::PropagationProps> ReleaseOwnership();
+	inline PodBuffer<PropagationTable::PropagationProps> ReleaseOwnership();
 };
 
 PropagationBuilderThreadState::PropagationBuilderThreadState( ParentBuilderType *parent, const PropagationGraphBuilder *referenceGraph )
@@ -544,7 +544,7 @@ class FinePropagationBuilder : public PropagationTableBuilder {
 	 * An euclidean distance table for leaves
 	 * @todo using short values is sufficient for the majority of maps
 	 */
-	PodBufferHolder<float> m_euclideanDistanceTable;
+	PodBuffer<float> m_euclideanDistanceTable;
 
 	bool ExecComputations() override {
 		TaskSystem taskSystem( { .numExtraThreads = S_SuggestNumExtraThreadsForComputations() } );
@@ -602,7 +602,7 @@ public:
 		: PropagationTableBuilder( actualNumLeafs_, true ) {}
 };
 
-PodBufferHolder<PropagationTable::PropagationProps> PropagationTableBuilder::ReleaseOwnership() {
+PodBuffer<PropagationTable::PropagationProps> PropagationTableBuilder::ReleaseOwnership() {
 	return std::move( m_table );
 }
 
@@ -1093,7 +1093,7 @@ public:
 	PropagationTableReader( const PropagationTable *parent_, int fsFlags )
 		: CachedComputationReader( parent_, fsFlags ) {}
 
-	PodBufferHolder<PropagationTable::PropagationProps> ReadPropsTable( int actualNumLeafs );
+	PodBuffer<PropagationTable::PropagationProps> ReadPropsTable( int actualNumLeafs );
 };
 
 class PropagationTableWriter: public CachedComputationWriter {
@@ -1179,7 +1179,7 @@ bool PropagationTableReader::ValidateTable( PropagationTable::PropagationProps *
 	return true;
 }
 
-PodBufferHolder<PropagationTable::PropagationProps> PropagationTableReader::ReadPropsTable( int actualNumLeafs ) {
+PodBuffer<PropagationTable::PropagationProps> PropagationTableReader::ReadPropsTable( int actualNumLeafs ) {
 	// Sanity check
 	assert( actualNumLeafs > 0 && actualNumLeafs < ( 1 << 20 ) );
 
@@ -1202,7 +1202,7 @@ PodBufferHolder<PropagationTable::PropagationProps> PropagationTableReader::Read
 	// Just return a view of the file data that is read and is kept in-memory.
 	// An overhead of storing few extra strings at the beginning is insignificant.
 
-	PodBufferHolder<PropagationTable::PropagationProps> result;
+	PodBuffer<PropagationTable::PropagationProps> result;
 	result.reserve( actualNumLeafs * actualNumLeafs );
 	if( Read( result.get(), sizeof( PropagationTable::PropagationProps ) * actualNumLeafs * actualNumLeafs ) ) {
 		if( ValidateTable( result.get(), actualNumLeafs ) ) {

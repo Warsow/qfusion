@@ -6,7 +6,7 @@
 #include <client/renderer/ref.h>
 #include <common/helpers/randomgenerator.h>
 #include <common/helpers/freelistallocator.h>
-#include <common/types/podbufferholder.h>
+#include <common/types/podbuffer.h>
 #include <common/types/podvector.h>
 
 struct CMShapeList;
@@ -681,8 +681,8 @@ private:
 	static constexpr unsigned kMaxMeshesPerHull   = wsw::max( kMaxMeshesPerHullGeneral, kMaxMeshesPerHullForCombinedExplosion );
 	static constexpr unsigned kMaxHullsWithLayers = kMaxFireHulls + kMaxFireClusterHulls + kMaxBlastHulls + kMaxToonSmokeHulls;
 
-	PodBufferHolder<const DynamicMesh *> m_storageOfSubmittedMeshPtrs;
-	PodBufferHolder<float> m_storageOfSubmittedMeshOrderDesignators;
+	PodBuffer<const DynamicMesh *> m_storageOfSubmittedMeshPtrs;
+	PodBuffer<float> m_storageOfSubmittedMeshOrderDesignators;
 
 	wsw::RandomGenerator m_rng;
 	int64_t m_lastTime { 0 };

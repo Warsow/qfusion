@@ -29,7 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/q_collision.h>
 #include <common/facilities/cvar.h>
 #include <common/facilities/messagestreams.h>
-#include <common/types/podbufferholder.h>
+#include <common/types/podbuffer.h>
 #include <client/snd_public.h>
 
 #define AL_ALEXT_PROTOTYPES
@@ -255,7 +255,7 @@ typedef struct bgTrack_s {
 
 bool S_InitDecoders( bool verbose );
 void S_ShutdownDecoders( bool verbose );
-bool S_LoadSound( const char *filename, PodBufferHolder<uint8_t> *dataBuffer, snd_info_t *info );
+bool S_LoadSound( const char *filename, PodBuffer<uint8_t> *dataBuffer, snd_info_t *info );
 snd_stream_t *S_OpenStream( const char *filename, bool *delay );
 bool S_ContOpenStream( snd_stream_t *stream );
 int S_ReadStream( snd_stream_t *stream, int bytes, void *buffer );

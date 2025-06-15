@@ -11,14 +11,14 @@
 #include <common/helpers/exceptions.h>
 
 template <typename T>
-class PodBufferHolder {
+class PodBuffer {
 	static_assert( std::is_trivial_v<T> );
 public:
-	PodBufferHolder() noexcept = default;
-	~PodBufferHolder() noexcept { destroy(); }
+	PodBuffer() noexcept = default;
+	~PodBuffer() noexcept { destroy(); }
 
-	PodBufferHolder( const PodBufferHolder<T> & ) = delete;
-	auto operator=( const PodBufferHolder<T> & ) -> PodBufferHolder<T> & = delete;
+	PodBuffer( const PodBuffer<T> & ) = delete;
+	auto operator=( const PodBuffer<T> & ) -> PodBuffer<T> & = delete;
 
 	[[nodiscard]]
 	auto releaseOwnership() -> T * {
@@ -28,7 +28,7 @@ public:
 		return result;
 	}
 
-	PodBufferHolder( PodBufferHolder<T> &&that ) noexcept {
+	PodBuffer( PodBuffer<T> &&that ) noexcept {
 		m_data     = that.m_data;
 		m_capacity = that.m_capacity;
 
@@ -37,7 +37,7 @@ public:
 	}
 
 	[[maybe_unused]]
-	auto operator=( PodBufferHolder<T> &&that ) noexcept -> PodBufferHolder<T> & {
+	auto operator=( PodBuffer<T> &&that ) noexcept -> PodBuffer<T> & {
 		destroy();
 
 		m_data     = that.m_data;
@@ -128,8 +128,8 @@ public:
 	}
 
 	[[nodiscard]]
-	auto makeADeepCopy() const -> PodBufferHolder<T> {
-		PodBufferHolder<T> result;
+	auto makeADeepCopy() const -> PodBuffer<T> {
+		PodBuffer<T> result;
 		result.reserve( m_capacity );
 		std::memcpy( result.get(), m_data, sizeof( T ) * m_capacity );
 		return result;

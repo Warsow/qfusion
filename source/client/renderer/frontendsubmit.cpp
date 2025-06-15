@@ -617,11 +617,11 @@ void Frontend::addDebugLine( StateForCamera *stateForCamera, const float *p1, co
 
 // TODO: Write to mapped buffers directly
 struct MeshBuilder {
-	PodBufferHolder<vec4_t> meshPositions;
-	PodBufferHolder<vec4_t> meshNormals;
-	PodBufferHolder<vec2_t> meshTexCoords;
-	PodBufferHolder<byte_vec4_t> meshColors;
-	PodBufferHolder<uint16_t> meshIndices;
+	PodBuffer<vec4_t> meshPositions;
+	PodBuffer<vec4_t> meshNormals;
+	PodBuffer<vec2_t> meshTexCoords;
+	PodBuffer<byte_vec4_t> meshColors;
+	PodBuffer<uint16_t> meshIndices;
 
 	unsigned numVerticesSoFar { 0 };
 	unsigned numIndicesSoFar { 0 };

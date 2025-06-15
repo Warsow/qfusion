@@ -8,7 +8,7 @@ template <typename> class SingletonHolder;
 #include <common/helpers/freelistallocator.h>
 #include <common/helpers/randomgenerator.h>
 #include <client/renderer/ref.h>
-#include <common/types/podbufferholder.h>
+#include <common/types/podbuffer.h>
 // TODO: Lift it to the top level
 #include <server/game/ai/vec3.h>
 #include "polyeffectssystem.h"

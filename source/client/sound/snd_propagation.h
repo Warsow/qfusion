@@ -4,7 +4,7 @@
 #include "snd_local.h"
 #include "snd_cached_computation.h"
 
-#include <common/types/podbufferholder.h>
+#include <common/types/podbuffer.h>
 #include <common/facilities/tasksystem.h>
 
 class GraphLike {
@@ -13,9 +13,9 @@ class GraphLike {
 	friend class CachedGraphWriter;
 	friend class PropagationGraphBuilder;
 protected:
-	PodBufferHolder<int> m_adjacencyListsData;
-	PodBufferHolder<int> m_adjacencyListsOffsets;
-	PodBufferHolder<float> m_distanceTable;
+	PodBuffer<int> m_adjacencyListsData;
+	PodBuffer<int> m_adjacencyListsOffsets;
+	PodBuffer<float> m_distanceTable;
 
 	int m_numLeafs;
 
@@ -44,7 +44,7 @@ class CachedLeafsGraph: public CachedComputation, public GraphLike {
 	template <typename> friend class SingletonHolder;
 	friend class PropagationGraphBuilder;
 
-	PodBufferHolder<uint8_t> m_dirsTable;
+	PodBuffer<uint8_t> m_dirsTable;
 
 	void ResetExistingState() override;
 	bool TryReadFromFile( int fsFlags ) override;
@@ -124,7 +124,7 @@ class PropagationTable: public CachedComputation {
 	static_assert( alignof( PropagationProps ) == 1 );
 	static_assert( sizeof( PropagationProps ) == 2 );
 
-	PodBufferHolder<PropagationProps> m_table;
+	PodBuffer<PropagationProps> m_table;
 
 	const PropagationProps &GetProps( int fromLeafNum, int toLeafNum ) const {
 		const auto numLeafs = NumLeafs();
@@ -135,7 +135,7 @@ class PropagationTable: public CachedComputation {
 	}
 
 	void Clear() {
-		m_table = PodBufferHolder<PropagationProps>();
+		m_table = PodBuffer<PropagationProps>();
 	}
 
 	void ResetExistingState() override {
@@ -253,8 +253,8 @@ public:
 	const float *GetDirFromLeafToLeaf( int leaf1, int leaf2, vec3_t reuse ) const;
 private:
 
-	PodBufferHolder<float> m_distanceTableScratchpad;
-	PodBufferHolder<uint8_t> m_dirsTable;
+	PodBuffer<float> m_distanceTableScratchpad;
+	PodBuffer<uint8_t> m_dirsTable;
 	const bool m_fastAndCoarse;
 };
 

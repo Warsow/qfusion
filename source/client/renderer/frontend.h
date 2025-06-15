@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <span>
 
-#include <common/types/podbufferholder.h>
+#include <common/types/podbuffer.h>
 #include <common/types/function.h>
 #include <common/helpers/qthreads.h>
 #include <common/facilities/tasksystem.h>
@@ -213,7 +213,7 @@ private:
 
 		// TODO: We don't really need a growable vector, preallocate at it start
 		wsw::PodVector<sortedDrawSurf_t> *sortList;
-		// Same here, we can't use PodBufferHolder yet for wsw::Function<>
+		// Same here, we can't use PodBuffer yet for wsw::Function<>
 		// TODO: Use something less wasteful wrt storage than wsw::Function<>
 		wsw::PodVector<wsw::Function<void( FrontendToBackendShared *)>> *drawActionsList;
 
@@ -227,35 +227,35 @@ private:
 		wsw::PodVector<PrepareSpriteSurfWorkload> *prepareSpritesWorkload;
 		wsw::PodVector<PreparedSpriteMesh> *preparedSpriteMeshes;
 
-		PodBufferHolder<unsigned> *visibleLeavesBuffer;
-		PodBufferHolder<unsigned> *visibleOccludersBuffer;
-		PodBufferHolder<SortedOccluder> *sortedOccludersBuffer;
+		PodBuffer<unsigned> *visibleLeavesBuffer;
+		PodBuffer<unsigned> *visibleOccludersBuffer;
+		PodBuffer<SortedOccluder> *sortedOccludersBuffer;
 
 		// TODO: Merge these two? Keeping it separate can be more cache-friendly though
-		PodBufferHolder<drawSurfaceBSP_t> *bspDrawSurfacesBuffer;
-		PodBufferHolder<MergedSurfSpan> *drawSurfSurfSpansBuffer;
+		PodBuffer<drawSurfaceBSP_t> *bspDrawSurfacesBuffer;
+		PodBuffer<MergedSurfSpan> *drawSurfSurfSpansBuffer;
 
-		PodBufferHolder<uint8_t> *leafSurfTableBuffer;
-		PodBufferHolder<unsigned> *leafSurfNumsBuffer;
+		PodBuffer<uint8_t> *leafSurfTableBuffer;
+		PodBuffer<unsigned> *leafSurfNumsBuffer;
 
-		PodBufferHolder<uint8_t> *surfVisTableBuffer;
-		PodBufferHolder<GLsizei> *drawSurfMultiDrawCountsBuffer;
-		PodBufferHolder<const GLvoid *> *drawSurfMultiDrawIndicesBuffer;
+		PodBuffer<uint8_t> *surfVisTableBuffer;
+		PodBuffer<GLsizei> *drawSurfMultiDrawCountsBuffer;
+		PodBuffer<const GLvoid *> *drawSurfMultiDrawIndicesBuffer;
 		// For lights
-		PodBufferHolder<unsigned> *drawSurfSurfSubspansBuffer;
+		PodBuffer<unsigned> *drawSurfSurfSubspansBuffer;
 
 		unsigned drawSurfSurfSubspansOffset { 0 };
 		unsigned drawSurfMultiDrawDataOffset { 0 };
 
-		PodBufferHolder<VisTestedModel> *visTestedModelsBuffer;
-		PodBufferHolder<uint32_t> *leafLightBitsOfSurfacesBuffer;
+		PodBuffer<VisTestedModel> *visTestedModelsBuffer;
+		PodBuffer<uint32_t> *leafLightBitsOfSurfacesBuffer;
 
 		ParticleDrawSurface *particleDrawSurfaces;
 		DynamicMeshDrawSurface *dynamicMeshDrawSurfaces;
 
 		// A table of pairs (span offset, span length)
 		std::pair<unsigned, unsigned> *lightSpansForParticleAggregates;
-		PodBufferHolder<uint16_t> *lightIndicesForParticleAggregates;
+		PodBuffer<uint16_t> *lightIndicesForParticleAggregates;
 
 		wsw::PodVector<DebugLine> *debugLines;
 
@@ -691,31 +691,31 @@ private:
 		wsw::PodVector<PrepareSpriteSurfWorkload> prepareSpritesWorkloadBuffer;
 		wsw::PodVector<PreparedSpriteMesh> preparedSpriteMeshesBuffer;
 
-		PodBufferHolder<unsigned> visibleLeavesBuffer;
-		PodBufferHolder<unsigned> visibleOccludersBuffer;
-		PodBufferHolder<SortedOccluder> sortedOccludersBuffer;
+		PodBuffer<unsigned> visibleLeavesBuffer;
+		PodBuffer<unsigned> visibleOccludersBuffer;
+		PodBuffer<SortedOccluder> sortedOccludersBuffer;
 
-		PodBufferHolder<uint8_t> leafSurfTableBuffer;
-		PodBufferHolder<unsigned> leafSurfNumsBuffer;
+		PodBuffer<uint8_t> leafSurfTableBuffer;
+		PodBuffer<unsigned> leafSurfNumsBuffer;
 
-		PodBufferHolder<DynamicMeshDrawSurface> dynamicMeshDrawSurfacesBuffer;
-		PodBufferHolder<drawSurfaceBSP_t> bspDrawSurfacesBuffer;
-		PodBufferHolder<MergedSurfSpan> drawSurfSurfSpansBuffer;
-		PodBufferHolder<uint8_t> bspSurfVisTableBuffer;
-		PodBufferHolder<unsigned> drawSurfSurfSubspansBuffer;
-		PodBufferHolder<GLsizei> drawSurfMultiDrawCountsBuffer;
-		PodBufferHolder<const GLvoid *> drawSurfMultiDrawIndicesBuffer;
+		PodBuffer<DynamicMeshDrawSurface> dynamicMeshDrawSurfacesBuffer;
+		PodBuffer<drawSurfaceBSP_t> bspDrawSurfacesBuffer;
+		PodBuffer<MergedSurfSpan> drawSurfSurfSpansBuffer;
+		PodBuffer<uint8_t> bspSurfVisTableBuffer;
+		PodBuffer<unsigned> drawSurfSurfSubspansBuffer;
+		PodBuffer<GLsizei> drawSurfMultiDrawCountsBuffer;
+		PodBuffer<const GLvoid *> drawSurfMultiDrawIndicesBuffer;
 
-		PodBufferHolder<VisTestedModel> visTestedModelsBuffer;
-		PodBufferHolder<uint32_t> leafLightBitsOfSurfacesBuffer;
+		PodBuffer<VisTestedModel> visTestedModelsBuffer;
+		PodBuffer<uint32_t> leafLightBitsOfSurfacesBuffer;
 
-		PodBufferHolder<ParticleDrawSurface> particleDrawSurfacesBuffer;
+		PodBuffer<ParticleDrawSurface> particleDrawSurfacesBuffer;
 
 		wsw::PodVector<DebugLine> debugLinesBuffer;
 
-		// TODO: Allow storing std::pair<PodType, PodType> in PodBufferHolder
+		// TODO: Allow storing std::pair<PodType, PodType> in PodBuffer
 		wsw::PodVector<std::pair<unsigned, unsigned>> lightSpansForParticleAggregatesBuffer;
-		PodBufferHolder<uint16_t> lightIndicesForParticleAggregatesBuffer;
+		PodBuffer<uint16_t> lightIndicesForParticleAggregatesBuffer;
 
 		StateForCameraStorage *prev { nullptr }, *next { nullptr };
 	};

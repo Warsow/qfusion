@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/cmdsystem.h>
 #include <common/facilities/cvar.h>
 #include <common/helpers/freelistallocator.h>
-#include <common/types/podbufferholder.h>
+#include <common/types/podbuffer.h>
 #include <common/facilities/profilerscope.h>
 #include <common/helpers/singletonholder.h>
 #include <common/helpers/stringsplitter.h>
@@ -1040,7 +1040,7 @@ auto Console::RegularEntry::getWordSpans() const -> std::span<const Console::Reg
 
 	// TODO: Implement a custom wsw::Vector template that allows transferring the underlying buffer ownership
 	// TODO: What to do in case of allocation failure?
-	PodBufferHolder<WordSpan> builtSpansHolder;
+	PodBuffer<WordSpan> builtSpansHolder;
 	builtSpansHolder.reserve( 32u );
 	unsigned numBuiltSpans = 0;
 

@@ -77,7 +77,7 @@ void S_ShutdownDecoders( bool verbose ) {
 	SNDOGG_Shutdown( verbose );
 }
 
-bool S_LoadSound( const char *filename, PodBufferHolder<uint8_t> *dataBuffer, snd_info_t *info ) {
+bool S_LoadSound( const char *filename, PodBuffer<uint8_t> *dataBuffer, snd_info_t *info ) {
 	snd_decoder_t *decoder;
 	char fn[MAX_QPATH];
 

@@ -71,8 +71,8 @@ private:
 	SoundSet *m_registeredSoundSetsHead { nullptr };
 	wsw::MemberBasedFreelistAllocator<sizeof( SoundSet ) + MAX_QPATH + 1, kMaxSoundSets> m_soundSetsAllocator;
 
-	PodBufferHolder<uint8_t> m_fileDataBuffer;
-	PodBufferHolder<uint8_t> m_resamplingBuffer;
+	PodBuffer<uint8_t> m_fileDataBuffer;
+	PodBuffer<uint8_t> m_resamplingBuffer;
 
 	wsw::StringSpanStorage<unsigned, unsigned> m_tmpPathListStorage;
 

@@ -333,10 +333,10 @@ void CachedLeafsGraph::Shutdown() {
 }
 
 void CachedLeafsGraph::ResetExistingState() {
-	m_distanceTable         = PodBufferHolder<float>();
-	m_dirsTable             = PodBufferHolder<uint8_t>();
-	m_adjacencyListsData    = PodBufferHolder<int>();
-	m_adjacencyListsOffsets = PodBufferHolder<int>();
+	m_distanceTable         = PodBuffer<float>();
+	m_dirsTable             = PodBuffer<uint8_t>();
+	m_adjacencyListsData    = PodBuffer<int>();
+	m_adjacencyListsOffsets = PodBuffer<int>();
 }
 
 bool CachedLeafsGraph::TryReadFromFile( int fsFlags ) {
@@ -408,13 +408,13 @@ bool CachedGraphReader::Read( CachedLeafsGraph *readObject ) {
 		return false;
 	}
 
-	PodBufferHolder<float> distanceTableHolder;
+	PodBuffer<float> distanceTableHolder;
 	distanceTableHolder.reserve( numLeafs * numLeafs );
 	if( !CachedComputationReader::Read( distanceTableHolder.get(), numBytesForDistanceTable ) ) {
 		return false;
 	}
 
-	PodBufferHolder<uint8_t> dirsTableHolder;
+	PodBuffer<uint8_t> dirsTableHolder;
 	dirsTableHolder.reserve( numLeafs * numLeafs );
 	if( !CachedComputationReader::Read( dirsTableHolder.get(), numBytesForDirsTable ) ) {
 		return false;
@@ -429,7 +429,7 @@ bool CachedGraphReader::Read( CachedLeafsGraph *readObject ) {
 		}
 	}
 
-	PodBufferHolder<int> adjacencyListsData, adjacencyListsOffsets;
+	PodBuffer<int> adjacencyListsData, adjacencyListsOffsets;
 	adjacencyListsData.reserve( listsDataSize );
 	adjacencyListsOffsets.reserve( numLeafs );
 
