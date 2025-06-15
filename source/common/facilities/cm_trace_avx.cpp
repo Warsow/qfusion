@@ -205,8 +205,7 @@ void AvxOps::ClipToAvxFriendlyShape( CMTraceContext *__restrict tlc, const cbrus
 		const __m256 ymmTestMask = _mm256_xor_ps( ymmSkipMask, ymmFFFs );
 		const __m256 ymmF = _mm256_sub_ps( ymmDist1, ymmDist2 );
 
-		// TODO: Is it that safe? Use a precise division maybe?
-		const __m256 ymmInvDelta = _mm256_rcp_ps( ymmF );
+		const __m256 ymmInvDelta = _mm256_div_ps( _mm256_set1_ps( 1.0f ), ymmF );
 		const __m256 ymmEnterFracs = _mm256_mul_ps( _mm256_sub_ps( ymmDist1, ymmEps ), ymmInvDelta );
 		const __m256 ymmFNegMask = _mm256_and_ps( ymmTestMask, _mm256_cmp_ps( ymmF, ymmZero, _CMP_LT_OQ ) );
 		const __m256 ymmLeaveFracs = _mm256_mul_ps( _mm256_add_ps( ymmDist1, ymmEps ), ymmInvDelta );

@@ -293,8 +293,7 @@ void Sse42Ops::ClipBoxToBrush( CMTraceContext *tlc, const cbrush_t *brush ) {
 		const __m128 xmmTestMask = _mm_xor_ps( xmmSkipMask, xmmFFFs );
 		const __m128 xmmF = _mm_sub_ps( xmmDist1, xmmDist2 );
 
-		// TODO: Is it that safe? Use a precise division maybe?
-		const __m128 xmmInvDelta = _mm_rcp_ps( xmmF );
+		const __m128 xmmInvDelta = _mm_div_ps( _mm_set1_ps( 1.0f ), xmmF );
 		const __m128 xmmEnterFracs = _mm_mul_ps( _mm_sub_ps( xmmDist1, xmmEps ), xmmInvDelta );
 		const __m128 xmmFNegMask = _mm_and_ps( xmmTestMask, _mm_cmplt_ps( xmmF, xmmZero ) );
 		const __m128 xmmLeaveFracs = _mm_mul_ps( _mm_add_ps( xmmDist1, xmmEps ), xmmInvDelta );

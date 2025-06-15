@@ -332,17 +332,17 @@ void Ops::ClipBoxToBrush( CMTraceContext *tlc, const cbrush_t *brush ) {
 		// crosses face
 		f = d1 - d2;
 		if( f > 0 ) {   // enter
-			// conform to SIMD versions by using RCP
-			// there is slight difference in rightmost digits (~ 1e-4) with the division but we believe it's negligible.
-			// we could provide a specialized double-precision version for gameplay code if it is really needed.
-			f = ( d1 - DIST_EPSILON ) * Q_Rcp( f );
+			// conform to SIMD versions by using 1.0f / f, not dividing directly
+			const float rcpF = 1.0f / f;
+			f = ( d1 - DIST_EPSILON ) * rcpF;
 			if( f > enterfrac ) {
 				enterfrac = f;
 				clipplane = p;
 				leadside = side;
 			}
 		} else if( f < 0 ) {   // leave
-			f = ( d1 + DIST_EPSILON ) * Q_Rcp( f );
+			const float rcpF = 1.0f / f;
+			f = ( d1 + DIST_EPSILON ) * rcpF;
 			if( f < leavefrac ) {
 				leavefrac = f;
 			}
