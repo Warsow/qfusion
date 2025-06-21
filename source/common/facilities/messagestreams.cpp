@@ -6,6 +6,7 @@
 #include <common/helpers/qthreads.h>
 #include <common/facilities/cvar.h>
 #include <common/facilities/fscompat.h>
+#include <common/facilities/syspublic.h>
 #include <common/local.h>
 #include <common/common.h>
 #include <common/syslocal.h>
@@ -110,61 +111,61 @@ static const char *kPrintedMessageColorForCategory[4] {
 	S_COLOR_GREY, S_COLOR_WHITE, S_COLOR_YELLOW, S_COLOR_RED
 };
 
-class alignas( 16 ) MessageStreamsAllocator {
+class alignas( 16 ) RegularMessageStreamsAllocator {
 	wsw::Mutex m_mutex;
 	wsw::HeapBasedFreelistAllocator m_allocator;
 
-	static constexpr size_t kSize = MAX_PRINTMSG + sizeof( wsw::OutputMessageStream );
+	static constexpr size_t kSize = MAX_PRINTMSG + sizeof( wsw::RegularMessageStream );
 	static constexpr size_t kCapacity = 1024;
 
 	static constexpr size_t kCategoryCount = std::size( kPrintedMessageColorForCategory );
 	static constexpr size_t kDomainCount = std::size( g_domainTraits );
 
-	wsw::StaticVector<wsw::OutputMessageStream, kCategoryCount * kDomainCount> m_nullStreams;
+	wsw::StaticVector<wsw::RegularMessageStream, kCategoryCount * kDomainCount> m_nullStreams;
 public:
-	MessageStreamsAllocator() : m_allocator( kSize, kCapacity ) {
+	RegularMessageStreamsAllocator() : m_allocator( kSize, kCapacity ) {
 		// TODO: This is very flaky, but alternatives aren't perfect either...
 		for( unsigned domainIndex = 0; domainIndex < kDomainCount; ++domainIndex ) {
 			const auto domain( ( wsw::MessageDomain)( domainIndex ) );
 			for( unsigned categoryIndex = 0; categoryIndex < kCategoryCount; ++categoryIndex ) {
 				const auto category( ( wsw::MessageCategory )( categoryIndex ) );
-				new( m_nullStreams.unsafe_grow_back() )wsw::OutputMessageStream( nullptr, 0, domain, category );
+				new( m_nullStreams.unsafe_grow_back() )wsw::RegularMessageStream( nullptr, 0, domain, category );
 			}
 		}
 	}
 
 	[[nodiscard]]
-	auto nullStreamFor( wsw::MessageDomain domain, wsw::MessageCategory category ) -> wsw::OutputMessageStream * {
+	auto nullStreamFor( wsw::MessageDomain domain, wsw::MessageCategory category ) -> wsw::RegularMessageStream * {
 		const auto indexForDomain   = (unsigned)domain;
 		const auto indexForCategory = (unsigned)category;
 		return std::addressof( m_nullStreams[indexForDomain * kCategoryCount + indexForCategory] );
 	}
 
 	[[nodiscard]]
-	bool isANullStream( wsw::OutputMessageStream *stream ) {
+	bool isANullStream( wsw::RegularMessageStream *stream ) {
 		return (size_t)( stream - m_nullStreams.data() ) < std::size( m_nullStreams );
 	}
 
 	[[nodiscard]]
-	auto alloc( wsw::MessageDomain domain, wsw::MessageCategory category ) -> wsw::OutputMessageStream * {
+	auto alloc( wsw::MessageDomain domain, wsw::MessageCategory category ) -> wsw::RegularMessageStream * {
 		[[maybe_unused]] volatile wsw::ScopedLock<wsw::Mutex> lock( &m_mutex );
 		if( !m_allocator.isFull() ) [[likely]] {
 			uint8_t *mem = m_allocator.allocOrNull();
-			auto *buffer = (char *)( mem + sizeof( wsw::OutputMessageStream ) );
-			return new( mem )wsw::OutputMessageStream( buffer, MAX_PRINTMSG, domain, category );
+			auto *buffer = (char *)( mem + sizeof( wsw::RegularMessageStream ) );
+			return new( mem )wsw::RegularMessageStream( buffer, MAX_PRINTMSG, domain, category );
 		} else if( auto *mem = (uint8_t *)::malloc( kSize ) ) {
-			auto *buffer = (char *)( mem + sizeof( wsw::OutputMessageStream ) );
-			return new( mem )wsw::OutputMessageStream( buffer, MAX_PRINTMSG, domain, category );
+			auto *buffer = (char *)( mem + sizeof( wsw::RegularMessageStream ) );
+			return new( mem )wsw::RegularMessageStream( buffer, MAX_PRINTMSG, domain, category );
 		} else {
 			return nullStreamFor( domain, category );
 		}
 	}
 
 	[[nodiscard]]
-	auto free( wsw::OutputMessageStream *stream ) {
+	auto free( wsw::RegularMessageStream *stream ) {
 		if( !isANullStream( stream ) ) [[likely]] {
 			[[maybe_unused]] volatile wsw::ScopedLock<wsw::Mutex> lock( &m_mutex );
-			stream->~OutputMessageStream();
+			stream->~RegularMessageStream();
 			if( m_allocator.mayOwn( stream ) ) [[likely]] {
 				m_allocator.free( stream );
 			} else {
@@ -174,7 +175,7 @@ public:
 	}
 };
 
-static MessageStreamsAllocator g_logLineStreamsAllocator;
+static RegularMessageStreamsAllocator g_regularMessageStreamsAllocator;
 
 [[nodiscard]]
 static bool isMessageAcceptedByFilters( wsw::MessageDomain domain, wsw::MessageCategory category ) {
@@ -210,17 +211,17 @@ static bool isMessageAcceptedByFilters( wsw::MessageDomain domain, wsw::MessageC
 	return true;
 }
 
-auto wsw::createMessageStream( wsw::MessageDomain domain, wsw::MessageCategory category ) -> wsw::OutputMessageStream * {
+auto wsw::createRegularMessageStream( wsw::MessageDomain domain, wsw::MessageCategory category ) -> wsw::RegularMessageStream * {
 	if( isMessageAcceptedByFilters( domain, category ) ) {
-		return ::g_logLineStreamsAllocator.alloc( domain, category );
+		return ::g_regularMessageStreamsAllocator.alloc( domain, category );
 	}
-	return ::g_logLineStreamsAllocator.nullStreamFor( domain, category );
+	return ::g_regularMessageStreamsAllocator.nullStreamFor( domain, category );
 }
 
-void wsw::submitMessageStream( wsw::OutputMessageStream *stream ) {
+void wsw::submitRegularMessageStream( wsw::RegularMessageStream *stream ) {
 	if( isMessageAcceptedByFilters( stream->m_domain, stream->m_category ) ) {
 		// TODO: Eliminate Com_Printf()
-		if( !::g_logLineStreamsAllocator.isANullStream( stream ) ) {
+		if( !::g_regularMessageStreamsAllocator.isANullStream( stream ) ) {
 			stream->m_data[wsw::min( stream->m_limit, stream->m_offset )] = '\0';
 			const auto indexForCategory = (unsigned)stream->m_category;
 			assert( indexForCategory <= std::size( kPrintedMessageColorForCategory ) );
@@ -237,7 +238,58 @@ void wsw::submitMessageStream( wsw::OutputMessageStream *stream ) {
 			Com_Printf( S_COLOR_RED "A null line stream was used. The line content was discarded\n" );
 		}
 	}
-	::g_logLineStreamsAllocator.free( stream );
+	::g_regularMessageStreamsAllocator.free( stream );
+}
+
+class FailureMessageStreamsAllocator {
+public:
+	[[nodiscard]]
+	auto alloc( wsw::FailureKind kind ) -> wsw::FailureMessageStream * {
+		const int currIndex = ( kind == wsw::DropFailure ) ? 0 : 1;
+		if( m_streamHolders[0].size() +  m_streamHolders[1].size() > 0 ) {
+			const char *kindNames[2] {"drop", "fatal" };
+			const char *currName = kindNames[currIndex];
+			// TODO: Should we just throw instead of calling Sys_Error()?
+			if( m_streamHolders[currIndex].full() ) {
+				Sys_Error( "Attempting to allocate a %s failure stream recursively", currName );
+			} else {
+				const char *otherName = kindNames[( currIndex + 1 ) % 2];
+				Sys_Error( "Attempting to allocate a %s failure stream while %s stream is open", currName, otherName );
+			}
+		}
+		char *data = m_streamCharData[currIndex];
+		return new( m_streamHolders[currIndex].unsafe_grow_back() )wsw::FailureMessageStream( data, MAX_PRINTMSG, kind );
+	}
+	void free( wsw::FailureMessageStream *stream ) {
+		const int index = stream->m_kind == wsw::DropFailure ? 0 : 1;
+		if( m_streamHolders[index].empty() ) {
+			Sys_Error( "The respective failure stream holder is empty" );
+		}
+		if( m_streamHolders[index].data() != stream ) {
+			Sys_Error( "Attempting to free a stray stream" );
+		}
+		m_streamHolders[index].pop_back();
+	}
+private:
+	wsw::StaticVector<wsw::FailureMessageStream, 1> m_streamHolders[2];
+	char m_streamCharData[2][MAX_PRINTMSG];
+};
+
+static thread_local FailureMessageStreamsAllocator tl_failureMessageStreamsAllocator;
+
+auto wsw::createFailureMessageStream( FailureKind kind ) -> FailureMessageStream * {
+	return tl_failureMessageStreamsAllocator.alloc( kind );
+}
+
+void wsw::submitFailureMessageStream( FailureMessageStream *stream ) {
+	const auto len = wsw::min( stream->m_limit, stream->m_offset );
+	assert( len <= MAX_PRINTMSG );
+	char message[MAX_PRINTMSG];
+	memcpy( message, stream->m_data, len );
+	message[len] = '\0';
+	const auto code = ( stream->m_kind == DropFailure ) ? ERR_DROP : ERR_FATAL;
+	tl_failureMessageStreamsAllocator.free( stream );
+	Com_Error( code, "%s", message );
 }
 
 /*

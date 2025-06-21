@@ -287,9 +287,9 @@ int S_FindTopNodeForSphere( const float *center, float radius );
 const char *S_GetConfigString( int index );
 
 
-#define sDebug()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Sound, wsw::MessageCategory::Debug ) ).getWriter()
-#define sNotice()  wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Sound, wsw::MessageCategory::Notice ) ).getWriter()
-#define sWarning() wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Sound, wsw::MessageCategory::Warning ) ).getWriter()
-#define sError()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Sound, wsw::MessageCategory::Error ) ).getWriter()
+#define sDebug()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Sound, wsw::MessageCategory::Debug ) ).getWriter()
+#define sNotice()  wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Sound, wsw::MessageCategory::Notice ) ).getWriter()
+#define sWarning() wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Sound, wsw::MessageCategory::Warning ) ).getWriter()
+#define sError()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Sound, wsw::MessageCategory::Error ) ).getWriter()
 
 #endif

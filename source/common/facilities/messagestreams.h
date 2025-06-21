@@ -4,7 +4,8 @@
 #include <common/helpers/textstreamwriter.h>
 #include <cassert>
 
-class MessageStreamsAllocator;
+class RegularMessageStreamsAllocator;
+class FailureMessageStreamsAllocator;
 
 namespace wsw {
 
@@ -28,13 +29,8 @@ enum class MessageCategory : uint8_t {
 };
 
 class OutputMessageStream {
-	friend auto createMessageStream( MessageDomain, MessageCategory ) -> OutputMessageStream *;
-	friend void submitMessageStream( OutputMessageStream * );
-
-	friend class ::MessageStreamsAllocator;
 public:
-	OutputMessageStream( char *data, unsigned limit, MessageDomain domain, MessageCategory category ) noexcept
-		: m_data( data ), m_limit( limit ), m_domain( domain ), m_category( category ) {}
+	OutputMessageStream( char *data, unsigned limit ) noexcept : m_data( data ), m_limit( limit ) {}
 
 	[[nodiscard]]
 	auto reserve( size_t size ) noexcept -> char * {
@@ -45,32 +41,78 @@ public:
 		m_offset += (unsigned)size;
 		assert( m_offset <= m_limit );
 	}
-private:
+protected:
 	char *const m_data;
 	const unsigned m_limit { 0 };
 	unsigned m_offset { 0 };
+};
+
+class RegularMessageStream : public OutputMessageStream {
+	friend auto createRegularMessageStream( MessageDomain, MessageCategory ) -> RegularMessageStream *;
+	friend void submitRegularMessageStream( RegularMessageStream * );
+
+	friend class ::RegularMessageStreamsAllocator;
+public:
+	RegularMessageStream( char *data, unsigned limit, MessageDomain domain, MessageCategory category ) noexcept
+		: OutputMessageStream( data, limit ), m_domain( domain ), m_category( category ) {}
+private:
 	const MessageDomain m_domain;
 	const MessageCategory m_category;
 };
 
 [[nodiscard]]
-auto createMessageStream( MessageDomain, MessageCategory ) -> OutputMessageStream *;
+auto createRegularMessageStream( MessageDomain, MessageCategory ) -> RegularMessageStream *;
 
-void submitMessageStream( OutputMessageStream * );
+void submitRegularMessageStream( RegularMessageStream * );
 
-class PendingOutputMessage {
+class PendingRegularMessage {
 public:
-	explicit PendingOutputMessage( wsw::OutputMessageStream *stream ) : m_stream( stream ), m_writer( stream ) {}
-	~PendingOutputMessage() { submitMessageStream( m_stream ); }
+	explicit PendingRegularMessage( wsw::RegularMessageStream *stream ) : m_stream( stream ), m_writer( stream ) {}
+	~PendingRegularMessage() { submitRegularMessageStream( m_stream ); }
 
 	[[nodiscard]]
 	auto getWriter() -> TextStreamWriter & { return m_writer; }
 private:
-	wsw::OutputMessageStream *const m_stream;
+	wsw::RegularMessageStream *const m_stream;
+	wsw::TextStreamWriter m_writer;
+};
+
+enum FailureKind { DropFailure, FatalFailure };
+
+class FailureMessageStream;
+
+[[nodiscard]]
+auto createFailureMessageStream( FailureKind kind ) -> FailureMessageStream *;
+[[noreturn]]
+void submitFailureMessageStream( FailureMessageStream * );
+
+class FailureMessageStream : public OutputMessageStream {
+	friend class ::FailureMessageStreamsAllocator;
+	friend auto createFailureMessageStream( FailureKind ) -> FailureMessageStream *;
+	friend void submitFailureMessageStream( FailureMessageStream * );
+public:
+	FailureMessageStream( char *data, unsigned limit, FailureKind kind )
+		: OutputMessageStream( data, limit ), m_kind( kind ) {}
+private:
+	const FailureKind m_kind;
+};
+
+class PendingFailureMessage {
+public:
+	explicit PendingFailureMessage( wsw::FailureMessageStream *stream ) : m_stream( stream ), m_writer( stream ) {}
+	~PendingFailureMessage() { submitFailureMessageStream( m_stream ); };
+
+	[[nodiscard]]
+	auto getWriter() -> TextStreamWriter & { return m_writer; }
+private:
+	wsw::FailureMessageStream *const m_stream;
 	wsw::TextStreamWriter m_writer;
 };
 
 }
+
+#define failDrop() wsw::PendingFailureMessage( wsw::createFailureMessageStream( wsw::DropFailure ) ).getWriter()
+#define failFatal() wsw::PendingFailureMessage( wsw::createRegularMessageStream( wsw::FatalFailure ) ).getWriter()
 
 //
 // Compat stuff

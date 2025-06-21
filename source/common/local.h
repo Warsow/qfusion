@@ -26,10 +26,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <optional>
 #include <utility>
 
-#define comDebug()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Common, wsw::MessageCategory::Debug ) ).getWriter()
-#define comNotice()  wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Common, wsw::MessageCategory::Notice ) ).getWriter()
-#define comWarning() wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Common, wsw::MessageCategory::Warning ) ).getWriter()
-#define comError()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Common, wsw::MessageCategory::Error ) ).getWriter()
+#define comDebug()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Common, wsw::MessageCategory::Debug ) ).getWriter()
+#define comNotice()  wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Common, wsw::MessageCategory::Notice ) ).getWriter()
+#define comWarning() wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Common, wsw::MessageCategory::Warning ) ).getWriter()
+#define comError()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Common, wsw::MessageCategory::Error ) ).getWriter()
 
 void Qcommon_Init( int argc, char **argv );
 void Qcommon_Frame( unsigned realMsec, unsigned *gameMsec, float *extraTime );

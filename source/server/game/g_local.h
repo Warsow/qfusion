@@ -1471,7 +1471,7 @@ void *Q_realloc( void *buf, size_t newsize );
 void Q_free( void *buf );
 char *Q_strdup( const char *str );
 
-#define gDebug()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Game, wsw::MessageCategory::Debug ) ).getWriter()
-#define gNotice()  wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Game, wsw::MessageCategory::Notice ) ).getWriter()
-#define gWarning() wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Game, wsw::MessageCategory::Warning ) ).getWriter()
-#define gError()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Game, wsw::MessageCategory::Error ) ).getWriter()
+#define gDebug()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Game, wsw::MessageCategory::Debug ) ).getWriter()
+#define gNotice()  wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Game, wsw::MessageCategory::Notice ) ).getWriter()
+#define gWarning() wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Game, wsw::MessageCategory::Warning ) ).getWriter()
+#define gError()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Game, wsw::MessageCategory::Error ) ).getWriter()

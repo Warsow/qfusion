@@ -69,10 +69,10 @@ auto rasterizeSvg( const QByteArray &data, const ImageOptions &options ) -> QIma
 
 }
 
-#define uiDebug()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::UI, wsw::MessageCategory::Debug ) ).getWriter()
-#define uiNotice()  wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::UI, wsw::MessageCategory::Notice ) ).getWriter()
-#define uiWarning() wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::UI, wsw::MessageCategory::Warning ) ).getWriter()
-#define uiError()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::UI, wsw::MessageCategory::Error ) ).getWriter()
+#define uiDebug()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::UI, wsw::MessageCategory::Debug ) ).getWriter()
+#define uiNotice()  wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::UI, wsw::MessageCategory::Notice ) ).getWriter()
+#define uiWarning() wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::UI, wsw::MessageCategory::Warning ) ).getWriter()
+#define uiError()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::UI, wsw::MessageCategory::Error ) ).getWriter()
 
 [[maybe_unused]]
 auto operator<<( wsw::TextStreamWriter &writer, const QString &string ) -> wsw::TextStreamWriter &;

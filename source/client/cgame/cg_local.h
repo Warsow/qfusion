@@ -967,7 +967,7 @@ struct ParticleColorsForTeamHolder {
 	}
 };
 
-#define cgDebug()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::CGame, wsw::MessageCategory::Debug ) ).getWriter()
-#define cgNotice()  wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::CGame, wsw::MessageCategory::Notice ) ).getWriter()
-#define cgWarning() wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::CGame, wsw::MessageCategory::Warning ) ).getWriter()
-#define cgError()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::CGame, wsw::MessageCategory::Error ) ).getWriter()
+#define cgDebug()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::CGame, wsw::MessageCategory::Debug ) ).getWriter()
+#define cgNotice()  wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::CGame, wsw::MessageCategory::Notice ) ).getWriter()
+#define cgWarning() wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::CGame, wsw::MessageCategory::Warning ) ).getWriter()
+#define cgError()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::CGame, wsw::MessageCategory::Error ) ).getWriter()

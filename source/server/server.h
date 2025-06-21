@@ -323,9 +323,9 @@ void SV_Web_RemoveGameClient( const char *session );
 void SV_NotifyClientOfStartedBuiltinServer();
 void SV_NotifyBuiltinServerOfShutdownGameRequest();
 
-#define svDebug()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Server, wsw::MessageCategory::Debug ) ).getWriter()
-#define svNotice()  wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Server, wsw::MessageCategory::Notice ) ).getWriter()
-#define svWarning() wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Server, wsw::MessageCategory::Warning ) ).getWriter()
-#define svError()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Server, wsw::MessageCategory::Error ) ).getWriter()
+#define svDebug()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Server, wsw::MessageCategory::Debug ) ).getWriter()
+#define svNotice()  wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Server, wsw::MessageCategory::Notice ) ).getWriter()
+#define svWarning() wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Server, wsw::MessageCategory::Warning ) ).getWriter()
+#define svError()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Server, wsw::MessageCategory::Error ) ).getWriter()
 
 #endif

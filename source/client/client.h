@@ -545,8 +545,8 @@ void CL_Sys_Shutdown( void );
 #define DEFAULT_SYSTEM_FONT_BIG_SIZE        24
 #define DEFAULT_SYSTEM_FONT_STYLE           0
 
-#define clDebug()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Client, wsw::MessageCategory::Debug ) ).getWriter()
-#define clNotice()  wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Client, wsw::MessageCategory::Notice ) ).getWriter()
-#define clWarning() wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Client, wsw::MessageCategory::Warning ) ).getWriter()
-#define clError()   wsw::PendingOutputMessage( wsw::createMessageStream( wsw::MessageDomain::Client, wsw::MessageCategory::Error ) ).getWriter()
+#define clDebug()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Client, wsw::MessageCategory::Debug ) ).getWriter()
+#define clNotice()  wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Client, wsw::MessageCategory::Notice ) ).getWriter()
+#define clWarning() wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Client, wsw::MessageCategory::Warning ) ).getWriter()
+#define clError()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Client, wsw::MessageCategory::Error ) ).getWriter()
 
