@@ -78,16 +78,16 @@ file(GLOB CLIENT_COMMON_SOURCES
 
 if (USE_SDL2)
 	file(GLOB REF_PLATFORM_SOURCES
-			"sdl/sdl_glw.cpp"
-			"sdl/sdl_qgl.cpp"
+			"platform/sdl/sdl_glw.cpp"
+			"platform/sdl/sdl_qgl.cpp"
 			)
 
 	set(REF_PLATFORM_LIBRARIES ${SDL2_LIBRARY})
 else()
 	if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 		file(GLOB REF_PLATFORM_SOURCES
-				"win32/win_glw.cpp"
-				"win32/win_qgl.cpp"
+				"platform/win32/win_glw.cpp"
+				"platform/win32/win_qgl.cpp"
 				)
 
 		set(REF_PLATFORM_LIBRARIES "")
@@ -96,15 +96,15 @@ endif()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	file(GLOB CLIENT_PLATFORM_HEADERS
-		"win32/resource.h"
-		"win32/conproc.h"
-		"win32/winquake.h"
-		"win32/win_input.h"
+		"platform/win32/resource.h"
+		"platform/win32/conproc.h"
+		"platform/win32/winquake.h"
+		"platform/win32/win_input.h"
 	)
 
     file(GLOB CLIENT_PLATFORM_SOURCES
-        "win32/*.cpp"
-        "win32/qfusion.rc"
+        "platform/win32/*.cpp"
+        "platform/win32/qfusion.rc"
     )
 
 	# TODO: Get rid of the automation stuff
@@ -120,7 +120,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 	# TODO
     file(GLOB CLIENT_PLATFORM_SOURCES
-        "sdl/*.cpp"
+        "platform/sdl/*.cpp"
         "${QFUSION_MAC_INFO_PLIST}"
     )
 
@@ -143,7 +143,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	set(CLIENT_PLATFORM_HEADERS "")
 
 	file(GLOB CLIENT_PLATFORM_SOURCES
-		"sdl/*.cpp")
+		"platform/sdl/*.cpp")
 
 	# TODO: Discover how to get rid of all of this?
 	set(QT_XCB_DEPENDENCY_LIBRARIES

@@ -36,8 +36,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <conio.h>
 #include <limits.h>
 
-#include <server/win32/conproc.h>
-
 #if !defined( USE_SDL2 ) || defined( DEDICATED_ONLY )
 
 int starttime;
