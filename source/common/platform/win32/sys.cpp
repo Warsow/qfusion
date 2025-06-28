@@ -1,5 +1,5 @@
-#include "../local.h"
-#include "../common.h"
+#include <common/local.h>
+#include <common/common.h>
 #include <common/types/podbuffer.h>
 #include <common/facilities/syspublic.h>
 

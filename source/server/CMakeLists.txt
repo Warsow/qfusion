@@ -13,8 +13,8 @@ file(GLOB SERVER_SOURCES
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     file(GLOB SERVER_PLATFORM_SOURCES
-        "win32/conproc.cpp"
-        "win32/win_server.cpp"
+        "platform/win32/conproc.cpp"
+        "platform/win32/win_server.cpp"
     )
 
     # Link Ole32.lib for CoCreateGUID()
@@ -22,7 +22,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     set(SERVER_BINARY_TYPE WIN32)
 else()
     file(GLOB SERVER_PLATFORM_SOURCES 
-        "unix/unix_main.cpp"
+        "platform/unix/unix_main.cpp"
     )
 
     # Link libuuid

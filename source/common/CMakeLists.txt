@@ -42,17 +42,17 @@ file(GLOB EXECOMMON_HEADERS
      "*.h")
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    file(GLOB EXECOMMON_PLATFORM_SOURCES "win32/*.cpp")
-    file(GLOB EXECOMMON_PLATFORM_HEADERS "win32/*.h")
+    file(GLOB EXECOMMON_PLATFORM_SOURCES "platform/win32/*.cpp")
+    file(GLOB EXECOMMON_PLATFORM_HEADERS "platform/win32/*.h")
 endif()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     file(GLOB EXECOMMON_PLATFORM_SOURCES
-         "linux/*.cpp"
-         "unix/*.cpp")
+         "platform/linux/*.cpp"
+         "platform/unix/*.cpp")
     file(GLOB EXECOMMON_PLATFORM_HEADERS
-         "linux/*.h"
-         "unix/*.h")
+         "platform/linux/*.h"
+         "platform/unix/*.h")
 endif()
 
 if (MSVC)
