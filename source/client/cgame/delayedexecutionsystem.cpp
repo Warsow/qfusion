@@ -71,7 +71,7 @@ void DelayedExecutionSystem::run() {
 	// TODO: Traverse the heap first, then execute callables to reduce icache pollution
 	// (this design is also more parallel-friendly)?
 	while( !m_heapOfCallables.empty() && m_heapOfCallables.front()->timeoutAt <= cg.time ) {
-		wsw::pop_heap( m_heapOfCallables.begin(), m_heapOfCallables.end() );
+		wsw::pop_heap( m_heapOfCallables.begin(), m_heapOfCallables.end(), kCallableLess );
 		Callable *const callable = m_heapOfCallables.back();
 		m_heapOfCallables.pop_back();
 		try {
