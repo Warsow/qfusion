@@ -219,6 +219,28 @@ wsw_forceinline auto quoteson( TextStreamWriter &writer ) -> TextStreamWriter & 
 	return writer;
 }
 
+#define S_COLOR_BLACK   "^0"
+#define S_COLOR_RED     "^1"
+#define S_COLOR_GREEN   "^2"
+#define S_COLOR_YELLOW  "^3"
+#define S_COLOR_BLUE    "^4"
+#define S_COLOR_CYAN    "^5"
+#define S_COLOR_MAGENTA "^6"
+#define S_COLOR_WHITE   "^7"
+#define S_COLOR_ORANGE  "^8"
+#define S_COLOR_GREY    "^9"
+
+[[maybe_unused]] auto black( TextStreamWriter & ) -> TextStreamWriter &;
+[[maybe_unused]] auto red( TextStreamWriter & ) -> TextStreamWriter &;
+[[maybe_unused]] auto green( TextStreamWriter & ) -> TextStreamWriter &;
+[[maybe_unused]] auto yellow( TextStreamWriter & ) -> TextStreamWriter &;
+[[maybe_unused]] auto blue( TextStreamWriter & ) -> TextStreamWriter &;
+[[maybe_unused]] auto cyan( TextStreamWriter & ) -> TextStreamWriter &;
+[[maybe_unused]] auto magenta( TextStreamWriter & ) -> TextStreamWriter &;
+[[maybe_unused]] auto white( TextStreamWriter & ) -> TextStreamWriter &;
+[[maybe_unused]] auto orange( TextStreamWriter & ) -> TextStreamWriter &;
+[[maybe_unused]] auto grey( TextStreamWriter & ) -> TextStreamWriter &;
+
 }
 
 #endif

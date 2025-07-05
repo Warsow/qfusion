@@ -164,4 +164,27 @@ void TextStreamWriter::writeQuotedChars( const char *chars, size_t numGivenChars
 		}
 	}
 }
+
+template <size_t N>
+[[nodiscard]]
+static auto writeConsoleColor( TextStreamWriter &writer, const char ( &color )[N] ) -> TextStreamWriter & {
+	static_assert( N == 3 ); // Includes '\0'
+	const bool hadSeparator    = writer.hasPendingSeparator;
+	writer.hasPendingSeparator = false;
+	writer.writeChars( color, 2 );
+	writer.hasPendingSeparator = hadSeparator;
+	return writer;
+}
+
+auto black( TextStreamWriter &writer ) -> TextStreamWriter & { return writeConsoleColor( writer, S_COLOR_BLACK ); }
+auto red( TextStreamWriter &writer ) -> TextStreamWriter & { return writeConsoleColor( writer, S_COLOR_RED ); }
+auto green( TextStreamWriter &writer ) -> TextStreamWriter & { return writeConsoleColor( writer, S_COLOR_GREEN ); }
+auto yellow( TextStreamWriter &writer ) -> TextStreamWriter & { return writeConsoleColor( writer, S_COLOR_YELLOW ); }
+auto blue( TextStreamWriter &writer ) -> TextStreamWriter & { return writeConsoleColor( writer, S_COLOR_BLUE ); }
+auto cyan( TextStreamWriter &writer ) -> TextStreamWriter & { return writeConsoleColor( writer, S_COLOR_CYAN ); }
+auto magenta( TextStreamWriter &writer ) -> TextStreamWriter & { return writeConsoleColor( writer, S_COLOR_MAGENTA ); }
+auto white( TextStreamWriter &writer ) -> TextStreamWriter & { return writeConsoleColor( writer, S_COLOR_WHITE ); }
+auto orange( TextStreamWriter &writer ) -> TextStreamWriter & { return writeConsoleColor( writer, S_COLOR_ORANGE ); }
+auto grey( TextStreamWriter &writer ) -> TextStreamWriter & { return writeConsoleColor( writer, S_COLOR_GREY ); }
+
 }
