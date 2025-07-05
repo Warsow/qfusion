@@ -55,6 +55,7 @@ public:
 
 	char separatorChar { ' ' };
 	char quotesChar { '\'' };
+	bool useQuotes { true };
 	bool hasPendingSeparator { false };
 	bool usePendingSeparators { true };
 };
@@ -154,7 +155,11 @@ template <typename Chars>
 	}
 [[maybe_unused]]
 wsw_forceinline auto operator<<( TextStreamWriter &writer, const Chars &chars ) -> TextStreamWriter & {
-	writer.writeQuotedChars( chars.data(), chars.size() );
+	if( writer.useQuotes ) {
+		writer.writeQuotedChars( chars.data(), chars.size() );
+	} else {
+		writer.writeChars( chars.data(), chars.size() );
+	}
 	return writer;
 }
 
@@ -186,6 +191,31 @@ wsw_forceinline auto sepoff( TextStreamWriter &writer ) -> TextStreamWriter & {
 [[maybe_unused]]
 wsw_forceinline auto eatsep( TextStreamWriter &writer ) -> TextStreamWriter & {
 	writer.hasPendingSeparator = false;
+	return writer;
+}
+
+class quotes {
+public:
+	explicit quotes( char ch ) : m_ch( ch ) {}
+	const char m_ch;
+};
+
+[[maybe_unused]]
+wsw_forceinline auto operator<<( TextStreamWriter &writer, const quotes &q ) -> TextStreamWriter & {
+	writer.quotesChar = q.m_ch;
+	writer.useQuotes  = true;
+	return writer;
+}
+
+[[maybe_unused]]
+wsw_forceinline auto quotesoff( TextStreamWriter &writer ) -> TextStreamWriter & {
+	writer.useQuotes = false;
+	return writer;
+}
+
+[[maybe_unused]]
+wsw_forceinline auto quoteson( TextStreamWriter &writer ) -> TextStreamWriter & {
+	writer.useQuotes = true;
 	return writer;
 }
 
