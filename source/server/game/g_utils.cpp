@@ -689,6 +689,17 @@ int G_PlayerGender( edict_t *player ) {
 	return GENDER_NEUTRAL;
 }
 
+PendingPlayerMessage::PendingPlayerMessage( const edict_t *target, bool centerPrint )
+	: m_stream( m_buffer, MAX_PRINTMSG ), m_writer( &m_stream ), m_target( target ), m_centerPrint( centerPrint ) {}
+
+PendingPlayerMessage::~PendingPlayerMessage() {
+	m_buffer[wsw::min<size_t>( MAX_PRINTMSG - 1, m_stream.offset() )] = '\0';
+	auto fn = m_centerPrint ? G_CenterPrintMsg : G_PrintMsg;
+	// TODO: Prevent truncation of the last `\n` in the boundary case
+	// Ensure that client prints every message on new line
+	fn( m_target, "%s\n", m_buffer );
+}
+
 /*
 * G_PrintMsg
 *

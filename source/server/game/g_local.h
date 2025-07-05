@@ -633,6 +633,29 @@ void G_CenterPrintMsg( const edict_t *ent, _Printf_format_string_ const char *fo
 void G_CenterPrintFormatMsg( const edict_t *ent, int numVargs, _Printf_format_string_ const char *format, ... );
 #endif
 
+class PendingPlayerMessage {
+public:
+	// Note: Supplying boolean arguments is bad in general
+	// but this constructor is not supposed to be called by users directly
+	PendingPlayerMessage( const edict_t *traget, bool centerPrint );
+	~PendingPlayerMessage();
+
+	[[nodiscard]]
+	auto getWriter() -> wsw::TextStreamWriter & { return m_writer; }
+private:
+	// Note: We don't follow the design of PendingRegularMessage with external stream allocation
+	// as printing to clients is very unlikely to be performed in a recursive call chain
+	// and we can afford allocating the buffer on stack (TODO: Really?)
+	char m_buffer[MAX_PRINTMSG];
+	wsw::OutputMessageStream m_stream;
+	wsw::TextStreamWriter m_writer;
+	const edict_t *const m_target;
+	const bool m_centerPrint;
+};
+
+#define gPrintTo( target ) PendingPlayerMessage( target, false ).getWriter()
+#define gCenterPrintTo( target ) PendingPlayerMessage( target, true ).getWriter()
+
 void G_UpdatePlayerMatchMsg( edict_t *ent, bool force = false );
 void G_UpdatePlayersMatchMsgs( void );
 void G_Obituary( edict_t *victim, edict_t *attacker, int mod );

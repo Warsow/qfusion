@@ -41,6 +41,9 @@ public:
 		m_offset += (unsigned)size;
 		assert( m_offset <= m_limit );
 	}
+
+	[[nodiscard]]
+	auto offset() const -> unsigned { return m_offset; }
 protected:
 	char *const m_data;
 	const unsigned m_limit { 0 };
