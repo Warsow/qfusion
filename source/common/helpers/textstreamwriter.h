@@ -158,6 +158,37 @@ wsw_forceinline auto operator<<( TextStreamWriter &writer, const Chars &chars ) 
 	return writer;
 }
 
+class sep {
+public:
+	explicit sep( char ch ) : m_ch( ch ) {}
+	const char m_ch;
+};
+
+[[maybe_unused]]
+wsw_forceinline auto operator<<( TextStreamWriter &writer, const sep &sep ) -> TextStreamWriter & {
+	writer.separatorChar        = sep.m_ch;
+	writer.usePendingSeparators = true;
+	return writer;
+}
+
+[[maybe_unused]]
+wsw_forceinline auto sepon( TextStreamWriter &writer ) -> TextStreamWriter & {
+	writer.usePendingSeparators = true;
+	return writer;
+}
+
+[[maybe_unused]]
+wsw_forceinline auto sepoff( TextStreamWriter &writer ) -> TextStreamWriter & {
+	writer.usePendingSeparators = false;
+	return writer;
+}
+
+[[maybe_unused]]
+wsw_forceinline auto eatsep( TextStreamWriter &writer ) -> TextStreamWriter & {
+	writer.hasPendingSeparator = false;
+	return writer;
+}
+
 }
 
 #endif
