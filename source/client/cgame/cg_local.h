@@ -623,6 +623,8 @@ typedef struct cg_state_s {
 	SimulatedHullsSystem simulatedHullsSystem;
 	PolyEffectsSystem polyEffectsSystem;
 	EffectsSystemFacade effectsSystem;
+
+	SoundSystem *soundSystem;
 } cg_state_t;
 
 extern cg_static_t cgs;

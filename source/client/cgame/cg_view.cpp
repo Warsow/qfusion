@@ -331,7 +331,7 @@ static void CG_AddLocalSounds() {
 			if( remainingSeconds != lastSecond ) {
 				if( 1 + remainingSeconds < 4 ) {
 					const wsw::StringView exactName( va( S_ANNOUNCER_COUNTDOWN_COUNT_1_to_3_SET_1_to_2, 1 + remainingSeconds, 1 ) );
-					const SoundSet *sound = SoundSystem::instance()->registerSound( SoundSetProps {
+					const SoundSet *sound = cg.soundSystem->registerSound( SoundSetProps {
 						.name = SoundSetProps::Exact { exactName },
 					});
 					CG_AddAnnouncerEvent( sound, false );
@@ -350,13 +350,13 @@ static void CG_AddLocalSounds() {
 	// Stop background music in postmatch state
 	if( GS_MatchState( *cggs ) >= MATCH_STATE_POSTMATCH ) {
 		if( !postmatchsilence_set && !demostream ) {
-			SoundSystem::instance()->stopBackgroundTrack();
+			cg.soundSystem->stopBackgroundTrack();
 			postmatchsilence_set = true;
 			background = false;
 		}
 	} else {
 		if( cgs.demoPlaying && cgs.demoAudioStream && !demostream ) {
-			SoundSystem::instance()->startBackgroundTrack( cgs.demoAudioStream, NULL, 0 );
+			cg.soundSystem->startBackgroundTrack( cgs.demoAudioStream, NULL, 0 );
 			demostream = true;
 		}
 
@@ -1556,7 +1556,7 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 
 			CG_ClearEffects();
 
-			SoundSystem::instance()->updateListener( -1, vec3_origin, vec3_origin, axis_identity );
+			cg.soundSystem->updateListener( -1, vec3_origin, vec3_origin, axis_identity );
 		} else {
 			if( cg.motd && ( cg.time > cg.motd_time ) ) {
 				Q_free( cg.motd );
@@ -1622,7 +1622,7 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 			cg.oldAreabits = true;
 
 			const ViewState *primaryViewState = getPrimaryViewState();
-			SoundSystem::instance()->updateListener( primaryViewState->view.POVent, primaryViewState->view.origin,
+			cg.soundSystem->updateListener( primaryViewState->view.POVent, primaryViewState->view.origin,
 													 primaryViewState->view.velocity, primaryViewState->view.axis );
 		}
 	}

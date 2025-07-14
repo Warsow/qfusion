@@ -61,7 +61,7 @@ void MediaCache::registerMaterials() {
 
 void MediaCache::registerSound( CachedSound *sound ) {
 	if( !sound->m_handle ) {
-		sound->m_handle = SoundSystem::instance()->registerSound( sound->m_props );
+		sound->m_handle = cg.soundSystem->registerSound( sound->m_props );
 	}
 }
 

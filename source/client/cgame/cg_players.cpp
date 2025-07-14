@@ -91,18 +91,17 @@ static const SoundSet *CG_RegisterPmodelSexedSound( pmodelinfo_t *pmodelinfo, co
 	// see if we already know of the model specific sound
 	Q_snprintfz( sexedFilename, sizeof( sexedFilename ), "sounds/players/%s/%s", model, oname + 1 );
 
-	SoundSystem *soundSystem = SoundSystem::instance();
 	if( ( !COM_FileExtension( sexedFilename ) &&
 		FS_FirstExtension( sexedFilename, SOUND_EXTENSIONS, std::size( SOUND_EXTENSIONS ) ) ) ||
 		FS_FOpenFile( sexedFilename, NULL, FS_READ ) != -1 ) {
-		sexedSfx->sfx = soundSystem->registerSound( { .name = SoundSetProps::Exact { wsw::StringView( sexedFilename ) } } );
+		sexedSfx->sfx = cg.soundSystem->registerSound( { .name = SoundSetProps::Exact { wsw::StringView( sexedFilename ) } } );
 	} else {   // no, revert to default player sounds folders
 		if( pmodelinfo->sex == GENDER_FEMALE ) {
 			Q_snprintfz( sexedFilename, sizeof( sexedFilename ), "sounds/players/%s/%s", "female", oname + 1 );
-			sexedSfx->sfx = soundSystem->registerSound( { .name = SoundSetProps::Exact { wsw::StringView( sexedFilename ) } } );
+			sexedSfx->sfx = cg.soundSystem->registerSound( { .name = SoundSetProps::Exact { wsw::StringView( sexedFilename ) } } );
 		} else {
 			Q_snprintfz( sexedFilename, sizeof( sexedFilename ), "sounds/players/%s/%s", "male", oname + 1 );
-			sexedSfx->sfx = soundSystem->registerSound( { .name = SoundSetProps::Exact { wsw::StringView( sexedFilename ) } } );
+			sexedSfx->sfx = cg.soundSystem->registerSound( { .name = SoundSetProps::Exact { wsw::StringView( sexedFilename ) } } );
 		}
 	}
 
@@ -165,9 +164,9 @@ void playSexedSoundInPrimaryView( int entnum, int attachmentTag, int entchannel,
 		entchannel &= ~CHAN_FIXED;
 		const SoundSet *soundSet = CG_RegisterSexedSound( entnum, name );
 		if( fixed ) {
-			SoundSystem::instance()->startFixedSound( soundSet, cg_entities[entnum].current.origin, entchannel, fvol, attn );
+			cg.soundSystem->startFixedSound( soundSet, cg_entities[entnum].current.origin, entchannel, fvol, attn );
 		} else {
-			SoundSystem::instance()->startRelativeSound( soundSet, (SoundSystem::AttachmentTag)attachmentTag, entnum, entchannel, fvol, attn );
+			cg.soundSystem->startRelativeSound( soundSet, (SoundSystem::AttachmentTag)attachmentTag, entnum, entchannel, fvol, attn );
 		}
 	}
 }
