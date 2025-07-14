@@ -200,7 +200,7 @@ static void CG_LoadClientInfo( unsigned clientNum, const char *info ) {
 		Vector4Set( ci->color, 255, 255, 255, 255 );
 	}
 
-	wsw::ui::UISystem::instance()->handleClientInfoChanges( clientNum );
+	cg.uiSystem->handleClientInfoChanges( clientNum );
 }
 
 void CG_LoadClientInfo( unsigned clientNum, const wsw::StringView &info ) {

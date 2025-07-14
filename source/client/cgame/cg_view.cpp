@@ -288,7 +288,7 @@ bool CG_ChaseStep( int step ) {
 	if( cg.chaseSwitchTimestamp + kChaseSwitchCooldown < cg.time ) {
 		if( doChaseStep( step ) ) {
 			cg.chaseSwitchTimestamp = cg.time;
-			wsw::ui::UISystem::instance()->playForwardSound();
+			cg.uiSystem->playForwardSound();
 			return true;
 		}
 	}
@@ -907,7 +907,7 @@ bool CG_SwitchChaseCamMode() {
 	if( cg.chaseSwitchTimestamp + kChaseSwitchCooldown < cg.time ) {
 		if( doSwitchChaseCamMode() ) {
 			cg.chaseSwitchTimestamp = cg.time;
-			wsw::ui::UISystem::instance()->playForwardSound();
+			cg.uiSystem->playForwardSound();
 			return true;
 		}
 	}
@@ -1181,7 +1181,7 @@ static auto prepareViewRectsAndStateIndices( Rect *viewRects, unsigned *viewStat
 		}
 		viewStateIndices[0] = (unsigned)( getPrimaryViewState() - cg.viewStates );
 		numDisplayedViewStates = 1;
-		numDisplayedViewStates += wsw::ui::UISystem::instance()->retrieveHudControlledMiniviews( viewRects + 1, viewStateIndices + 1 );
+		numDisplayedViewStates += cg.uiSystem->retrieveHudControlledMiniviews( viewRects + 1, viewStateIndices + 1 );
 	}
 
 	return { actuallyUseTiledMode, numDisplayedViewStates };
@@ -1193,8 +1193,6 @@ static auto createDrawSceneRequests( DrawSceneRequest **drawSceneRequests, bool 
 	WSW_PROFILER_SCOPE();
 
 	unsigned useCachedViewsMask = 0;
-
-	const auto *const uiSystem = wsw::ui::UISystem::instance();
 
 	// Set to zero by default so subtraction tests in the main loop don't lead to UB
 	int bestMiniviewWidth     = std::numeric_limits<int>::lowest();
@@ -1280,7 +1278,7 @@ static auto createDrawSceneRequests( DrawSceneRequest **drawSceneRequests, bool 
 				rd->rdflags = RDF_LOWDETAIL;
 			}
 		} else {
-			if( uiSystem->isShowingModalMenu() || uiSystem->isShowingScoreboard() ) {
+			if( cg.uiSystem->isShowingModalMenu() || cg.uiSystem->isShowingScoreboard() ) {
 				rd->rdflags |= RDF_DRAWBRIGHT;
 			}
 		}
@@ -1380,7 +1378,7 @@ static auto coPrepareDrawSceneRequests( CoroTask::StartInfo si, DrawSceneRequest
 	}
 
 	// Perform UI rendering in the main thread, while the actual set of views gets prepared in background
-	wsw::ui::UISystem::instance()->renderInternally();
+	cg.uiSystem->renderInternally();
 
 	cg.delayedExecutionSystem.run();
 
@@ -1425,7 +1423,7 @@ static void prepareDrawSceneRequests( DrawSceneRequest **drawSceneRequests, unsi
 	// Let worker threads execute while we are running GC in the main thread.
 	// We must note that this approach is benefitial only for small GC threshold values
 	// (otherwise, the spike is way too large to be hidden anyway).
-	wsw::ui::UISystem::instance()->runGCIfNeeded();
+	cg.uiSystem->runGCIfNeeded();
 
 	EndProcessingOfTasks();
 }
@@ -1513,7 +1511,7 @@ static bool blitPreparedViews( DrawSceneRequest **requests, bool actuallyUseTile
 
 		if( !isMiniview ) {
 			RF_Set2DScissor( 0, 0, cgs.vidWidth, cgs.vidHeight );
-			wsw::ui::UISystem::instance()->drawMenuPartInMainContext();
+			cg.uiSystem->drawMenuPartInMainContext();
 			// TODO: The UI system should restore 2D mode on its own
 			R_Set2DMode( true );
 			hasRenderedTheMenu = true;
@@ -1603,8 +1601,7 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 
 			result.hasRenderedUIInternally = true;
 
-			auto *const uiSystem       = wsw::ui::UISystem::instance();
-			const bool hasModalOverlay = uiSystem->isShowingModalMenu() || uiSystem->isShowingScoreboard();
+			const bool hasModalOverlay = cg.uiSystem->isShowingModalMenu() || cg.uiSystem->isShowingScoreboard();
 			result.hasBlittedTheMenu   = blitPreparedViews( drawSceneRequests, actuallyUseTiledMode, hasModalOverlay,
 															viewStateIndices, numDisplayedViewStates );
 
@@ -1613,7 +1610,7 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 			// Blit the HUD first in this case (this is a hack for the demo playback menu which must be on top)
 			if( actuallyUseTiledMode && !hasModalOverlay ) {
 				RF_Set2DScissor( 0, 0, cgs.vidWidth, cgs.vidHeight );
-				wsw::ui::UISystem::instance()->drawHudPartInMainContext();
+				cg.uiSystem->drawHudPartInMainContext();
 				result.hasBlittedTheHud = true;
 			}
 
@@ -1719,8 +1716,7 @@ void CG_ClearPointedNum( ViewState *viewState ) {
 }
 
 static void CG_UpdatePointedNum( ViewState *viewState ) {
-	const auto *uiSystem = wsw::ui::UISystem::instance();
-	if( uiSystem->isShowingModalMenu() || uiSystem->isShowingScoreboard() || viewState->view.thirdperson ||
+	if( cg.uiSystem->isShowingModalMenu() || cg.uiSystem->isShowingScoreboard() || viewState->view.thirdperson ||
 		viewState->view.type != VIEWDEF_PLAYERVIEW || !v_showPointedPlayer.get() ) {
 		CG_ClearPointedNum( viewState );
 	} else {

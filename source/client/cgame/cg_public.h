@@ -76,8 +76,9 @@ typedef struct snapshot_s {
 void CG_InitPersistentState();
 
 class SoundSystem;
+namespace wsw::ui { class UISystem; }
 
-void CG_Init( SoundSystem *soundSystem, const char *serverName, unsigned int playerNum,
+void CG_Init( SoundSystem *soundSystem, wsw::ui::UISystem *uiSystem, const char *serverName, unsigned int playerNum,
 			  int vidWidth, int vidHeight, int pixelRatio,
 			  bool demoplaying, const char *demoName, bool pure, unsigned snapFrameTime,
 			  int protocol, const char *demoExtension, int sharedSeed, bool gameStart );

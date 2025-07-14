@@ -240,7 +240,7 @@ void CL_GameModule_Init( void ) {
 	SCR_EnableQuickMenu( false );
 
 	const int64_t start = Sys_Milliseconds();
-	CG_Init( soundSystem, cls.servername, cl.playernum,
+	CG_Init( soundSystem, wsw::ui::UISystem::instance(), cls.servername, cl.playernum,
 			 viddef.width, viddef.height, VID_GetPixelRatio(),
 			 cls.demoPlayer.playing, cls.demoPlayer.playing ? cls.demoPlayer.filename : "",
 			 cls.sv_pure, cl.snapFrameTime, APP_PROTOCOL_VERSION, APP_DEMO_EXTENSION_STR,

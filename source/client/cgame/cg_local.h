@@ -553,6 +553,8 @@ struct CrosshairSizeProps { unsigned minSize, maxSize, defaultSize; };
 constexpr const CrosshairSizeProps kRegularCrosshairSizeProps { 16, 48, 32 };
 constexpr const CrosshairSizeProps kStrongCrosshairSizeProps { 48, 72, 64 };
 
+namespace wsw::ui { class UISystem; }
+
 typedef struct cg_state_s {
 	int64_t time;
 	float delay;
@@ -625,6 +627,7 @@ typedef struct cg_state_s {
 	EffectsSystemFacade effectsSystem;
 
 	SoundSystem *soundSystem;
+	wsw::ui::UISystem *uiSystem;
 } cg_state_t;
 
 extern cg_static_t cgs;

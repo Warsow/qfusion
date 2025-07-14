@@ -311,10 +311,10 @@ static void CG_SC_ChatPrint( ViewState *viewState, const CmdArgs &cmdArgs ) {
 		if( teamonly ) {
 			CG_LocalPrint( S_COLOR_YELLOW "[%s]" S_COLOR_WHITE "%s" S_COLOR_YELLOW ": %s\n",
 						   viewState->snapPlayerState.stats[STAT_REALTEAM] == TEAM_SPECTATOR ? "SPEC" : "TEAM", name, text );
-			wsw::ui::UISystem::instance()->addToTeamChat( { nameView, textView, sendCommandNum } );
+			cg.uiSystem->addToTeamChat( { nameView, textView, sendCommandNum } );
 		} else {
 			CG_LocalPrint( "%s" S_COLOR_GREEN ": %s\n", name, text );
-			wsw::ui::UISystem::instance()->addToChat( { nameView, textView, sendCommandNum } );
+			cg.uiSystem->addToChat( { nameView, textView, sendCommandNum } );
 		}
 
 		if( v_chatBeep.get() ) {
@@ -373,7 +373,7 @@ static void CG_SC_MessageFault( ViewState *viewState, const CmdArgs &cmdArgs ) {
 							} else {
 								wsw::failWithLogicError( "unreachable" );
 							}
-							wsw::ui::UISystem::instance()->handleMessageFault( { *maybeCommandNum, kind, timeout } );
+							cg.uiSystem->handleMessageFault( { *maybeCommandNum, kind, timeout } );
 						}
 					}
 				}
@@ -450,7 +450,7 @@ void CG_ConfigString( int i, const wsw::StringView &string ) {
 	}
 
 	// Let the UI system decide whether it could handle the config string as well
-	wsw::ui::UISystem::instance()->handleConfigString( i, string );
+	cg.uiSystem->handleConfigString( i, string );
 }
 
 static const char *CG_SC_AutoRecordName( ViewState *viewState ) {
@@ -744,7 +744,7 @@ static void CG_SC_MOTD( ViewState *viewState, const CmdArgs &cmdArgs ) {
 static void CG_SC_AddAward( ViewState *viewState, const CmdArgs &cmdArgs ) {
 	const char *str = Cmd_Argv( 1 );
 	if( str && *str ) {
-		wsw::ui::UISystem::instance()->addAward( viewState->snapPlayerState.playerNum, wsw::StringView( str ) );
+		cg.uiSystem->addAward( viewState->snapPlayerState.playerNum, wsw::StringView( str ) );
 	}
 }
 
@@ -772,7 +772,7 @@ static void CG_SC_ActionRequest( ViewState *viewState, const CmdArgs &cmdArgs ) 
 							}
 							actions.emplace_back( { wsw::StringView( Cmd_Argv( argNum++ ) ), *maybeKey } );
 						}
-						wsw::ui::UISystem::instance()->touchActionRequest( tag, *maybeTimeout, title, desc, actions );
+						cg.uiSystem->touchActionRequest( tag, *maybeTimeout, title, desc, actions );
 					}
 				}
 			}
@@ -805,7 +805,7 @@ static void CG_SC_FragEvent( ViewState *viewState, const CmdArgs &cmdArgs ) {
 					const auto victimAndTeam( std::make_pair( victimName, victimTeam ) );
 					// TODO: Is it the right condition?
 					if( viewState == getPrimaryViewState() ) {
-						wsw::ui::UISystem::instance()->addFragEvent( victimAndTeam, meansOfDeath, attackerAndTeam );
+						cg.uiSystem->addFragEvent( victimAndTeam, meansOfDeath, attackerAndTeam );
 					}
 					if( attacker && attacker != victim && viewState->isViewerEntity( attacker ) ) {
 						wsw::StaticString<256> message;
@@ -819,7 +819,7 @@ static void CG_SC_FragEvent( ViewState *viewState, const CmdArgs &cmdArgs ) {
 							message << wsw::StringView( "Cool! You fragged " );
 						}
 						message << victimName;
-						wsw::ui::UISystem::instance()->addStatusMessage( viewState->snapPlayerState.playerNum, message.asView() );
+						cg.uiSystem->addStatusMessage( viewState->snapPlayerState.playerNum, message.asView() );
 					}
 				}
 			}
@@ -873,14 +873,14 @@ void CG_GameCommand( ViewState *viewState, const wsw::StringView &fullText ) {
 }
 
 void CG_OptionsStatus( const CmdArgs &cmdArgs ) {
-	wsw::ui::UISystem::instance()->handleOptionsStatusCommand( cmdArgs[1] );
+	cg.uiSystem->handleOptionsStatusCommand( cmdArgs[1] );
 }
 
 void CG_ReloadOptions( const CmdArgs & ) {
 	// We have to reload commands first
 	// as the UI system checks whether specific commands are actually available and enqueues needed commands immediately
 	CG_ReloadCommands( {} );
-	wsw::ui::UISystem::instance()->reloadOptions();
+	cg.uiSystem->reloadOptions();
 }
 
 void CG_ReloadCommands( const CmdArgs & ) {
@@ -2223,7 +2223,7 @@ static void handlePlayerRespawnEvent( entity_state_t *ent, int parm, bool predic
 			CG_ResetColorBlend( viewState );
 			CG_ResetDamageIndicator( viewState );
 			if( viewState == getPrimaryViewState() ) {
-				wsw::ui::UISystem::instance()->handleGCSafepoint( wsw::ui::UISystem::GCSafepointKind::Respawn );
+				cg.uiSystem->handleGCSafepoint( wsw::ui::UISystem::GCSafepointKind::Respawn );
 			}
 		}
 
@@ -2241,7 +2241,7 @@ static void handlePlayerTeleportInEvent( entity_state_t *ent, int parm, bool pre
 		cg_entities[ent->ownerNum].localEffects[LOCALEFFECT_EV_PLAYER_TELEPORT_IN] = cg.time;
 		VectorCopy( ent->origin, cg_entities[ent->ownerNum].teleportedTo );
 		if( getViewStateForEntity( ent->ownerNum ) == getPrimaryViewState() ) {
-			wsw::ui::UISystem::instance()->handleGCSafepoint( wsw::ui::UISystem::GCSafepointKind::Teleport );
+			cg.uiSystem->handleGCSafepoint( wsw::ui::UISystem::GCSafepointKind::Teleport );
 		}
 	}
 }
@@ -2255,7 +2255,7 @@ static void handlePlayerTeleportOutEvent( entity_state_t *ent, int parm, bool pr
 		cg_entities[ent->ownerNum].localEffects[LOCALEFFECT_EV_PLAYER_TELEPORT_OUT] = cg.time;
 		VectorCopy( ent->origin, cg_entities[ent->ownerNum].teleportedFrom );
 		if( getViewStateForEntity( ent->ownerNum ) == getPrimaryViewState() ) {
-			wsw::ui::UISystem::instance()->handleGCSafepoint( wsw::ui::UISystem::GCSafepointKind::Teleport );
+			cg.uiSystem->handleGCSafepoint( wsw::ui::UISystem::GCSafepointKind::Teleport );
 		}
 	}
 }
@@ -3100,7 +3100,7 @@ static void CG_UpdatePlayerState() {
 	if( cg.hasPendingSwitchFromTiledMode ) {
 		if( cg.chaseMode == CAM_TILED ) {
 			if( CG_SwitchChaseCamMode() ) {
-				wsw::ui::UISystem::instance()->playForwardSound();
+				cg.uiSystem->playForwardSound();
 			}
 		}
 		cg.hasPendingSwitchFromTiledMode = false;
@@ -3118,9 +3118,9 @@ static void CG_UpdatePlayerState() {
 	cg.tileMiniviewPositions.clear();
 
 	unsigned numMiniviewViewStates  = 0;
-	const unsigned limitOfMiniviews = wsw::ui::UISystem::instance()->retrieveLimitOfMiniviews();
+	const unsigned limitOfMiniviews = cg.uiSystem->retrieveLimitOfMiniviews();
 
-	const unsigned numPanes = wsw::ui::UISystem::instance()->retrieveNumberOfHudMiniviewPanes();
+	const unsigned numPanes = cg.uiSystem->retrieveNumberOfHudMiniviewPanes();
 	assert( numPanes >= 0 && numPanes <= 2 );
 
 	const bool hasTwoTeams = GS_TeamBasedGametype( *cggs ) && !GS_IndividualGametype( *cggs );
@@ -3319,13 +3319,12 @@ bool CG_NewFrameSnap( snapshot_t *frame, snapshot_t *lerpframe ) {
 
 	CG_UpdatePlayerState();
 
-	auto *const uiSystem = wsw::ui::UISystem::instance();
 	// Must be performed immediately if there were POV property updates
 	// TODO: Don't call it twice per frame in this case
-	uiSystem->refreshProperties();
+	cg.uiSystem->refreshProperties();
 
 	static_assert( AccuracyRows::Span::extent == kNumAccuracySlots );
-	uiSystem->updateScoreboard( frame->scoreboardData, AccuracyRows {
+	cg.uiSystem->updateScoreboard( frame->scoreboardData, AccuracyRows {
 		.weak   = AccuracyRows::Span( getPrimaryViewState()->snapPlayerState.weakAccuracy ),
 		.strong = AccuracyRows::Span( getPrimaryViewState()->snapPlayerState.strongAccuracy ),
 	});
@@ -5304,7 +5303,7 @@ void CG_PredictMovement() {
 
 void CG_CenterPrint( ViewState *viewState, const char *str ) {
 	if( str && *str ) {
-		wsw::ui::UISystem::instance()->addStatusMessage( viewState->snapPlayerState.playerNum, wsw::StringView( str ) );
+		cg.uiSystem->addStatusMessage( viewState->snapPlayerState.playerNum, wsw::StringView( str ) );
 	}
 }
 
@@ -5577,20 +5576,20 @@ wsw::StringView CG_PlayerClan( unsigned playerNum ) {
 }
 
 void CG_ScoresOn_f( const CmdArgs & ) {
-	wsw::ui::UISystem::instance()->setScoreboardShown( true );
+	cg.uiSystem->setScoreboardShown( true );
 }
 
 void CG_ScoresOff_f( const CmdArgs & ) {
-	wsw::ui::UISystem::instance()->setScoreboardShown( false );
+	cg.uiSystem->setScoreboardShown( false );
 }
 
 void CG_MessageMode( const CmdArgs & ) {
-	wsw::ui::UISystem::instance()->toggleChatPopup();
+	cg.uiSystem->toggleChatPopup();
 	CL_ClearInputState();
 }
 
 void CG_MessageMode2( const CmdArgs & ) {
-	wsw::ui::UISystem::instance()->toggleTeamChatPopup();
+	cg.uiSystem->toggleTeamChatPopup();
 	CL_ClearInputState();
 }
 
@@ -5642,7 +5641,7 @@ void CG_LocalPrint( const char *format, ... ) {
 	}
 
 	const wsw::StringView msgView( msg, wsw::min( (size_t)res, sizeof( msg ) ) );
-	wsw::ui::UISystem::instance()->addToMessageFeed( playerNum, msgView.trim() );
+	cg.uiSystem->addToMessageFeed( playerNum, msgView.trim() );
 
 	Con_PrintSilent( msg );
 }
@@ -6137,7 +6136,7 @@ void CG_Reset( void ) {
 
 	CG_ResetItemTimers();
 
-	wsw::ui::UISystem::instance()->resetHudFeed();
+	cg.uiSystem->resetHudFeed();
 
 	CG_ClearEffects();
 
@@ -6194,7 +6193,7 @@ void CG_InitPersistentState() {
 	CG_InitTemporaryBoneposesCache();
 }
 
-void CG_Init( SoundSystem *soundSystem, const char *serverName, unsigned int playerNum,
+void CG_Init( SoundSystem *soundSystem, wsw::ui::UISystem *uiSystem, const char *serverName, unsigned int playerNum,
 			  int vidWidth, int vidHeight, int pixelRatio,
 			  bool demoplaying, const char *demoName, bool pure,
 			  unsigned snapFrameTime, int protocol, const char *demoExtension,
@@ -6205,7 +6204,9 @@ void CG_Init( SoundSystem *soundSystem, const char *serverName, unsigned int pla
 	cg.~cg_state_t();
 	memset( &cg, 0, sizeof( cg_state_t ) );
 	new( &cg )cg_state_t;
+
 	cg.soundSystem = soundSystem;
+	cg.uiSystem    = uiSystem;
 
 	// Hacks, see a related comment in the client/ code
 	cgs.~cg_static_t();
@@ -6282,7 +6283,7 @@ void CG_Init( SoundSystem *soundSystem, const char *serverName, unsigned int pla
 }
 
 void CG_Shutdown( void ) {
-	wsw::ui::UISystem::instance()->resetHudFeed();
+	cg.uiSystem->resetHudFeed();
 	CG_DemocamShutdown();
 	CG_UnregisterCGameCommands();
 	CG_ShutdownCrosshairs();
