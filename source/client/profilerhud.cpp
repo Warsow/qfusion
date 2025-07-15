@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "client.h"
 #include <common/facilities/cmdargs.h>
 #include <common/facilities/profilerscope.h>
+#include <common/types/scopedresource.h>
 #include <common/helpers/singletonholder.h>
 #include <common/helpers/algorithm.h>
 #include <common/helpers/tonum.h>
@@ -651,7 +652,7 @@ void ProfilerHud::drawSelf( unsigned screenWidth, unsigned ) {
 		return;
 	}
 
-	Draw2DRequest *const request = CreateDraw2DRequest();
+	wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
 
 	const int margin      = 8 * VID_GetPixelRatio();
 	const auto lineHeight = (int)SCR_FontHeight( cls.consoleFont );
@@ -661,27 +662,27 @@ void ProfilerHud::drawSelf( unsigned screenWidth, unsigned ) {
 	int y               = margin;
 
 	const int paneHeight = 9 * lineHeight + 5 * margin + 2 * kGraphHeight + 3 * margin;
-	SCR_DrawFillRect( request, paneX, y, paneWidth, paneHeight, kConsoleBackgroundColor );
+	SCR_DrawFillRect( request.get(), paneX, y, paneWidth, paneHeight, kConsoleBackgroundColor );
 	y += margin;
 
-	drawHeader( request, m_isFrozen ? "S U M M A R Y [*]"_asView : "S U M M A R Y"_asView, paneX, y, paneWidth, margin, lineHeight );
+	drawHeader( request.get(), m_isFrozen ? "S U M M A R Y [*]"_asView : "S U M M A R Y"_asView, paneX, y, paneWidth, margin, lineHeight );
 	y += lineHeight + margin;
 
 	wsw::StaticString<16> realFrameTime( "%d", m_lastRealFrameTime );
-	drawSideAlignedPair( request, "Real frame time"_asView, realFrameTime.asView(), paneX, y, paneWidth, margin, lineHeight, colorMdGrey );
+	drawSideAlignedPair( request.get(), "Real frame time"_asView, realFrameTime.asView(), paneX, y, paneWidth, margin, lineHeight, colorMdGrey );
 	y += lineHeight + margin;
 
-	drawTimeline( request, m_realFrameTimeTimeline, paneX, y, paneWidth, kGraphHeight, margin );
+	drawTimeline( request.get(), m_realFrameTimeTimeline, paneX, y, paneWidth, kGraphHeight, margin );
 	y += kGraphHeight + margin;
 
 	wsw::StaticString<16> gameFrameTime( "%d", m_lastGameFrameTime );
-	drawSideAlignedPair( request, "Game frame time"_asView, gameFrameTime.asView(), paneX, y, paneWidth, margin, lineHeight, colorMdGrey );
+	drawSideAlignedPair( request.get(), "Game frame time"_asView, gameFrameTime.asView(), paneX, y, paneWidth, margin, lineHeight, colorMdGrey );
 	y += lineHeight + margin;
 
-	drawTimeline( request, m_gameFrameTimeTimeline, paneX, y, paneWidth, kGraphHeight, margin );
+	drawTimeline( request.get(), m_gameFrameTimeTimeline, paneX, y, paneWidth, kGraphHeight, margin );
 	y += kGraphHeight + margin;
 
-	drawHeader( request, "H E L P"_asView, paneX, y, paneWidth, margin, lineHeight );
+	drawHeader( request.get(), "H E L P"_asView, paneX, y, paneWidth, margin, lineHeight );
 	y += lineHeight + margin;
 
 	const std::pair<const char *, const char *> cmdDescs[] {
@@ -693,7 +694,7 @@ void ProfilerHud::drawSelf( unsigned screenWidth, unsigned ) {
 	};
 
 	for( const auto &[syntax, desc]: cmdDescs ) {
-		drawSideAlignedPair( request, syntax, desc, paneX, y, paneWidth, margin, lineHeight, colorMdGrey );
+		drawSideAlignedPair( request.get(), syntax, desc, paneX, y, paneWidth, margin, lineHeight, colorMdGrey );
 		y += lineHeight;
 	}
 	y += margin;
@@ -705,11 +706,11 @@ void ProfilerHud::drawSelf( unsigned screenWidth, unsigned ) {
 	for( size_t groupIndex = 0; groupIndex < std::size( m_groupStates ); ++groupIndex ) {
 		const GroupState &groupState = m_groupStates[groupIndex];
 		if( groupState.operationMode == GroupState::ListRoots ) {
-			y += drawDiscoveredRoots( request, groupState, groupTitles[groupIndex], paneX, y, paneWidth, margin, lineHeight );
+			y += drawDiscoveredRoots( request.get(), groupState, groupTitles[groupIndex], paneX, y, paneWidth, margin, lineHeight );
 		} else if( groupState.operationMode == GroupState::ProfileCall ) {
-			y += drawProfilingStats( request, groupState, groupTitles[groupIndex], paneX, y, paneWidth, margin, lineHeight );
+			y += drawProfilingStats( request.get(), groupState, groupTitles[groupIndex], paneX, y, paneWidth, margin, lineHeight );
 		}
 	}
 
-	CommitDraw2DRequest( request );
+	CommitDraw2DRequest( request.get() );
 }

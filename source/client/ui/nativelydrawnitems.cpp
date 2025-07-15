@@ -1,5 +1,7 @@
 #include "nativelydrawnitems.h"
 #include <client/renderer/ref.h>
+#include <common/helpers/scopeexitaction.h>
+#include <common/types/scopedresource.h>
 
 #include <QQmlProperty>
 
@@ -133,7 +135,7 @@ void NativelyDrawnImage::drawSelfNatively( int64_t, int64_t, int pixelsPerLogica
 	reloadIfNeeded( pixelsPerLogicalUnit );
 
 	if( isLoaded() ) {
-		Draw2DRequest *const request = CreateDraw2DRequest();
+		wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
 
 		const float opacity = QQmlProperty::read( m_selfAsItem, "opacity" ).toFloat();
 		const vec4_t color {
@@ -163,7 +165,7 @@ void NativelyDrawnImage::drawSelfNatively( int64_t, int64_t, int pixelsPerLogica
 			request->drawStretchPic( x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color, m_material );
 		}
 
-		CommitDraw2DRequest( request );
+		CommitDraw2DRequest( request.get() );
 	}
 }
 
@@ -386,6 +388,7 @@ void NativelyDrawnModel::drawSelfNatively( int64_t, int64_t timeDelta, int pixel
 	}
 
 	BeginDrawingScenes();
+	[[maybe_unused]] volatile wsw::ScopeExitAction callEndDrawingScenes( &EndDrawingScenes );
 	DrawSceneRequest *drawSceneRequest = CreateDrawSceneRequest( refdef );
 	CG_SetBoneposesForTemporaryEntity( &entity );
 	drawSceneRequest->addEntity( &entity );

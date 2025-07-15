@@ -587,6 +587,15 @@ private:
 
 Draw2DRequest *CreateDraw2DRequest();
 void CommitDraw2DRequest( Draw2DRequest *request );
+void RecycleDraw2DRequest( Draw2DRequest *request );
+
+struct Draw2DRequestScopedOps {
+	void destroy( Draw2DRequest *value ) { RecycleDraw2DRequest( value ); }
+	[[nodiscard]]
+	static auto emptyValue() -> Draw2DRequest * { return nullptr; }
+	[[nodiscard]]
+	static bool isPresent( const Draw2DRequest *value ) { return value != nullptr; }
+};
 
 shader_s *R_WrapMenuTextureHandleInMaterial( unsigned externalTexNum );
 shader_s *R_WrapHudTextureHandleInMaterial( unsigned externalTexNum );

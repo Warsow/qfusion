@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/cmdargs.h>
 #include <common/facilities/cmdcompat.h>
 #include <common/helpers/algorithm.h>
+#include <common/helpers/scopeexitaction.h>
+#include <common/types/scopedresource.h>
 #include <common/facilities/wswfs.h>
 #include <common/facilities/profilerscope.h>
 #include <common/facilities/configvars.h>
@@ -1413,6 +1415,7 @@ static void prepareDrawSceneRequests( DrawSceneRequest **drawSceneRequests, unsi
 	WSW_PROFILER_SCOPE();
 
 	TaskSystem *const taskSystem = BeginProcessingOfTasks();
+	[[maybe_unused]] volatile wsw::ScopeExitAction callEndProcessingOfTasks( &EndProcessingOfTasks );
 
 	(void)taskSystem->addCoro( [=]() {
 		CoroTask::StartInfo si { taskSystem, std::span<const TaskHandle> {}, CoroTask::OnlyMainThread };
@@ -1423,8 +1426,6 @@ static void prepareDrawSceneRequests( DrawSceneRequest **drawSceneRequests, unsi
 	// We must note that this approach is benefitial only for small GC threshold values
 	// (otherwise, the spike is way too large to be hidden anyway).
 	cg.uiSystem->runGCIfNeeded();
-
-	EndProcessingOfTasks();
 }
 
 static void commitDrawSceneRequests( DrawSceneRequest **drawSceneRequests, bool actuallyUseTiledMode,
@@ -1459,7 +1460,7 @@ static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actual
 		ViewState *const viewState = cg.viewStates + viewStateIndices[viewNum];
 		refdef_t &rd = viewState->view.refdef;
 
-		Draw2DRequest *const request = CreateDraw2DRequest();
+		wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
 
 		if( auto *renderTarget = rd.renderTarget ) {
 			const float tcX0 = rcpVidWidth * (float)rd.x;
@@ -1503,15 +1504,17 @@ static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actual
 					if( isMiniview ) {
 						miniviewScale = wsw::min( rcpVidWidth * (float)rd.width, rcpVidHeight * (float)rd.height );
 					}
-					drawNamesAndBeacons( request, viewState, miniviewScale );
+					drawNamesAndBeacons( request.get(), viewState, miniviewScale );
 					if( drawCrosshair ) {
-						CG_DrawCrosshair( request, viewState, miniviewScale );
+						CG_DrawCrosshair( request.get(), viewState, miniviewScale );
 					}
 				}
 			}
 		}
 
-		CommitDraw2DRequest( request );
+		CommitDraw2DRequest( request.get() );
+		// Let the UI use the limited resource
+		request = {};
 
 		if( !isMiniview ) {
 			cg.uiSystem->drawMenuPartInMainContext();
@@ -1551,9 +1554,9 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 		if( cgs.configStrings.getWorldModel() == std::nullopt ) {
 			CG_AddLocalSounds();
 
-			Draw2DRequest *const request = CreateDraw2DRequest();
+			wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
 			request->drawStretchPic( 0, 0, cgs.vidWidth, cgs.vidHeight, 0, 0, 1, 1, colorBlack, cgs.shaderWhite );
-			CommitDraw2DRequest( request );
+			CommitDraw2DRequest( request.get() );
 
 			CG_ClearEffects();
 
@@ -1590,17 +1593,19 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 			DrawSceneRequest *drawSceneRequests[MAX_CLIENTS + 1];
 			CG_ResetTemporaryBoneposesCache();
 
-			BeginDrawingScenes();
+			unsigned useCachedViewsMask = 0;
+			do {
+				BeginDrawingScenes();
+				[[maybe_unused]] volatile wsw::ScopeExitAction callEndDrawingScenes( []() { EndDrawingScenes(); } );
 
-			const unsigned useCachedViewsMask = createDrawSceneRequests( drawSceneRequests, actuallyUseTiledMode, viewRects,
-																		 viewStateIndices, numDisplayedViewStates );
+				useCachedViewsMask = createDrawSceneRequests( drawSceneRequests, actuallyUseTiledMode, viewRects,
+															  viewStateIndices, numDisplayedViewStates );
 
-			prepareDrawSceneRequests( drawSceneRequests, useCachedViewsMask, viewStateIndices, numDisplayedViewStates );
-			result.hasRunGCIfNeeded = true;
+				prepareDrawSceneRequests( drawSceneRequests, useCachedViewsMask, viewStateIndices, numDisplayedViewStates );
+				result.hasRunGCIfNeeded = true;
 
-			commitDrawSceneRequests( drawSceneRequests, actuallyUseTiledMode, viewStateIndices, numDisplayedViewStates );
-
-			EndDrawingScenes();
+				commitDrawSceneRequests( drawSceneRequests, actuallyUseTiledMode, viewStateIndices, numDisplayedViewStates );
+			} while( false );
 
 			result.hasRenderedUIInternally = true;
 

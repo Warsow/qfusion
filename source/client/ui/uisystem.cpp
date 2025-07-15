@@ -4,9 +4,11 @@
 #include <common/facilities/cvar.h>
 #include <common/facilities/syspublic.h>
 #include <common/helpers/links.h>
+#include <common/helpers/scopeexitaction.h>
 #include <common/facilities/profilerscope.h>
 #include <common/helpers/singletonholder.h>
 #include <common/types/staticvector.h>
+#include <common/types/scopedresource.h>
 #include <client/client.h>
 #include <client/renderer/ref.h>
 #include "actionrequestmodel.h"
@@ -1344,9 +1346,9 @@ void QtUISystem::drawMenuPartInMainContext() {
 		// Don't blit initial FBO content
 		if( m_activeMenuMask || m_isShowingScoreboard ) {
 			shader_s *const material = R_WrapMenuTextureHandleInMaterial( m_menuSandbox->m_framebufferObject->texture() );
-			Draw2DRequest *const request = CreateDraw2DRequest();
+			wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
 			request->drawStretchPic( 0, 0, m_widthInPixels, m_heightInPixels, 0.0f, 1.0f, 1.0f, 0.0f, colorWhite, material );
-			CommitDraw2DRequest( request );
+			CommitDraw2DRequest( request.get() );
 		}
 
 		while( !m_nativelyDrawnOverlayHeap.empty() ) {
@@ -1419,7 +1421,7 @@ void QtUISystem::drawHudPartInMainContext() {
 			}
 
 			// Draw grid cells which have been marked by items
-			Draw2DRequest *const request = CreateDraw2DRequest();
+			wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
 
 			const float rcpWindowWidth  = 1.0f / (float)windowWidth;
 			const float rcpWindowHeight = 1.0f / (float)windowHeight;
@@ -1492,14 +1494,14 @@ void QtUISystem::drawHudPartInMainContext() {
 				}
 			}
 
-			CommitDraw2DRequest( request );
+			CommitDraw2DRequest( request.get() );
 		}
 	}
 }
 
 void QtUISystem::drawCursorInMainContext() {
 	if( m_activeMenuMask || CG_UsesTiledView() ) {
-		Draw2DRequest *const request = CreateDraw2DRequest();
+		wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
 
 		// TODO: Handle precaching of resources properly
 		auto *cursorMaterial = R_RegisterPic( "gfx/ui/cursor.tga" );
@@ -1509,7 +1511,7 @@ void QtUISystem::drawCursorInMainContext() {
 		const int side = 32 * m_pixelsPerLogicalUnit;
 
 		request->drawStretchPic( x, y, side, side, 0.0f, 0.0f, 1.0f, 1.0f, colorWhite, cursorMaterial );
-		CommitDraw2DRequest( request );
+		CommitDraw2DRequest( request.get() );
 	}
 }
 
@@ -1559,8 +1561,8 @@ void QtUISystem::drawBackgroundMapIfNeeded() {
 	std::tie( rdf.scissor_width, rdf.scissor_height ) = widthAndHeight;
 
 	BeginDrawingScenes();
+	[[maybe_unused]] volatile wsw::ScopeExitAction callEndDrawingScenes( []() { EndDrawingScenes(); } );
 	ExecuteSingleDrawSceneRequestNonSpeedCritical( CreateDrawSceneRequest( rdf ) );
-	EndDrawingScenes();
 }
 
 void QtUISystem::runGCIfNeeded() {

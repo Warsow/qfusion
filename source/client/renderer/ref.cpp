@@ -26,11 +26,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "materiallocal.h"
 #include "frontend.h"
 #include <common/helpers/textstreamwriterextras.h>
+#include <common/facilities/sysclock.h>
+#include <common/helpers/scopeexitaction.h>
 #include <common/facilities/cvar.h>
 #include <common/facilities/fscompat.h>
 #include <common/facilities/profilerscope.h>
 #include <common/facilities/syspublic.h>
-#include <common/facilities/sysclock.h>
 #include <common/common.h>
 
 r_globals_t rf;
@@ -824,6 +825,10 @@ void CommitDraw2DRequest( Draw2DRequest *request ) {
 	wsw::ref::Frontend::instance()->commitDraw2DRequest( request );
 }
 
+void RecycleDraw2DRequest( Draw2DRequest *request ) {
+	wsw::ref::Frontend::instance()->recycleDraw2DRequest( request );
+}
+
 [[nodiscard]]
 static auto coPrepareDrawSceneRequest( CoroTask::StartInfo si, DrawSceneRequest *drawSceneRequest ) -> CoroTask {
 	co_await si.taskSystem->awaiterOf( BeginProcessingDrawSceneRequests( { &drawSceneRequest, 1 } ) );
@@ -831,11 +836,13 @@ static auto coPrepareDrawSceneRequest( CoroTask::StartInfo si, DrawSceneRequest 
 }
 
 void ExecuteSingleDrawSceneRequestNonSpeedCritical( DrawSceneRequest *request ) {
-	TaskSystem *taskSystem = BeginProcessingOfTasks();
-	(void)taskSystem->addCoro( [=]() {
-		return coPrepareDrawSceneRequest( { taskSystem, {}, CoroTask::OnlyMainThread }, request );
-	});
-	EndProcessingOfTasks();
+	do {
+		TaskSystem *taskSystem = BeginProcessingOfTasks();
+		[[maybe_unused]] volatile wsw::ScopeExitAction callEndProcessingOfTasks( &EndProcessingOfTasks );
+		(void)taskSystem->addCoro( [=]() {
+			return coPrepareDrawSceneRequest( { taskSystem, {}, CoroTask::OnlyMainThread }, request );
+		});
+	} while( false );
 	CommitProcessedDrawSceneRequest( request );
 }
 

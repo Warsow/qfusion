@@ -156,6 +156,7 @@ void Frontend::bindRenderTargetAndViewport( RenderTargetComponents *components, 
 }
 
 void Frontend::beginDrawingScenes() {
+	m_mainThreadChecker.checkCallingThread();
 	R_ClearSkeletalCache();
 	recycleFrameCameraStates();
 	m_drawSceneFrame++;
@@ -165,6 +166,7 @@ void Frontend::beginDrawingScenes() {
 }
 
 auto Frontend::createDrawSceneRequest( const refdef_t &refdef ) -> DrawSceneRequest * {
+	m_mainThreadChecker.checkCallingThread();
 	return new( m_drawSceneRequestsHolder.unsafe_grow_back() )DrawSceneRequest( refdef, m_sceneIndexCounter++ );
 }
 
@@ -227,21 +229,22 @@ void Frontend::commitProcessedDrawSceneRequest( DrawSceneRequest *request ) {
 }
 
 void Frontend::endDrawingScenes() {
+	m_mainThreadChecker.checkCallingThread();
 	bindRenderTargetAndViewport( nullptr, nullptr );
 	recycleFrameCameraStates();
 	m_drawSceneRequestsHolder.clear();
 }
 
 auto Frontend::createDraw2DRequest() -> Draw2DRequest * {
+	m_mainThreadChecker.checkCallingThread();
 	assert( !m_isDraw2DRequestInUse );
-	m_draw2DRequest.m_cmds.clear();
+	assert( m_draw2DRequest.m_cmds.empty() );
 	m_isDraw2DRequestInUse = true;
 	return &m_draw2DRequest;
 }
 
 void Frontend::commitDraw2DRequest( Draw2DRequest *request ) {
-	assert( m_isDraw2DRequestInUse );
-	assert( request == &m_draw2DRequest );
+	m_mainThreadChecker.checkCallingThread();
 	set2DMode( true );
 	set2DScissor( 0, 0, rf.width2D, rf.height2D );
 	for( const auto &cmd: request->m_cmds ) {
@@ -255,13 +258,21 @@ void Frontend::commitDraw2DRequest( Draw2DRequest *request ) {
 			wsw::failWithRuntimeError( "Unreachable" );
 		}
 	}
-	m_isDraw2DRequestInUse = false;
 	// Ensure flushing dynamic meshes
 	set2DMode( false );
 }
 
+void Frontend::recycleDraw2DRequest( Draw2DRequest *request ) {
+	m_mainThreadChecker.checkCallingThread();
+	assert( m_isDraw2DRequestInUse );
+	assert( request == &m_draw2DRequest );
+	request->m_cmds.clear();
+	m_isDraw2DRequestInUse = false;
+}
+
 Frontend::Frontend() : m_taskSystem( { .profilingGroup  = wsw::ProfilingSystem::ClientGroup,
 									   .numExtraThreads = suggestNumExtraWorkerThreads( {} ) } ) {
+	m_mainThreadChecker.markCurrentThreadForFurtherAccessChecks();
 	const auto features = Sys_GetProcessorFeatures();
 	if( Q_CPU_FEATURE_SSE41 & features ) {
 		m_collectVisibleWorldLeavesArchMethod = &Frontend::collectVisibleWorldLeavesSse41;
@@ -285,6 +296,7 @@ Frontend::Frontend() : m_taskSystem( { .profilingGroup  = wsw::ProfilingSystem::
 }
 
 Frontend::~Frontend() {
+	m_mainThreadChecker.checkCallingThread();
 	disposeCameraStates();
 }
 

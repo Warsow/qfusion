@@ -72,7 +72,7 @@ public:
 
 	// TODO: See the remark along with m_taskSystem definition
 	[[nodiscard]]
-	auto getTaskSystem() -> TaskSystem * { return &m_taskSystem; }
+	auto getTaskSystem() -> TaskSystem * { m_mainThreadChecker.checkCallingThread(); return &m_taskSystem; }
 
 	void beginDrawingScenes();
 
@@ -91,6 +91,7 @@ public:
 	[[nodiscard]]
 	auto createDraw2DRequest() -> Draw2DRequest *;
 	void commitDraw2DRequest( Draw2DRequest *request );
+	void recycleDraw2DRequest( Draw2DRequest *request );
 
 	[[nodiscard]]
 	auto getMiniviewRenderTarget() -> RenderTargetComponents *;
@@ -731,6 +732,8 @@ private:
 	Draw2DRequest m_draw2DRequest;
 	// Currently we limit things to a single Draw2DRequest in flight
 	bool m_isDraw2DRequestInUse { false };
+
+	CallingThreadChecker m_mainThreadChecker;
 
 	wsw::Mutex m_stateAllocLock;
 	wsw::Mutex m_portalTextureLock;
