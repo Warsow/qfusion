@@ -1099,9 +1099,8 @@ static void CG_SetupViewDef( cg_viewdef_t *view, int type, bool thirdperson, Vie
 	}
 }
 
-static void CG_DrawCrosshair( ViewState *viewState, std::optional<float> miniviewScale );
-static void drawNamesAndBeacons( ViewState *viewState, std::optional<float> miniviewScale );
-static void CG_SCRDrawViewBlend( ViewState *viewState );
+static void CG_DrawCrosshair( Draw2DRequest *request, ViewState *viewState, std::optional<float> miniviewScale );
+static void drawNamesAndBeacons( Draw2DRequest *request, ViewState *viewState, std::optional<float> miniviewScale );
 
 static void updateFrameLerpProperties( unsigned extrapolationTime ) {
 	int snapTime = ( cg.frame.serverTime - cg.oldFrame.serverTime );
@@ -1442,7 +1441,7 @@ static void commitDrawSceneRequests( DrawSceneRequest **drawSceneRequests, bool 
 }
 
 [[nodiscard]]
-static bool blitPreparedViews( DrawSceneRequest **requests, bool actuallyUseTiledMode, bool hasModalOverlay,
+static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actuallyUseTiledMode, bool hasModalOverlay,
 							   const unsigned *viewStateIndices, unsigned numDisplayedViewStates ) {
 	WSW_PROFILER_SCOPE();
 
@@ -1459,6 +1458,9 @@ static bool blitPreparedViews( DrawSceneRequest **requests, bool actuallyUseTile
 	for( unsigned viewNum = 0; viewNum < numDisplayedViewStates; ++viewNum ) {
 		ViewState *const viewState = cg.viewStates + viewStateIndices[viewNum];
 		refdef_t &rd = viewState->view.refdef;
+
+		Draw2DRequest *const request = CreateDraw2DRequest();
+
 		if( auto *renderTarget = rd.renderTarget ) {
 			const float tcX0 = rcpVidWidth * (float)rd.x;
 			const float tcY0 = rcpVidHeight * (float)( cgs.vidHeight - rd.y );
@@ -1467,8 +1469,8 @@ static bool blitPreparedViews( DrawSceneRequest **requests, bool actuallyUseTile
 
 			shader_s *shader = R_WrapMiniviewRenderTargetInMaterial( renderTarget );
 
-			RF_Set2DScissor( rd.x, rd.y, rd.width, rd.height );
-			R_DrawStretchPic( rd.x, rd.y, rd.width, rd.height, tcX0, tcY0, tcX1, tcY1, colorWhite, shader );
+			request->setScissor( rd.x, rd.y, rd.width, rd.height );
+			request->drawStretchPic( rd.x, rd.y, rd.width, rd.height, tcX0, tcY0, tcX1, tcY1, colorWhite, shader );
 		}
 
 		const bool isMiniview = viewNum != 0 || actuallyUseTiledMode;
@@ -1493,7 +1495,7 @@ static bool blitPreparedViews( DrawSceneRequest **requests, bool actuallyUseTile
 				}
 			}
 
-			RF_Set2DScissor( rd.x, rd.y, rd.width, rd.height );
+			request->setScissor( rd.x, rd.y, rd.width, rd.height );
 
 			if( shouldDrawHuds ) {
 				if( drawGfx ) {
@@ -1501,19 +1503,18 @@ static bool blitPreparedViews( DrawSceneRequest **requests, bool actuallyUseTile
 					if( isMiniview ) {
 						miniviewScale = wsw::min( rcpVidWidth * (float)rd.width, rcpVidHeight * (float)rd.height );
 					}
-					drawNamesAndBeacons( viewState, miniviewScale );
+					drawNamesAndBeacons( request, viewState, miniviewScale );
 					if( drawCrosshair ) {
-						CG_DrawCrosshair( viewState, miniviewScale );
+						CG_DrawCrosshair( request, viewState, miniviewScale );
 					}
 				}
 			}
 		}
 
+		CommitDraw2DRequest( request );
+
 		if( !isMiniview ) {
-			RF_Set2DScissor( 0, 0, cgs.vidWidth, cgs.vidHeight );
 			cg.uiSystem->drawMenuPartInMainContext();
-			// TODO: The UI system should restore 2D mode on its own
-			R_Set2DMode( true );
 			hasRenderedTheMenu = true;
 		}
 	}
@@ -1550,7 +1551,9 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 		if( cgs.configStrings.getWorldModel() == std::nullopt ) {
 			CG_AddLocalSounds();
 
-			R_DrawStretchPic( 0, 0, cgs.vidWidth, cgs.vidHeight, 0, 0, 1, 1, colorBlack, cgs.shaderWhite );
+			Draw2DRequest *const request = CreateDraw2DRequest();
+			request->drawStretchPic( 0, 0, cgs.vidWidth, cgs.vidHeight, 0, 0, 1, 1, colorBlack, cgs.shaderWhite );
+			CommitDraw2DRequest( request );
 
 			CG_ClearEffects();
 
@@ -1609,7 +1612,6 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 
 			// Blit the HUD first in this case (this is a hack for the demo playback menu which must be on top)
 			if( actuallyUseTiledMode && !hasModalOverlay ) {
-				RF_Set2DScissor( 0, 0, cgs.vidWidth, cgs.vidHeight );
 				cg.uiSystem->drawHudPartInMainContext();
 				result.hasBlittedTheHud = true;
 			}
@@ -1697,17 +1699,6 @@ static void CG_CalcColorBlend( float *color, ViewState *viewState ) {
 	}
 }
 
-static void CG_SCRDrawViewBlend( ViewState *viewState ) {
-	if( v_showViewBlends.get() ) {
-		vec4_t colorblend;
-		CG_CalcColorBlend( colorblend, viewState );
-		if( colorblend[3] >= 0.01f ) {
-			const refdef_t &rd = viewState->view.refdef;
-			R_DrawStretchPic( rd.x, rd.y, rd.width, rd.height, 0.0f, 0.0f, 1.0f, 1.0f, colorblend, cgs.shaderWhite );
-		}
-	}
-}
-
 void CG_ClearPointedNum( ViewState *viewState ) {
 	viewState->pointedNum      = 0;
 	viewState->pointRemoveTime = 0;
@@ -1779,7 +1770,7 @@ int CG_VerticalAlignForHeight( const int y, int align, int height ) {
 	return ny;
 }
 
-static void drawBar( int x, int y, int align, int w, int h, int val, int maxval, const vec4_t color, struct shader_s *shader ) {
+static void drawBar( Draw2DRequest *request, int x, int y, int align, int w, int h, int val, int maxval, const vec4_t color, struct shader_s *shader ) {
 	if( val < 1 || maxval < 1 || w < 1 || h < 1 ) {
 		return;
 	}
@@ -1827,10 +1818,10 @@ static void drawBar( int x, int y, int align, int w, int h, int val, int maxval,
 	x = CG_HorizontalAlignForWidth( x, align, w );
 	y = CG_VerticalAlignForHeight( y, align, h );
 
-	R_DrawStretchPic( x, y, w, h, tc[0][0], tc[1][0], tc[0][1], tc[1][1], color, shader );
+	request->drawStretchPic( x, y, w, h, tc[0][0], tc[1][0], tc[0][1], tc[1][1], color, shader );
 }
 
-static void drawPlayerBars( qfontface_s *font, int requestedX, int requestedY, const vec4_t color, int health, int armor ) {
+static void drawPlayerBars( Draw2DRequest *request, qfontface_s *font, int requestedX, int requestedY, const vec4_t color, int health, int armor ) {
 	const int barwidth     = (int)std::round( (float)SCR_strWidth( "_", font, 0 ) * v_showPlayerNames_barWidth.get() ); // size of 8 characters
 	const int barheight    = (int)std::round( (float)SCR_FontHeight( font ) * 0.25 ); // quarter of a character height
 	const int barseparator = (int)barheight / 3;
@@ -1843,36 +1834,36 @@ static void drawPlayerBars( qfontface_s *font, int requestedX, int requestedY, c
 	int y = CG_VerticalAlignForHeight( requestedY, ALIGN_CENTER_TOP, barheight );
 
 	// draw the background box
-	drawBar( x, y, ALIGN_LEFT_TOP, barwidth, barheight * 3, 100, 100, tmpcolor, NULL );
+	drawBar( request, x, y, ALIGN_LEFT_TOP, barwidth, barheight * 3, 100, 100, tmpcolor, NULL );
 
 	y += barseparator;
 
 	if( health > 100 ) {
 		const vec4_t alphagreen   = { 0.0f, 1.0f, 0.0f, 1.0f };
 		const vec4_t alphamagenta = { 1.0f, 0.0f, 1.0f, 1.0f };
-		drawBar( x, y, ALIGN_LEFT_TOP, barwidth, barheight, 100, 100, alphagreen, NULL );
-		drawBar( x, y, ALIGN_LEFT_TOP, barwidth, barheight, health - 100, 100, alphamagenta, NULL );
+		drawBar( request, x, y, ALIGN_LEFT_TOP, barwidth, barheight, 100, 100, alphagreen, NULL );
+		drawBar( request, x, y, ALIGN_LEFT_TOP, barwidth, barheight, health - 100, 100, alphamagenta, NULL );
 	} else {
 		if( health <= 33 ) {
 			const vec4_t alphared { 1.0f, 0.0f, 0.0f, color[3] };
-			drawBar( x, y, ALIGN_LEFT_TOP, barwidth, barheight, health, 100, alphared, NULL );
+			drawBar( request, x, y, ALIGN_LEFT_TOP, barwidth, barheight, health, 100, alphared, NULL );
 		} else if( health <= 66 ) {
 			const vec4_t alphayellow { 1.0f, 1.0f, 0.0f, color[3] };
-			drawBar( x, y, ALIGN_LEFT_TOP, barwidth, barheight, health, 100, alphayellow, NULL );
+			drawBar( request, x, y, ALIGN_LEFT_TOP, barwidth, barheight, health, 100, alphayellow, NULL );
 		} else {
 			const vec4_t alphagreen { 0.0f, 1.0f, 0.0f, color[3] };
-			drawBar( x, y, ALIGN_LEFT_TOP, barwidth, barheight, health, 100, alphagreen, NULL );
+			drawBar( request, x, y, ALIGN_LEFT_TOP, barwidth, barheight, health, 100, alphagreen, NULL );
 		}
 	}
 
 	if( armor ) {
 		y += barseparator + barheight;
 		const vec4_t alphagrey { 0.85, 0.85, 0.85, color[3] };
-		drawBar( x, y, ALIGN_LEFT_TOP, barwidth, barheight, armor, 150, alphagrey, NULL );
+		drawBar( request, x, y, ALIGN_LEFT_TOP, barwidth, barheight, armor, 150, alphagrey, NULL );
 	}
 }
 
-static void drawNamesAndBeacons( ViewState *viewState, std::optional<float> miniviewScale ) {
+static void drawNamesAndBeacons( Draw2DRequest *request, ViewState *viewState, std::optional<float> miniviewScale ) {
 	const int showNamesValue           = v_showPlayerNames.get();
 	const int showTeamInfoValue        = v_showTeamInfo.get();
 	const int showPointedPlayerValue   = v_showPointedPlayer.get();
@@ -2020,7 +2011,7 @@ static void drawNamesAndBeacons( ViewState *viewState, std::optional<float> mini
 				} else {
 					shader = cgs.media.shaderTeamMateIndicator;
 				}
-				R_DrawStretchPic( picX, picY, picSize, picSize, 0.0f, 0.0f, 1.0f, 1.0f, color, shader );
+				request->drawStretchPic( picX, picY, picSize, picSize, 0.0f, 0.0f, 1.0f, 1.0f, color, shader );
 			}
 		}
 	}
@@ -2041,11 +2032,11 @@ static void drawNamesAndBeacons( ViewState *viewState, std::optional<float> mini
 			const vec4_t color { 1.0f, 1.0f, 1.0f, playerNameAlphaValues[i] };
 			const int requestedX = savedCoords[i][0];
 			const int requestedY = savedCoords[i][1];
-			SCR_DrawString( requestedX, requestedY, ALIGN_CENTER_BOTTOM, cgs.clientInfo[i].name, font, color );
+			SCR_DrawString( request, requestedX, requestedY, ALIGN_CENTER_BOTTOM, cgs.clientInfo[i].name, font, color );
 			if( showPointedPlayerValue && ( i + 1 == viewState->pointedNum ) ) {
 				// pointed player hasn't a health value to be drawn, so skip adding the bars
 				if( viewState->pointedHealth && v_showPlayerNames_barWidth.get() > 0 ) {
-					drawPlayerBars( font, requestedX, requestedY, color, viewState->pointedHealth, viewState->pointedArmor );
+					drawPlayerBars( request, font, requestedX, requestedY, color, viewState->pointedHealth, viewState->pointedArmor );
 				}
 			}
 		}
@@ -2079,7 +2070,7 @@ void CG_CheckSharedCrosshairState( bool initial ) {
 	}
 }
 
-static void drawCrosshair( int weapon, int fireMode, std::optional<float> miniviewScale, const ViewState *viewState ) {
+static void drawCrosshair( Draw2DRequest *request, int weapon, int fireMode, std::optional<float> miniviewScale, const ViewState *viewState ) {
 	const UnsignedConfigVar *sizeVar;
 	const ColorConfigVar *colorVar;
 	const StringConfigVar *nameVar;
@@ -2134,11 +2125,11 @@ static void drawCrosshair( int weapon, int fireMode, std::optional<float> minivi
 		const int x = viewState->view.refdef.x + ( viewState->view.refdef.width - (int)imageWidth ) / 2;
 		const int y = viewState->view.refdef.y + ( viewState->view.refdef.height - (int)imageHeight ) / 2;
 
-		R_DrawStretchPic( x, y, (int)imageWidth, (int)imageHeight, 0, 0, 1, 1, color, material );
+		request->drawStretchPic( x, y, (int)imageWidth, (int)imageHeight, 0, 0, 1, 1, color, material );
 	}
 }
 
-static void CG_DrawCrosshair( ViewState *viewState, std::optional<float> miniviewScale ) {
+static void CG_DrawCrosshair( Draw2DRequest *request, ViewState *viewState, std::optional<float> miniviewScale ) {
 	const player_state_t *playerState;
 	if( viewState->view.playerPrediction ) {
 		playerState = &viewState->predictFromPlayerState;
@@ -2148,9 +2139,9 @@ static void CG_DrawCrosshair( ViewState *viewState, std::optional<float> minivie
 	if( const auto weapon = playerState->stats[STAT_WEAPON] ) {
 		if( const auto *const firedef = GS_FiredefForPlayerState( cggs, playerState, weapon ) ) {
 			if( firedef->fire_mode == FIRE_MODE_STRONG ) {
-				::drawCrosshair( weapon, FIRE_MODE_STRONG, miniviewScale, viewState );
+				::drawCrosshair( request, weapon, FIRE_MODE_STRONG, miniviewScale, viewState );
 			}
-			::drawCrosshair( weapon, FIRE_MODE_WEAK, miniviewScale, viewState );
+			::drawCrosshair( request, weapon, FIRE_MODE_WEAK, miniviewScale, viewState );
 		}
 	}
 }

@@ -706,18 +706,18 @@ void Console::drawPane( unsigned width, unsigned height ) {
 		Q_strncatz( version, APP_VERSION_STAGE, sizeof( version ) );
 	}
 
-	R_Set2DMode( true );
+	Draw2DRequest *const request = CreateDraw2DRequest();
 
 	// draw the background
-	R_DrawStretchPic( 0, 0, width, height, 0, 0, 1, 1, kConsoleBackgroundColor, cls.whiteShader );
+	request->drawStretchPic( 0, 0, width, height, 0, 0, 1, 1, kConsoleBackgroundColor, cls.whiteShader );
 
 	const int bottomLineHeight = 2 * pixelRatio;
-	SCR_DrawFillRect( 0, height - bottomLineHeight, width, bottomLineHeight, colorOrange );
+	SCR_DrawFillRect( request, 0, height - bottomLineHeight, width, bottomLineHeight, colorOrange );
 
 	const int versionMargin = 4 * pixelRatio;
 	const int versionX      = width - SCR_strWidth( version, cls.consoleFont, 0, 0 ) - versionMargin;
 	const int versionY      = height - SCR_FontHeight( cls.consoleFont ) - versionMargin;
-	SCR_DrawString( versionX, versionY, ALIGN_LEFT_TOP, version, cls.consoleFont, colorOrange, 0 );
+	SCR_DrawString( request, versionX, versionY, ALIGN_LEFT_TOP, version, cls.consoleFont, colorOrange, 0 );
 
 	// Draw the input prompt, user text, and cursor if desired
 
@@ -743,13 +743,13 @@ void Console::drawPane( unsigned width, unsigned height ) {
 		}
 	}
 
-	SCR_DrawRawChar( inputX - promptWidth, inputY, ']', cls.consoleFont, colorWhite );
+	SCR_DrawRawChar( request, inputX - promptWidth, inputY, ']', cls.consoleFont, colorWhite );
 
-	SCR_DrawClampString( inputX - inputPrestep, inputY, m_inputLine.data(), inputX, inputY,
+	SCR_DrawClampString( request, inputX - inputPrestep, inputY, m_inputLine.data(), inputX, inputY,
 						 inputX + inputWidth, inputY + 2 * smallCharHeight, cls.consoleFont, colorWhite, 0 );
 
 	if( (int)( cls.realtime >> 8 ) & 1 ) {
-		SCR_DrawRawChar( inputX + preWidth - inputPrestep, inputY, '_', cls.consoleFont, colorWhite );
+		SCR_DrawRawChar( request, inputX + preWidth - inputPrestep, inputY, '_', cls.consoleFont, colorWhite );
 	}
 
 	int lineY = height - smallCharHeight - inputReservedHeight;
@@ -793,7 +793,7 @@ void Console::drawPane( unsigned width, unsigned height ) {
 		if( lineY >= minY ) {
 			// draw arrows to show the buffer is backscrolled
 			for( unsigned x = arrowSpacing; x + arrowSpacing <= width; x += arrowSpacing ) {
-				SCR_DrawRawChar( x, lineY, '^', cls.consoleFont, colorOrange );
+				SCR_DrawRawChar( request, x, lineY, '^', cls.consoleFont, colorOrange );
 			}
 			// the arrows obscure one line of scrollback
 			lineY -= smallCharHeight;
@@ -831,7 +831,7 @@ void Console::drawPane( unsigned width, unsigned height ) {
 				}
 				scrDrawStringBuffer.assign( it->data(), it->size() );
 				scrDrawStringBuffer.push_back( '\0' );
-				SCR_DrawString( sideMargin, lineY, ALIGN_LEFT_TOP, scrDrawStringBuffer.data(), cls.consoleFont, colorWhite, 0 );
+				SCR_DrawString( request, sideMargin, lineY, ALIGN_LEFT_TOP, scrDrawStringBuffer.data(), cls.consoleFont, colorWhite, 0 );
 				lineY -= smallCharHeight;
 			}
 			if( lineY < minY ) {
@@ -839,6 +839,8 @@ void Console::drawPane( unsigned width, unsigned height ) {
 			}
 		}
 	}
+
+	CommitDraw2DRequest( request );
 }
 
 auto Console::RegularEntry::getRequiredCapacityForDumping() const -> unsigned {
@@ -1413,7 +1415,7 @@ void Console::drawNotifications( unsigned width, unsigned height ) {
 		return;
 	}
 
-	R_Set2DMode( true );
+	Draw2DRequest *const request = CreateDraw2DRequest();
 
 	const int pixelRatio  = VID_GetPixelRatio();
 	const size_t fontHeight = SCR_FontHeight( cls.consoleFont );
@@ -1427,9 +1429,11 @@ void Console::drawNotifications( unsigned width, unsigned height ) {
 	const int textX = 8 * pixelRatio;
 	for( const RegularEntry *line: matchingLines ) {
 		// TODO: Is it guaranteed to be zero-terminated?
-		SCR_DrawString( textX, textY, ALIGN_LEFT_TOP, line->m_data, cls.consoleFont, colorWhite, 0 );
+		SCR_DrawString( request, textX, textY, ALIGN_LEFT_TOP, line->m_data, cls.consoleFont, colorWhite, 0 );
 		textY += fontHeight;
 	}
+
+	CommitDraw2DRequest( request );
 }
 
 void Console::addToHistory( wsw::StringView line ) {

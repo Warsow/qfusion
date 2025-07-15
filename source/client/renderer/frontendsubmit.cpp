@@ -1354,4 +1354,55 @@ void Frontend::prepareLegacySprite( PrepareSpriteSurfWorkload *workload ) {
 	}
 }
 
+void Frontend::submitRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2, float angle,
+										const float *color, const shader_s *material ) {
+	vec4_t pic_xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
+	vec4_t pic_normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
+	vec2_t pic_st[4];
+	byte_vec4_t pic_colors[4];
+	elem_t pic_elems[6] = { 0, 1, 2, 0, 2, 3 };
+	mesh_t pic_mesh = { 4, 6, pic_elems, pic_xyz, pic_normals, nullptr, pic_st, { 0, 0, 0, 0 }, { 0 },
+						{ pic_colors, pic_colors, pic_colors, pic_colors }, nullptr, nullptr };
+
+	// lower-left
+	Vector2Set( pic_xyz[0], x, y );
+	Vector2Set( pic_st[0], s1, t1 );
+	Vector4Set( pic_colors[0],
+				bound( 0, ( int )( color[0] * 255.0f ), 255 ),
+				bound( 0, ( int )( color[1] * 255.0f ), 255 ),
+				bound( 0, ( int )( color[2] * 255.0f ), 255 ),
+				bound( 0, ( int )( color[3] * 255.0f ), 255 ) );
+	const int bcolor = *(int *)pic_colors[0];
+
+	// lower-right
+	Vector2Set( pic_xyz[1], x + w, y );
+	Vector2Set( pic_st[1], s2, t1 );
+	*(int *)pic_colors[1] = bcolor;
+
+	// upper-right
+	Vector2Set( pic_xyz[2], x + w, y + h );
+	Vector2Set( pic_st[2], s2, t2 );
+	*(int *)pic_colors[2] = bcolor;
+
+	// upper-left
+	Vector2Set( pic_xyz[3], x, y + h );
+	Vector2Set( pic_st[3], s1, t2 );
+	*(int *)pic_colors[3] = bcolor;
+
+	// rotated image
+	if( angle != 0.0f && ( angle = anglemod( angle ) ) != 0.0f ) {
+		angle = DEG2RAD( angle );
+		const float sint = sinf( angle );
+		const float cost = cosf( angle );
+		for( unsigned j = 0; j < 4; j++ ) {
+			t1 = pic_st[j][0];
+			t2 = pic_st[j][1];
+			pic_st[j][0] = cost * ( t1 - 0.5f ) - sint * ( t2 - 0.5f ) + 0.5f;
+			pic_st[j][1] = cost * ( t2 - 0.5f ) + sint * ( t1 - 0.5f ) + 0.5f;
+		}
+	}
+
+	RB_AddDynamicMesh( nullptr, material, nullptr, nullptr, 0, &pic_mesh, GL_TRIANGLES, 0.0f, 0.0f );
+}
+
 }

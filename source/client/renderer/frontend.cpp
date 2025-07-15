@@ -35,10 +35,6 @@ void R_Set2DMode( bool enable ) {
 	wsw::ref::Frontend::instance()->set2DMode( enable );
 }
 
-void RF_Set2DScissor( int x, int y, int w, int h ) {
-	wsw::ref::Frontend::instance()->set2DScissor( x, y, w, h );
-}
-
 void R_TransformForWorld();
 void R_TranslateForEntity( const entity_t *e );
 void R_TransformForEntity( const entity_t *e );
@@ -228,15 +224,40 @@ void Frontend::commitProcessedDrawSceneRequest( DrawSceneRequest *request ) {
 	} else {
 		// TODO what to do
 	}
-
-	set2DMode( true );
 }
 
 void Frontend::endDrawingScenes() {
 	bindRenderTargetAndViewport( nullptr, nullptr );
-	set2DMode( true );
 	recycleFrameCameraStates();
 	m_drawSceneRequestsHolder.clear();
+}
+
+auto Frontend::createDraw2DRequest() -> Draw2DRequest * {
+	assert( !m_isDraw2DRequestInUse );
+	m_draw2DRequest.m_cmds.clear();
+	m_isDraw2DRequestInUse = true;
+	return &m_draw2DRequest;
+}
+
+void Frontend::commitDraw2DRequest( Draw2DRequest *request ) {
+	assert( m_isDraw2DRequestInUse );
+	assert( request == &m_draw2DRequest );
+	set2DMode( true );
+	set2DScissor( 0, 0, rf.width2D, rf.height2D );
+	for( const auto &cmd: request->m_cmds ) {
+		if( const auto *drawPicCmd = std::get_if<Draw2DRequest::DrawPicCmd>( &cmd ) ) {
+			submitRotatedStretchPic( drawPicCmd->x, drawPicCmd->y, drawPicCmd->w, drawPicCmd->h,
+									 drawPicCmd->s1, drawPicCmd->t1, drawPicCmd->s2, drawPicCmd->t2,
+									 drawPicCmd->angle, drawPicCmd->color, drawPicCmd->shader );
+		} else if( const auto *setScissorCmd = std::get_if<Draw2DRequest::SetScissorCmd>( &cmd ) ) {
+			set2DScissor( setScissorCmd->x, setScissorCmd->y, setScissorCmd->w, setScissorCmd->h );
+		} else {
+			wsw::failWithRuntimeError( "Unreachable" );
+		}
+	}
+	m_isDraw2DRequestInUse = false;
+	// Ensure flushing dynamic meshes
+	set2DMode( false );
 }
 
 Frontend::Frontend() : m_taskSystem( { .profilingGroup  = wsw::ProfilingSystem::ClientGroup,
@@ -1163,4 +1184,22 @@ void DrawSceneRequest::addCompoundDynamicMesh( const float *mins, const float *m
 			.numParts             = numParts,
 		});
 	}
+}
+
+void Draw2DRequest::setScissor( int x, int y, int w, int h ) {
+	m_cmds.emplace_back( SetScissorCmd { .x = x, .y = y, .w = w, .h = h } );
+}
+
+void Draw2DRequest::drawStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2,
+									const vec_t *color, const shader_s *shader ) {
+	drawRotatedStretchPic( x, y, w, h, s1, t1, s2, t2, 0.0f, color, shader );
+}
+
+void Draw2DRequest::drawRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2,
+										   float angle, const vec_t *color, const shader_s *shader ) {
+	m_cmds.emplace_back( DrawPicCmd {
+		.x = x, .y = y, .w = w, .h = h,
+		.s1 = s1, .t1 = t1, .s2 = s2, .t2 = t2,
+		.angle = angle, .color = { color[0], color[1], color[2], color[3] }, .shader = shader,
+	});
 }

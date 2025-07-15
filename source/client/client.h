@@ -499,11 +499,11 @@ size_t SCR_strWidth( const char *str, qfontface_t *font, size_t maxlen, int flag
 #define ALIGN_CENTER_BOTTOM         7
 #define ALIGN_RIGHT_BOTTOM          8
 
-int SCR_DrawString( int x, int y, int align, const char *str, qfontface_t *font = nullptr, const float *color = colorWhite, int flags = 0 );
-int SCR_DrawString( int x, int y, int align, const wsw::StringView &str, qfontface_t *font = nullptr, const float *color = colorWhite, int flags = 0 );
-void SCR_DrawClampString( int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags = 0 );
-void SCR_DrawRawChar( int x, int y, wchar_t num, qfontface_t *font, const vec4_t color );
-void SCR_DrawFillRect( int x, int y, int w, int h, const vec4_t color );
+int SCR_DrawString( Draw2DRequest *request, int x, int y, int align, const char *str, qfontface_t *font = nullptr, const float *color = colorWhite, int flags = 0 );
+int SCR_DrawString( Draw2DRequest *request, int x, int y, int align, const wsw::StringView &str, qfontface_t *font = nullptr, const float *color = colorWhite, int flags = 0 );
+void SCR_DrawClampString( Draw2DRequest *request, int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags = 0 );
+void SCR_DrawRawChar( Draw2DRequest *request, int x, int y, wchar_t num, qfontface_t *font, const vec4_t color );
+void SCR_DrawFillRect( Draw2DRequest *request, int x, int y, int w, int h, const vec4_t color );
 
 void CL_ProfilerHud_Init();
 void CL_ProfilerHud_Shutdown();

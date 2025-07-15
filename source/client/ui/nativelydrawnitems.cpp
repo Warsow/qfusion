@@ -133,7 +133,7 @@ void NativelyDrawnImage::drawSelfNatively( int64_t, int64_t, int pixelsPerLogica
 	reloadIfNeeded( pixelsPerLogicalUnit );
 
 	if( isLoaded() ) {
-		R_Set2DMode( true );
+		Draw2DRequest *const request = CreateDraw2DRequest();
 
 		const float opacity = QQmlProperty::read( m_selfAsItem, "opacity" ).toFloat();
 		const vec4_t color {
@@ -154,16 +154,16 @@ void NativelyDrawnImage::drawSelfNatively( int64_t, int64_t, int pixelsPerLogica
 			const int y = pixelsPerLogicalUnit * ( qmlY + (int)height() / 2 );
 			const int w = pixelsPerLogicalUnit * m_sourceSize.width();
 			const int h = pixelsPerLogicalUnit * m_sourceSize.height();
-			R_DrawStretchPic( x - w / 2, y - w / 2, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color, m_material );
+			request->drawStretchPic( x - w / 2, y - w / 2, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color, m_material );
 		} else {
 			const int x = pixelsPerLogicalUnit * qmlX;
 			const int y = pixelsPerLogicalUnit * qmlY;
 			const int w = pixelsPerLogicalUnit * (int)width();
 			const int h = pixelsPerLogicalUnit * (int)height();
-			R_DrawStretchPic( x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color, m_material );
+			request->drawStretchPic( x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color, m_material );
 		}
 
-		R_Set2DMode( false );
+		CommitDraw2DRequest( request );
 	}
 }
 
@@ -323,8 +323,6 @@ void NativelyDrawnModel::drawSelfNatively( int64_t, int64_t timeDelta, int pixel
 	const int y      = pixelsPerLogicalUnit * rect.y();
 	const int width  = pixelsPerLogicalUnit * rect.width();
 	const int height = pixelsPerLogicalUnit * rect.height();
-
-	R_Set2DMode( false );
 
 	refdef_t refdef {};
 	entity_t entity {};

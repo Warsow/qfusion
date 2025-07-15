@@ -22,8 +22,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "ftlib_local.h"
 #include "renderer/ref.h"
 
-static fdrawchar_t drawCharIntercept = NULL;
-
 //===============================================================================
 //STRINGS HELPERS
 //===============================================================================
@@ -247,24 +245,14 @@ size_t FTLIB_FontXHeight( qfontface_t *font ) {
 //===============================================================================
 
 /*
-* FTLIB_SetDrawIntercept
-*/
-fdrawchar_t FTLIB_SetDrawCharIntercept( fdrawchar_t intercept ) {
-	fdrawchar_t old = drawCharIntercept;
-	drawCharIntercept = intercept;
-	return old;
-}
-
-/*
 * FTLIB_DrawRawChar
 *
 * Draws one graphics character with 0 being transparent.
 * It can be clipped to the top of the screen to allow the console to be
 * smoothly scrolled off.
 */
-void FTLIB_DrawRawChar( int x, int y, wchar_t num, qfontface_t *font, const vec4_t color ) {
+void FTLIB_DrawRawChar( Draw2DRequest *request, int x, int y, wchar_t num, qfontface_t *font, const vec4_t color ) {
 	qglyph_t *glyph;
-	fdrawchar_t draw = R_DrawStretchPic;
 
 	if( ( num <= ' ' ) || !font || ( y <= -font->height ) ) {
 		return;
@@ -284,11 +272,7 @@ void FTLIB_DrawRawChar( int x, int y, wchar_t num, qfontface_t *font, const vec4
 		return;
 	}
 
-	if( drawCharIntercept ) {
-		draw = drawCharIntercept;
-	}
-
-	draw( x + glyph->x_offset, y + font->glyphYOffset + glyph->y_offset,
+	request->drawStretchPic( x + glyph->x_offset, y + font->glyphYOffset + glyph->y_offset,
 		  glyph->width, glyph->height,
 		  glyph->s1, glyph->t1, glyph->s2, glyph->t2,
 		  color, glyph->shader );
@@ -300,12 +284,11 @@ void FTLIB_DrawRawChar( int x, int y, wchar_t num, qfontface_t *font, const vec4
 * Draws one graphics character with 0 being transparent.
 * Clipped to [xmin, ymin; xmax, ymax].
 */
-void FTLIB_DrawClampChar( int x, int y, wchar_t num, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color ) {
+void FTLIB_DrawClampChar( Draw2DRequest *request, int x, int y, wchar_t num, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color ) {
 	qglyph_t *glyph;
 	int x2, y2;
 	float s1 = 0.0f, t1 = 0.0f, s2 = 1.0f, t2 = 1.0f;
 	float tw, th;
-	fdrawchar_t draw = R_DrawStretchPic;
 
 	if( ( num <= ' ' ) || !font || ( xmax <= xmin ) || ( ymax <= ymin ) ) {
 		return;
@@ -356,11 +339,7 @@ void FTLIB_DrawClampChar( int x, int y, wchar_t num, int xmin, int ymin, int xma
 	tw = glyph->s2 - glyph->s1;
 	th = glyph->t2 - glyph->t1;
 
-	if( drawCharIntercept ) {
-		draw = drawCharIntercept;
-	}
-
-	draw( x, y, x2 - x, y2 - y,
+	request->drawStretchPic( x, y, x2 - x, y2 - y,
 		  glyph->s1 + tw * s1, glyph->t1 + th * t1,
 		  glyph->s1 + tw * s2, glyph->t1 + th * t2,
 		  color, glyph->shader );
@@ -369,7 +348,7 @@ void FTLIB_DrawClampChar( int x, int y, wchar_t num, int xmin, int ymin, int xma
 /*
 * FTLIB_DrawClampString
 */
-void FTLIB_DrawClampString( int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags ) {
+void FTLIB_DrawClampString( Draw2DRequest *request, int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags ) {
 	int xoffset = 0;
 	vec4_t scolor;
 	int colorindex;
@@ -427,7 +406,7 @@ void FTLIB_DrawClampString( int x, int y, const char *str, int xmin, int ymin, i
 				break;
 			}
 
-			FTLIB_DrawClampChar( x + xoffset, y, num, xmin, ymin, xmax, ymax, font, scolor );
+			FTLIB_DrawClampChar( request, x + xoffset, y, num, xmin, ymin, xmax, ymax, font, scolor );
 
 			prev_num = num;
 			prev_glyph = glyph;
@@ -446,7 +425,7 @@ void FTLIB_DrawClampString( int x, int y, const char *str, int xmin, int ymin, i
 * FTLIB_DrawRawString - Doesn't care about aligning. Returns drawn len.
 * It can stop when reaching maximum width when a value has been parsed.
 */
-size_t FTLIB_DrawRawString( int x, int y, const char *str, size_t maxwidth, int *width, qfontface_t *font, const vec4_t color, int flags ) {
+size_t FTLIB_DrawRawString( Draw2DRequest *request, int x, int y, const char *str, size_t maxwidth, int *width, qfontface_t *font, const vec4_t color, int flags ) {
 	unsigned int xoffset = 0;
 	vec4_t scolor;
 	const char *s, *olds;
@@ -499,7 +478,7 @@ size_t FTLIB_DrawRawString( int x, int y, const char *str, size_t maxwidth, int 
 				xoffset += getKerning( font, prev_glyph, glyph );
 			}
 
-			FTLIB_DrawRawChar( x + xoffset, y, num, font, scolor );
+			FTLIB_DrawRawChar( request, x + xoffset, y, num, font, scolor );
 
 			xoffset += glyph->x_advance;
 

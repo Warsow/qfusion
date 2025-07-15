@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 struct shader_s;
 struct qfontface_s;
 
+class Draw2DRequest;
+
 // font style flags
 typedef enum {
 	QFONT_STYLE_NONE            = 0,
@@ -37,8 +39,6 @@ typedef enum {
 	TEXTDRAWFLAG_NO_COLORS  = 1 << 0,   // draw color codes instead of applying them
 	TEXTDRAWFLAG_KERNING    = 1 << 1
 } textdrawflag_t;
-
-typedef void ( *fdrawchar_t )( int x, int y, int w, int h, float s1, float t1, float s2, float t2, const vec4_t color, const struct shader_s *shader );
 
 bool FTLIB_Init( bool verbose );
 void FTLIB_Shutdown( bool verbose );
@@ -58,11 +58,9 @@ size_t FTLIB_StrlenForWidth( const char *str, struct qfontface_s *font, size_t m
 int FTLIB_FontUnderline( struct qfontface_s *font, int *thickness );
 size_t FTLIB_FontAdvance( struct qfontface_s *font );
 size_t FTLIB_FontXHeight( struct qfontface_s *font );
-void FTLIB_DrawRawChar( int x, int y, wchar_t num, struct qfontface_s *font, const vec4_t color );
-void FTLIB_DrawClampChar( int x, int y, wchar_t num, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, const vec4_t color );
-void FTLIB_DrawClampString( int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, const vec4_t color, int flags );
-size_t FTLIB_DrawRawString( int x, int y, const char *str, size_t maxwidth, int *width, struct qfontface_s *font, const vec4_t color, int flags );
-int FTLIB_DrawMultilineString( int x, int y, const char *str, int halign, int maxwidth, int maxlines, struct qfontface_s *font, const vec4_t color, int flags );
-fdrawchar_t FTLIB_SetDrawCharIntercept( fdrawchar_t intercept );
+void FTLIB_DrawRawChar( Draw2DRequest *request, int x, int y, wchar_t num, struct qfontface_s *font, const vec4_t color );
+void FTLIB_DrawClampChar( Draw2DRequest *request, int x, int y, wchar_t num, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, const vec4_t color );
+void FTLIB_DrawClampString( Draw2DRequest *request, int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, const vec4_t color, int flags );
+size_t FTLIB_DrawRawString( Draw2DRequest *request, int x, int y, const char *str, size_t maxwidth, int *width, struct qfontface_s *font, const vec4_t color, int flags );
 
 #endif

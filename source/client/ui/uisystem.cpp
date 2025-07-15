@@ -8,6 +8,7 @@
 #include <common/helpers/singletonholder.h>
 #include <common/types/staticvector.h>
 #include <client/client.h>
+#include <client/renderer/ref.h>
 #include "actionrequestmodel.h"
 #include "callvotesmodel.h"
 #include "chatmodel.h"
@@ -1343,9 +1344,9 @@ void QtUISystem::drawMenuPartInMainContext() {
 		// Don't blit initial FBO content
 		if( m_activeMenuMask || m_isShowingScoreboard ) {
 			shader_s *const material = R_WrapMenuTextureHandleInMaterial( m_menuSandbox->m_framebufferObject->texture() );
-			R_Set2DMode( true );
-			R_DrawStretchPic( 0, 0, m_widthInPixels, m_heightInPixels, 0.0f, 1.0f, 1.0f, 0.0f, colorWhite, material );
-			R_Set2DMode( false );
+			Draw2DRequest *const request = CreateDraw2DRequest();
+			request->drawStretchPic( 0, 0, m_widthInPixels, m_heightInPixels, 0.0f, 1.0f, 1.0f, 0.0f, colorWhite, material );
+			CommitDraw2DRequest( request );
 		}
 
 		while( !m_nativelyDrawnOverlayHeap.empty() ) {
@@ -1418,7 +1419,7 @@ void QtUISystem::drawHudPartInMainContext() {
 			}
 
 			// Draw grid cells which have been marked by items
-			R_Set2DMode( true );
+			Draw2DRequest *const request = CreateDraw2DRequest();
 
 			const float rcpWindowWidth  = 1.0f / (float)windowWidth;
 			const float rcpWindowHeight = 1.0f / (float)windowHeight;
@@ -1453,7 +1454,7 @@ void QtUISystem::drawHudPartInMainContext() {
 					const float color[4] {
 						(float)(numStripesDrawn % 2 ), 1.0f - (float)( numStripesDrawn % 2 ), 1.0f, 0.25f
 					};
-					R_DrawStretchPic( x, y, stripeWidth, cellHeight, s1, t1, s2, t2, color, cgs.shaderWhite );
+					request->drawStretchPic( x, y, stripeWidth, cellHeight, s1, t1, s2, t2, color, cgs.shaderWhite );
 					numCellsDrawn += (int)( column - stripeStartColumn );
 					numStripesDrawn++;
 				}
@@ -1487,20 +1488,18 @@ void QtUISystem::drawHudPartInMainContext() {
 					const float t1         = 1.0f - (float)y * rcpWindowHeight;
 					const float s2         = 0.0f + (float)( x + stripeWidth ) * rcpWindowWidth;
 					const float t2         = 1.0f - (float)( y + cellHeight ) * rcpWindowHeight;
-					R_DrawStretchPic( x, y, stripeWidth, cellHeight, s1, t1, s2, t2, colorWhite, material );
+					request->drawStretchPic( x, y, stripeWidth, cellHeight, s1, t1, s2, t2, colorWhite, material );
 				}
 			}
 
-			R_Set2DMode( false );
+			CommitDraw2DRequest( request );
 		}
 	}
-
-
 }
 
 void QtUISystem::drawCursorInMainContext() {
 	if( m_activeMenuMask || CG_UsesTiledView() ) {
-		R_Set2DMode( true );
+		Draw2DRequest *const request = CreateDraw2DRequest();
 
 		// TODO: Handle precaching of resources properly
 		auto *cursorMaterial = R_RegisterPic( "gfx/ui/cursor.tga" );
@@ -1509,8 +1508,8 @@ void QtUISystem::drawCursorInMainContext() {
 		const auto y   = (int)m_mouseXY[1] * m_pixelsPerLogicalUnit;
 		const int side = 32 * m_pixelsPerLogicalUnit;
 
-		R_DrawStretchPic( x, y, side, side, 0.0f, 0.0f, 1.0f, 1.0f, colorWhite, cursorMaterial );
-		R_Set2DMode( false );
+		request->drawStretchPic( x, y, side, side, 0.0f, 0.0f, 1.0f, 1.0f, colorWhite, cursorMaterial );
+		CommitDraw2DRequest( request );
 	}
 }
 

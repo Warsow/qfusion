@@ -1274,15 +1274,15 @@ size_t SCR_strWidth( const char *str, qfontface_t *font, size_t maxlen, int flag
 	return FTLIB_StringWidth( str, font, maxlen, flags );
 }
 
-void SCR_DrawRawChar( int x, int y, wchar_t num, qfontface_t *font, const vec4_t color ) {
-	FTLIB_DrawRawChar( x, y, num, font, color );
+void SCR_DrawRawChar( Draw2DRequest *request, int x, int y, wchar_t num, qfontface_t *font, const vec4_t color ) {
+	FTLIB_DrawRawChar( request, x, y, num, font, color );
 }
 
-void SCR_DrawClampString( int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags ) {
-	FTLIB_DrawClampString( x, y, str, xmin, ymin, xmax, ymax, font, color, flags );
+void SCR_DrawClampString( Draw2DRequest *request, int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags ) {
+	FTLIB_DrawClampString( request, x, y, str, xmin, ymin, xmax, ymax, font, color, flags );
 }
 
-int SCR_DrawString( int x, int y, int align, const char *str, qfontface_t *font, const float *color, int flags ) {
+int SCR_DrawString( Draw2DRequest *request, int x, int y, int align, const char *str, qfontface_t *font, const float *color, int flags ) {
 	if( !str ) {
 		return 0;
 	}
@@ -1299,29 +1299,29 @@ int SCR_DrawString( int x, int y, int align, const char *str, qfontface_t *font,
 	y = SCR_VerticalAlignForString( y, align, fontHeight );
 
 	int width = 0;
-	FTLIB_DrawRawString( x, y, str, 0, &width, font, color, flags );
+	FTLIB_DrawRawString( request, x, y, str, 0, &width, font, color, flags );
 
 	return width;
 }
 
-int SCR_DrawString( int x, int y, int align, const wsw::StringView &str, qfontface_t *font, const float *color, int flags ) {
+int SCR_DrawString( Draw2DRequest *request, int x, int y, int align, const wsw::StringView &str, qfontface_t *font, const float *color, int flags ) {
 	if( str.isZeroTerminated() ) {
-		return SCR_DrawString( x, y, align, str.data(), font, color, flags );
+		return SCR_DrawString( request, x, y, align, str.data(), font, color, flags );
 	}
 	if( str.length() < 256 ) {
 		wsw::StaticString<256> ztStr;
 		ztStr << str;
-		return SCR_DrawString( x, y, align, ztStr.data(), font, color, flags );
+		return SCR_DrawString( request, x, y, align, ztStr.data(), font, color, flags );
 	}
 	static wsw::PodVector<char> ztStr;
 	ztStr.clear();
 	ztStr.append( str );
 	ztStr.append( '\0' );
-	return SCR_DrawString( x, y, align, ztStr.data(), font, color, flags );
+	return SCR_DrawString( request, x, y, align, ztStr.data(), font, color, flags );
 }
 
-void SCR_DrawFillRect( int x, int y, int w, int h, const vec4_t color ) {
-	R_DrawStretchPic( x, y, w, h, 0, 0, 1, 1, color, cls.whiteShader );
+void SCR_DrawFillRect( Draw2DRequest *request, int x, int y, int w, int h, const vec4_t color ) {
+	request->drawStretchPic( x, y, w, h, 0, 0, 1, 1, color, cls.whiteShader );
 }
 
 void SCR_InitScreen( void ) {
@@ -1472,9 +1472,6 @@ void SCR_UpdateScreen( void ) {
 
 	// TODO: This should not belong to the UI module, let client manage it!
 	uiSystem->drawBackgroundMapIfNeeded();
-
-	R_Set2DMode( true );
-	RF_Set2DScissor( 0, 0, viddef.width, viddef.height );
 
 	if( !cgRenderViewResult.hasBlittedTheMenu ) {
 		uiSystem->drawMenuPartInMainContext();

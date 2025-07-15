@@ -565,10 +565,28 @@ void ExecuteSingleDrawSceneRequestNonSpeedCritical( DrawSceneRequest *request );
 
 class Texture;
 
-void        R_DrawStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2,
-							  const vec4_t color, const shader_s *shader );
-void        R_DrawRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2,
-									 float angle, const vec4_t color, const shader_s *shader );
+class Draw2DRequest {
+	friend class wsw::ref::Frontend;
+public:
+	void setScissor( int x, int y, int w, int h );
+	void drawStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2, const vec4_t color, const shader_s *shader );
+	void drawRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2, float angle, const vec4_t color, const shader_s *shader );
+private:
+	struct SetScissorCmd {
+		int x, y, w, h;
+	};
+	struct DrawPicCmd {
+		int x, y, w, h;
+		float s1, t1, s2, t2;
+		float angle { 0.0f };
+		float color[4];
+		const shader_s *shader;
+	};
+	wsw::PodVector<std::variant<SetScissorCmd, DrawPicCmd>> m_cmds;
+};
+
+Draw2DRequest *CreateDraw2DRequest();
+void CommitDraw2DRequest( Draw2DRequest *request );
 
 shader_s *R_WrapMenuTextureHandleInMaterial( unsigned externalTexNum );
 shader_s *R_WrapHudTextureHandleInMaterial( unsigned externalTexNum );
@@ -646,9 +664,6 @@ void RF_Shutdown( bool verbose );
 
 void RF_BeginFrame( bool forceClear, bool forceVsync, bool uncappedFPS );
 void RF_EndFrame();
-
-void R_Set2DMode( bool );
-void RF_Set2DScissor( int x, int y, int w, int h );
 
 const char *RF_GetSpeedsMessage( char *out, size_t size );
 

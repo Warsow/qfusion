@@ -295,65 +295,6 @@ mesh_vbo_t *R_InitNullModelVBO( void ) {
 	return vbo;
 }
 
-static vec4_t pic_xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
-static vec4_t pic_normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
-static vec2_t pic_st[4];
-static byte_vec4_t pic_colors[4];
-static elem_t pic_elems[6] = { 0, 1, 2, 0, 2, 3 };
-static mesh_t pic_mesh = { 4, 6, pic_elems, pic_xyz, pic_normals, NULL, pic_st, { 0, 0, 0, 0 }, { 0 }, { pic_colors, pic_colors, pic_colors, pic_colors }, NULL, NULL };
-
-void R_DrawRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2, float angle,
-							  const vec4_t color, const shader_t *shader ) {
-	if( !shader ) {
-		return;
-	}
-
-	// lower-left
-	Vector2Set( pic_xyz[0], x, y );
-	Vector2Set( pic_st[0], s1, t1 );
-	Vector4Set( pic_colors[0],
-				bound( 0, ( int )( color[0] * 255.0f ), 255 ),
-				bound( 0, ( int )( color[1] * 255.0f ), 255 ),
-				bound( 0, ( int )( color[2] * 255.0f ), 255 ),
-				bound( 0, ( int )( color[3] * 255.0f ), 255 ) );
-	const int bcolor = *(int *)pic_colors[0];
-
-	// lower-right
-	Vector2Set( pic_xyz[1], x + w, y );
-	Vector2Set( pic_st[1], s2, t1 );
-	*(int *)pic_colors[1] = bcolor;
-
-	// upper-right
-	Vector2Set( pic_xyz[2], x + w, y + h );
-	Vector2Set( pic_st[2], s2, t2 );
-	*(int *)pic_colors[2] = bcolor;
-
-	// upper-left
-	Vector2Set( pic_xyz[3], x, y + h );
-	Vector2Set( pic_st[3], s1, t2 );
-	*(int *)pic_colors[3] = bcolor;
-
-	// rotated image
-	if( ( angle = anglemod( angle ) ) != 0.0f ) {
-		angle = DEG2RAD( angle );
-		const float sint = sin( angle );
-		const float cost = cos( angle );
-		for( unsigned j = 0; j < 4; j++ ) {
-			t1 = pic_st[j][0];
-			t2 = pic_st[j][1];
-			pic_st[j][0] = cost * ( t1 - 0.5f ) - sint * ( t2 - 0.5f ) + 0.5f;
-			pic_st[j][1] = cost * ( t2 - 0.5f ) + sint * ( t1 - 0.5f ) + 0.5f;
-		}
-	}
-
-	RB_AddDynamicMesh( NULL, shader, NULL, NULL, 0, &pic_mesh, GL_TRIANGLES, 0.0f, 0.0f );
-}
-
-void R_DrawStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2,
-					   const vec4_t color, const shader_t *shader ) {
-	R_DrawRotatedStretchPic( x, y, w, h, s1, t1, s2, t2, 0, color, shader );
-}
-
 static shader_s g_externalTextureMaterialStorage[2];
 static shaderpass_t g_externalTextureMaterialPassStorage[2];
 
@@ -873,6 +814,14 @@ void CommitProcessedDrawSceneRequest( DrawSceneRequest *request ) {
 void EndDrawingScenes() {
 	WSW_PROFILER_SCOPE();
 	wsw::ref::Frontend::instance()->endDrawingScenes();
+}
+
+Draw2DRequest *CreateDraw2DRequest() {
+	return wsw::ref::Frontend::instance()->createDraw2DRequest();
+}
+
+void CommitDraw2DRequest( Draw2DRequest *request ) {
+	wsw::ref::Frontend::instance()->commitDraw2DRequest( request );
 }
 
 [[nodiscard]]

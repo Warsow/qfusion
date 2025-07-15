@@ -89,6 +89,10 @@ public:
 	void endDrawingScenes();
 
 	[[nodiscard]]
+	auto createDraw2DRequest() -> Draw2DRequest *;
+	void commitDraw2DRequest( Draw2DRequest *request );
+
+	[[nodiscard]]
 	auto getMiniviewRenderTarget() -> RenderTargetComponents *;
 
 	void initVolatileAssets();
@@ -647,6 +651,10 @@ private:
 
 	void prepareLegacySprite( PrepareSpriteSurfWorkload *workload );
 
+	// TODO: Should we care of preparing the data in async fashion?
+	void submitRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2,
+								  float angle, const float *color, const shader_s *material );
+
 	auto ( Frontend::*m_collectVisibleWorldLeavesArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
 	auto ( Frontend::*m_collectVisibleOccludersArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
 	auto ( Frontend::*m_buildFrustaOfOccludersArchMethod )( StateForCamera *, std::span<const SortedOccluder> ) -> std::span<const Frustum>;
@@ -719,6 +727,10 @@ private:
 
 		StateForCameraStorage *prev { nullptr }, *next { nullptr };
 	};
+
+	Draw2DRequest m_draw2DRequest;
+	// Currently we limit things to a single Draw2DRequest in flight
+	bool m_isDraw2DRequestInUse { false };
 
 	wsw::Mutex m_stateAllocLock;
 	wsw::Mutex m_portalTextureLock;
