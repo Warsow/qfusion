@@ -344,14 +344,6 @@ struct VisualTrace {
 	float fraction;
 };
 
-namespace wsw::ref {
-
-void traceAgainstBspWorld( VisualTrace *tr, const float *start, const float *end, int skipSurfMask = 0 );
-void traceAgainstBrushModel( VisualTrace *tr, const model_s *model, const float *origin,
-							 const float *axis, const float *start, const float *end, int skipSurfMask = 0 );
-
-}
-
 namespace wsw::ref { class Frontend; }
 
 struct QuadPoly;
@@ -548,22 +540,18 @@ struct DynamicMesh {
 								  uint16_t *__restrict destIndices ) const -> std::pair<unsigned, unsigned> = 0;
 };
 
-void BeginDrawingScenes();
-TaskSystem *BeginProcessingOfTasks();
-DrawSceneRequest *CreateDrawSceneRequest( const refdef_t &refdef );
-TaskHandle BeginProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests );
-TaskHandle EndProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests, std::span<const TaskHandle> dependencies );
-void EndProcessingOfTasks();
-void CommitProcessedDrawSceneRequest( DrawSceneRequest *request );
-void EndDrawingScenes();
+struct ImageOptions {
+	std::optional<std::pair<unsigned, unsigned>> desiredSize;
+	unsigned borderWidth { 0 };
+	bool fitSizeForCrispness { false };
+	bool useOutlineEffect { false };
 
-RenderTargetComponents *GetMiniviewRenderTarget();
-unsigned GetMiniviewRenderTargetTexture();
-
-// For UI purposes
-void ExecuteSingleDrawSceneRequestNonSpeedCritical( DrawSceneRequest *request );
-
-class Texture;
+	template <typename T>
+	void setDesiredSize( T width, T height ) {
+		assert( width > 0 && height > 0 && width < (T)( 1 << 16 ) && height < (T)( 1 << 16 ) );
+		desiredSize = std::make_pair( (unsigned)width, (unsigned)height );
+	}
+};
 
 class Draw2DRequest {
 	friend class wsw::ref::Frontend;
@@ -585,69 +573,113 @@ private:
 	wsw::PodVector<std::variant<SetScissorCmd, DrawPicCmd>> m_cmds;
 };
 
-Draw2DRequest *CreateDraw2DRequest();
-void CommitDraw2DRequest( Draw2DRequest *request );
-void RecycleDraw2DRequest( Draw2DRequest *request );
+struct model_s;
+struct Skin;
 
-struct Draw2DRequestScopedOps {
-	void destroy( Draw2DRequest *value ) { RecycleDraw2DRequest( value ); }
+class RenderSystem {
+public:
+	[[nodiscard]]
+	auto beginProcessingOfTasks() -> TaskSystem *;
+	void endProcessingOfTasks();
+
+	void beginDrawingScenes();
+	void endDrawingScenes();
+
+	[[nodiscard]]
+	auto createDrawSceneRequest( const refdef_t &refdef ) -> DrawSceneRequest *;
+	[[nodiscard]]
+	auto beginProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests ) -> TaskHandle;
+	[[nodiscard]]
+	auto endProcessingDrawSceneRequests( std::span<DrawSceneRequest *>requests, std::span<const TaskHandle> dependences ) -> TaskHandle;
+	void commitProcessedDrawSceneRequest( DrawSceneRequest *request );
+
+	// For UI purposes
+	void executeSingleDrawSceneRequestNonSpeedCritical( DrawSceneRequest *request );
+
+	[[nodiscard]]
+	auto getMiniviewRenderTarget() -> RenderTargetComponents *;
+	[[nodiscard]]
+	auto getMiniviewRenderTargetTexture() -> unsigned;
+
+	[[nodiscard]]
+	auto createDraw2DRequest() -> Draw2DRequest *;
+	void commitDraw2DRequest( Draw2DRequest * );
+	void recycleDraw2DRequest( Draw2DRequest * );
+
+	[[nodiscard]]
+	auto wrapMenuTextureHandleInMaterial( unsigned externalTexNum ) -> shader_s *;
+	[[nodiscard]]
+	auto wrapHudTextureHandleInMaterial( unsigned externalTexNum ) -> shader_s *;
+	[[nodiscard]]
+	auto wrapMiniviewRenderTargetInMaterial( RenderTargetComponents * renderTarget ) -> shader_s *;
+
+	void getModelBounds( const model_s *model, float *mins, float *maxs );
+	void getModelFrameBounds( const model_s *model, int frame, float *mins, float *maxs );
+	void registerWorldModel( const char *model );
+	[[nodiscard]]
+	auto registerModel( const char *name ) -> model_s *;
+
+	[[nodiscard]]
+	bool lerpTag( orientation_t *orient, const model_s *mod, int oldframe, int frame, float lerpfrac, const char *name );
+
+	// TODO: Let users operate on model directly?
+	[[nodiscard]]
+	auto getBoneInfo( const model_s *mod, int bonenum, char *name, size_t name_size, int *flags ) -> int;
+	void getBonePose( const model_s *mod, int bonenum, int frame, bonepose_t *bonepose );
+	[[nodiscard]]
+	auto getNumBones( const model_s *mod, int *numFrames ) -> int;
+
+	[[nodiscard]]
+	auto registerPic( const char *name ) -> shader_s *;
+	[[nodiscard]]
+	auto registerRawAlphaMask( const char *name, int width, int height, const uint8_t *data ) -> shader_s *;
+	[[nodiscard]]
+	auto registerSkin( const char *name ) -> shader_s *;
+	[[nodiscard]]
+	auto registerLinearPic( const char *name ) -> shader_s *;
+
+	void replaceRawSubPic( shader_s *shader, int x, int y, int width, int height, const uint8_t *data );
+
+	[[nodiscard]]
+	auto registerSkinFile( const char *name ) -> Skin *;
+
+	[[nodiscard]]
+	auto createExplicitlyManaged2DMaterial() -> shader_s *;
+	void releaseExplicitlyManaged2DMaterial( shader_s *material );
+	[[nodiscard]]
+	bool updateExplicitlyManaged2DMaterialImage( shader_s *material, const char *name, const ImageOptions &options );
+
+	[[nodiscard]]
+	auto getMaterialDimensions( const shader_s *shader ) -> std::optional<std::pair<unsigned, unsigned>>;
+
+	void traceAgainstBspWorld( VisualTrace *tr, const float *start, const float *end, int skipSurfMask = 0 );
+	void traceAgainstBrushModel( VisualTrace *tr, const model_s *model, const float *origin,
+								 const float *axis, const float *start, const float *end, int skipSurfMask = 0 );
+
+	[[nodiscard]]
+	bool transformVectorToViewport( const refdef_t *rd, const vec3_t in, vec2_t out );
+
+	void setCustomColor( int num, int r, int g, int b );
+private:
+	void *m_priv { nullptr };
+};
+
+class Draw2DRequestScopedOps {
+public:
+	Draw2DRequestScopedOps() : m_renderSystem( nullptr ) {}
+	explicit Draw2DRequestScopedOps( RenderSystem *renderSystem ) : m_renderSystem( renderSystem ) {}
+	void destroy( Draw2DRequest *value ) { m_renderSystem->recycleDraw2DRequest( value ); }
 	[[nodiscard]]
 	static auto emptyValue() -> Draw2DRequest * { return nullptr; }
 	[[nodiscard]]
 	static bool isPresent( const Draw2DRequest *value ) { return value != nullptr; }
+private:
+	RenderSystem *m_renderSystem;
 };
 
-shader_s *R_WrapMenuTextureHandleInMaterial( unsigned externalTexNum );
-shader_s *R_WrapHudTextureHandleInMaterial( unsigned externalTexNum );
-shader_s *R_WrapMiniviewRenderTargetInMaterial( RenderTargetComponents *renderTarget );
-
-struct model_s;
-
-void        R_ModelBounds( const model_s *model, vec3_t mins, vec3_t maxs );
-void        R_ModelFrameBounds( const model_s *model, int frame, vec3_t mins, vec3_t maxs );
-void        R_RegisterWorldModel( const char *model );
-model_s *R_RegisterModel( const char *name );
-
-int         R_SkeletalGetBoneInfo( const model_s *mod, int bonenum, char *name, size_t name_size, int *flags );
-void        R_SkeletalGetBonePose( const model_s *mod, int bonenum, int frame, bonepose_t *bonepose );
-int         R_SkeletalGetNumBones( const model_s *mod, int *numFrames );
-
-shader_s    *R_RegisterShader( const char *name, int type );
-shader_s    *R_RegisterPic( const char *name );
-shader_s    *R_RegisterRawAlphaMask( const char *name, int width, int height, const uint8_t *data );
-shader_s    *R_RegisterSkin( const char *name );
-shader_s    *R_RegisterLinearPic( const char *name );
-
-struct ImageOptions {
-	std::optional<std::pair<unsigned, unsigned>> desiredSize;
-	unsigned borderWidth { 0 };
-	bool fitSizeForCrispness { false };
-	bool useOutlineEffect { false };
-
-	template <typename T>
-	void setDesiredSize( T width, T height ) {
-		assert( width > 0 && height > 0 && width < (T)( 1 << 16 ) && height < (T)( 1 << 16 ) );
-		desiredSize = std::make_pair( (unsigned)width, (unsigned)height );
-	}
-};
-
-shader_s *R_CreateExplicitlyManaged2DMaterial();
-void R_ReleaseExplicitlyManaged2DMaterial( shader_s *material );
-bool R_UpdateExplicitlyManaged2DMaterialImage( shader_s *material, const char *name, const ImageOptions &options );
-
-[[nodiscard]]
-auto R_GetShaderDimensions( const shader_s *shader ) -> std::optional<std::pair<unsigned, unsigned>>;
-
-void        R_ReplaceRawSubPic( shader_s *shader, int x, int y, int width, int height, const uint8_t *data );
-
-struct Skin;
-Skin *R_RegisterSkinFile( const char *name );
-shader_s *R_FindShaderForSkinFile( const Skin *skin, const char *meshname );
-
-bool RF_TransformVectorToViewport( const refdef_t *rd, const vec3_t in, vec2_t out );
-bool RF_LerpTag( orientation_t *orient, const model_s *mod, int oldframe, int frame, float lerpfrac, const char *name );
-
-void        R_SetCustomColor( int num, int r, int g, int b );
+#define DECLARE_SCOPED_DRAW_2D_REQUEST( varName, renderSystem ) \
+	wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> varName( \
+		renderSystem->createDraw2DRequest(), Draw2DRequestScopedOps( renderSystem ) )
 
 struct VidModeOptions {
 	bool fullscreen { false };
@@ -671,14 +703,14 @@ void RF_EndRegistration();
 void RF_AppActivate( bool active, bool minimize, bool destroy );
 void RF_Shutdown( bool verbose );
 
+RenderSystem *RF_GetRenderSystem();
+
+// TODO: This should belong to the interface
+
 void RF_BeginFrame( bool forceClear, bool forceVsync, bool uncappedFPS );
 void RF_EndFrame();
 
-const char *RF_GetSpeedsMessage( char *out, size_t size );
-
 int RF_GetAverageFrametime();
-
-void R_Finish();
 
 rserr_t     R_Init( const char *applicationName, const char *screenshotPrefix, int startupColor,
 					int iconResource, const int *iconXPM,

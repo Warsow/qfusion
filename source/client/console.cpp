@@ -92,8 +92,8 @@ public:
 	void clearNotifications();
 	void clearInput();
 
-	void drawPane( unsigned width, unsigned height );
-	void drawNotifications( unsigned width, unsigned height );
+	void drawPane( RenderSystem *renderSystem, unsigned width, unsigned height );
+	void drawNotifications( RenderSystem *renderSystem, unsigned width, unsigned height );
 
 	enum NotificationBehaviour : uint8_t {
 		DrawNotification,
@@ -657,21 +657,21 @@ static auto calcPrefixLenForNumVisibleCodePoints( const char *utf8Chars, unsigne
 	return (unsigned)( utf8Chars - start );
 }
 
-void Con_DrawNotify( unsigned width, unsigned height ) {
+void Con_DrawNotify( RenderSystem *renderSystem, unsigned width, unsigned height ) {
 	if( con_initialized ) {
-		g_console.instance()->drawNotifications( width, height );
+		g_console.instance()->drawNotifications( renderSystem, width, height );
 	}
 }
 
-void Con_DrawConsole( unsigned width, unsigned height ) {
+void Con_DrawConsole( RenderSystem *renderSystem, unsigned width, unsigned height ) {
 	if( con_initialized ) {
-		g_console.instance()->drawPane( width, height );
+		g_console.instance()->drawPane( renderSystem, width, height );
 	}
 }
 
 extern const vec4_t kConsoleBackgroundColor { 0.10f, 0.05f, 0.17f, 0.7f };
 
-void Console::drawPane( unsigned width, unsigned height ) {
+void Console::drawPane( RenderSystem *renderSystem, unsigned width, unsigned height ) {
 	WSW_PROFILER_SCOPE();
 
 	const int smallCharHeight = SCR_FontHeight( cls.consoleFont );
@@ -707,7 +707,7 @@ void Console::drawPane( unsigned width, unsigned height ) {
 		Q_strncatz( version, APP_VERSION_STAGE, sizeof( version ) );
 	}
 
-	wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
+	DECLARE_SCOPED_DRAW_2D_REQUEST( request, renderSystem );
 
 	// draw the background
 	request->drawStretchPic( 0, 0, width, height, 0, 0, 1, 1, kConsoleBackgroundColor, cls.whiteShader );
@@ -716,21 +716,21 @@ void Console::drawPane( unsigned width, unsigned height ) {
 	SCR_DrawFillRect( request.get(), 0, height - bottomLineHeight, width, bottomLineHeight, colorOrange );
 
 	const int versionMargin = 4 * pixelRatio;
-	const int versionX      = width - SCR_strWidth( version, cls.consoleFont, 0, 0 ) - versionMargin;
+	const int versionX      = width - SCR_strWidth( renderSystem, version, cls.consoleFont, 0, 0 ) - versionMargin;
 	const int versionY      = height - SCR_FontHeight( cls.consoleFont ) - versionMargin;
-	SCR_DrawString( request.get(), versionX, versionY, ALIGN_LEFT_TOP, version, cls.consoleFont, colorOrange, 0 );
+	SCR_DrawString( renderSystem, request.get(), versionX, versionY, ALIGN_LEFT_TOP, version, cls.consoleFont, colorOrange, 0 );
 
 	// Draw the input prompt, user text, and cursor if desired
 
-	const int promptWidth         = SCR_strWidth( "]", cls.consoleFont, 1, 0 );
-	const int inputWidth          = width - sideMargin * 2 - promptWidth - SCR_strWidth( "_", cls.consoleFont, 1, 0 );
+	const int promptWidth         = SCR_strWidth( renderSystem, "]", cls.consoleFont, 1, 0 );
+	const int inputWidth          = width - sideMargin * 2 - promptWidth - SCR_strWidth( renderSystem, "_", cls.consoleFont, 1, 0 );
 	const int inputReservedHeight = 14 * pixelRatio + smallCharHeight;
 
 	const int inputX = sideMargin + promptWidth;
 	const int inputY = height - inputReservedHeight;
 
-	const int inputTextWidth = SCR_strWidth( m_inputLine.data(), cls.consoleFont, 0, 0 );
-	const int preWidth = m_inputPos ? SCR_strWidth( m_inputLine.data(), cls.consoleFont, m_inputPos, 0 ) : 0;
+	const int inputTextWidth = SCR_strWidth( renderSystem, m_inputLine.data(), cls.consoleFont, 0, 0 );
+	const int preWidth = m_inputPos ? SCR_strWidth( renderSystem, m_inputLine.data(), cls.consoleFont, m_inputPos, 0 ) : 0;
 
 	int inputPrestep = 0;
 	if( inputTextWidth > inputWidth ) {
@@ -744,13 +744,13 @@ void Console::drawPane( unsigned width, unsigned height ) {
 		}
 	}
 
-	SCR_DrawRawChar( request.get(), inputX - promptWidth, inputY, ']', cls.consoleFont, colorWhite );
+	SCR_DrawRawChar( renderSystem, request.get(), inputX - promptWidth, inputY, ']', cls.consoleFont, colorWhite );
 
-	SCR_DrawClampString( request.get(), inputX - inputPrestep, inputY, m_inputLine.data(), inputX, inputY,
+	SCR_DrawClampString( renderSystem, request.get(), inputX - inputPrestep, inputY, m_inputLine.data(), inputX, inputY,
 						 inputX + inputWidth, inputY + 2 * smallCharHeight, cls.consoleFont, colorWhite, 0 );
 
 	if( (int)( cls.realtime >> 8 ) & 1 ) {
-		SCR_DrawRawChar( request.get(), inputX + preWidth - inputPrestep, inputY, '_', cls.consoleFont, colorWhite );
+		SCR_DrawRawChar( renderSystem, request.get(), inputX + preWidth - inputPrestep, inputY, '_', cls.consoleFont, colorWhite );
 	}
 
 	int lineY = height - smallCharHeight - inputReservedHeight;
@@ -788,13 +788,13 @@ void Console::drawPane( unsigned width, unsigned height ) {
 	}
 
 	if( m_requestedLineNumOffset ) {
-		const int arrowWidth   = SCR_strWidth( "^", cls.consoleFont, 0, 0 );
+		const int arrowWidth   = SCR_strWidth( renderSystem, "^", cls.consoleFont, 0, 0 );
 		const int arrowSpacing = 3 * arrowWidth;
 
 		if( lineY >= minY ) {
 			// draw arrows to show the buffer is backscrolled
 			for( unsigned x = arrowSpacing; x + arrowSpacing <= width; x += arrowSpacing ) {
-				SCR_DrawRawChar( request.get(), x, lineY, '^', cls.consoleFont, colorOrange );
+				SCR_DrawRawChar( renderSystem, request.get(), x, lineY, '^', cls.consoleFont, colorOrange );
 			}
 			// the arrows obscure one line of scrollback
 			lineY -= smallCharHeight;
@@ -832,7 +832,8 @@ void Console::drawPane( unsigned width, unsigned height ) {
 				}
 				scrDrawStringBuffer.assign( it->data(), it->size() );
 				scrDrawStringBuffer.push_back( '\0' );
-				SCR_DrawString( request.get(), sideMargin, lineY, ALIGN_LEFT_TOP, scrDrawStringBuffer.data(), cls.consoleFont, colorWhite, 0 );
+				SCR_DrawString( renderSystem, request.get(), sideMargin, lineY, ALIGN_LEFT_TOP,
+								scrDrawStringBuffer.data(), cls.consoleFont, colorWhite, 0 );
 				lineY -= smallCharHeight;
 			}
 			if( lineY < minY ) {
@@ -841,7 +842,7 @@ void Console::drawPane( unsigned width, unsigned height ) {
 		}
 	}
 
-	CommitDraw2DRequest( request.get() );
+	renderSystem->commitDraw2DRequest( request.get() );
 }
 
 auto Console::RegularEntry::getRequiredCapacityForDumping() const -> unsigned {
@@ -1385,7 +1386,7 @@ auto Console::CompletionEntry::getCharSpansForDrawing( unsigned resizeId, unsign
 	return builder->getFinalSpans();
 }
 
-void Console::drawNotifications( unsigned width, unsigned height ) {
+void Console::drawNotifications( RenderSystem *renderSystem, unsigned width, unsigned height ) {
 	WSW_PROFILER_SCOPE();
 
 	const auto maxLines = (unsigned)con_maxNotificationLines->integer;
@@ -1416,7 +1417,7 @@ void Console::drawNotifications( unsigned width, unsigned height ) {
 		return;
 	}
 
-	wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
+	DECLARE_SCOPED_DRAW_2D_REQUEST( request, renderSystem );
 
 	const int pixelRatio  = VID_GetPixelRatio();
 	const size_t fontHeight = SCR_FontHeight( cls.consoleFont );
@@ -1430,11 +1431,11 @@ void Console::drawNotifications( unsigned width, unsigned height ) {
 	const int textX = 8 * pixelRatio;
 	for( const RegularEntry *line: matchingLines ) {
 		// TODO: Is it guaranteed to be zero-terminated?
-		SCR_DrawString( request.get(), textX, textY, ALIGN_LEFT_TOP, line->m_data, cls.consoleFont, colorWhite, 0 );
+		SCR_DrawString( renderSystem, request.get(), textX, textY, ALIGN_LEFT_TOP, line->m_data, cls.consoleFont, colorWhite, 0 );
 		textY += fontHeight;
 	}
 
-	CommitDraw2DRequest( request.get() );
+	renderSystem->commitDraw2DRequest( request.get() );
 }
 
 void Console::addToHistory( wsw::StringView line ) {

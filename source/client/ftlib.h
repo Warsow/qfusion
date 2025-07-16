@@ -25,6 +25,7 @@ struct shader_s;
 struct qfontface_s;
 
 class Draw2DRequest;
+class RenderSystem;
 
 // font style flags
 typedef enum {
@@ -43,9 +44,9 @@ typedef enum {
 bool FTLIB_Init( bool verbose );
 void FTLIB_Shutdown( bool verbose );
 
-struct qfontface_s *FTLIB_RegisterFont( const char *family, const char *fallback, int style, unsigned int size );
-void FTLIB_TouchFont( struct qfontface_s *qfont );
-void FTLIB_TouchAllFonts( void );
+struct qfontface_s *FTLIB_RegisterFont( RenderSystem *, const char *family, const char *fallback, int style, unsigned int size );
+void FTLIB_TouchFont( RenderSystem *, struct qfontface_s *qfont );
+void FTLIB_TouchAllFonts( RenderSystem * );
 void FTLIB_PrecacheFonts( bool verbose );
 void FTLIB_FreeFonts( bool verbose );
 
@@ -53,14 +54,14 @@ void FTLIB_FreeFonts( bool verbose );
 
 size_t FTLIB_FontSize( struct qfontface_s *font );
 size_t FTLIB_FontHeight( struct qfontface_s *font );
-size_t FTLIB_StringWidth( const char *str, struct qfontface_s *font, size_t maxlen, int flags );
-size_t FTLIB_StrlenForWidth( const char *str, struct qfontface_s *font, size_t maxwidth, int flags );
+size_t FTLIB_StringWidth( RenderSystem *, const char *str, struct qfontface_s *font, size_t maxlen, int flags );
+size_t FTLIB_StrlenForWidth( RenderSystem *, const char *str, struct qfontface_s *font, size_t maxwidth, int flags );
 int FTLIB_FontUnderline( struct qfontface_s *font, int *thickness );
 size_t FTLIB_FontAdvance( struct qfontface_s *font );
 size_t FTLIB_FontXHeight( struct qfontface_s *font );
-void FTLIB_DrawRawChar( Draw2DRequest *request, int x, int y, wchar_t num, struct qfontface_s *font, const vec4_t color );
-void FTLIB_DrawClampChar( Draw2DRequest *request, int x, int y, wchar_t num, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, const vec4_t color );
-void FTLIB_DrawClampString( Draw2DRequest *request, int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, const vec4_t color, int flags );
-size_t FTLIB_DrawRawString( Draw2DRequest *request, int x, int y, const char *str, size_t maxwidth, int *width, struct qfontface_s *font, const vec4_t color, int flags );
+void FTLIB_DrawRawChar( RenderSystem *, Draw2DRequest *, int x, int y, wchar_t num, struct qfontface_s *font, const vec4_t color );
+void FTLIB_DrawClampChar( RenderSystem *, Draw2DRequest *, int x, int y, wchar_t num, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, const vec4_t color );
+void FTLIB_DrawClampString( RenderSystem *, Draw2DRequest *, int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, const vec4_t color, int flags );
+size_t FTLIB_DrawRawString( RenderSystem *, Draw2DRequest *, int x, int y, const char *str, size_t maxwidth, int *width, struct qfontface_s *font, const vec4_t color, int flags );
 
 #endif

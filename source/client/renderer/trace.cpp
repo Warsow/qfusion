@@ -236,8 +236,8 @@ loc0:
 /*
 * R_TraceLine
 */
-static msurface_t *R_TransformedTraceLine( VisualTrace *tr, const vec3_t start, const vec3_t end, const model_s *model,
-										   const float *modelOrigin, const float *modelAxis, int surfumask ) {
+msurface_t *R_TransformedTraceLine( VisualTrace *tr, const vec3_t start, const vec3_t end, const model_s *model,
+									const float *modelOrigin, const float *modelAxis, int surfumask ) {
 	r_traceframecount++;    // for multi-check avoidance
 
 	// fill in a default trace
@@ -307,17 +307,4 @@ static msurface_t *R_TransformedTraceLine( VisualTrace *tr, const vec3_t start, 
 	VectorCopy( trace_impact, tr->endpos );
 
 	return trace_surface;
-}
-
-namespace wsw::ref {
-
-void traceAgainstBspWorld( VisualTrace *tr, const float *start, const float *end, int skipSurfMask ) {
-	R_TransformedTraceLine( tr, start, end, rsh.worldModel, vec3_origin, axis_identity, skipSurfMask );
-}
-
-void traceAgainstBrushModel( VisualTrace *tr, const model_t *model, const float *origin,
-							 const float *axis, const float *start, const float *end, int skipSurfMask ) {
-	R_TransformedTraceLine( tr, start, end, model, origin, axis, skipSurfMask );
-}
-
 }

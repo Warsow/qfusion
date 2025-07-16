@@ -739,7 +739,7 @@ void CG_ResetDamageIndicator( ViewState *viewState ) {
 
 void CG_AddEntityToScene( entity_t *ent, DrawSceneRequest *drawSceneRequest ) {
 	if( ent->model && ( !ent->boneposes || !ent->oldboneposes ) ) {
-		if( R_SkeletalGetNumBones( ent->model, NULL ) ) {
+		if( cg.renderSystem->getNumBones( ent->model, NULL ) ) {
 			CG_SetBoneposesForTemporaryEntity( ent );
 		}
 	}
@@ -1293,13 +1293,13 @@ static auto createDrawSceneRequests( DrawSceneRequest **drawSceneRequests, bool 
 		}
 
 		if( viewNum > 0 && !actuallyUseTiledMode ) {
-			viewState->view.refdef.renderTarget = GetMiniviewRenderTarget();
+			viewState->view.refdef.renderTarget = cg.renderSystem->getMiniviewRenderTarget();
 			if( (int)( ( viewNum - 1 ) % 4 ) != (int)( cg.frameCount % 4 ) ) {
 				useCachedViewsMask |= 1 << viewNum;
 			}
 		}
 
-		drawSceneRequests[viewNum] = CreateDrawSceneRequest( viewState->view.refdef );
+		drawSceneRequests[viewNum] = cg.renderSystem->createDrawSceneRequest( viewState->view.refdef );
 	}
 
 	for( int pnum = 0; pnum < cg.frame.numEntities; pnum++ ) {
@@ -1353,7 +1353,7 @@ static auto coPrepareDrawSceneRequests( CoroTask::StartInfo si, DrawSceneRequest
 		requestsToSubmit = { drawSceneRequests, drawSceneRequests + numDisplayedViewStates };
 	}
 
-	const TaskHandle beginTask = BeginProcessingDrawSceneRequests( requestsToSubmit );
+	const TaskHandle beginTask = cg.renderSystem->beginProcessingDrawSceneRequests( requestsToSubmit );
 
 	for( unsigned viewNum = 0; viewNum < numDisplayedViewStates; ++viewNum ) {
 		ViewState *const viewState = cg.viewStates + viewStateIndices[viewNum];
@@ -1407,15 +1407,15 @@ static auto coPrepareDrawSceneRequests( CoroTask::StartInfo si, DrawSceneRequest
 	}
 
 	const std::span<const TaskHandle> endProcessingDependencies { &beginTask, 1 };
-	co_await si.taskSystem->awaiterOf( EndProcessingDrawSceneRequests( requestsToSubmit, endProcessingDependencies ) );
+	co_await si.taskSystem->awaiterOf( cg.renderSystem->endProcessingDrawSceneRequests( requestsToSubmit, endProcessingDependencies ) );
 }
 
 static void prepareDrawSceneRequests( DrawSceneRequest **drawSceneRequests, unsigned useCachedViewsMask,
 									  const unsigned *viewStateIndices, unsigned numDisplayedViewStates ) {
 	WSW_PROFILER_SCOPE();
 
-	TaskSystem *const taskSystem = BeginProcessingOfTasks();
-	[[maybe_unused]] volatile wsw::ScopeExitAction callEndProcessingOfTasks( &EndProcessingOfTasks );
+	TaskSystem *const taskSystem = cg.renderSystem->beginProcessingOfTasks();
+	[[maybe_unused]] volatile wsw::ScopeExitAction callEndProcessingOfTasks( [&]() { cg.renderSystem->endProcessingOfTasks(); } );
 
 	(void)taskSystem->addCoro( [=]() {
 		CoroTask::StartInfo si { taskSystem, std::span<const TaskHandle> {}, CoroTask::OnlyMainThread };
@@ -1434,7 +1434,7 @@ static void commitDrawSceneRequests( DrawSceneRequest **drawSceneRequests, bool 
 
 	for( unsigned viewNum = 0; viewNum < numDisplayedViewStates; ++viewNum ) {
 		if( actuallyUseTiledMode || viewNum == 0 || (int)( cg.frameCount % 4 ) == (int)( ( viewNum - 1 ) % 4 ) ) {
-			CommitProcessedDrawSceneRequest( drawSceneRequests[viewNum] );
+			cg.renderSystem->commitProcessedDrawSceneRequest( drawSceneRequests[viewNum] );
 		} else {
 			assert( cg.viewStates[viewStateIndices[viewNum]].view.refdef.renderTarget );
 		}
@@ -1460,7 +1460,7 @@ static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actual
 		ViewState *const viewState = cg.viewStates + viewStateIndices[viewNum];
 		refdef_t &rd = viewState->view.refdef;
 
-		wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
+		DECLARE_SCOPED_DRAW_2D_REQUEST( request, cg.renderSystem );
 
 		if( auto *renderTarget = rd.renderTarget ) {
 			const float tcX0 = rcpVidWidth * (float)rd.x;
@@ -1468,7 +1468,7 @@ static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actual
 			const float tcX1 = rcpVidWidth * (float)( rd.x + rd.width );
 			const float tcY1 = rcpVidHeight * (float)( cgs.vidHeight - ( rd.y + rd.height ) );
 
-			shader_s *shader = R_WrapMiniviewRenderTargetInMaterial( renderTarget );
+			shader_s *shader = cg.renderSystem->wrapMiniviewRenderTargetInMaterial( renderTarget );
 
 			request->setScissor( rd.x, rd.y, rd.width, rd.height );
 			request->drawStretchPic( rd.x, rd.y, rd.width, rd.height, tcX0, tcY0, tcX1, tcY1, colorWhite, shader );
@@ -1512,12 +1512,12 @@ static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actual
 			}
 		}
 
-		CommitDraw2DRequest( request.get() );
-		// Let the UI use the limited resource
-		request = {};
+		cg.renderSystem->commitDraw2DRequest( request.get() );
 
 		if( !isMiniview ) {
-			cg.uiSystem->drawMenuPartInMainContext();
+			// Let the UI use the limited resource
+			request = {};
+			cg.uiSystem->drawMenuPartInMainContext( cg.renderSystem );
 			hasRenderedTheMenu = true;
 		}
 	}
@@ -1554,9 +1554,9 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 		if( cgs.configStrings.getWorldModel() == std::nullopt ) {
 			CG_AddLocalSounds();
 
-			wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
+			DECLARE_SCOPED_DRAW_2D_REQUEST( request, cg.renderSystem );
 			request->drawStretchPic( 0, 0, cgs.vidWidth, cgs.vidHeight, 0, 0, 1, 1, colorBlack, cgs.shaderWhite );
-			CommitDraw2DRequest( request.get() );
+			cg.renderSystem->commitDraw2DRequest( request.get() );
 
 			CG_ClearEffects();
 
@@ -1595,8 +1595,8 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 
 			unsigned useCachedViewsMask = 0;
 			do {
-				BeginDrawingScenes();
-				[[maybe_unused]] volatile wsw::ScopeExitAction callEndDrawingScenes( []() { EndDrawingScenes(); } );
+				cg.renderSystem->beginDrawingScenes();
+				[[maybe_unused]] volatile wsw::ScopeExitAction callEndDrawingScenes( [&]() { cg.renderSystem->endDrawingScenes(); } );
 
 				useCachedViewsMask = createDrawSceneRequests( drawSceneRequests, actuallyUseTiledMode, viewRects,
 															  viewStateIndices, numDisplayedViewStates );
@@ -1617,7 +1617,7 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 
 			// Blit the HUD first in this case (this is a hack for the demo playback menu which must be on top)
 			if( actuallyUseTiledMode && !hasModalOverlay ) {
-				cg.uiSystem->drawHudPartInMainContext();
+				cg.uiSystem->drawHudPartInMainContext( cg.renderSystem );
 				result.hasBlittedTheHud = true;
 			}
 
@@ -1827,7 +1827,7 @@ static void drawBar( Draw2DRequest *request, int x, int y, int align, int w, int
 }
 
 static void drawPlayerBars( Draw2DRequest *request, qfontface_s *font, int requestedX, int requestedY, const vec4_t color, int health, int armor ) {
-	const int barwidth     = (int)std::round( (float)SCR_strWidth( "_", font, 0 ) * v_showPlayerNames_barWidth.get() ); // size of 8 characters
+	const int barwidth     = (int)std::round( (float)SCR_strWidth( cg.renderSystem, "_", font, 0 ) * v_showPlayerNames_barWidth.get() ); // size of 8 characters
 	const int barheight    = (int)std::round( (float)SCR_FontHeight( font ) * 0.25 ); // quarter of a character height
 	const int barseparator = (int)barheight / 3;
 
@@ -1936,7 +1936,7 @@ static void drawNamesAndBeacons( Draw2DRequest *request, ViewState *viewState, s
 				// May legitimately out of viewport bounds.
 				// The actual clipping relies on scissor test.
 				// TODO: Calculate the mvp matrix before the loop
-				if( RF_TransformVectorToViewport( &refdef, drawOrigin, tmpCoords ) ) {
+				if( cg.renderSystem->transformVectorToViewport( &refdef, drawOrigin, tmpCoords ) ) {
 					const auto coordX = (int)std::round( tmpCoords[0] );
 					const auto coordY = (int)std::round( tmpCoords[1] );
 					LazyCachedTrace trace { .m_viewState = viewState, .m_cent = cent };
@@ -2037,7 +2037,7 @@ static void drawNamesAndBeacons( Draw2DRequest *request, ViewState *viewState, s
 			const vec4_t color { 1.0f, 1.0f, 1.0f, playerNameAlphaValues[i] };
 			const int requestedX = savedCoords[i][0];
 			const int requestedY = savedCoords[i][1];
-			SCR_DrawString( request, requestedX, requestedY, ALIGN_CENTER_BOTTOM, cgs.clientInfo[i].name, font, color );
+			SCR_DrawString( cg.renderSystem, request, requestedX, requestedY, ALIGN_CENTER_BOTTOM, cgs.clientInfo[i].name, font, color );
 			if( showPointedPlayerValue && ( i + 1 == viewState->pointedNum ) ) {
 				// pointed player hasn't a health value to be drawn, so skip adding the bars
 				if( viewState->pointedHealth && v_showPlayerNames_barWidth.get() > 0 ) {

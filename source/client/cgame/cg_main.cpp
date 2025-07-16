@@ -429,12 +429,12 @@ void CG_ConfigString( int i, const wsw::StringView &string ) {
 		}
 	} else if( i >= CS_IMAGES && i < CS_IMAGES + MAX_IMAGES ) {
 		if( string.indexOf( "correction/"_asView ) != std::nullopt ) { // HACK HACK HACK -- for color correction LUTs
-			cgs.imagePrecache[i - CS_IMAGES] = R_RegisterLinearPic( string.data() );
+			cgs.imagePrecache[i - CS_IMAGES] = cg.renderSystem->registerLinearPic( string.data() );
 		} else {
-			cgs.imagePrecache[i - CS_IMAGES] = R_RegisterPic( string.data() );
+			cgs.imagePrecache[i - CS_IMAGES] = cg.renderSystem->registerPic( string.data() );
 		}
 	} else if( i >= CS_SKINFILES && i < CS_SKINFILES + MAX_SKINFILES ) {
-		cgs.skinPrecache[i - CS_SKINFILES] = R_RegisterSkinFile( string.data() );
+		cgs.skinPrecache[i - CS_SKINFILES] = cg.renderSystem->registerSkinFile( string.data() );
 	} else if( i >= CS_LIGHTS && i < CS_LIGHTS + MAX_LIGHTSTYLES ) {
 		CG_SetLightStyle( i - CS_LIGHTS, string );
 	} else if( i >= CS_ITEMS && i < CS_ITEMS + MAX_ITEMS ) {
@@ -1552,14 +1552,14 @@ auto getSurfFlagsForImpact( const trace_t &trace, const float *impactDir ) -> in
 
 		// Check behind
 		VectorMA( trace.endpos, 30.0f, impactDir, testPoint );
-		wsw::ref::traceAgainstBspWorld( &visualTrace, trace.endpos, testPoint );
+		cg.renderSystem->traceAgainstBspWorld( &visualTrace, trace.endpos, testPoint );
 		if( visualTrace.fraction != 1.0f ) {
 			return visualTrace.surfFlags;
 		}
 
 		// Check in front
 		VectorMA( trace.endpos, -4.0f, impactDir, testPoint );
-		wsw::ref::traceAgainstBspWorld( &visualTrace, testPoint, trace.endpos );
+		cg.renderSystem->traceAgainstBspWorld( &visualTrace, testPoint, trace.endpos );
 		if( visualTrace.fraction != 1.0f ) {
 			return visualTrace.surfFlags;
 		}
@@ -3491,7 +3491,7 @@ static void CG_AddLinkedModel( centity_t *cent, DrawSceneRequest *drawSceneReque
 	Matrix3_Copy( cent->ent.axis, ent.axis );
 
 	if( cent->item && ( cent->effects & EF_AMMOBOX ) ) { // ammobox icon hack
-		ent.customShader = R_RegisterPic( cent->item->icon );
+		ent.customShader = cg.renderSystem->registerPic( cent->item->icon );
 	}
 
 	if( cent->item && ( cent->item->type & IT_WEAPON ) ) {
@@ -3752,7 +3752,7 @@ void CG_AddFlagModelOnTag( centity_t *cent, byte_vec4_t teamcolor, const char *t
 	}
 
 	memset( &flag, 0, sizeof( entity_t ) );
-	flag.model = R_RegisterModel( PATH_FLAG_MODEL );
+	flag.model = cg.renderSystem->registerModel( PATH_FLAG_MODEL );
 	if( !flag.model ) {
 		return;
 	}
@@ -4079,8 +4079,7 @@ static void CG_UpdateItemEnt( centity_t *cent ) {
 			cent->effects &= ~EF_ROTATE_AND_BOB;
 		}
 
-		cent->ent.customShader = NULL;
-		cent->ent.customShader = R_RegisterPic( cent->item->simpleitem );
+		cent->ent.customShader = cg.renderSystem->registerPic( cent->item->simpleitem );
 	} else {
 		cent->ent.rtype = RT_MODEL;
 		cent->ent.frame = cent->current.frame;
@@ -5744,7 +5743,7 @@ static void CG_RegisterModels( void ) {
 				return;
 			}
 			CG_LoadingString( name.data() );
-			R_RegisterWorldModel( name.data() );
+			cg.renderSystem->registerWorldModel( name.data() );
 		}
 
 		CG_LoadingString( "models" );
@@ -5874,9 +5873,9 @@ static void CG_RegisterShaders( void ) {
 		}
 
 		if( strstr( name.data(), "correction/" ) ) { // HACK HACK HACK -- for color correction LUTs
-			cgs.imagePrecache[i] = R_RegisterLinearPic( name.data() );
+			cgs.imagePrecache[i] = cg.renderSystem->registerLinearPic( name.data() );
 		} else {
-			cgs.imagePrecache[i] = R_RegisterPic( name.data() );
+			cgs.imagePrecache[i] = cg.renderSystem->registerPic( name.data() );
 		}
 	}
 
@@ -5912,7 +5911,7 @@ static void CG_RegisterSkinFiles( void ) {
 			return;
 		}
 
-		cgs.skinPrecache[i] = R_RegisterSkinFile( name.data() );
+		cgs.skinPrecache[i] = cg.renderSystem->registerSkinFile( name.data() );
 	}
 
 	cgs.precacheSkinsStart = MAX_SKINFILES;
@@ -6193,7 +6192,8 @@ void CG_InitPersistentState() {
 	CG_InitTemporaryBoneposesCache();
 }
 
-void CG_Init( SoundSystem *soundSystem, wsw::ui::UISystem *uiSystem, const char *serverName, unsigned int playerNum,
+void CG_Init( RenderSystem *renderSystem, SoundSystem *soundSystem, wsw::ui::UISystem *uiSystem,
+			  const char *serverName, unsigned int playerNum,
 			  int vidWidth, int vidHeight, int pixelRatio,
 			  bool demoplaying, const char *demoName, bool pure,
 			  unsigned snapFrameTime, int protocol, const char *demoExtension,
@@ -6205,8 +6205,9 @@ void CG_Init( SoundSystem *soundSystem, wsw::ui::UISystem *uiSystem, const char 
 	memset( &cg, 0, sizeof( cg_state_t ) );
 	new( &cg )cg_state_t;
 
-	cg.soundSystem = soundSystem;
-	cg.uiSystem    = uiSystem;
+	cg.renderSystem = renderSystem;
+	cg.soundSystem  = soundSystem;
+	cg.uiSystem     = uiSystem;
 
 	// Hacks, see a related comment in the client/ code
 	cgs.~cg_static_t();
@@ -6256,7 +6257,7 @@ void CG_Init( SoundSystem *soundSystem, wsw::ui::UISystem *uiSystem, const char 
 
 	// register fonts here so loading screen works
 	CG_RegisterFonts();
-	cgs.shaderWhite = R_RegisterPic( "$whiteimage" );
+	cgs.shaderWhite = cg.renderSystem->registerPic( "$whiteimage" );
 
 	CG_RegisterLevelMinimap();
 

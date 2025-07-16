@@ -90,7 +90,7 @@ cgs_skeleton_t *CG_SkeletonForModel( struct model_s *model ) {
 		return NULL;
 	}
 
-	numBones = R_SkeletalGetNumBones( model, &numFrames );
+	numBones = cg.renderSystem->getNumBones( model, &numFrames );
 	if( !numBones || !numFrames ) {
 		return NULL; // no bones or frames
 
@@ -113,13 +113,13 @@ cgs_skeleton_t *CG_SkeletonForModel( struct model_s *model ) {
 
 	// register bones
 	for( i = 0, bone = skel->bones; i < numBones; i++, bone++ )
-		bone->parent = R_SkeletalGetBoneInfo( model, i, bone->name, sizeof( bone->name ), &bone->flags );
+		bone->parent = cg.renderSystem->getBoneInfo( model, i, bone->name, sizeof( bone->name ), &bone->flags );
 
 	// register poses for all frames for all bones
 	for( i = 0; i < numFrames; i++ ) {
 		skel->bonePoses[i] = ( bonepose_t * )buffer; buffer += numBones * sizeof( bonepose_t );
 		for( j = 0, bonePose = skel->bonePoses[i]; j < numBones; j++, bonePose++ )
-			R_SkeletalGetBonePose( model, j, i, bonePose );
+			cg.renderSystem->getBonePose( model, j, i, bonePose );
 	}
 
 	skel->next = skel_headnode;

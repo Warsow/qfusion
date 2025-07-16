@@ -1493,9 +1493,6 @@ void        R_DeferDataSync( void );
 
 int         R_LODForSphere( const vec3_t origin, float radius, const float *viewOrigin, float fovLodScale, float viewLodScale );
 
-struct mesh_vbo_s *R_InitNullModelVBO( void );
-struct mesh_vbo_s *R_InitPostProcessingVBO( void );
-
 void        R_InitCustomColors( void );
 int         R_GetCustomColor( int num );
 void        R_ShutdownCustomColors( void );
@@ -1539,6 +1536,31 @@ bool    R_SurfPotentiallyFragmented( const msurface_t *surf );
 // r_register.c
 //
 
+void        R_ModelBounds( const model_s *model, vec3_t mins, vec3_t maxs );
+void        R_ModelFrameBounds( const model_s *model, int frame, vec3_t mins, vec3_t maxs );
+void        R_RegisterWorldModel( const char *model );
+model_s    *R_RegisterModel( const char *name );
+
+int         R_SkeletalGetBoneInfo( const model_s *mod, int bonenum, char *name, size_t name_size, int *flags );
+void        R_SkeletalGetBonePose( const model_s *mod, int bonenum, int frame, bonepose_t *bonepose );
+int         R_SkeletalGetNumBones( const model_s *mod, int *numFrames );
+
+shader_s    *R_RegisterShader( const char *name, int type );
+shader_s    *R_RegisterPic( const char *name );
+shader_s    *R_RegisterRawAlphaMask( const char *name, int width, int height, const uint8_t *data );
+shader_s    *R_RegisterSkin( const char *name );
+shader_s    *R_RegisterLinearPic( const char *name );
+
+void        R_ReplaceRawSubPic( shader_s *shader, int x, int y, int width, int height, const uint8_t *data );
+
+Skin *R_RegisterSkinFile( const char *name );
+
+shader_s *R_CreateExplicitlyManaged2DMaterial();
+void R_ReleaseExplicitlyManaged2DMaterial( shader_s *material );
+bool R_UpdateExplicitlyManaged2DMaterialImage( shader_s *material, const char *name, const ImageOptions &options );
+
+[[nodiscard]]
+auto R_GetShaderDimensions( const shader_s *shader ) -> std::optional<std::pair<unsigned, unsigned>>;
 
 void        R_BeginRegistration_();
 void        R_EndRegistration_();
@@ -1570,6 +1592,9 @@ bool R_SkeletalModelLerpTag( orientation_t *orient, const mskmodel_t *skmodel, i
 void        R_InitSkeletalCache( void );
 void        R_ClearSkeletalCache( void );
 void        R_ShutdownSkeletalCache( void );
+
+msurface_t *R_TransformedTraceLine( VisualTrace *tr, const vec3_t start, const vec3_t end, const model_s *model,
+									const float *modelOrigin, const float *modelAxis, int surfumask );
 
 //
 // r_vbo.c

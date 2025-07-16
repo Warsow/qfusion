@@ -53,7 +53,7 @@ typedef struct {
 	float s1, t1, s2, t2;
 } qglyph_t;
 
-typedef void ( *renderString_f )( struct qfontface_s *qfont, const char *str );
+typedef void ( *renderString_f )( RenderSystem *, struct qfontface_s *qfont, const char *str );
 typedef int ( *getKerning_f )( struct qfontface_s *qfont,  qglyph_t *g1, qglyph_t *g2 );
 
 typedef struct qfontface_funcs_s {
@@ -106,7 +106,7 @@ typedef struct qfontface_s {
 
 typedef struct qfontfamily_funcs_s {
 	// method which the loader needs to call to load specific font face
-	qfontface_t *( *loadFace )( struct qfontfamily_s *family, unsigned int size );
+	qfontface_t *( *loadFace )( RenderSystem *renderSystem, struct qfontfamily_s *family, unsigned int size );
 
 	// method which the loader needs to call to unload font face
 	void ( *unloadFace )( qfontface_t *face );

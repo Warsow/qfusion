@@ -626,6 +626,7 @@ typedef struct cg_state_s {
 	PolyEffectsSystem polyEffectsSystem;
 	EffectsSystemFacade effectsSystem;
 
+	RenderSystem *renderSystem;
 	SoundSystem *soundSystem;
 	wsw::ui::UISystem *uiSystem;
 } cg_state_t;

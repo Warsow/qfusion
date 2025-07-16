@@ -286,7 +286,7 @@ static int QFT_GetKerning( qfontface_t *qfont, qglyph_t *g1_, qglyph_t *g2_ ) {
 /*
 * QFT_UploadRenderedGlyphs
 */
-static void QFT_UploadRenderedGlyphs( uint8_t *pic, struct shader_s *shader, int x, int y, int src_width, int width, int height ) {
+static void QFT_UploadRenderedGlyphs( RenderSystem *renderSystem, uint8_t *pic, struct shader_s *shader, int x, int y, int src_width, int width, int height ) {
 	int i;
 	const uint8_t *src = pic;
 	uint8_t *dest = pic;
@@ -298,13 +298,13 @@ static void QFT_UploadRenderedGlyphs( uint8_t *pic, struct shader_s *shader, int
 	for( i = 0; i < height; i++, src += src_width, dest += width ) {
 		memmove( dest, src, width );
 	}
-	R_ReplaceRawSubPic( shader, x, y, width, height, pic );
+	renderSystem->replaceRawSubPic( shader, x, y, width, height, pic );
 }
 
 /*
 * QFT_RenderString
 */
-static void QFT_RenderString( qfontface_t *qfont, const char *str ) {
+static void QFT_RenderString( RenderSystem *renderSystem, qfontface_t *qfont, const char *str ) {
 	int gc;
 	wchar_t num;
 	qftface_t *qttf = ( qftface_t * )( qfont->facedata );
@@ -325,7 +325,7 @@ static void QFT_RenderString( qfontface_t *qfont, const char *str ) {
 	for( ; ; ) {
 		gc = Q_GrabWCharFromColorString( &str, &num, NULL );
 		if( gc == GRABCHAR_END ) {
-			QFT_UploadRenderedGlyphs( qftGlyphTempBitmap, shader, qttf->imageCurX, qttf->imageCurY, qfont->shaderWidth, tempWidth, tempLineHeight );
+			QFT_UploadRenderedGlyphs( renderSystem, qftGlyphTempBitmap, shader, qttf->imageCurX, qttf->imageCurY, qfont->shaderWidth, tempWidth, tempLineHeight );
 			qttf->imageCurX += tempWidth;
 			break;
 		}
@@ -384,7 +384,7 @@ static void QFT_RenderString( qfontface_t *qfont, const char *str ) {
 		}
 
 		if( ( qttf->imageCurX + tempWidth + bitmapWidth ) > qfont->shaderWidth ) {
-			QFT_UploadRenderedGlyphs( qftGlyphTempBitmap, shader, qttf->imageCurX, qttf->imageCurY, qfont->shaderWidth, tempWidth, tempLineHeight );
+			QFT_UploadRenderedGlyphs( renderSystem, qftGlyphTempBitmap, shader, qttf->imageCurX, qttf->imageCurY, qfont->shaderWidth, tempWidth, tempLineHeight );
 			tempWidth = 0;
 			tempLineHeight = 0;
 			qttf->imageCurX = 0;
@@ -400,13 +400,13 @@ static void QFT_RenderString( qfontface_t *qfont, const char *str ) {
 		if( bitmapHeight > tempLineHeight ) {
 			if( bitmapHeight > qttf->imageCurLineHeight ) {
 				if( ( qttf->imageCurY + bitmapHeight ) > qfont->shaderHeight ) {
-					QFT_UploadRenderedGlyphs( qftGlyphTempBitmap, shader, qttf->imageCurX, qttf->imageCurY, qfont->shaderWidth, tempWidth, tempLineHeight );
+					QFT_UploadRenderedGlyphs( renderSystem, qftGlyphTempBitmap, shader, qttf->imageCurX, qttf->imageCurY, qfont->shaderWidth, tempWidth, tempLineHeight );
 					tempWidth = 0;
 					qttf->imageCurX = 0;
 					qttf->imageCurY = 0;
 					shaderNum = ( qfont->numShaders )++;
-					shader = R_RegisterRawAlphaMask( FTLIB_FontShaderName( qfont, shaderNum ),
-														  qfont->shaderWidth, qfont->shaderHeight, NULL );
+					shader = renderSystem->registerRawAlphaMask( FTLIB_FontShaderName( qfont, shaderNum ),
+																 qfont->shaderWidth, qfont->shaderHeight, NULL );
 					qfont->shaders = (shader_s **)Q_realloc( qfont->shaders, qfont->numShaders * sizeof( struct shader_s * ) );
 					qfont->shaders[shaderNum] = shader;
 				}
@@ -480,7 +480,7 @@ static const qfontface_funcs_t qft_face_funcs =
 /*
 * QFT_LoadFace
 */
-static qfontface_t *QFT_LoadFace( qfontfamily_t *family, unsigned int size ) {
+static qfontface_t *QFT_LoadFace( RenderSystem *renderSystem, qfontfamily_t *family, unsigned int size ) {
 	unsigned int i;
 	int fontHeight;
 	float unitScale;
@@ -567,8 +567,8 @@ static qfontface_t *QFT_LoadFace( qfontfamily_t *family, unsigned int size ) {
 
 	qfont->numShaders = 1;
 	qfont->shaders = (shader_t **)Q_malloc( sizeof( struct shader_s * ) );
-	qfont->shaders[0] = R_RegisterRawAlphaMask( FTLIB_FontShaderName( qfont, 0 ),
-													 qfont->shaderWidth, qfont->shaderHeight, NULL );
+	qfont->shaders[0] = renderSystem->registerRawAlphaMask( FTLIB_FontShaderName( qfont, 0 ),
+															qfont->shaderWidth, qfont->shaderHeight, NULL );
 	qfont->hasKerning = hasKerning;
 	qfont->f = &qft_face_funcs;
 	qfont->facedata = ( void * )qttf;
@@ -580,7 +580,7 @@ static qfontface_t *QFT_LoadFace( qfontfamily_t *family, unsigned int size ) {
 		renderStr[i] = FTLIB_FIRST_ASCII_CHAR + i;
 	}
 	renderStr[i] = '\0';
-	QFT_RenderString( qfont, renderStr );
+	QFT_RenderString( renderSystem, qfont, renderStr );
 
 	return qfont;
 }
@@ -839,7 +839,7 @@ static qfontfamily_t *FTLIB_GetRegisterFontFamily( const char *family, int style
 /*
 * FTLIB_RegisterFont
 */
-qfontface_t *FTLIB_RegisterFont( const char *family, const char *fallback, int style, unsigned int size ) {
+qfontface_t *FTLIB_RegisterFont( RenderSystem *renderSystem, const char *family, const char *fallback, int style, unsigned int size ) {
 	qfontfamily_t *qfamily;
 	qfontface_t *qface;
 
@@ -858,13 +858,13 @@ qfontface_t *FTLIB_RegisterFont( const char *family, const char *fallback, int s
 	for( qface = qfamily->faces; qface; qface = qface->next ) {
 		if( qface->size == size ) {
 			// exact match
-			FTLIB_TouchFont( qface );
+			FTLIB_TouchFont( renderSystem, qface );
 			break;
 		}
 	}
 
 	if( !qface ) {
-		qface = qfamily->f->loadFace( qfamily, size );
+		qface = qfamily->f->loadFace( renderSystem, qfamily, size );
 	}
 
 	if( !qface ) {
@@ -888,18 +888,18 @@ qfontface_t *FTLIB_RegisterFont( const char *family, const char *fallback, int s
 /*
 * FTLIB_TouchFont
 */
-void FTLIB_TouchFont( qfontface_t *qfont ) {
+void FTLIB_TouchFont( RenderSystem *renderSystem, qfontface_t *qfont ) {
 	unsigned int i;
 
 	for( i = 0; i < qfont->numShaders; i++ ) {
-		R_RegisterPic( FTLIB_FontShaderName( qfont, i ) );
+		renderSystem->registerPic( FTLIB_FontShaderName( qfont, i ) );
 	}
 }
 
 /*
 * FTLIB_TouchAllFonts
 */
-void FTLIB_TouchAllFonts( void ) {
+void FTLIB_TouchAllFonts( RenderSystem *renderSystem ) {
 	qfontfamily_t *qfamily;
 	qfontface_t *qface;
 
@@ -907,7 +907,7 @@ void FTLIB_TouchAllFonts( void ) {
 	for( qfamily = fontFamilies; qfamily; qfamily = qfamily->next ) {
 		// touch all faces for this family
 		for( qface = qfamily->faces; qface; qface = qface->next ) {
-			FTLIB_TouchFont( qface );
+			FTLIB_TouchFont( renderSystem, qface );
 		}
 	}
 }

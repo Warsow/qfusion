@@ -26,21 +26,23 @@ protected:
 	QQuickItem *m_selfAsItem { nullptr };
 	unsigned m_reloadRequestMask { 0 };
 
-	static wsw::PodVector<shader_s *> s_materialsToRecycle;
+	static wsw::PodVector<std::pair<RenderSystem *, shader_s *>> s_materialsToRecycle;
 public:
 	int m_nativeZ { 0 };
 	NativelyDrawn *next { nullptr };
 	NativelyDrawn *prev { nullptr };
 
-	static void recycleResourcesInMainContext();
+	static void recycleResourcesInMainContext( RenderSystem *renderSystem );
 
 	[[nodiscard]]
 	virtual bool isLoaded() const = 0;
-	virtual void drawSelfNatively( int64_t time, int64_t timeDelta, int pixelsPerLogicalUnit ) = 0;
+	virtual void drawSelfNatively( RenderSystem *renderSystem, int64_t time, int64_t timeDelta, int pixelsPerLogicalUnit ) = 0;
 };
 
 class NativelyDrawnImage : public QQuickItem, public NativelyDrawn {
 	Q_OBJECT
+
+	RenderSystem *m_createdByRenderSystem { nullptr };
 
 	shader_s *m_material { nullptr };
 	QString m_materialName;
@@ -104,13 +106,13 @@ class NativelyDrawnImage : public QQuickItem, public NativelyDrawn {
 
 	void setBorderWidth( int borderWidth );
 
-	void reloadIfNeeded( int pixelsPerLogicalUnit );
+	void reloadIfNeeded( RenderSystem *, int pixelsPerLogicalUnit );
 	void updateSourceSize( int w, int h );
 public:
 	explicit NativelyDrawnImage( QQuickItem *parent = nullptr );
 	~NativelyDrawnImage() override;
 
-	void drawSelfNatively( int64_t, int64_t, int ) override;
+	void drawSelfNatively( RenderSystem *, int64_t, int64_t, int ) override;
 };
 
 class NativelyDrawnModel : public QQuickItem, public NativelyDrawn {
@@ -191,13 +193,13 @@ class NativelyDrawnModel : public QQuickItem, public NativelyDrawn {
 	[[nodiscard]]
 	bool isLoaded() const override;
 
-	void reloadIfNeeded();
+	void reloadIfNeeded( RenderSystem * );
 
 	void updateViewAxis();
 public:
 	explicit NativelyDrawnModel( QQuickItem *parent = nullptr );
 
-	void drawSelfNatively( int64_t, int64_t, int ) override;
+	void drawSelfNatively( RenderSystem *, int64_t, int64_t, int ) override;
 };
 
 }

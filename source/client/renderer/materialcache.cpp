@@ -713,7 +713,3 @@ auto MaterialCache::findMeshMaterialInSkin( const Skin *skin, const wsw::StringV
 Skin *R_RegisterSkinFile( const char *name ) {
 	return MaterialCache::instance()->registerSkin( wsw::StringView( name ) );
 }
-
-shader_t *R_FindShaderForSkinFile( const Skin *skin, const char *meshname ) {
-	return MaterialCache::instance()->findMeshMaterialInSkin( skin, wsw::StringView( meshname ) );
-}

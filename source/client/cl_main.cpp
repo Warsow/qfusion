@@ -240,7 +240,7 @@ void CL_GameModule_Init( void ) {
 	SCR_EnableQuickMenu( false );
 
 	const int64_t start = Sys_Milliseconds();
-	CG_Init( soundSystem, wsw::ui::UISystem::instance(), cls.servername, cl.playernum,
+	CG_Init( RF_GetRenderSystem(), soundSystem, wsw::ui::UISystem::instance(), cls.servername, cl.playernum,
 			 viddef.width, viddef.height, VID_GetPixelRatio(),
 			 cls.demoPlayer.playing, cls.demoPlayer.playing ? cls.demoPlayer.filename : "",
 			 cls.sv_pure, cl.snapFrameTime, APP_PROTOCOL_VERSION, APP_DEMO_EXTENSION_STR,
@@ -1212,21 +1212,21 @@ void VID_Shutdown( void ) {
 	}
 }
 
-qfontface_t *SCR_RegisterFont( const char *family, int style, unsigned int size ) {
-	return FTLIB_RegisterFont( family, DEFAULT_SYSTEM_FONT_FAMILY_FALLBACK, style, size );
+qfontface_t *SCR_RegisterFont( RenderSystem *renderSystem, const char *family, int style, unsigned int size ) {
+	return FTLIB_RegisterFont( renderSystem, family, DEFAULT_SYSTEM_FONT_FAMILY_FALLBACK, style, size );
 }
 
-static void SCR_RegisterConsoleFont( void ) {
+static void SCR_RegisterConsoleFont( RenderSystem *renderSystem ) {
 	const int size = ceilf( 15 * VID_GetPixelRatio() );
-	cls.consoleFont = SCR_RegisterFont( DEFAULT_SYSTEM_FONT_FAMILY_MONO, DEFAULT_SYSTEM_FONT_STYLE, size );
+	cls.consoleFont = SCR_RegisterFont( renderSystem, DEFAULT_SYSTEM_FONT_FAMILY_MONO, DEFAULT_SYSTEM_FONT_STYLE, size );
 	if( !cls.consoleFont ) {
 		Com_Error( ERR_FATAL, "Couldn't load default font \"%s\"", DEFAULT_SYSTEM_FONT_FAMILY_MONO );
 	}
 	Con_CheckResize();
 }
 
-static void SCR_InitFonts( void ) {
-	SCR_RegisterConsoleFont();
+static void SCR_InitFonts( RenderSystem *renderSystem ) {
+	SCR_RegisterConsoleFont( renderSystem );
 }
 
 static void SCR_ShutdownFonts( void ) {
@@ -1270,19 +1270,19 @@ size_t SCR_FontHeight( qfontface_t *font ) {
 	return FTLIB_FontHeight( font );
 }
 
-size_t SCR_strWidth( const char *str, qfontface_t *font, size_t maxlen, int flags ) {
-	return FTLIB_StringWidth( str, font, maxlen, flags );
+size_t SCR_strWidth( RenderSystem *renderSystem, const char *str, qfontface_t *font, size_t maxlen, int flags ) {
+	return FTLIB_StringWidth( renderSystem, str, font, maxlen, flags );
 }
 
-void SCR_DrawRawChar( Draw2DRequest *request, int x, int y, wchar_t num, qfontface_t *font, const vec4_t color ) {
-	FTLIB_DrawRawChar( request, x, y, num, font, color );
+void SCR_DrawRawChar( RenderSystem *renderSystem, Draw2DRequest *request, int x, int y, wchar_t num, qfontface_t *font, const vec4_t color ) {
+	FTLIB_DrawRawChar( renderSystem, request, x, y, num, font, color );
 }
 
-void SCR_DrawClampString( Draw2DRequest *request, int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags ) {
-	FTLIB_DrawClampString( request, x, y, str, xmin, ymin, xmax, ymax, font, color, flags );
+void SCR_DrawClampString( RenderSystem *renderSystem, Draw2DRequest *request, int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags ) {
+	FTLIB_DrawClampString( renderSystem, request, x, y, str, xmin, ymin, xmax, ymax, font, color, flags );
 }
 
-int SCR_DrawString( Draw2DRequest *request, int x, int y, int align, const char *str, qfontface_t *font, const float *color, int flags ) {
+int SCR_DrawString( RenderSystem *renderSystem, Draw2DRequest *request, int x, int y, int align, const char *str, qfontface_t *font, const float *color, int flags ) {
 	if( !str ) {
 		return 0;
 	}
@@ -1294,30 +1294,30 @@ int SCR_DrawString( Draw2DRequest *request, int x, int y, int align, const char 
 	const int fontHeight = FTLIB_FontHeight( font );
 
 	if( ( align % 3 ) != 0 ) { // not left - don't precalculate the width if not needed
-		x = SCR_HorizontalAlignForString( x, align, FTLIB_StringWidth( str, font, 0, flags ) );
+		x = SCR_HorizontalAlignForString( x, align, FTLIB_StringWidth( renderSystem, str, font, 0, flags ) );
 	}
 	y = SCR_VerticalAlignForString( y, align, fontHeight );
 
 	int width = 0;
-	FTLIB_DrawRawString( request, x, y, str, 0, &width, font, color, flags );
+	FTLIB_DrawRawString( renderSystem, request, x, y, str, 0, &width, font, color, flags );
 
 	return width;
 }
 
-int SCR_DrawString( Draw2DRequest *request, int x, int y, int align, const wsw::StringView &str, qfontface_t *font, const float *color, int flags ) {
+int SCR_DrawString( RenderSystem *renderSystem, Draw2DRequest *request, int x, int y, int align, const wsw::StringView &str, qfontface_t *font, const float *color, int flags ) {
 	if( str.isZeroTerminated() ) {
-		return SCR_DrawString( request, x, y, align, str.data(), font, color, flags );
+		return SCR_DrawString( renderSystem, request, x, y, align, str.data(), font, color, flags );
 	}
 	if( str.length() < 256 ) {
 		wsw::StaticString<256> ztStr;
 		ztStr << str;
-		return SCR_DrawString( request, x, y, align, ztStr.data(), font, color, flags );
+		return SCR_DrawString( renderSystem, request, x, y, align, ztStr.data(), font, color, flags );
 	}
 	static wsw::PodVector<char> ztStr;
 	ztStr.clear();
 	ztStr.append( str );
 	ztStr.append( '\0' );
-	return SCR_DrawString( request, x, y, align, ztStr.data(), font, color, flags );
+	return SCR_DrawString( renderSystem, request, x, y, align, ztStr.data(), font, color, flags );
 }
 
 void SCR_DrawFillRect( Draw2DRequest *request, int x, int y, int w, int h, const vec4_t color ) {
@@ -1381,10 +1381,10 @@ void SCR_EndLoadingPlaque( void ) {
 	Con_ClearNotify();
 }
 
-void SCR_RegisterConsoleMedia() {
-	cls.whiteShader = R_RegisterPic( "$whiteimage" );
+void SCR_RegisterConsoleMedia( RenderSystem *renderSystem ) {
+	cls.whiteShader = renderSystem->registerPic( "$whiteimage" );
 
-	SCR_InitFonts();
+	SCR_InitFonts( renderSystem );
 }
 
 void SCR_ShutDownConsoleMedia( void ) {
@@ -1470,26 +1470,28 @@ void SCR_UpdateScreen( void ) {
 		uiSystem->renderInternally();
 	}
 
+	RenderSystem *renderSystem = nullptr;
+
 	// TODO: This should not belong to the UI module, let client manage it!
-	uiSystem->drawBackgroundMapIfNeeded();
+	uiSystem->drawBackgroundMapIfNeeded( renderSystem );
 
 	if( !cgRenderViewResult.hasBlittedTheMenu ) {
-		uiSystem->drawMenuPartInMainContext();
+		uiSystem->drawMenuPartInMainContext( renderSystem );
 	}
 	if( !cgRenderViewResult.hasBlittedTheHud ) {
-		uiSystem->drawHudPartInMainContext();
+		uiSystem->drawHudPartInMainContext( renderSystem );
 	}
 
-	uiSystem->drawCursorInMainContext();
+	uiSystem->drawCursorInMainContext( renderSystem );
 
 	const bool shouldDrawConsole = canDrawConsole && scr_con_current > 0.0f;
 	if( canDrawDebug && !shouldDrawConsole ) {
-		Con_DrawNotify( viddef.width, viddef.height );
-		CL_ProfilerHud_Draw( viddef.width, viddef.height );
+		Con_DrawNotify( renderSystem, viddef.width, viddef.height );
+		CL_ProfilerHud_Draw( renderSystem, viddef.width, viddef.height );
 	}
 
 	if( shouldDrawConsole ) {
-		Con_DrawConsole( viddef.width, viddef.height * scr_con_current );
+		Con_DrawConsole( renderSystem, viddef.width, viddef.height * scr_con_current );
 	}
 
 	RF_EndFrame();
@@ -1917,7 +1919,7 @@ static void CL_EndRegistration( void ) {
 	if( cls.registrationOpen ) {
 		cls.registrationOpen = false;
 
-		FTLIB_TouchAllFonts();
+		FTLIB_TouchAllFonts( RF_GetRenderSystem() );
 		RF_EndRegistration();
 		wsw::ui::UISystem::instance()->endRegistration();
 		SoundSystem::instance()->endRegistration();
@@ -2088,8 +2090,6 @@ void CL_Disconnect( const char *message, bool isCalledByBuiltinServer /* TODO!!!
 			Q_free( cls.httpbaseurl );
 			cls.httpbaseurl = NULL;
 		}
-
-		R_Finish();
 
 		CL_EndRegistration();
 
@@ -4928,7 +4928,7 @@ void CL_InitMedia() {
 		SoundSystem::instance()->stopSounds( SoundSystem::StopMusic );
 
 		// register console font and background
-		SCR_RegisterConsoleMedia();
+		SCR_RegisterConsoleMedia( RF_GetRenderSystem() );
 
 		SCR_EnableQuickMenu( false );
 
@@ -4972,10 +4972,12 @@ void CL_RestartMedia( void ) {
 
 		cls.mediaInitialized = true;
 
-		FTLIB_TouchAllFonts();
+		RenderSystem *renderSystem = RF_GetRenderSystem();
+
+		FTLIB_TouchAllFonts( renderSystem );
 
 		// register console font and background
-		SCR_RegisterConsoleMedia();
+		SCR_RegisterConsoleMedia( renderSystem );
 	}
 }
 
