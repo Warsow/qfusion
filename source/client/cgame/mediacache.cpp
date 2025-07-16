@@ -75,7 +75,7 @@ void MediaCache::registerModel( CachedModel *model ) {
 void MediaCache::registerMaterial( CachedMaterial *material ) {
 	if( !material->m_handle ) {
 		assert( material->m_name.isZeroTerminated() );
-		material->m_handle = R_RegisterPic( material->m_name.data() );
+		material->m_handle = cg.renderSystem->registerPic( material->m_name.data() );
 	}
 }
 
@@ -85,10 +85,10 @@ void MediaCache::registerMaterial( CachedMaterial *material ) {
 struct model_s *CG_RegisterModel( const char *name ) {
 	struct model_s *model;
 
-	model = R_RegisterModel( name );
+	model = cg.renderSystem->registerModel( name );
 
 	// precache bones
-	if( R_SkeletalGetNumBones( model, NULL ) ) {
+	if( cg.renderSystem->getNumBones( model, NULL ) ) {
 		CG_SkeletonForModel( model );
 	}
 
@@ -107,7 +107,7 @@ void CG_RegisterLevelMinimap( void ) {
 		Q_snprintfz( minimap, sizeof( minimap ), "minimaps/%s%s", name, ext );
 		file = FS_FOpenFile( minimap, NULL, FS_READ );
 		if( file != -1 ) {
-			cgs.shaderMiniMap = R_RegisterPic( minimap );
+			cgs.shaderMiniMap = cg.renderSystem->registerPic( minimap );
 			break;
 		}
 	}
@@ -117,19 +117,22 @@ void CG_RegisterFonts() {
 	// TODO: Just use int explicitly and get rid of ceil?
 	const float scale = VID_GetPixelRatio();
 
-	cgs.fontPlayerNameTiny = SCR_RegisterFont( DEFAULT_SYSTEM_FONT_FAMILY, QFONT_STYLE_NONE, (unsigned)ceilf( 13 * scale ) );
+	const char *family = DEFAULT_SYSTEM_FONT_FAMILY;
+	const int style    = QFONT_STYLE_NONE;
+
+	cgs.fontPlayerNameTiny = SCR_RegisterFont( cg.renderSystem, family, style, (unsigned)ceilf( 13 * scale ) );
 	if( !cgs.fontPlayerNameTiny ) {
-		CG_Error( "Couldn't load default font \"%s\"", DEFAULT_SYSTEM_FONT_FAMILY );
+		CG_Error( "Couldn't load default font \"%s\"", family );
 	}
 
-	cgs.fontPlayerNameSmall = SCR_RegisterFont( DEFAULT_SYSTEM_FONT_FAMILY, QFONT_STYLE_NONE, (unsigned)ceilf( 15 * scale ) );
+	cgs.fontPlayerNameSmall = SCR_RegisterFont( cg.renderSystem, family, style, (unsigned)ceilf( 15 * scale ) );
 	if( !cgs.fontPlayerNameSmall ) {
-		CG_Error( "Couldn't load default font \"%s\"", DEFAULT_SYSTEM_FONT_FAMILY );
+		CG_Error( "Couldn't load default font \"%s\"", family );
 	}
 
-	cgs.fontPlayerNameLarge = SCR_RegisterFont( DEFAULT_SYSTEM_FONT_FAMILY, QFONT_STYLE_NONE, (unsigned)ceilf( 24 * scale ) );
+	cgs.fontPlayerNameLarge = SCR_RegisterFont( cg.renderSystem, family, style, (unsigned)ceilf( 24 * scale ) );
 	if( !cgs.fontPlayerNameLarge ) {
-		CG_Error( "Couldn't load default font \"%s\"", DEFAULT_SYSTEM_FONT_FAMILY );
+		CG_Error( "Couldn't load default font \"%s\"", family );
 	}
 }
 
@@ -173,10 +176,10 @@ public:
 					.fitSizeForCrispness = true,
 					.useOutlineEffect    = true,
 				};
-				R_UpdateExplicitlyManaged2DMaterialImage( bin->material, filePath.data(), options );
+				(void)cg.renderSystem->updateExplicitlyManaged2DMaterialImage( bin->material, filePath.data(), options );
 				bin->cachedRequestedSize = size;
 				if( bin->material ) {
-					bin->cachedActualSize = R_GetShaderDimensions( bin->material ).value();
+					bin->cachedActualSize = cg.renderSystem->getMaterialDimensions( bin->material ).value();
 				}
 			}
 			if( bin->material ) {
@@ -218,8 +221,8 @@ public:
 		for( unsigned i = 0, maxEntries = getFileSpans().size(); i < maxEntries; ++i ) {
 			m_cacheEntries.emplace_back( CacheEntry {
 				.bins = {
-					CacheEntry::Bin { .material = R_CreateExplicitlyManaged2DMaterial() },
-					CacheEntry::Bin { .material = R_CreateExplicitlyManaged2DMaterial() },
+					CacheEntry::Bin { .material = cg.renderSystem->createExplicitlyManaged2DMaterial() },
+					CacheEntry::Bin { .material = cg.renderSystem->createExplicitlyManaged2DMaterial() },
 				},
 			});
 		}
@@ -228,7 +231,7 @@ public:
 	void destroyMaterials() {
 		for( CacheEntry &entry: m_cacheEntries ) {
 			for( CacheEntry::Bin &bin: entry.bins ) {
-				R_ReleaseExplicitlyManaged2DMaterial( bin.material );
+				cg.renderSystem->releaseExplicitlyManaged2DMaterial( bin.material );
 			}
 		}
 		m_cacheEntries.clear();

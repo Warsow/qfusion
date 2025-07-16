@@ -90,7 +90,7 @@ public:
 
 	void update( int gameMsec, int realMsec );
 
-	void drawSelf( unsigned screenWidth, unsigned screenHeight );
+	void drawSelf( RenderSystem *renderSystem, unsigned screenWidth, unsigned screenHeight );
 
 	void listRoots( wsw::ProfilingSystem::FrameGroup group );
 
@@ -110,10 +110,12 @@ private:
 	struct GroupState;
 
 	[[nodiscard]]
-	auto drawDiscoveredRoots( Draw2DRequest *request, const GroupState &groupState, const wsw::StringView &title,
+	auto drawDiscoveredRoots( RenderSystem *renderSystem, Draw2DRequest *request,
+							  const GroupState &groupState, const wsw::StringView &title,
 							  int startX, int startY, int width, int margin, int lineHeight ) -> int;
 	[[nodiscard]]
-	auto drawProfilingStats( Draw2DRequest *request, const GroupState &groupState, const wsw::StringView &title,
+	auto drawProfilingStats( RenderSystem *renderSystem, Draw2DRequest *request,
+							 const GroupState &groupState, const wsw::StringView &title,
 							 int startX, int startY, int width, int margin, int lineHeight ) -> int;
 
 	class Timeline {
@@ -163,8 +165,8 @@ private:
 		auto end() const -> Iterator { return { this, m_head }; }
 	};
 
-	static void drawTimeline( Draw2DRequest *request, const Timeline &timeline, int startX, int startY,
-							  int width, int height, int margin );
+	static void drawTimeline( RenderSystem *renderSystem, Draw2DRequest *request, const Timeline &timeline,
+							  int startX, int startY, int width, int height, int margin );
 
 	wsw::Mutex m_mutex;
 
@@ -281,10 +283,10 @@ void CL_ProfilerHud_Update( int gameMsec, int realMsec ) {
 	g_profilerHudHolder.instance()->update( gameMsec, realMsec );
 }
 
-void CL_ProfilerHud_Draw( unsigned width, unsigned height ) {
+void CL_ProfilerHud_Draw( RenderSystem *renderSystem, unsigned width, unsigned height ) {
 	WSW_PROFILER_SCOPE();
 
-	g_profilerHudHolder.instance()->drawSelf( width, height );
+	g_profilerHudHolder.instance()->drawSelf( renderSystem, width, height );
 }
 
 wsw::ProfilerArgsSupplier *CL_GetProfilerArgsSupplier() {
@@ -406,12 +408,13 @@ void ProfilerHud::toggleFrozenState() {
 extern const vec4_t kConsoleBackgroundColor;
 
 template <typename S>
-static void drawSideAlignedPair( Draw2DRequest *request, const S &left, const S &right, int startX, int startY,
+static void drawSideAlignedPair( RenderSystem *renderSystem, Draw2DRequest *request,
+								 const S &left, const S &right, int startX, int startY,
 								 int width, int margin, int lineHeight, const float *color = colorWhite ) {
 	const int leftX      = startX + margin;
 	const int rightX     = startX + width - margin;
-	const int leftWidth  = SCR_DrawString( request, leftX, startY, ALIGN_LEFT_TOP, left, nullptr, color );
-	const int rightWidth = SCR_DrawString( request, rightX, startY, ALIGN_RIGHT_TOP, right, nullptr, color );
+	const int leftWidth  = SCR_DrawString( renderSystem, request, leftX, startY, ALIGN_LEFT_TOP, left, nullptr, color );
+	const int rightWidth = SCR_DrawString( renderSystem, request, rightX, startY, ALIGN_RIGHT_TOP, right, nullptr, color );
 	if( leftWidth + rightWidth + 2 * margin + 48 < width ) {
 		const int barX     = startX + leftWidth + 2 * margin;
 		const int barY     = startY + ( 7 * lineHeight ) / 8;
@@ -420,16 +423,17 @@ static void drawSideAlignedPair( Draw2DRequest *request, const S &left, const S 
 	}
 }
 
-static void drawHeader( Draw2DRequest *request, const wsw::StringView &title, int startX, int startY,
-						int width, int margin, int lineHeight ) {
-	const int textWidth = SCR_DrawString( request, startX + margin, startY, ALIGN_LEFT_TOP, title );
+static void drawHeader( RenderSystem *renderSystem, Draw2DRequest *request, const wsw::StringView &title,
+						int startX, int startY, int width, int margin, int lineHeight ) {
+	const int textWidth = SCR_DrawString( renderSystem, request, startX + margin, startY, ALIGN_LEFT_TOP, title );
 	const int barX      = startX + textWidth + 2 * margin;
 	const int barY      = startY + ( 7 * lineHeight ) / 8;
 	const int barWidth  = (int)width  - textWidth - 3 * margin;
 	SCR_DrawFillRect( request, barX, barY, barWidth, 1, colorLtGrey );
 }
 
-auto ProfilerHud::drawDiscoveredRoots( Draw2DRequest *request, const GroupState &groupState, const wsw::StringView &title,
+auto ProfilerHud::drawDiscoveredRoots( RenderSystem *renderSystem, Draw2DRequest *request,
+									   const GroupState &groupState, const wsw::StringView &title,
 									   int startX, int startY, int width, int margin, int lineHeight ) -> int {
 	const std::span<const wsw::ProfilingSystem::RegisteredScope> &scopes = wsw::ProfilingSystem::getRegisteredScopes();
 
@@ -442,10 +446,10 @@ auto ProfilerHud::drawDiscoveredRoots( Draw2DRequest *request, const GroupState 
 
 	int y = startY;
 
-	drawHeader( request, title, startX, y, width, margin, lineHeight );
+	drawHeader( renderSystem, request, title, startX, y, width, margin, lineHeight );
 	y += lineHeight + margin;
 
-	SCR_DrawString( request, startX + margin, y, ALIGN_LEFT_TOP, "Available profiling roots", nullptr, colorLtGrey );
+	SCR_DrawString( renderSystem, request, startX + margin, y, ALIGN_LEFT_TOP, "Available profiling roots", nullptr, colorLtGrey );
 	y += lineHeight + margin;
 
 	unsigned threadIndex = 0;
@@ -454,14 +458,14 @@ auto ProfilerHud::drawDiscoveredRoots( Draw2DRequest *request, const GroupState 
 		(void)threadHeader.appendf( "Thread #%-2d", threadIndex );
 		(void)threadStats.appendf( "%d", (unsigned)threadResults.discoveredScopes.size() );
 
-		drawSideAlignedPair( request, threadHeader.asView(), threadStats.asView(), startX, y, width, margin, lineHeight, colorLtGrey );
+		drawSideAlignedPair( renderSystem, request, threadHeader.asView(), threadStats.asView(), startX, y, width, margin, lineHeight, colorLtGrey );
 		y += lineHeight;
 
 		for( const unsigned scopeId: threadResults.discoveredScopes ) {
 			const wsw::StringView &fn = scopes[scopeId].readableFunction;
 			wsw::StaticString<16> idString;
 			idString << '@' << scopeId;
-			drawSideAlignedPair( request, fn, idString.asView(), startX, y, width, margin, lineHeight, colorMdGrey );
+			drawSideAlignedPair( renderSystem, request, fn, idString.asView(), startX, y, width, margin, lineHeight, colorMdGrey );
 			y += lineHeight;
 		}
 
@@ -473,7 +477,8 @@ auto ProfilerHud::drawDiscoveredRoots( Draw2DRequest *request, const GroupState 
 
 static constexpr int kGraphHeight = 64;
 
-auto ProfilerHud::drawProfilingStats( Draw2DRequest *request, const GroupState &groupState, const wsw::StringView &title,
+auto ProfilerHud::drawProfilingStats( RenderSystem *renderSystem, Draw2DRequest *request,
+									  const GroupState &groupState, const wsw::StringView &title,
 									  int startX, int startY, int width, int margin, int lineHeight ) -> int {
 	const std::span<const wsw::ProfilingSystem::RegisteredScope> &scopes = wsw::ProfilingSystem::getRegisteredScopes();
 
@@ -505,14 +510,14 @@ auto ProfilerHud::drawProfilingStats( Draw2DRequest *request, const GroupState &
 
 	int y = startY;
 
-	drawHeader( request, title, startX, y, width, margin, lineHeight );
+	drawHeader( renderSystem, request, title, startX, y, width, margin, lineHeight );
 	y += lineHeight + margin;
 
 	wsw::StaticString<64> commonHeader( "Profiling " );
 	constexpr unsigned maxNameLimit = 48;
 	commonHeader << scopes[groupState.selectedScope.value()].readableFunction.take( maxNameLimit );
 
-	SCR_DrawString( request, startX + margin, y, ALIGN_LEFT_TOP, commonHeader.asView(), nullptr, colorLtGrey );
+	SCR_DrawString( renderSystem, request, startX + margin, y, ALIGN_LEFT_TOP, commonHeader.asView(), nullptr, colorLtGrey );
 	y += lineHeight + margin;
 
 	unsigned threadIndex = 0;
@@ -523,14 +528,14 @@ auto ProfilerHud::drawProfilingStats( Draw2DRequest *request, const GroupState &
 		(void)threadStats.appendf( "count=%-4d", threadResults.callStats.enterCount );
 		(void)threadStats.appendf( " us=%-5d", (unsigned)threadResults.callStats.totalTime );
 
-		drawSideAlignedPair( request, threadHeader.asView(), threadStats.asView(), startX, y, width, margin, lineHeight, colorLtGrey );
+		drawSideAlignedPair( renderSystem, request, threadHeader.asView(), threadStats.asView(), startX, y, width, margin, lineHeight, colorLtGrey );
 		y += lineHeight;
 
 		if( threadGraphMask & ( 1 << threadIndex ) ) {
 			y += margin;
 			const auto it = groupState.threadProfilingTimelines.find( threadId );
 			assert( it != groupState.threadProfilingTimelines.end() );
-			drawTimeline( request, it->second, startX, y, width, kGraphHeight, margin );
+			drawTimeline( renderSystem, request, it->second, startX, y, width, kGraphHeight, margin );
 			y += kGraphHeight + margin;
 		}
 
@@ -550,7 +555,7 @@ auto ProfilerHud::drawProfilingStats( Draw2DRequest *request, const GroupState &
 			(void)childStats.appendf( "count=%-4d", callStats.enterCount );
 			(void)childStats.appendf( " us=%-5d", (unsigned)callStats.totalTime );
 
-			drawSideAlignedPair( request, childDesc.asView(), childStats.asView(), startX, y, width, margin, lineHeight, colorMdGrey );
+			drawSideAlignedPair( renderSystem, request, childDesc.asView(), childStats.asView(), startX, y, width, margin, lineHeight, colorMdGrey );
 			y += lineHeight;
 
 			remaining -= (int64_t)callStats.totalTime;
@@ -560,7 +565,7 @@ auto ProfilerHud::drawProfilingStats( Draw2DRequest *request, const GroupState &
 			wsw::StaticString<64> otherStats;
 			(void)otherStats.appendf( "us=%-5d", (unsigned)wsw::max<int64_t>( 0, remaining ) );
 
-			drawSideAlignedPair( request, "Other"_asView, otherStats.asView(), startX, y, width, margin, lineHeight, colorDkGrey );
+			drawSideAlignedPair( renderSystem, request, "Other"_asView, otherStats.asView(), startX, y, width, margin, lineHeight, colorDkGrey );
 			y += lineHeight;
 		}
 
@@ -581,8 +586,8 @@ void ProfilerHud::update( int gameMsec, int realMsec ) {
 	}
 }
 
-void ProfilerHud::drawTimeline( Draw2DRequest *request, const Timeline &timeline, int startX, int startY,
-								int width, int height, int margin ) {
+void ProfilerHud::drawTimeline( RenderSystem *renderSystem, Draw2DRequest *request, const Timeline &timeline,
+								int startX, int startY, int width, int height, int margin ) {
 	const float barColor[4] = { 1.0f, 1.0f, 1.0f, 0.1f };
 
 	int graphWidthStep = 1;
@@ -638,21 +643,21 @@ void ProfilerHud::drawTimeline( Draw2DRequest *request, const Timeline &timeline
 	const int textX = startX + width - margin;
 	int textY       = startY;
 
-	SCR_DrawString( request, textX, textY, ALIGN_RIGHT_TOP, minText.asView(), nullptr, colorMdGrey );
+	SCR_DrawString( renderSystem, request, textX, textY, ALIGN_RIGHT_TOP, minText.asView(), nullptr, colorMdGrey );
 	textY += ( height ) / 3;
-	SCR_DrawString( request, textX, textY, ALIGN_RIGHT_TOP, avgText.asView(), nullptr, colorMdGrey );
+	SCR_DrawString( renderSystem, request, textX, textY, ALIGN_RIGHT_TOP, avgText.asView(), nullptr, colorMdGrey );
 	textY += ( height ) / 3;
-	SCR_DrawString( request, textX, textY, ALIGN_RIGHT_TOP, maxText.asView(), nullptr, colorMdGrey );
+	SCR_DrawString( renderSystem, request, textX, textY, ALIGN_RIGHT_TOP, maxText.asView(), nullptr, colorMdGrey );
 }
 
-void ProfilerHud::drawSelf( unsigned screenWidth, unsigned ) {
+void ProfilerHud::drawSelf( RenderSystem *renderSystem, unsigned screenWidth, unsigned ) {
 	[[maybe_unused]] volatile wsw::ScopedLock<wsw::Mutex> lock( &m_mutex );
 
 	if( !m_isEnabled ) {
 		return;
 	}
 
-	wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
+	DECLARE_SCOPED_DRAW_2D_REQUEST( request, renderSystem );
 
 	const int margin      = 8 * VID_GetPixelRatio();
 	const auto lineHeight = (int)SCR_FontHeight( cls.consoleFont );
@@ -665,24 +670,24 @@ void ProfilerHud::drawSelf( unsigned screenWidth, unsigned ) {
 	SCR_DrawFillRect( request.get(), paneX, y, paneWidth, paneHeight, kConsoleBackgroundColor );
 	y += margin;
 
-	drawHeader( request.get(), m_isFrozen ? "S U M M A R Y [*]"_asView : "S U M M A R Y"_asView, paneX, y, paneWidth, margin, lineHeight );
+	drawHeader( renderSystem, request.get(), m_isFrozen ? "S U M M A R Y [*]"_asView : "S U M M A R Y"_asView, paneX, y, paneWidth, margin, lineHeight );
 	y += lineHeight + margin;
 
 	wsw::StaticString<16> realFrameTime( "%d", m_lastRealFrameTime );
-	drawSideAlignedPair( request.get(), "Real frame time"_asView, realFrameTime.asView(), paneX, y, paneWidth, margin, lineHeight, colorMdGrey );
+	drawSideAlignedPair( renderSystem, request.get(), "Real frame time"_asView, realFrameTime.asView(), paneX, y, paneWidth, margin, lineHeight, colorMdGrey );
 	y += lineHeight + margin;
 
-	drawTimeline( request.get(), m_realFrameTimeTimeline, paneX, y, paneWidth, kGraphHeight, margin );
+	drawTimeline( renderSystem, request.get(), m_realFrameTimeTimeline, paneX, y, paneWidth, kGraphHeight, margin );
 	y += kGraphHeight + margin;
 
 	wsw::StaticString<16> gameFrameTime( "%d", m_lastGameFrameTime );
-	drawSideAlignedPair( request.get(), "Game frame time"_asView, gameFrameTime.asView(), paneX, y, paneWidth, margin, lineHeight, colorMdGrey );
+	drawSideAlignedPair( renderSystem, request.get(), "Game frame time"_asView, gameFrameTime.asView(), paneX, y, paneWidth, margin, lineHeight, colorMdGrey );
 	y += lineHeight + margin;
 
-	drawTimeline( request.get(), m_gameFrameTimeTimeline, paneX, y, paneWidth, kGraphHeight, margin );
+	drawTimeline( renderSystem, request.get(), m_gameFrameTimeTimeline, paneX, y, paneWidth, kGraphHeight, margin );
 	y += kGraphHeight + margin;
 
-	drawHeader( request.get(), "H E L P"_asView, paneX, y, paneWidth, margin, lineHeight );
+	drawHeader( renderSystem, request.get(), "H E L P"_asView, paneX, y, paneWidth, margin, lineHeight );
 	y += lineHeight + margin;
 
 	const std::pair<const char *, const char *> cmdDescs[] {
@@ -694,7 +699,7 @@ void ProfilerHud::drawSelf( unsigned screenWidth, unsigned ) {
 	};
 
 	for( const auto &[syntax, desc]: cmdDescs ) {
-		drawSideAlignedPair( request.get(), syntax, desc, paneX, y, paneWidth, margin, lineHeight, colorMdGrey );
+		drawSideAlignedPair( renderSystem, request.get(), syntax, desc, paneX, y, paneWidth, margin, lineHeight, colorMdGrey );
 		y += lineHeight;
 	}
 	y += margin;
@@ -706,11 +711,11 @@ void ProfilerHud::drawSelf( unsigned screenWidth, unsigned ) {
 	for( size_t groupIndex = 0; groupIndex < std::size( m_groupStates ); ++groupIndex ) {
 		const GroupState &groupState = m_groupStates[groupIndex];
 		if( groupState.operationMode == GroupState::ListRoots ) {
-			y += drawDiscoveredRoots( request.get(), groupState, groupTitles[groupIndex], paneX, y, paneWidth, margin, lineHeight );
+			y += drawDiscoveredRoots( renderSystem, request.get(), groupState, groupTitles[groupIndex], paneX, y, paneWidth, margin, lineHeight );
 		} else if( groupState.operationMode == GroupState::ProfileCall ) {
-			y += drawProfilingStats( request.get(), groupState, groupTitles[groupIndex], paneX, y, paneWidth, margin, lineHeight );
+			y += drawProfilingStats( renderSystem, request.get(), groupState, groupTitles[groupIndex], paneX, y, paneWidth, margin, lineHeight );
 		}
 	}
 
-	CommitDraw2DRequest( request.get() );
+	renderSystem->commitDraw2DRequest( request.get() );
 }

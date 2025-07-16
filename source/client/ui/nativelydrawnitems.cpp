@@ -9,11 +9,12 @@
 
 namespace wsw::ui {
 
-wsw::PodVector<shader_s *> NativelyDrawn::s_materialsToRecycle;
+wsw::PodVector<std::pair<RenderSystem *, shader_s *>> NativelyDrawn::s_materialsToRecycle;
 
-void NativelyDrawn::recycleResourcesInMainContext() {
-	for( auto *material: s_materialsToRecycle ) {
-		R_ReleaseExplicitlyManaged2DMaterial( material );
+void NativelyDrawn::recycleResourcesInMainContext( RenderSystem *renderSystem ) {
+	for( auto &[createdByRenderSystem, material]: s_materialsToRecycle ) {
+		assert( createdByRenderSystem && ( !renderSystem || renderSystem == createdByRenderSystem ) );
+		createdByRenderSystem->releaseExplicitlyManaged2DMaterial( material );
 	}
 	s_materialsToRecycle.clear();
 }
@@ -25,7 +26,7 @@ NativelyDrawnImage::NativelyDrawnImage( QQuickItem *parent )
 
 NativelyDrawnImage::~NativelyDrawnImage() {
 	if( m_material ) {
-		s_materialsToRecycle.push_back( m_material );
+		s_materialsToRecycle.push_back( { m_createdByRenderSystem, m_material } );
 	}
 }
 
@@ -89,7 +90,7 @@ void NativelyDrawnImage::updateSourceSize( int w, int h ) {
 	}
 }
 
-void NativelyDrawnImage::reloadIfNeeded( int pixelsPerLogicalUnit ) {
+void NativelyDrawnImage::reloadIfNeeded( RenderSystem *renderSystem, int pixelsPerLogicalUnit ) {
 	if( !m_reloadRequestMask ) {
 		return;
 	}
@@ -100,7 +101,7 @@ void NativelyDrawnImage::reloadIfNeeded( int pixelsPerLogicalUnit ) {
 	const QByteArray nameBytes( m_materialName.toUtf8() );
 
 	if( !m_material ) {
-		m_material = R_CreateExplicitlyManaged2DMaterial();
+		m_material = renderSystem->createExplicitlyManaged2DMaterial();
 	}
 
 	ImageOptions options;
@@ -114,7 +115,7 @@ void NativelyDrawnImage::reloadIfNeeded( int pixelsPerLogicalUnit ) {
 		options.borderWidth = pixelsPerLogicalUnit * wsw::clamp( m_borderWidth, 0, minSide / 2 - 1 );
 	}
 
-	m_isMaterialLoaded = R_UpdateExplicitlyManaged2DMaterialImage( m_material, nameBytes, options );
+	m_isMaterialLoaded = renderSystem->updateExplicitlyManaged2DMaterialImage( m_material, nameBytes, options );
 
 	const bool isLoaded = this->isLoaded();
 	if( wasLoaded != isLoaded ) {
@@ -123,19 +124,21 @@ void NativelyDrawnImage::reloadIfNeeded( int pixelsPerLogicalUnit ) {
 
 	int w = 0, h = 0;
 	if( isLoaded ) {
-		if( const auto maybeDimensions = R_GetShaderDimensions( m_material ) ) {
+		if( const auto maybeDimensions = renderSystem->getMaterialDimensions( m_material ) ) {
 			w = maybeDimensions->first / pixelsPerLogicalUnit;
 			h = maybeDimensions->second / pixelsPerLogicalUnit;
 		}
 	}
 	updateSourceSize( w, h );
+
+	m_createdByRenderSystem = renderSystem;
 }
 
-void NativelyDrawnImage::drawSelfNatively( int64_t, int64_t, int pixelsPerLogicalUnit ) {
-	reloadIfNeeded( pixelsPerLogicalUnit );
+void NativelyDrawnImage::drawSelfNatively( RenderSystem *renderSystem, int64_t, int64_t, int pixelsPerLogicalUnit ) {
+	reloadIfNeeded( renderSystem, pixelsPerLogicalUnit );
 
 	if( isLoaded() ) {
-		wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
+		DECLARE_SCOPED_DRAW_2D_REQUEST( request, renderSystem );
 
 		const float opacity = QQmlProperty::read( m_selfAsItem, "opacity" ).toFloat();
 		const vec4_t color {
@@ -165,7 +168,7 @@ void NativelyDrawnImage::drawSelfNatively( int64_t, int64_t, int pixelsPerLogica
 			request->drawStretchPic( x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color, m_material );
 		}
 
-		CommitDraw2DRequest( request.get() );
+		renderSystem->commitDraw2DRequest( request.get() );
 	}
 }
 
@@ -268,14 +271,14 @@ bool NativelyDrawnModel::isLoaded() const {
 	return m_model != nullptr;
 }
 
-void NativelyDrawnModel::reloadIfNeeded() {
+void NativelyDrawnModel::reloadIfNeeded( RenderSystem *renderSystem ) {
 	if( m_reloadRequestMask ) {
 		m_transitionScale = 0.0f;
 	}
 
 	if( m_reloadRequestMask & ReloadModel ) {
 		const bool wasLoaded = m_model != nullptr;
-		m_model = R_RegisterModel( m_modelName.toUtf8().constData() );
+		m_model = renderSystem->registerModel( m_modelName.toUtf8().constData() );
 		const bool isLoaded = m_model != nullptr;
 		if( wasLoaded != isLoaded ) {
 			Q_EMIT isLoadedChanged( isLoaded );
@@ -283,7 +286,7 @@ void NativelyDrawnModel::reloadIfNeeded() {
 	}
 
 	if( m_reloadRequestMask & ReloadSkin ) {
-		m_skinFile = R_RegisterSkinFile( m_skinName.toUtf8().constData() );
+		m_skinFile = renderSystem->registerSkinFile( m_skinName.toUtf8().constData() );
 	}
 
 	m_reloadRequestMask = 0;
@@ -308,8 +311,8 @@ static inline void setByteColorFromQColor( uint8_t *byteColor, const QColor &col
 	byteColor[3] = (uint8_t)( color.alphaF() * 255.0 );
 }
 
-void NativelyDrawnModel::drawSelfNatively( int64_t, int64_t timeDelta, int pixelsPerLogicalUnit ) {
-	reloadIfNeeded();
+void NativelyDrawnModel::drawSelfNatively( RenderSystem *renderSystem, int64_t, int64_t timeDelta, int pixelsPerLogicalUnit ) {
+	reloadIfNeeded( renderSystem );
 
 	if( !m_model ) {
 		return;
@@ -366,7 +369,7 @@ void NativelyDrawnModel::drawSelfNatively( int64_t, int64_t timeDelta, int pixel
 	// Hacks to show player models with approximately the same height
 	if( m_desiredModelHeight > 0 ) {
 		vec3_t modelMins, modelMaxs;
-		R_ModelFrameBounds( m_model, 0, modelMins, modelMaxs );
+		renderSystem->getModelFrameBounds( m_model, 0, modelMins, modelMaxs );
 		if( const float modelHeight = modelMaxs[2] - modelMins[2]; height > 0 ) {
 			entity.scale = (float)m_desiredModelHeight / modelHeight;
 		}
@@ -387,13 +390,12 @@ void NativelyDrawnModel::drawSelfNatively( int64_t, int64_t timeDelta, int pixel
 		Matrix3_Copy( axis_identity, entity.axis );
 	}
 
-	BeginDrawingScenes();
-	[[maybe_unused]] volatile wsw::ScopeExitAction callEndDrawingScenes( &EndDrawingScenes );
-	DrawSceneRequest *drawSceneRequest = CreateDrawSceneRequest( refdef );
+	renderSystem->beginDrawingScenes();
+	[[maybe_unused]] volatile wsw::ScopeExitAction callEndDrawingScenes( [&]() { renderSystem->endDrawingScenes(); } );
+	DrawSceneRequest *drawSceneRequest = renderSystem->createDrawSceneRequest( refdef );
 	CG_SetBoneposesForTemporaryEntity( &entity );
 	drawSceneRequest->addEntity( &entity );
-	ExecuteSingleDrawSceneRequestNonSpeedCritical( drawSceneRequest );
-	EndDrawingScenes();
+	renderSystem->executeSingleDrawSceneRequestNonSpeedCritical( drawSceneRequest );
 }
 
 }

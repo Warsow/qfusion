@@ -483,11 +483,11 @@ void SCR_BeginLoadingPlaque( void );
 void SCR_EndLoadingPlaque( void );
 void SCR_RunConsole( int msec );
 void SCR_CloseConsole();
-void SCR_RegisterConsoleMedia( void );
-void SCR_ShutDownConsoleMedia( void );
-qfontface_t *SCR_RegisterFont( const char *family, int style, unsigned int size );
+void SCR_RegisterConsoleMedia( RenderSystem * );
+void SCR_ShutDownConsoleMedia( RenderSystem * );
+qfontface_t *SCR_RegisterFont( RenderSystem *, const char *family, int style, unsigned int size );
 size_t SCR_FontHeight( qfontface_t *font );
-size_t SCR_strWidth( const char *str, qfontface_t *font, size_t maxlen, int flags = 0 );
+size_t SCR_strWidth( RenderSystem *, const char *str, qfontface_t *font, size_t maxlen, int flags = 0 );
 
 #define ALIGN_LEFT_TOP              0
 #define ALIGN_CENTER_TOP            1
@@ -499,16 +499,16 @@ size_t SCR_strWidth( const char *str, qfontface_t *font, size_t maxlen, int flag
 #define ALIGN_CENTER_BOTTOM         7
 #define ALIGN_RIGHT_BOTTOM          8
 
-int SCR_DrawString( Draw2DRequest *request, int x, int y, int align, const char *str, qfontface_t *font = nullptr, const float *color = colorWhite, int flags = 0 );
-int SCR_DrawString( Draw2DRequest *request, int x, int y, int align, const wsw::StringView &str, qfontface_t *font = nullptr, const float *color = colorWhite, int flags = 0 );
-void SCR_DrawClampString( Draw2DRequest *request, int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags = 0 );
-void SCR_DrawRawChar( Draw2DRequest *request, int x, int y, wchar_t num, qfontface_t *font, const vec4_t color );
-void SCR_DrawFillRect( Draw2DRequest *request, int x, int y, int w, int h, const vec4_t color );
+int SCR_DrawString( RenderSystem *, Draw2DRequest *, int x, int y, int align, const char *str, qfontface_t *font = nullptr, const float *color = colorWhite, int flags = 0 );
+int SCR_DrawString( RenderSystem *, Draw2DRequest *, int x, int y, int align, const wsw::StringView &str, qfontface_t *font = nullptr, const float *color = colorWhite, int flags = 0 );
+void SCR_DrawClampString( RenderSystem *, Draw2DRequest *, int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags = 0 );
+void SCR_DrawRawChar( RenderSystem *, Draw2DRequest *, int x, int y, wchar_t num, qfontface_t *font, const vec4_t color );
+void SCR_DrawFillRect( Draw2DRequest *, int x, int y, int w, int h, const vec4_t color );
 
 void CL_ProfilerHud_Init();
 void CL_ProfilerHud_Shutdown();
 void CL_ProfilerHud_Update( int gameMsec, int realMsec );
-void CL_ProfilerHud_Draw( unsigned width, unsigned height );
+void CL_ProfilerHud_Draw( RenderSystem *renderSystem, unsigned width, unsigned height );
 
 namespace wsw {
 class ProfilerArgsSupplier;

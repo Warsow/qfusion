@@ -63,7 +63,7 @@ size_t FTLIB_FontHeight( qfontface_t *font ) {
 * FTLIB_strWidth
 * doesn't count invisible characters. Counts up to given length, if any.
 */
-size_t FTLIB_StringWidth( const char *str, qfontface_t *font, size_t maxlen, int flags ) {
+size_t FTLIB_StringWidth( RenderSystem *renderSystem, const char *str, qfontface_t *font, size_t maxlen, int flags ) {
 	const char *s = str, *olds;
 	size_t width = 0;
 	wchar_t num, prev_num = 0;
@@ -100,7 +100,7 @@ size_t FTLIB_StringWidth( const char *str, qfontface_t *font, size_t maxlen, int
 				}
 
 				if( !glyph->shader ) {
-					renderString( font, olds );
+					renderString( renderSystem, font, olds );
 				}
 
 				if( prev_num && hasKerning ) {
@@ -131,7 +131,7 @@ size_t FTLIB_StringWidth( const char *str, qfontface_t *font, size_t maxlen, int
 * FTLIB_StrlenForWidth
 * returns the len allowed for the string to fit inside a given width when using a given font.
 */
-size_t FTLIB_StrlenForWidth( const char *str, qfontface_t *font, size_t maxwidth, int flags ) {
+size_t FTLIB_StrlenForWidth( RenderSystem *renderSystem, const char *str, qfontface_t *font, size_t maxwidth, int flags ) {
 	const char *s, *olds;
 	size_t width = 0;
 	int gc;
@@ -169,7 +169,7 @@ size_t FTLIB_StrlenForWidth( const char *str, qfontface_t *font, size_t maxwidth
 			}
 
 			if( !glyph->shader ) {
-				renderString( font, olds );
+				renderString( renderSystem, font, olds );
 			}
 
 			advance = glyph->x_advance;
@@ -251,7 +251,7 @@ size_t FTLIB_FontXHeight( qfontface_t *font ) {
 * It can be clipped to the top of the screen to allow the console to be
 * smoothly scrolled off.
 */
-void FTLIB_DrawRawChar( Draw2DRequest *request, int x, int y, wchar_t num, qfontface_t *font, const vec4_t color ) {
+void FTLIB_DrawRawChar( RenderSystem *renderSystem, Draw2DRequest *request, int x, int y, wchar_t num, qfontface_t *font, const vec4_t color ) {
 	qglyph_t *glyph;
 
 	if( ( num <= ' ' ) || !font || ( y <= -font->height ) ) {
@@ -265,7 +265,7 @@ void FTLIB_DrawRawChar( Draw2DRequest *request, int x, int y, wchar_t num, qfont
 	}
 
 	if( !glyph->shader ) {
-		font->f->renderString( font, Q_WCharToUtf8Char( num ) );
+		font->f->renderString( renderSystem, font, Q_WCharToUtf8Char( num ) );
 	}
 
 	if( !glyph->width || !glyph->height ) {
@@ -284,7 +284,7 @@ void FTLIB_DrawRawChar( Draw2DRequest *request, int x, int y, wchar_t num, qfont
 * Draws one graphics character with 0 being transparent.
 * Clipped to [xmin, ymin; xmax, ymax].
 */
-void FTLIB_DrawClampChar( Draw2DRequest *request, int x, int y, wchar_t num, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color ) {
+void FTLIB_DrawClampChar( RenderSystem *renderSystem, Draw2DRequest *request, int x, int y, wchar_t num, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color ) {
 	qglyph_t *glyph;
 	int x2, y2;
 	float s1 = 0.0f, t1 = 0.0f, s2 = 1.0f, t2 = 1.0f;
@@ -301,7 +301,7 @@ void FTLIB_DrawClampChar( Draw2DRequest *request, int x, int y, wchar_t num, int
 	}
 
 	if( !glyph->shader ) {
-		font->f->renderString( font, Q_WCharToUtf8Char( num ) );
+		font->f->renderString( renderSystem, font, Q_WCharToUtf8Char( num ) );
 	}
 
 	if( !glyph->width || !glyph->height ) {
@@ -348,7 +348,7 @@ void FTLIB_DrawClampChar( Draw2DRequest *request, int x, int y, wchar_t num, int
 /*
 * FTLIB_DrawClampString
 */
-void FTLIB_DrawClampString( Draw2DRequest *request, int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags ) {
+void FTLIB_DrawClampString( RenderSystem *renderSystem, Draw2DRequest *request, int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, const vec4_t color, int flags ) {
 	int xoffset = 0;
 	vec4_t scolor;
 	int colorindex;
@@ -392,7 +392,7 @@ void FTLIB_DrawClampString( Draw2DRequest *request, int x, int y, const char *st
 			}
 
 			if( !glyph->shader ) {
-				renderString( font, olds );
+				renderString( renderSystem, font, olds );
 			}
 
 			if( prev_num ) {
@@ -406,7 +406,7 @@ void FTLIB_DrawClampString( Draw2DRequest *request, int x, int y, const char *st
 				break;
 			}
 
-			FTLIB_DrawClampChar( request, x + xoffset, y, num, xmin, ymin, xmax, ymax, font, scolor );
+			FTLIB_DrawClampChar( renderSystem, request, x + xoffset, y, num, xmin, ymin, xmax, ymax, font, scolor );
 
 			prev_num = num;
 			prev_glyph = glyph;
@@ -425,7 +425,7 @@ void FTLIB_DrawClampString( Draw2DRequest *request, int x, int y, const char *st
 * FTLIB_DrawRawString - Doesn't care about aligning. Returns drawn len.
 * It can stop when reaching maximum width when a value has been parsed.
 */
-size_t FTLIB_DrawRawString( Draw2DRequest *request, int x, int y, const char *str, size_t maxwidth, int *width, qfontface_t *font, const vec4_t color, int flags ) {
+size_t FTLIB_DrawRawString( RenderSystem *renderSystem, Draw2DRequest *request, int x, int y, const char *str, size_t maxwidth, int *width, qfontface_t *font, const vec4_t color, int flags ) {
 	unsigned int xoffset = 0;
 	vec4_t scolor;
 	const char *s, *olds;
@@ -465,7 +465,7 @@ size_t FTLIB_DrawRawString( Draw2DRequest *request, int x, int y, const char *st
 			}
 
 			if( !glyph->shader ) {
-				renderString( font, olds );
+				renderString( renderSystem, font, olds );
 			}
 
 			// ignore kerning at this point so the full width of the previous character will always be returned
@@ -478,7 +478,7 @@ size_t FTLIB_DrawRawString( Draw2DRequest *request, int x, int y, const char *st
 				xoffset += getKerning( font, prev_glyph, glyph );
 			}
 
-			FTLIB_DrawRawChar( request, x + xoffset, y, num, font, scolor );
+			FTLIB_DrawRawChar( renderSystem, request, x + xoffset, y, num, font, scolor );
 
 			xoffset += glyph->x_advance;
 

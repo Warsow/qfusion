@@ -30,16 +30,17 @@
 #define     CON_CASE_SENSITIVE 0
 
 struct qfontface_s;
+class RenderSystem;
 
 extern volatile bool con_initialized;
 
 void Con_CheckResize( void );
 void Con_Init( void );
 void Con_Shutdown( void );
-void Con_DrawConsole( unsigned width, unsigned height );
+void Con_DrawConsole( RenderSystem *renderSystem, unsigned width, unsigned height );
 void Con_Print( const char *txt );
 void Con_PrintSilent( const char *txt );
-void Con_DrawNotify( unsigned width, unsigned height );
+void Con_DrawNotify( RenderSystem *renderSystem, unsigned width, unsigned height );
 void Con_ClearNotify( void );
 void Con_ToggleConsole_f( const CmdArgs & );
 void Con_Close( void );

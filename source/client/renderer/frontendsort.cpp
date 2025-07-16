@@ -82,6 +82,8 @@ namespace wsw::ref {
 
 void Frontend::addAliasModelEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *aliasModelEntities,
 												std::span<const VisTestedModel> models, std::span<const uint16_t> indices ) {
+	MaterialCache *const materialCache = MaterialCache::instance();
+
 	for( const auto modelIndex: indices ) {
 		const VisTestedModel &__restrict visTestedModel = models[modelIndex];
 		const entity_t *const __restrict entity          = aliasModelEntities + visTestedModel.indexInEntitiesGroup;
@@ -102,7 +104,7 @@ void Frontend::addAliasModelEntitiesToSortList( StateForCamera *stateForCamera, 
 			const shader_t *shader = nullptr;
 
 			if( entity->customSkin ) {
-				shader = R_FindShaderForSkinFile( entity->customSkin, mesh->name );
+				shader = materialCache->findMeshMaterialInSkin( entity->customSkin, wsw::StringView( mesh->name ) );
 			} else if( entity->customShader ) {
 				shader = entity->customShader;
 			} else if( mesh->numskins ) {
@@ -128,6 +130,8 @@ void Frontend::addAliasModelEntitiesToSortList( StateForCamera *stateForCamera, 
 
 void Frontend::addSkeletalModelEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *skeletalModelEntities,
 												   std::span<const VisTestedModel> models, std::span<const uint16_t> indices ) {
+	MaterialCache *const materialCache = MaterialCache::instance();
+
 	for( const auto modelIndex: indices ) {
 		const VisTestedModel &__restrict visTestedModel = models[modelIndex];
 		const entity_t *const __restrict entity         = skeletalModelEntities + visTestedModel.indexInEntitiesGroup;
@@ -151,7 +155,7 @@ void Frontend::addSkeletalModelEntitiesToSortList( StateForCamera *stateForCamer
 			shader_t *shader = nullptr;
 
 			if( entity->customSkin ) {
-				shader = R_FindShaderForSkinFile( entity->customSkin, mesh->name );
+				shader = materialCache->findMeshMaterialInSkin( entity->customSkin, wsw::StringView( mesh->name ) );
 			} else if( entity->customShader ) {
 				shader = entity->customShader;
 			} else {

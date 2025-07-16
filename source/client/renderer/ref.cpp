@@ -148,62 +148,18 @@ extern cvar_t *cl_multithreading;
 static bool r_verbose;
 static bool r_postinit;
 
-#ifdef QGL_USE_CALL_WRAPPERS
+// Currently it's just a proxy for global function calls, so the lifecycle is trivial
+static RenderSystem g_renderSystem;
 
-QGLFunc *QGLFunc::listHead = nullptr;
-
-#ifdef QGL_VALIDATE_CALLS
-
-const char *QGLFunc::checkForError() {
-	// Never try to fetch errors for qglGetError itself
-	if ( !strcmp( name, "qglGetError" ) ) {
-		return nullptr;
-	}
-
-	if( strstr( name, "UniformLocation" ) ) {
-		return nullptr;
-	}
-
-	// Hacks: never try to fetch errors for qglBufferData().
-	// This is currently the only routine that has an additional custom error handling logic.
-	// We could try using something like `qglBufferData.unchecked().operator()(...`
-	// but this loses a structural compatibility with plain (unwrapped functions) code
-	if ( !strcmp( name, "qglBufferData" ) ) {
-		return nullptr;
-	}
-
-	// Get the underlying raw function pointer
-	typedef GLenum ( APIENTRY *GetErrorFn )();
-	switch( ( (GetErrorFn)qglGetError.address )() ) {
-		case GL_NO_ERROR:
-			return nullptr;
-		case GL_INVALID_ENUM:
-			return "GL_INVALID_ENUM";
-		case GL_INVALID_VALUE:
-			return "GL_INVALID_VALUE";
-		case GL_INVALID_OPERATION:
-			return "GL_INVALID_OPERATION";
-		case GL_INVALID_FRAMEBUFFER_OPERATION:
-			return "GL_INVALID_FRAMEBUFFER_OPERATION";
-		case GL_OUT_OF_MEMORY:
-			return "GL_OUT_OF_MEMORY";
-		case GL_STACK_UNDERFLOW:
-			return "GL_STACK_UNDERFLOW";
-		case GL_STACK_OVERFLOW:
-			return "GL_STACK_OVERFLOW";
-		default:
-			return "UNKNOWN";
-	}
+RenderSystem *RF_GetRenderSystem() {
+	return &g_renderSystem;
 }
-
-#endif
-#endif
 
 void R_InitCustomColors( void ) {
 	memset( rsh.customColors, 255, sizeof( rsh.customColors ) );
 }
 
-void R_SetCustomColor( int num, int r, int g, int b ) {
+void RenderSystem::setCustomColor( int num, int r, int g, int b ) {
 	if( num < 0 || num >= NUM_CUSTOMCOLORS ) {
 		return;
 	}
@@ -221,51 +177,6 @@ void R_ShutdownCustomColors( void ) {
 	memset( rsh.customColors, 255, sizeof( rsh.customColors ) );
 }
 
-mesh_vbo_t *R_InitNullModelVBO( void ) {
-	const vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_TEXCOORDS_BIT | VATTRIB_COLOR0_BIT;
-	mesh_vbo_s *vbo = R_CreateMeshVBO( &rf, 6, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
-	if( !vbo ) {
-		return NULL;
-	}
-
-	vec4_t xyz[6];
-	byte_vec4_t colors[6];
-
-	constexpr float scale = 15;
-	Vector4Set( xyz[0], 0, 0, 0, 1 );
-	Vector4Set( xyz[1], scale, 0, 0, 1 );
-	Vector4Set( colors[0], 255, 0, 0, 127 );
-	Vector4Set( colors[1], 255, 0, 0, 127 );
-
-	Vector4Set( xyz[2], 0, 0, 0, 1 );
-	Vector4Set( xyz[3], 0, scale, 0, 1 );
-	Vector4Set( colors[2], 0, 255, 0, 127 );
-	Vector4Set( colors[3], 0, 255, 0, 127 );
-
-	Vector4Set( xyz[4], 0, 0, 0, 1 );
-	Vector4Set( xyz[5], 0, 0, scale, 1 );
-	Vector4Set( colors[4], 0, 0, 255, 127 );
-	Vector4Set( colors[5], 0, 0, 255, 127 );
-
-	vec4_t normals[6] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
-	vec2_t texcoords[6] = { {0,0}, {0,1}, {0,0}, {0,1}, {0,0}, {0,1} };
-	elem_t elems[6] = { 0, 1, 2, 3, 4, 5 };
-
-	mesh_t mesh;
-	memset( &mesh, 0, sizeof( mesh ) );
-	mesh.numVerts = 6;
-	mesh.xyzArray = xyz;
-	mesh.normalsArray = normals;
-	mesh.stArray = texcoords;
-	mesh.colorsArray[0] = colors;
-	mesh.numElems = 6;
-	mesh.elems = elems;
-
-	R_UploadVBOVertexData( vbo, 0, vattribs, &mesh );
-	R_UploadVBOElemData( vbo, 0, 0, &mesh );
-
-	return vbo;
-}
 
 static shader_s g_externalTextureMaterialStorage[2];
 static shaderpass_t g_externalTextureMaterialPassStorage[2];
@@ -306,11 +217,11 @@ static shader_s *R_WrapExternalTextureHandle( GLuint externalTexNum, int storage
 	return s;
 }
 
-shader_s *R_WrapMenuTextureHandleInMaterial( unsigned externalTexNum ) {
+auto RenderSystem::wrapMenuTextureHandleInMaterial( unsigned externalTexNum ) -> shader_s * {
 	return R_WrapExternalTextureHandle( externalTexNum, 0 );
 }
 
-shader_s *R_WrapHudTextureHandleInMaterial( unsigned externalTexNum ) {
+auto RenderSystem::wrapHudTextureHandleInMaterial( unsigned externalTexNum ) -> shader_s * {
 	return R_WrapExternalTextureHandle( externalTexNum, 1 );
 }
 
@@ -319,9 +230,9 @@ static shaderpass_t g_miniviewMaterialPassStorage;
 
 static const wsw::HashedStringView kExternalMiniviewImage( "$miniviewimage" );
 
-shader_s *R_WrapMiniviewRenderTargetInMaterial( RenderTargetComponents *renderTarget ) {
+auto RenderSystem::wrapMiniviewRenderTargetInMaterial( RenderTargetComponents *renderTarget ) -> shader_s * {
 	// Currently all miniview render targets are shared
-	assert( renderTarget == GetMiniviewRenderTarget() );
+	//assert( renderTarget == GetMiniviewRenderTarget() );
 
 	shaderpass_t *const p = &g_miniviewMaterialPassStorage;
 	shader_t *const s     = &g_miniviewMaterialStorage;
@@ -342,31 +253,6 @@ shader_s *R_WrapMiniviewRenderTargetInMaterial( RenderTargetComponents *renderTa
 	p->program_type     = GLSL_PROGRAM_TYPE_NONE;
 
 	return s;
-}
-
-mesh_vbo_t *R_InitPostProcessingVBO( void ) {
-	const vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_TEXCOORDS_BIT;
-	mesh_vbo_t *vbo = R_CreateMeshVBO( &rf, 4, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
-	if( !vbo ) {
-		return NULL;
-	}
-
-	vec2_t texcoords[4] = { {0,1}, {1,1}, {1,0}, {0,0} };
-	elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
-	vec4_t xyz[4] = { {0,0,0,1}, {1,0,0,1}, {1,1,0,1}, {0,1,0,1} };
-
-	mesh_t mesh;
-	memset( &mesh, 0, sizeof( mesh ) );
-	mesh.numVerts = 4;
-	mesh.xyzArray = xyz;
-	mesh.stArray = texcoords;
-	mesh.numElems = 6;
-	mesh.elems = elems;
-
-	R_UploadVBOVertexData( vbo, 0, vattribs, &mesh );
-	R_UploadVBOElemData( vbo, 0, 0, &mesh );
-
-	return vbo;
 }
 
 void R_Finish() {
@@ -425,6 +311,267 @@ void R_SetWallFloorColors( const vec3_t wallColor, const vec3_t floorColor ) {
 	}
 }
 
+auto suggestNumExtraWorkerThreads( const SuggestNumWorkerThreadsArgs &args ) -> unsigned {
+	if( cl_multithreading->integer ) {
+		// This should be cheap to query as it's cached.
+		if( const auto maybeNumberOfProcessors = Sys_GetNumberOfProcessors() ) {
+			const auto numPhysicalProcessors = maybeNumberOfProcessors->first;
+			// Take the main thread into account as well (hence the +1)
+			if( numPhysicalProcessors > ( args.numExcludedCores + 1 ) ) {
+				// Disallow more than 3 worker threads.
+				return wsw::min<unsigned>( 3, numPhysicalProcessors - ( args.numExcludedCores + 1 ) );
+			}
+		}
+	}
+	return 0;
+}
+
+void RenderSystem::beginDrawingScenes() {
+	WSW_PROFILER_SCOPE();
+	wsw::ref::Frontend::instance()->beginDrawingScenes();
+}
+
+void RenderSystem::endDrawingScenes() {
+	WSW_PROFILER_SCOPE();
+	wsw::ref::Frontend::instance()->endDrawingScenes();
+}
+
+static std::optional<TaskSystem::ExecutionHandle> g_taskSystemExecutionHandle;
+
+auto RenderSystem::beginProcessingOfTasks() -> TaskSystem * {
+	WSW_PROFILER_SCOPE();
+
+	auto *result = wsw::ref::Frontend::instance()->getTaskSystem();
+	assert( !g_taskSystemExecutionHandle );
+
+	unsigned numAllowedExtraThreads = 0;
+	// The number of workers includes the main thread, so its always non-zero.
+	// Values greather than 1 indicate that we actually reserved extra worker threads.
+	// We don't return zero-based values as doing that is going to complicate the code
+	// which reserves thread-local stuff for workers.
+	if( const unsigned numWorkers = result->getNumberOfWorkers(); numWorkers > 1 ) {
+		// By default we reserve a single core for the sound backend,
+		// and also a core is always implicitly reserved for the main thread.
+		assert( ( SuggestNumWorkerThreadsArgs {} ).numExcludedCores == 1 );
+		assert( numWorkers == suggestNumExtraWorkerThreads( {} ) + 1 );
+		// Keep the same by default (numWorkers == number of allocated extra threads + 1)
+		numAllowedExtraThreads = numWorkers - 1;
+		// TODO: Use named constants here
+		// TODO: Use all available threads if there's no active bots on the server.
+		if( Com_ServerState() > 0 ) {
+			// If the builtin server is actually running, we have to reserve another core for it,
+			// so we activate fewer threads from the initially allocated pool
+			// for execution of frame tasks if the amount of available cores is insufficient.
+			// Note that another core is still implicitly reserved for the main thread as well.
+			numAllowedExtraThreads = suggestNumExtraWorkerThreads( { .numExcludedCores = 2 } );
+			assert( numAllowedExtraThreads <= numWorkers - 1 );
+		}
+	}
+
+	g_taskSystemExecutionHandle = result->startExecution( numAllowedExtraThreads );
+	return result;
+}
+
+void RenderSystem::endProcessingOfTasks() {
+	WSW_PROFILER_SCOPE();
+
+	const bool awaitResult = wsw::ref::Frontend::instance()->getTaskSystem()->awaitCompletion( g_taskSystemExecutionHandle.value() );
+	g_taskSystemExecutionHandle = std::nullopt;
+	if( !awaitResult ) {
+		wsw::failWithLogicError( "Failed to execute rendering tasks" );
+	}
+}
+
+auto RenderSystem::getMiniviewRenderTarget() -> RenderTargetComponents * {
+	return wsw::ref::Frontend::instance()->getMiniviewRenderTarget();
+}
+
+auto RenderSystem::getMiniviewRenderTargetTexture() -> unsigned {
+	static_assert( std::is_same_v<GLuint, unsigned> );
+	return wsw::ref::Frontend::instance()->getMiniviewRenderTarget()->texture->texnum;
+}
+
+auto RenderSystem::createDrawSceneRequest( const refdef_t &refdef ) -> DrawSceneRequest * {
+	WSW_PROFILER_SCOPE();
+	return wsw::ref::Frontend::instance()->createDrawSceneRequest( refdef );
+}
+
+auto RenderSystem::beginProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests ) -> TaskHandle {
+	return wsw::ref::Frontend::instance()->beginProcessingDrawSceneRequests( requests );
+}
+
+auto RenderSystem::endProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests, std::span<const TaskHandle> dependencies ) -> TaskHandle {
+	return wsw::ref::Frontend::instance()->endProcessingDrawSceneRequests( requests, dependencies );
+}
+
+void RenderSystem::commitProcessedDrawSceneRequest( DrawSceneRequest *request ) {
+	WSW_PROFILER_SCOPE();
+	wsw::ref::Frontend::instance()->commitProcessedDrawSceneRequest( request );
+}
+
+auto RenderSystem::createDraw2DRequest() -> Draw2DRequest * {
+	return wsw::ref::Frontend::instance()->createDraw2DRequest();
+}
+
+void RenderSystem::commitDraw2DRequest( Draw2DRequest *request ) {
+	wsw::ref::Frontend::instance()->commitDraw2DRequest( request );
+}
+
+void RenderSystem::recycleDraw2DRequest( Draw2DRequest *request ) {
+	wsw::ref::Frontend::instance()->recycleDraw2DRequest( request );
+}
+
+[[nodiscard]]
+static auto coPrepareDrawSceneRequest( CoroTask::StartInfo si, RenderSystem *system, DrawSceneRequest *request ) -> CoroTask {
+	co_await si.taskSystem->awaiterOf( system->beginProcessingDrawSceneRequests( { &request, 1 } ) );
+	co_await si.taskSystem->awaiterOf( system->endProcessingDrawSceneRequests( { &request, 1 }, {} ) );
+}
+
+void RenderSystem::executeSingleDrawSceneRequestNonSpeedCritical( DrawSceneRequest *request ) {
+	do {
+		TaskSystem *taskSystem = beginProcessingOfTasks();
+		[[maybe_unused]] volatile wsw::ScopeExitAction callEndProcessingOfTasks( [this]() { endProcessingOfTasks(); } );
+		(void)taskSystem->addCoro( [=,this]() {
+			return coPrepareDrawSceneRequest( { taskSystem, {}, CoroTask::OnlyMainThread }, this, request );
+		});
+	} while( false );
+	commitProcessedDrawSceneRequest( request );
+}
+
+void RenderSystem::getModelBounds( const model_s *model, float *mins, float *maxs ) {
+	R_ModelBounds( model, mins, maxs );
+}
+
+void RenderSystem::getModelFrameBounds( const model_s *model, int frame, float *mins, float *maxs ) {
+	R_ModelFrameBounds( model, frame, mins, maxs );
+}
+
+void RenderSystem::registerWorldModel( const char *model ) {
+	R_RegisterWorldModel( model );
+}
+
+auto RenderSystem::registerModel( const char *name ) -> model_s * {
+	return R_RegisterModel( name );
+}
+
+auto RenderSystem::getBoneInfo( const model_s *mod, int bonenum, char *name, size_t name_size, int *flags ) -> int {
+	return R_SkeletalGetBoneInfo( mod, bonenum, name, name_size, flags );
+}
+
+void RenderSystem::getBonePose( const model_s *mod, int bonenum, int frame, bonepose_t *bonepose ) {
+	R_SkeletalGetBonePose( mod, bonenum, frame, bonepose );
+}
+
+auto RenderSystem::getNumBones( const model_s *mod, int *numFrames ) -> int {
+	return R_SkeletalGetNumBones( mod, numFrames );
+}
+
+auto RenderSystem::registerPic( const char *name ) -> shader_s * {
+	return R_RegisterPic( name );
+}
+
+auto RenderSystem::registerRawAlphaMask( const char *name, int width, int height, const uint8_t *data ) -> shader_s * {
+	return R_RegisterRawAlphaMask( name, width, height, data );
+}
+
+auto RenderSystem::registerSkin( const char *name ) -> shader_s * {
+	return R_RegisterSkin( name );
+}
+
+auto RenderSystem::registerLinearPic( const char *name ) -> shader_s * {
+	return R_RegisterLinearPic( name );
+}
+
+void RenderSystem::replaceRawSubPic( shader_s *shader, int x, int y, int width, int height, const uint8_t *data ) {
+	R_ReplaceRawSubPic( shader, x, y, width, height, data );
+}
+
+auto RenderSystem::registerSkinFile( const char *name ) -> Skin * {
+	return R_RegisterSkinFile( name );
+}
+
+auto RenderSystem::createExplicitlyManaged2DMaterial() -> shader_s * {
+	return R_CreateExplicitlyManaged2DMaterial();
+}
+
+void RenderSystem::releaseExplicitlyManaged2DMaterial( shader_s *material ) {
+	R_ReleaseExplicitlyManaged2DMaterial( material );
+}
+
+bool RenderSystem::updateExplicitlyManaged2DMaterialImage( shader_s *material, const char *name, const ImageOptions &options ) {
+	return R_UpdateExplicitlyManaged2DMaterialImage( material, name, options );
+}
+
+auto RenderSystem::getMaterialDimensions( const shader_s *shader ) -> std::optional<std::pair<unsigned, unsigned>> {
+	return R_GetShaderDimensions( shader );
+}
+
+bool RenderSystem::transformVectorToViewport( const refdef_t *rd, const vec3_t in, vec2_t out ) {
+	if( !rd || !in || !out ) {
+		return false;
+	}
+
+	vec4_t temp;
+	temp[0] = in[0];
+	temp[1] = in[1];
+	temp[2] = in[2];
+	temp[3] = 1.0f;
+
+	mat4_t p;
+	if( rd->rdflags & RDF_USEORTHO ) {
+		Matrix4_OrthogonalProjection( rd->ortho_x, rd->ortho_x, rd->ortho_y, rd->ortho_y,
+									  -4096.0f, 4096.0f, p );
+	} else {
+		Matrix4_InfinitePerspectiveProjection( rd->fov_x, rd->fov_y, Z_NEAR, p, glConfig.depthEpsilon );
+	}
+
+	mat4_t m;
+	Matrix4_Modelview( rd->vieworg, rd->viewaxis, m );
+
+	vec4_t temp2;
+	Matrix4_Multiply_Vector( m, temp, temp2 );
+	Matrix4_Multiply_Vector( p, temp2, temp );
+
+	if( !temp[3] ) {
+		return false;
+	}
+
+	out[0] = (float)rd->x + ( temp[0] / temp[3] + 1.0f ) * (float)rd->width * 0.5f;
+	out[1] = (float)rd->height + (float)rd->y - ( temp[1] / temp[3] + 1.0f ) * (float)rd->height * 0.5f;
+	return true;
+}
+
+bool RenderSystem::lerpTag( orientation_t *orient, const model_t *mod, int oldframe, int frame, float lerpfrac, const char *name ) {
+	if( !orient ) {
+		return false;
+	}
+
+	VectorClear( orient->origin );
+	Matrix3_Identity( orient->axis );
+
+	if( !name ) {
+		return false;
+	}
+
+	if( mod->type == mod_skeletal ) {
+		return R_SkeletalModelLerpTag( orient, (const mskmodel_t *)mod->extradata, oldframe, frame, lerpfrac, name );
+	}
+	if( mod->type == mod_alias ) {
+		return R_AliasModelLerpTag( orient, (const maliasmodel_t *)mod->extradata, oldframe, frame, lerpfrac, name );
+	}
+
+	return false;
+}
+
+void RenderSystem::traceAgainstBspWorld( VisualTrace *tr, const float *start, const float *end, int skipSurfMask ) {
+	R_TransformedTraceLine( tr, start, end, rsh.worldModel, vec3_origin, axis_identity, skipSurfMask );
+}
+
+void RenderSystem::traceAgainstBrushModel( VisualTrace *tr, const model_s *model, const float *origin,
+							 const float *axis, const float *start, const float *end, int skipSurfMask ) {
+	R_TransformedTraceLine( tr, start, end, model, origin, axis, skipSurfMask );
+}
+
 void R_BeginFrame( bool forceClear, int swapInterval ) {
 	WSW_PROFILER_SCOPE();
 
@@ -470,132 +617,6 @@ void R_EndFrame( void ) {
 	GLimp_EndFrame();
 
 	//assert( qglGetError() == GL_NO_ERROR );
-}
-
-void BeginDrawingScenes() {
-	WSW_PROFILER_SCOPE();
-	wsw::ref::Frontend::instance()->beginDrawingScenes();
-}
-
-auto suggestNumExtraWorkerThreads( const SuggestNumWorkerThreadsArgs &args ) -> unsigned {
-	if( cl_multithreading->integer ) {
-		// This should be cheap to query as it's cached.
-		if( const auto maybeNumberOfProcessors = Sys_GetNumberOfProcessors() ) {
-			const auto numPhysicalProcessors = maybeNumberOfProcessors->first;
-			// Take the main thread into account as well (hence the +1)
-			if( numPhysicalProcessors > ( args.numExcludedCores + 1 ) ) {
-				// Disallow more than 3 worker threads.
-				return wsw::min<unsigned>( 3, numPhysicalProcessors - ( args.numExcludedCores + 1 ) );
-			}
-		}
-	}
-	return 0;
-}
-
-static std::optional<TaskSystem::ExecutionHandle> g_taskSystemExecutionHandle;
-
-TaskSystem *BeginProcessingOfTasks() {
-	WSW_PROFILER_SCOPE();
-
-	auto *result = wsw::ref::Frontend::instance()->getTaskSystem();
-	assert( !g_taskSystemExecutionHandle );
-
-	unsigned numAllowedExtraThreads = 0;
-	// The number of workers includes the main thread, so its always non-zero.
-	// Values greather than 1 indicate that we actually reserved extra worker threads.
-	// We don't return zero-based values as doing that is going to complicate the code
-	// which reserves thread-local stuff for workers.
-	if( const unsigned numWorkers = result->getNumberOfWorkers(); numWorkers > 1 ) {
-		// By default we reserve a single core for the sound backend,
-		// and also a core is always implicitly reserved for the main thread.
-		assert( ( SuggestNumWorkerThreadsArgs {} ).numExcludedCores == 1 );
-		assert( numWorkers == suggestNumExtraWorkerThreads( {} ) + 1 );
-		// Keep the same by default (numWorkers == number of allocated extra threads + 1)
-		numAllowedExtraThreads = numWorkers - 1;
-		// TODO: Use named constants here
-		// TODO: Use all available threads if there's no active bots on the server.
-		if( Com_ServerState() > 0 ) {
-			// If the builtin server is actually running, we have to reserve another core for it,
-			// so we activate fewer threads from the initially allocated pool
-			// for execution of frame tasks if the amount of available cores is insufficient.
-			// Note that another core is still implicitly reserved for the main thread as well.
-			numAllowedExtraThreads = suggestNumExtraWorkerThreads( { .numExcludedCores = 2 } );
-			assert( numAllowedExtraThreads <= numWorkers - 1 );
-		}
-	}
-
-	g_taskSystemExecutionHandle = result->startExecution( numAllowedExtraThreads );
-	return result;
-}
-
-void EndProcessingOfTasks() {
-	WSW_PROFILER_SCOPE();
-
-	const bool awaitResult = wsw::ref::Frontend::instance()->getTaskSystem()->awaitCompletion( g_taskSystemExecutionHandle.value() );
-	g_taskSystemExecutionHandle = std::nullopt;
-	if( !awaitResult ) {
-		wsw::failWithLogicError( "Failed to execute rendering tasks" );
-	}
-}
-
-RenderTargetComponents *GetMiniviewRenderTarget() {
-	return wsw::ref::Frontend::instance()->getMiniviewRenderTarget();
-}
-
-unsigned GetMiniviewRenderTargetTexture() {
-	return wsw::ref::Frontend::instance()->getMiniviewRenderTarget()->texture->texnum;
-}
-
-DrawSceneRequest *CreateDrawSceneRequest( const refdef_t &refdef ) {
-	WSW_PROFILER_SCOPE();
-	return wsw::ref::Frontend::instance()->createDrawSceneRequest( refdef );
-}
-
-TaskHandle BeginProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests ) {
-	return wsw::ref::Frontend::instance()->beginProcessingDrawSceneRequests( requests );
-}
-
-TaskHandle EndProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests, std::span<const TaskHandle> dependencies ) {
-	return wsw::ref::Frontend::instance()->endProcessingDrawSceneRequests( requests, dependencies );
-}
-
-void CommitProcessedDrawSceneRequest( DrawSceneRequest *request ) {
-	WSW_PROFILER_SCOPE();
-	wsw::ref::Frontend::instance()->commitProcessedDrawSceneRequest( request );
-}
-
-void EndDrawingScenes() {
-	WSW_PROFILER_SCOPE();
-	wsw::ref::Frontend::instance()->endDrawingScenes();
-}
-
-Draw2DRequest *CreateDraw2DRequest() {
-	return wsw::ref::Frontend::instance()->createDraw2DRequest();
-}
-
-void CommitDraw2DRequest( Draw2DRequest *request ) {
-	wsw::ref::Frontend::instance()->commitDraw2DRequest( request );
-}
-
-void RecycleDraw2DRequest( Draw2DRequest *request ) {
-	wsw::ref::Frontend::instance()->recycleDraw2DRequest( request );
-}
-
-[[nodiscard]]
-static auto coPrepareDrawSceneRequest( CoroTask::StartInfo si, DrawSceneRequest *drawSceneRequest ) -> CoroTask {
-	co_await si.taskSystem->awaiterOf( BeginProcessingDrawSceneRequests( { &drawSceneRequest, 1 } ) );
-	co_await si.taskSystem->awaiterOf( EndProcessingDrawSceneRequests( { &drawSceneRequest, 1 }, {} ) );
-}
-
-void ExecuteSingleDrawSceneRequestNonSpeedCritical( DrawSceneRequest *request ) {
-	do {
-		TaskSystem *taskSystem = BeginProcessingOfTasks();
-		[[maybe_unused]] volatile wsw::ScopeExitAction callEndProcessingOfTasks( &EndProcessingOfTasks );
-		(void)taskSystem->addCoro( [=]() {
-			return coPrepareDrawSceneRequest( { taskSystem, {}, CoroTask::OnlyMainThread }, request );
-		});
-	} while( false );
-	CommitProcessedDrawSceneRequest( request );
 }
 
 void RF_AppActivate( bool active, bool minimize, bool destroy ) {
@@ -682,75 +703,14 @@ void RF_EndRegistration( void ) {
 	RB_EndRegistration();
 }
 
-const char *RF_GetSpeedsMessage( char *out, size_t size ) {
-	Q_strncpyz( out, rf.speedsMsg, size );
-	return out;
-}
-
 int RF_GetAverageFrametime( void ) {
 	return rf.frameTime.average;
-}
-
-bool RF_TransformVectorToViewport( const refdef_t *rd, const vec3_t in, vec2_t out ) {
-	if( !rd || !in || !out ) {
-		return false;
-	}
-
-	vec4_t temp;
-	temp[0] = in[0];
-	temp[1] = in[1];
-	temp[2] = in[2];
-	temp[3] = 1.0f;
-
-	mat4_t p;
-	if( rd->rdflags & RDF_USEORTHO ) {
-		Matrix4_OrthogonalProjection( rd->ortho_x, rd->ortho_x, rd->ortho_y, rd->ortho_y,
-									  -4096.0f, 4096.0f, p );
-	} else {
-		Matrix4_InfinitePerspectiveProjection( rd->fov_x, rd->fov_y, Z_NEAR, p, glConfig.depthEpsilon );
-	}
-
-	mat4_t m;
-	Matrix4_Modelview( rd->vieworg, rd->viewaxis, m );
-
-	vec4_t temp2;
-	Matrix4_Multiply_Vector( m, temp, temp2 );
-	Matrix4_Multiply_Vector( p, temp2, temp );
-
-	if( !temp[3] ) {
-		return false;
-	}
-
-	out[0] = (float)rd->x + ( temp[0] / temp[3] + 1.0f ) * (float)rd->width * 0.5f;
-	out[1] = (float)rd->height + (float)rd->y - ( temp[1] / temp[3] + 1.0f ) * (float)rd->height * 0.5f;
-	return true;
-}
-
-bool RF_LerpTag( orientation_t *orient, const model_t *mod, int oldframe, int frame, float lerpfrac, const char *name ) {
-	if( !orient ) {
-		return false;
-	}
-
-	VectorClear( orient->origin );
-	Matrix3_Identity( orient->axis );
-
-	if( !name ) {
-		return false;
-	}
-
-	if( mod->type == mod_skeletal ) {
-		return R_SkeletalModelLerpTag( orient, (const mskmodel_t *)mod->extradata, oldframe, frame, lerpfrac, name );
-	}
-	if( mod->type == mod_alias ) {
-		return R_AliasModelLerpTag( orient, (const maliasmodel_t *)mod->extradata, oldframe, frame, lerpfrac, name );
-	}
-
-	return false;
 }
 
 static void R_InitVolatileAssets( void );
 static void R_DestroyVolatileAssets( void );
 
+[[nodiscard]]
 static bool isExtensionSupported( const char *ext ) {
 	GLint numExtensions;
 	qglGetIntegerv( GL_NUM_EXTENSIONS, &numExtensions );
@@ -1183,6 +1143,77 @@ rserr_t R_TrySettingMode( int x, int y, int width, int height, int displayFreque
 	return rserr_ok;
 }
 
+mesh_vbo_t *R_InitNullModelVBO( void ) {
+	const vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_TEXCOORDS_BIT | VATTRIB_COLOR0_BIT;
+	mesh_vbo_s *vbo = R_CreateMeshVBO( &rf, 6, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
+	if( !vbo ) {
+		return NULL;
+	}
+
+	vec4_t xyz[6];
+	byte_vec4_t colors[6];
+
+	constexpr float scale = 15;
+	Vector4Set( xyz[0], 0, 0, 0, 1 );
+	Vector4Set( xyz[1], scale, 0, 0, 1 );
+	Vector4Set( colors[0], 255, 0, 0, 127 );
+	Vector4Set( colors[1], 255, 0, 0, 127 );
+
+	Vector4Set( xyz[2], 0, 0, 0, 1 );
+	Vector4Set( xyz[3], 0, scale, 0, 1 );
+	Vector4Set( colors[2], 0, 255, 0, 127 );
+	Vector4Set( colors[3], 0, 255, 0, 127 );
+
+	Vector4Set( xyz[4], 0, 0, 0, 1 );
+	Vector4Set( xyz[5], 0, 0, scale, 1 );
+	Vector4Set( colors[4], 0, 0, 255, 127 );
+	Vector4Set( colors[5], 0, 0, 255, 127 );
+
+	vec4_t normals[6] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
+	vec2_t texcoords[6] = { {0,0}, {0,1}, {0,0}, {0,1}, {0,0}, {0,1} };
+	elem_t elems[6] = { 0, 1, 2, 3, 4, 5 };
+
+	mesh_t mesh;
+	memset( &mesh, 0, sizeof( mesh ) );
+	mesh.numVerts = 6;
+	mesh.xyzArray = xyz;
+	mesh.normalsArray = normals;
+	mesh.stArray = texcoords;
+	mesh.colorsArray[0] = colors;
+	mesh.numElems = 6;
+	mesh.elems = elems;
+
+	R_UploadVBOVertexData( vbo, 0, vattribs, &mesh );
+	R_UploadVBOElemData( vbo, 0, 0, &mesh );
+
+	return vbo;
+}
+
+mesh_vbo_t *R_InitPostProcessingVBO( void ) {
+	const vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_TEXCOORDS_BIT;
+	mesh_vbo_t *vbo = R_CreateMeshVBO( &rf, 4, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
+	if( !vbo ) {
+		return NULL;
+	}
+
+	vec2_t texcoords[4] = { {0,1}, {1,1}, {1,0}, {0,0} };
+	elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
+	vec4_t xyz[4] = { {0,0,0,1}, {1,0,0,1}, {1,1,0,1}, {0,1,0,1} };
+
+	mesh_t mesh;
+	memset( &mesh, 0, sizeof( mesh ) );
+	mesh.numVerts = 4;
+	mesh.xyzArray = xyz;
+	mesh.stArray = texcoords;
+	mesh.numElems = 6;
+	mesh.elems = elems;
+
+	R_UploadVBOVertexData( vbo, 0, vattribs, &mesh );
+	R_UploadVBOElemData( vbo, 0, 0, &mesh );
+
+	return vbo;
+}
+
 static void R_InitVolatileAssets() {
 	// init volatile data
 	R_InitSkeletalCache();
@@ -1278,3 +1309,54 @@ void R_Shutdown_( bool verbose ) {
 	// shutdown our QGL subsystem
 	QGL_Shutdown();
 }
+
+#ifdef QGL_USE_CALL_WRAPPERS
+
+QGLFunc *QGLFunc::listHead = nullptr;
+
+#ifdef QGL_VALIDATE_CALLS
+
+const char *QGLFunc::checkForError() {
+	// Never try to fetch errors for qglGetError itself
+	if ( !strcmp( name, "qglGetError" ) ) {
+		return nullptr;
+	}
+
+	if( strstr( name, "UniformLocation" ) ) {
+		return nullptr;
+	}
+
+	// Hacks: never try to fetch errors for qglBufferData().
+	// This is currently the only routine that has an additional custom error handling logic.
+	// We could try using something like `qglBufferData.unchecked().operator()(...`
+	// but this loses a structural compatibility with plain (unwrapped functions) code
+	if ( !strcmp( name, "qglBufferData" ) ) {
+		return nullptr;
+	}
+
+	// Get the underlying raw function pointer
+	typedef GLenum ( APIENTRY *GetErrorFn )();
+	switch( ( (GetErrorFn)qglGetError.address )() ) {
+		case GL_NO_ERROR:
+			return nullptr;
+		case GL_INVALID_ENUM:
+			return "GL_INVALID_ENUM";
+		case GL_INVALID_VALUE:
+			return "GL_INVALID_VALUE";
+		case GL_INVALID_OPERATION:
+			return "GL_INVALID_OPERATION";
+		case GL_INVALID_FRAMEBUFFER_OPERATION:
+			return "GL_INVALID_FRAMEBUFFER_OPERATION";
+		case GL_OUT_OF_MEMORY:
+			return "GL_OUT_OF_MEMORY";
+		case GL_STACK_UNDERFLOW:
+			return "GL_STACK_UNDERFLOW";
+		case GL_STACK_OVERFLOW:
+			return "GL_STACK_OVERFLOW";
+		default:
+			return "UNKNOWN";
+	}
+}
+
+#endif
+#endif

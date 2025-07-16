@@ -417,7 +417,7 @@ static bool CG_LoadPlayerModel( pmodelinfo_t *pmodelinfo, const char *filename )
 	}
 
 	pmodelinfo->model = CG_RegisterModel( scratch );
-	if( !R_SkeletalGetNumBones( pmodelinfo->model, NULL ) ) {
+	if( !cg.renderSystem->getNumBones( pmodelinfo->model, NULL ) ) {
 		// pmodels only accept skeletal models
 		pmodelinfo->model = NULL;
 		return false;
@@ -482,7 +482,7 @@ void CG_RegisterBasePModel( void ) {
 	cgs.basePModelInfo = CG_RegisterPlayerModel( filename );
 
 	Q_snprintfz( filename, sizeof( filename ), "%s/%s/%s", "models/players", DEFAULT_PLAYERMODEL, DEFAULT_PLAYERSKIN );
-	cgs.baseSkin = R_RegisterSkinFile( filename );
+	cgs.baseSkin = cg.renderSystem->registerSkinFile( filename );
 	if( !cgs.baseSkin ) {
 		CG_Error( "'Default Player Model'(%s): Skin (%s) failed to load", DEFAULT_PLAYERMODEL, filename );
 	}
@@ -514,7 +514,7 @@ bool CG_GrabTag( orientation_t *tag, entity_t *ent, const char *tagname ) {
 		return CG_SkeletalPoseGetAttachment( tag, skel, ent->boneposes, tagname );
 	}
 
-	return RF_LerpTag( tag, ent->model, ent->frame, ent->oldframe, ent->backlerp, tagname );
+	return cg.renderSystem->lerpTag( tag, ent->model, ent->frame, ent->oldframe, ent->backlerp, tagname );
 }
 
 /*

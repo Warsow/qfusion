@@ -18,6 +18,8 @@ struct AccuracyRows {
 	const Span strong;
 };
 
+class RenderSystem;
+
 namespace wsw { class StringView; }
 
 namespace wsw::cl { struct ChatMessage; }
@@ -37,10 +39,10 @@ public:
 	virtual void refreshProperties() = 0;
 	virtual void renderInternally() = 0;
 
-	virtual void drawBackgroundMapIfNeeded() = 0;
-	virtual void drawMenuPartInMainContext() = 0;
-	virtual void drawHudPartInMainContext() = 0;
-	virtual void drawCursorInMainContext() = 0;
+	virtual void drawBackgroundMapIfNeeded( RenderSystem *renderSystem ) = 0;
+	virtual void drawMenuPartInMainContext( RenderSystem *renderSystem ) = 0;
+	virtual void drawHudPartInMainContext( RenderSystem *renderSystem ) = 0;
+	virtual void drawCursorInMainContext( RenderSystem *renderSystem ) = 0;
 
 	virtual void runGCIfNeeded() = 0;
 

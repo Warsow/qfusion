@@ -163,10 +163,10 @@ public:
 	void refreshProperties() override;
 	void renderInternally() override;
 
-	void drawBackgroundMapIfNeeded() override;
-	void drawMenuPartInMainContext() override;
-	void drawHudPartInMainContext() override;
-	void drawCursorInMainContext() override;
+	void drawBackgroundMapIfNeeded( RenderSystem *renderSystem ) override;
+	void drawMenuPartInMainContext( RenderSystem *renderSystem ) override;
+	void drawHudPartInMainContext( RenderSystem *renderSystem ) override;
+	void drawCursorInMainContext( RenderSystem *renderSystem ) override;
 
 	void runGCIfNeeded() override;
 	void handleGCSafepoint( GCSafepointKind kind ) override;
@@ -1135,7 +1135,7 @@ QtUISystem::~QtUISystem() {
 
 	assert( !m_isInUIRenderingMode );
 	// Don't try recycling these resources upon restart in another context
-	NativelyDrawn::recycleResourcesInMainContext();
+	NativelyDrawn::recycleResourcesInMainContext( nullptr );
 }
 
 auto QtUISystem::createQmlSandbox( int logicalWidth, int logicalHeight, SandboxKind kind ) -> std::unique_ptr<QmlSandbox> {
@@ -1275,7 +1275,7 @@ void QtUISystem::leaveUIRenderingMode() {
 	}
 }
 
-void QtUISystem::drawMenuPartInMainContext() {
+void QtUISystem::drawMenuPartInMainContext( RenderSystem *renderSystem ) {
 	WSW_PROFILER_SCOPE();
 
 	if( m_menuSandbox && m_menuSandbox->m_hasValidFboContent ) {
@@ -1337,35 +1337,37 @@ void QtUISystem::drawMenuPartInMainContext() {
 		while( !m_nativelyDrawnUnderlayHeap.empty() ) {
 			wsw::pop_heap( m_nativelyDrawnUnderlayHeap.begin(), m_nativelyDrawnUnderlayHeap.end(), cmp );
 			// Note: each drawSelfNatively() call manages 2D/scene mode on its own
-			m_nativelyDrawnUnderlayHeap.back()->drawSelfNatively( timestamp, delta, m_pixelsPerLogicalUnit );
+			m_nativelyDrawnUnderlayHeap.back()->drawSelfNatively( renderSystem, timestamp, delta, m_pixelsPerLogicalUnit );
 			m_nativelyDrawnUnderlayHeap.pop_back();
 		}
 
-		NativelyDrawn::recycleResourcesInMainContext();
+		NativelyDrawn::recycleResourcesInMainContext( renderSystem );
 
 		// Don't blit initial FBO content
 		if( m_activeMenuMask || m_isShowingScoreboard ) {
-			shader_s *const material = R_WrapMenuTextureHandleInMaterial( m_menuSandbox->m_framebufferObject->texture() );
-			wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
+			const GLuint externalTexNum = m_menuSandbox->m_framebufferObject->texture();
+			shader_s *const material = renderSystem->wrapMenuTextureHandleInMaterial( externalTexNum );
+			DECLARE_SCOPED_DRAW_2D_REQUEST( request, renderSystem );
 			request->drawStretchPic( 0, 0, m_widthInPixels, m_heightInPixels, 0.0f, 1.0f, 1.0f, 0.0f, colorWhite, material );
-			CommitDraw2DRequest( request.get() );
+			renderSystem->commitDraw2DRequest( request.get() );
 		}
 
 		while( !m_nativelyDrawnOverlayHeap.empty() ) {
 			wsw::pop_heap( m_nativelyDrawnOverlayHeap.begin(), m_nativelyDrawnOverlayHeap.end(), cmp );
 			// Note: each drawSelfNatively() call manages 2D/scene mode on its own
-			m_nativelyDrawnOverlayHeap.back()->drawSelfNatively( timestamp, delta, m_pixelsPerLogicalUnit );
+			m_nativelyDrawnOverlayHeap.back()->drawSelfNatively( renderSystem, timestamp, delta, m_pixelsPerLogicalUnit );
 			m_nativelyDrawnOverlayHeap.pop_back();
 		}
 	}
 }
 
-void QtUISystem::drawHudPartInMainContext() {
+void QtUISystem::drawHudPartInMainContext( RenderSystem *renderSystem ) {
 	WSW_PROFILER_SCOPE();
 
 	if( m_hudSandbox && m_hudSandbox->m_hasValidFboContent ) {
 		if( m_isShowingHud || m_isShowingChatPopup || m_isShowingTeamChatPopup || m_isShowingActionRequests ) {
-			shader_s *const material = R_WrapHudTextureHandleInMaterial( m_hudSandbox->m_framebufferObject->texture() );
+			const GLuint externalTexNum = m_hudSandbox->m_framebufferObject->texture();
+			shader_s *const material    = renderSystem->wrapHudTextureHandleInMaterial( externalTexNum );
 
 			m_boundsOfDrawnHudItems.clear();
 			Q_EMIT displayedHudItemsRetrievalRequested();
@@ -1421,7 +1423,7 @@ void QtUISystem::drawHudPartInMainContext() {
 			}
 
 			// Draw grid cells which have been marked by items
-			wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
+			DECLARE_SCOPED_DRAW_2D_REQUEST( request, renderSystem );
 
 			const float rcpWindowWidth  = 1.0f / (float)windowWidth;
 			const float rcpWindowHeight = 1.0f / (float)windowHeight;
@@ -1494,28 +1496,28 @@ void QtUISystem::drawHudPartInMainContext() {
 				}
 			}
 
-			CommitDraw2DRequest( request.get() );
+			renderSystem->commitDraw2DRequest( request.get() );
 		}
 	}
 }
 
-void QtUISystem::drawCursorInMainContext() {
+void QtUISystem::drawCursorInMainContext( RenderSystem *renderSystem ) {
 	if( m_activeMenuMask || CG_UsesTiledView() ) {
-		wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> request( CreateDraw2DRequest() );
+		DECLARE_SCOPED_DRAW_2D_REQUEST( request, renderSystem );
 
 		// TODO: Handle precaching of resources properly
-		auto *cursorMaterial = R_RegisterPic( "gfx/ui/cursor.tga" );
+		auto *cursorMaterial = renderSystem->registerPic( "gfx/ui/cursor.tga" );
 
 		const auto x   = (int)m_mouseXY[0] * m_pixelsPerLogicalUnit;
 		const auto y   = (int)m_mouseXY[1] * m_pixelsPerLogicalUnit;
 		const int side = 32 * m_pixelsPerLogicalUnit;
 
 		request->drawStretchPic( x, y, side, side, 0.0f, 0.0f, 1.0f, 1.0f, colorWhite, cursorMaterial );
-		CommitDraw2DRequest( request.get() );
+		renderSystem->commitDraw2DRequest( request.get() );
 	}
 }
 
-void QtUISystem::drawBackgroundMapIfNeeded() {
+void QtUISystem::drawBackgroundMapIfNeeded( RenderSystem *renderSystem ) {
 	if( m_clientState != CA_DISCONNECTED ) {
 		m_hasStartedBackgroundMapLoading = false;
 		m_hasSucceededBackgroundMapLoading = false;
@@ -1523,10 +1525,10 @@ void QtUISystem::drawBackgroundMapIfNeeded() {
 	}
 
 	if( !m_hasStartedBackgroundMapLoading ) {
-		R_RegisterWorldModel( UI_BACKGROUND_MAP_PATH );
+		renderSystem->registerWorldModel( UI_BACKGROUND_MAP_PATH );
 		m_hasStartedBackgroundMapLoading = true;
 	} else if( !m_hasSucceededBackgroundMapLoading ) {
-		if( R_RegisterModel( UI_BACKGROUND_MAP_PATH ) ) {
+		if( renderSystem->registerModel( UI_BACKGROUND_MAP_PATH ) ) {
 			m_hasSucceededBackgroundMapLoading = true;
 		}
 	}
@@ -1560,9 +1562,9 @@ void QtUISystem::drawBackgroundMapIfNeeded() {
 	std::tie( rdf.scissor_x, rdf.scissor_y ) = std::make_pair( 0, 0 );
 	std::tie( rdf.scissor_width, rdf.scissor_height ) = widthAndHeight;
 
-	BeginDrawingScenes();
-	[[maybe_unused]] volatile wsw::ScopeExitAction callEndDrawingScenes( []() { EndDrawingScenes(); } );
-	ExecuteSingleDrawSceneRequestNonSpeedCritical( CreateDrawSceneRequest( rdf ) );
+	renderSystem->beginDrawingScenes();
+	[[maybe_unused]] volatile wsw::ScopeExitAction callEndDrawingScenes( [&]() { renderSystem->endDrawingScenes(); } );
+	renderSystem->executeSingleDrawSceneRequestNonSpeedCritical( renderSystem->createDrawSceneRequest( rdf ) );
 }
 
 void QtUISystem::runGCIfNeeded() {
