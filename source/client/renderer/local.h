@@ -1456,14 +1456,11 @@ void        R_AliasModelFrameBounds( const model_t *mod, int frame, vec3_t mins,
 #define MAX_SUPER_STYLES    128
 
 void        R_LightForOrigin( const vec3_t origin, vec3_t dir, vec4_t ambient, vec4_t diffuse, float radius, bool noWorldLight );
-void        R_BuildLightmaps( model_t *mod, int numLightmaps, int w, int h, const uint8_t *data, mlightmapRect_t *rects );
 void        R_InitLightStyles( model_t *mod );
 superLightStyle_t   *R_AddSuperLightStyle( model_t *mod, const int *lightmaps,
 										   const uint8_t *lightmapStyles, const uint8_t *vertexStyles, mlightmapRect_t **lmRects );
 void        R_SortSuperLightStyles( model_t *mod );
 void        R_TouchLightmapImages( model_t *mod );
-
-void        R_BatchCoronaSurf(  const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, unsigned int shadowBits, drawSurfaceType_t *drawSurf );
 
 //
 // r_main.c
@@ -1499,15 +1496,10 @@ int         R_LODForSphere( const vec3_t origin, float radius, const float *view
 struct mesh_vbo_s *R_InitNullModelVBO( void );
 struct mesh_vbo_s *R_InitPostProcessingVBO( void );
 
-void        R_TransformBounds( const vec3_t origin, const mat3_t axis, vec3_t mins, vec3_t maxs, vec3_t bbox[8] );
-
 void        R_InitCustomColors( void );
 int         R_GetCustomColor( int num );
 void        R_ShutdownCustomColors( void );
 
-void R_CopyOffsetElements( const elem_t *inelems, int numElems, int vertsOffset, elem_t *outelems );
-void R_CopyOffsetTriangles( const elem_t *inelems, int numElems, int vertsOffset, elem_t *outelems );
-void R_BuildTrifanElements( int vertsOffset, int numVerts, elem_t *elems );
 void R_BuildTangentVectors( int numVertexes, vec4_t *xyzArray, vec4_t *normalsArray, vec2_t *stArray,
 							int numTris, elem_t *elems, vec4_t *sVectorsArray );
 
@@ -1558,8 +1550,6 @@ struct SuggestNumWorkerThreadsArgs { unsigned numExcludedCores { 1 }; };
 auto suggestNumExtraWorkerThreads( const SuggestNumWorkerThreadsArgs &args ) -> unsigned;
 
 void        R_Shutdown_( bool verbose );
-
-bool    R_SurfPotentiallyVisible( const msurface_t *surf );
 
 void R_BrushModelBBox( const entity_t *e, vec3_t mins, vec3_t maxs, bool *rotated = nullptr );
 

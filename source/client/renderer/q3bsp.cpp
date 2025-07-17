@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <array>
 
 #include <common/helpers/parsecompat.h>
+#include <common/helpers/textstreamwriterextras.h>
 
 typedef struct {
 	vec3_t mins, maxs;
@@ -70,6 +71,14 @@ BRUSHMODEL LOADING
 
 static uint8_t *mod_base;
 static mbrushmodel_t *loadbmodel;
+
+#define MAX_LIGHTMAP_IMAGES     1024
+
+static uint8_t *r_lightmapBuffer;
+static int r_lightmapBufferSize;
+static Texture *r_lightmapTextures[MAX_LIGHTMAP_IMAGES];
+static int r_numUploadedLightmaps;
+static int r_maxLightmapBlockSize;
 
 /*
 * Mod_CheckDeluxemaps
@@ -139,6 +148,448 @@ static void Mod_CheckDeluxemaps( const lump_t *l, uint8_t *lmData ) {
 
 	mapConfig.deluxeMaps = true;
 	mapConfig.deluxeMappingEnabled = r_lighting_deluxemapping->integer ? true : false;
+}
+
+static void R_BuildLightmap( int w, int h, bool deluxe, const uint8_t *data, uint8_t *dest, int blockWidth, int samples ) {
+	if( !data || ( r_fullbright->integer && !deluxe ) ) {
+		const size_t stride = (unsigned)w * (unsigned)samples;
+		const int val = deluxe ? 127 : 255;
+		for( int y = 0; y < h; y++ ) {
+			memset( dest + y * blockWidth, val, stride );
+		}
+		return;
+	}
+
+	if( deluxe || !r_lighting_grayscale->integer ) { // samples == LIGHTMAP_BYTES in this case
+		const size_t stride = (unsigned)w * (unsigned)LIGHTMAP_BYTES;
+		uint8_t *rgba = dest;
+		for( int y = 0; y < h; y++ ) {
+			memcpy( rgba, data, stride );
+			data += stride;
+			rgba += blockWidth;
+		}
+		return;
+	}
+
+	if( r_lighting_grayscale->integer ) {
+		for( int y = 0; y < h; y++ ) {
+			uint8_t *rgba = dest + y * blockWidth;
+			for( int x = 0; x < w; x++ ) {
+				rgba[0] = bound( 0, ColorGrayscale( data ), 255 );
+				if( samples > 1 ) {
+					rgba[1] = rgba[0];
+					rgba[2] = rgba[0];
+				}
+				data += LIGHTMAP_BYTES;
+				rgba += samples;
+			}
+		}
+	} else {
+		for( int y = 0; y < h; y++ ) {
+			uint8_t *rgba = dest + y * blockWidth;
+			for( int x = 0; x < w; x++ ) {
+				rgba[0] = data[0];
+				if( samples > 1 ) {
+					rgba[1] = data[1];
+					rgba[2] = data[2];
+				}
+			}
+			data += LIGHTMAP_BYTES;
+			rgba += samples;
+		}
+	}
+}
+
+static int R_UploadLightmap( const char *name, uint8_t *data, int w, int h, int samples, bool deluxe ) {
+	if( !name || !data ) {
+		return r_numUploadedLightmaps;
+	}
+	if( r_numUploadedLightmaps == MAX_LIGHTMAP_IMAGES ) {
+		// not sure what I'm supposed to do here.. an unrealistic scenario
+		rWarning() << "r_numUploadedLightmaps == MAX_LIGHTMAP_IMAGES";
+		return 0;
+	}
+
+	r_lightmapTextures[r_numUploadedLightmaps] = TextureCache::instance()
+		->getUnderlyingFactory()->createLightmap( w, h, samples, data );
+
+	return r_numUploadedLightmaps++;
+}
+
+static int R_PackLightmaps( int num, int w, int h, int dataSize, int stride, int samples, bool deluxe,
+							const char *name, const uint8_t *data, mlightmapRect_t *rects ) {
+	const int maxX = r_maxLightmapBlockSize / w;
+	const int maxY = r_maxLightmapBlockSize / h;
+	const int max = wsw::min( maxX, maxY );
+
+	Com_DPrintf( "Packing %i lightmap(s) -> ", num );
+
+	if( !max || num == 1 || !mapConfig.lightmapsPacking ) {
+		// process as it is
+		R_BuildLightmap( w, h, deluxe, data, r_lightmapBuffer, w * samples, samples );
+
+		const int lightmapNum = R_UploadLightmap( name, r_lightmapBuffer, w, h, samples, deluxe );
+		if( rects ) {
+			rects[0].texNum = lightmapNum;
+			rects[0].texLayer = 0;
+
+			// this is not a real texture matrix, but who cares?
+			rects[0].texMatrix[0][0] = 1; rects[0].texMatrix[0][1] = 0;
+			rects[0].texMatrix[1][0] = 1; rects[0].texMatrix[1][1] = 0;
+		}
+
+		Com_DPrintf( "\n" );
+
+		return 1;
+	}
+
+	// find the nearest square block size
+	int root = ( int )sqrt( (float)num );
+	if( root > max ) {
+		root = max;
+	}
+
+	int i;
+	// keep row size a power of two
+	for( i = 1; i < root; i <<= 1 ) ;
+	if( i > root ) {
+		i >>= 1;
+	}
+	root = i;
+
+	num -= root * root;
+
+	int rectX = root;
+	int rectY = root;
+
+	if( maxY > maxX ) {
+		for(; ( num >= root ) && ( rectY < maxY ); rectY++, num -= root ) {
+		}
+
+		//if( !glConfig.ext.texture_non_power_of_two )
+		{
+			// sample down if not a power of two
+			int y;
+			for( y = 1; y < rectY; y <<= 1 ) ;
+			if( y > rectY ) {
+				y >>= 1;
+			}
+			rectY = y;
+		}
+	} else {
+		for(; ( num >= root ) && ( rectX < maxX ); rectX++, num -= root ) {
+		}
+
+		//if( !glConfig.ext.texture_non_power_of_two )
+		{
+			// sample down if not a power of two
+			int x;
+			for( x = 1; x < rectX; x <<= 1 ) ;
+			if( x > rectX ) {
+				x >>= 1;
+			}
+			rectX = x;
+		}
+	}
+
+	const int xStride = w * samples;
+	const int rectW = rectX * w;
+	const int rectH = rectY * h;
+	const int rectSize = rectW * rectH * samples * sizeof( *r_lightmapBuffer );
+	if( rectSize > r_lightmapBufferSize ) {
+		if( r_lightmapBuffer ) {
+			Q_free( r_lightmapBuffer );
+		}
+		r_lightmapBuffer = (uint8_t *)Q_malloc( rectSize );
+		memset( r_lightmapBuffer, 255, rectSize );
+		r_lightmapBufferSize = rectSize;
+	}
+
+	Com_DPrintf( "%ix%i : %ix%i\n", rectX, rectY, rectW, rectH );
+
+	uint8_t *block = r_lightmapBuffer;
+	double ty, tx;
+	int x, y;
+	mlightmapRect_t *rect;
+
+	double tw = 1.0 / (double)rectX;
+	double th = 1.0 / (double)rectY;
+
+	for( y = 0, ty = 0.0, num = 0, rect = rects; y < rectY; y++, ty += th, block += rectX * xStride * h ) {
+		for( x = 0, tx = 0.0; x < rectX; x++, tx += tw, num++, data += dataSize * stride ) {
+			const bool deluxeThisStep = mapConfig.deluxeMappingEnabled && ( ( num & 1 ) != 0 );
+			R_BuildLightmap( w, h, deluxeThisStep, data, block + x * xStride, rectX * xStride, samples );
+
+			// this is not a real texture matrix, but who cares?
+			if( rects ) {
+				rect->texMatrix[0][0] = (float)tw;
+				rect->texMatrix[0][1] = (float)tx;
+				rect->texMatrix[1][0] = (float)th;
+				rect->texMatrix[1][1] = (float)ty;
+				rect += stride;
+			}
+		}
+	}
+
+	const int lightmapNum = R_UploadLightmap( name, r_lightmapBuffer, rectW, rectH, samples, deluxe );
+	if( rects ) {
+		for( i = 0, rect = rects; i < num; i++, rect += stride ) {
+			rect->texNum = lightmapNum;
+			rect->texLayer = 0;
+		}
+	}
+
+	if( rectW > mapConfig.maxLightmapSize ) {
+		mapConfig.maxLightmapSize = rectW;
+	}
+	if( rectH > mapConfig.maxLightmapSize ) {
+		mapConfig.maxLightmapSize = rectH;
+	}
+
+	return num;
+}
+
+static void R_BuildLightmaps( model_t *mod, int numLightmaps, int w, int h, const uint8_t *data, mlightmapRect_t *rects ) {
+	mbrushmodel_t *loadbmodel = ( ( mbrushmodel_t * )mod->extradata );
+
+	const int samples = ( ( r_lighting_grayscale->integer && !mapConfig.deluxeMappingEnabled ) ? 1 : LIGHTMAP_BYTES );
+
+	const int layerWidth = w * ( 1 + ( int )mapConfig.deluxeMappingEnabled );
+	const int numBlocks = numLightmaps;
+
+	mapConfig.maxLightmapSize = 0;
+	mapConfig.lightmapArrays = false && mapConfig.lightmapsPacking
+							   && glConfig.ext.texture_array
+							   && ( glConfig.maxVertexAttribs > VATTRIB_LMLAYERS0123 )
+							   && ( glConfig.maxVaryingFloats >= ( 9 * 4 ) ) // 9th varying is required by material shaders
+							   && ( layerWidth <= glConfig.maxTextureSize ) && ( h <= glConfig.maxTextureSize );
+
+	int size;
+	if( mapConfig.lightmapArrays ) {
+		mapConfig.maxLightmapSize = layerWidth;
+
+		size = layerWidth * h;
+	} else {
+		if( !mapConfig.lightmapsPacking ) {
+			size = wsw::max( w, h );
+		} else {
+			for( size = 1; ( size < r_lighting_maxlmblocksize->integer )
+						   && ( size < glConfig.maxTextureSize ); size <<= 1 ) ;
+		}
+
+		if( mapConfig.deluxeMappingEnabled && ( ( size == w ) || ( size == h ) ) ) {
+			rWarning() << "Lightmap blocks larger than " << wsw::noSep( size ) << wsw::noSep( 'x' )
+					   << size << "aren't supported, deluxemaps will be disabled";
+			mapConfig.deluxeMappingEnabled = false;
+		}
+
+		r_maxLightmapBlockSize = size;
+
+		size = w * h;
+	}
+
+	r_lightmapBufferSize = size * samples;
+	r_lightmapBuffer = (uint8_t *)Q_malloc( r_lightmapBufferSize );
+	r_numUploadedLightmaps = 0;
+
+	if( mapConfig.lightmapArrays ) {
+		if( mapConfig.deluxeMaps ) {
+			numLightmaps /= 2;
+		}
+
+		float texScale = 1.0f;
+		if( mapConfig.deluxeMappingEnabled ) {
+			texScale = 0.5f;
+		}
+
+		int layer = 0;
+		int lightmapNum = 0;
+		mlightmapRect_t *rect = rects;
+		const int blockSize = w * h * LIGHTMAP_BYTES;
+		const int numLayers = wsw::min( glConfig.maxTextureLayers, 256 ); // layer index is a uint8_t
+		auto *const textureFactory = TextureCache::instance()->getUnderlyingFactory();
+		for( int i = 0; i < numLightmaps; i++ ) {
+			Texture *image = nullptr;
+			if( !layer ) {
+				if( r_numUploadedLightmaps == MAX_LIGHTMAP_IMAGES ) {
+					// not sure what I'm supposed to do here.. an unrealistic scenario
+					rWarning() << "r_numUploadedLightmaps == MAX_LIGHTMAP_IMAGES";
+					break;
+				}
+				lightmapNum = r_numUploadedLightmaps++;
+				unsigned numArrayLayers = ( ( i + numLayers ) <= numLightmaps ) ? numLayers : numLightmaps % numLayers;
+				image = textureFactory->createLightmapArray( layerWidth, h, numArrayLayers, samples );
+				r_lightmapTextures[lightmapNum] = image;
+			}
+
+			R_BuildLightmap( w, h, false, data, r_lightmapBuffer, layerWidth * samples, samples );
+			data += blockSize;
+
+			rect->texNum = lightmapNum;
+			rect->texLayer = layer;
+			// this is not a real texture matrix, but who cares?
+			rect->texMatrix[0][0] = texScale; rect->texMatrix[0][1] = 0.0f;
+			rect->texMatrix[1][0] = 1.0f; rect->texMatrix[1][1] = 0.0f;
+			++rect;
+
+			if( mapConfig.deluxeMappingEnabled ) {
+				R_BuildLightmap( w, h, true, data, r_lightmapBuffer + w * samples, layerWidth * samples, samples );
+			}
+
+			if( mapConfig.deluxeMaps ) {
+				data += blockSize;
+				++rect;
+			}
+
+			textureFactory->replaceLightmapLayer( image, layer, r_lightmapBuffer );
+
+			++layer;
+			if( layer == numLayers ) {
+				layer = 0;
+			}
+		}
+	} else {
+		int stride = 1;
+		int dataRowSize = size * LIGHTMAP_BYTES;
+
+		if( mapConfig.deluxeMaps && !mapConfig.deluxeMappingEnabled ) {
+			stride = 2;
+			numLightmaps /= 2;
+		}
+
+		int p;
+		for( int i = 0, j = 0; i < numBlocks; i += p * stride, j += p ) {
+			p = R_PackLightmaps( numLightmaps - j, w, h, dataRowSize, stride, samples,
+								 false, "*lm", data + j * dataRowSize * stride, &rects[i] );
+
+		}
+	}
+
+	if( r_lightmapBuffer ) {
+		Q_free( r_lightmapBuffer );
+	}
+
+	loadbmodel->lightmapImages = (Texture **)Q_malloc( sizeof( *loadbmodel->lightmapImages ) * r_numUploadedLightmaps );
+	memcpy( loadbmodel->lightmapImages, r_lightmapTextures,
+			sizeof( *loadbmodel->lightmapImages ) * r_numUploadedLightmaps );
+	loadbmodel->numLightmapImages = r_numUploadedLightmaps;
+
+	Com_DPrintf( "Packed %i lightmap blocks into %i texture(s)\n", numBlocks, r_numUploadedLightmaps );
+}
+
+void R_TouchLightmapImages( model_t *mod ) {
+	mbrushmodel_s *loadbmodel = ( ( mbrushmodel_t * )mod->extradata );
+
+	auto *const textureCache = TextureCache::instance();
+	for( unsigned i = 0; i < loadbmodel->numLightmapImages; i++ ) {
+		// TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		// TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		// TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		// TODO!!!!!!!!!!!!!!!!!!!!!!!! is the cache supposed to care of lightmaps?
+		textureCache->touchTexture( loadbmodel->lightmapImages[i], IMAGE_TAG_GENERIC );
+	}
+}
+
+void R_InitLightStyles( model_t *mod ) {
+	assert( mod );
+
+	mbrushmodel_t *loadbmodel = ( ( mbrushmodel_t * )mod->extradata );
+	loadbmodel->superLightStyles = (superLightStyle_t *)Q_malloc( sizeof( *loadbmodel->superLightStyles ) * MAX_LIGHTSTYLES );
+	loadbmodel->numSuperLightStyles = 0;
+
+	for( auto &lightStyle: lightStyles ) {
+		lightStyle.rgb[0] = 1;
+		lightStyle.rgb[1] = 1;
+		lightStyle.rgb[2] = 1;
+	}
+}
+
+superLightStyle_t *R_AddSuperLightStyle( model_t *mod, const int *lightmaps,
+										 const uint8_t *lightmapStyles, const uint8_t *vertexStyles, mlightmapRect_t **lmRects ) {
+	unsigned i, j;
+	superLightStyle_t *sls;
+	mbrushmodel_t *loadbmodel;
+
+	assert( mod );
+
+	loadbmodel = ( ( mbrushmodel_t * )mod->extradata );
+
+	for( i = 0, sls = loadbmodel->superLightStyles; i < loadbmodel->numSuperLightStyles; i++, sls++ ) {
+		for( j = 0; j < MAX_LIGHTMAPS; j++ )
+			if( sls->lightmapNum[j] != lightmaps[j] ||
+				sls->lightmapStyles[j] != lightmapStyles[j] ||
+				sls->vertexStyles[j] != vertexStyles[j] ) {
+				break;
+			}
+		if( j == MAX_LIGHTMAPS ) {
+			return sls;
+		}
+	}
+
+	if( loadbmodel->numSuperLightStyles == MAX_SUPER_STYLES ) {
+		Com_Error( ERR_DROP, "R_AddSuperLightStyle: r_numSuperLightStyles == MAX_SUPER_STYLES" );
+	}
+	loadbmodel->numSuperLightStyles++;
+
+	sls->vattribs = 0;
+	for( j = 0; j < MAX_LIGHTMAPS; j++ ) {
+		sls->lightmapNum[j] = lightmaps[j];
+		sls->lightmapStyles[j] = lightmapStyles[j];
+		sls->vertexStyles[j] = vertexStyles[j];
+
+		if( lmRects && lmRects[j] && ( lightmaps[j] != -1 ) ) {
+			sls->stOffset[j][0] = lmRects[j]->texMatrix[0][0];
+			sls->stOffset[j][1] = lmRects[j]->texMatrix[1][0];
+		} else {
+			sls->stOffset[j][0] = 0;
+			sls->stOffset[j][0] = 0;
+		}
+
+		if( lightmapStyles[j] != 255 ) {
+			sls->vattribs |= ( VATTRIB_LMCOORDS0_BIT << j );
+			if( mapConfig.lightmapArrays && !( j & 3 ) ) {
+				sls->vattribs |= VATTRIB_LMLAYERS0123_BIT << ( j >> 2 );
+			}
+		}
+	}
+
+	return sls;
+}
+
+static int R_SuperLightStylesCmp( superLightStyle_t *sls1, superLightStyle_t *sls2 ) {
+	for( int i = 0; i < MAX_LIGHTMAPS; i++ ) { // compare lightmaps
+		if( sls2->lightmapNum[i] > sls1->lightmapNum[i] ) {
+			return 1;
+		} else if( sls1->lightmapNum[i] > sls2->lightmapNum[i] ) {
+			return -1;
+		}
+	}
+
+	for( int i = 0; i < MAX_LIGHTMAPS; i++ ) { // compare lightmap styles
+		if( sls2->lightmapStyles[i] > sls1->lightmapStyles[i] ) {
+			return 1;
+		} else if( sls1->lightmapStyles[i] > sls2->lightmapStyles[i] ) {
+			return -1;
+		}
+	}
+
+	for( int i = 0; i < MAX_LIGHTMAPS; i++ ) { // compare vertex styles
+		if( sls2->vertexStyles[i] > sls1->vertexStyles[i] ) {
+			return 1;
+		} else if( sls1->vertexStyles[i] > sls2->vertexStyles[i] ) {
+			return -1;
+		}
+	}
+
+	return 0; // equal
+}
+
+void R_SortSuperLightStyles( model_t *mod ) {
+	assert( mod );
+
+	mbrushmodel_t *loadbmodel = ( ( mbrushmodel_t * )mod->extradata );
+	qsort( loadbmodel->superLightStyles, loadbmodel->numSuperLightStyles,
+		   sizeof( superLightStyle_t ), ( int ( * )( const void *, const void * ) )R_SuperLightStylesCmp );
 }
 
 /*

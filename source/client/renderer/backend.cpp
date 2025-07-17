@@ -661,6 +661,29 @@ void R_EndFrameUploads( unsigned group ) {
 	}
 }
 
+static void R_CopyOffsetElements( const elem_t *inelems, int numElems, int vertsOffset, elem_t *outelems ) {
+	for( int i = 0; i < numElems; i++, inelems++, outelems++ ) {
+		*outelems = vertsOffset + *inelems;
+	}
+}
+
+static void R_CopyOffsetTriangles( const elem_t *inelems, int numElems, int vertsOffset, elem_t *outelems ) {
+	const int numTris = numElems / 3;
+	for( int i = 0; i < numTris; i++, inelems += 3, outelems += 3 ) {
+		outelems[0] = vertsOffset + inelems[0];
+		outelems[1] = vertsOffset + inelems[1];
+		outelems[2] = vertsOffset + inelems[2];
+	}
+}
+
+static void R_BuildTrifanElements( int vertsOffset, int numVerts, elem_t *elems ) {
+	for( int i = 2; i < numVerts; i++, elems += 3 ) {
+		elems[0] = vertsOffset;
+		elems[1] = vertsOffset + i - 1;
+		elems[2] = vertsOffset + i;
+	}
+}
+
 void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
 						const struct mfog_s *fog, const struct portalSurface_s *portalSurface, unsigned shadowBits,
 						const struct mesh_s *mesh, int primitive, float x_offset, float y_offset ) {

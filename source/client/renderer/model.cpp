@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // r_model.c -- model loading and caching
 
 #include "local.h"
+#include "frontend.h"
 #include "iqm.h"
 
 #include "../../../third-party/recastnavigation/Recast/Include/Recast.h"
@@ -110,6 +111,30 @@ static inline uint8_t *Mod_ClusterVS( int cluster, dvis_t *vis ) {
 
 uint8_t *Mod_ClusterPVS( int cluster, model_t *model ) {
 	return Mod_ClusterVS( cluster, ( ( mbrushmodel_t * )model->extradata )->pvs );
+}
+
+static bool R_SurfPotentiallyVisible( const msurface_t *surf ) {
+	const shader_t *shader = surf->shader;
+	// Exclude old sky surfaces from rendering for now
+	if( surf->flags & ( SURF_NODRAW | SURF_SKY ) ) {
+		return false;
+	}
+	if( !surf->mesh.numVerts ) {
+		return false;
+	}
+	if( !shader ) {
+		return false;
+	}
+	return true;
+}
+
+bool R_SurfPotentiallyFragmented( const msurface_t *surf ) {
+	if( surf->flags & ( SURF_NOMARKS | SURF_NOIMPACT | SURF_NODRAW ) ) {
+		return false;
+	}
+	return ( ( surf->facetype == FACETYPE_PLANAR )
+			 || ( surf->facetype == FACETYPE_PATCH )
+		/* || (surf->facetype == FACETYPE_TRISURF)*/ );
 }
 
 class RecastPolyMeshBuilder {
@@ -1240,6 +1265,39 @@ static model_t *Mod_FindSlot( const char *name ) {
 	return &mod_known[mod_numknown++];
 }
 
+int R_LoadFile_( const char *path, int flags, void **buffer, const char *filename, int fileline ) {
+	uint8_t *buf = NULL; // quiet compiler warning
+
+	int fhandle = 0;
+	// look for it in the filesystem or pack files
+	unsigned len = FS_FOpenFile( path, &fhandle, FS_READ | flags );
+
+	if( !fhandle ) {
+		if( buffer ) {
+			*buffer = NULL;
+		}
+		return -1;
+	}
+
+	if( !buffer ) {
+		FS_FCloseFile( fhandle );
+		return len;
+	}
+
+	buf = ( uint8_t *)Q_malloc( len + 1 );
+	buf[len] = 0;
+	*buffer = buf;
+
+	FS_Read( buf, len, fhandle );
+	FS_FCloseFile( fhandle );
+
+	return len;
+}
+
+void R_FreeFile_( void *buffer, const char *filename, int fileline ) {
+	Q_free( buffer );
+}
+
 model_t *Mod_ForName( const char *name, bool crash ) {
 
 	if( !name[0] ) {
@@ -1495,5 +1553,305 @@ void R_ModelFrameBounds( const struct model_s *model, int frame, vec3_t mins, ve
 			default:
 				break;
 		}
+	}
+}
+
+void R_BrushModelBBox( const entity_t *e, vec3_t mins, vec3_t maxs, bool *rotated ) {
+	const model_t *model = e->model;
+
+	if( !Matrix3_Compare( e->axis, axis_identity ) ) {
+		if( rotated ) {
+			*rotated = true;
+		}
+		for( unsigned i = 0; i < 3; i++ ) {
+			mins[i] = e->origin[i] - model->radius * e->scale;
+			maxs[i] = e->origin[i] + model->radius * e->scale;
+		}
+	} else {
+		if( rotated ) {
+			*rotated = false;
+		}
+		VectorMA( e->origin, e->scale, model->mins, mins );
+		VectorMA( e->origin, e->scale, model->maxs, maxs );
+	}
+}
+
+int R_LODForSphere( const vec3_t origin, float radius, const float *viewOrigin, float fovLodScale, float viewLodScale ) {
+	assert( fovLodScale > 0.0f );
+	assert( viewLodScale > 0.0f && viewLodScale <= 1.0f );
+
+	float dist = DistanceFast( origin, viewOrigin );
+	// The tested distance should be larger for greater fovs
+	dist *= fovLodScale;
+	// The tested distance should be larger for smaller views
+	dist /= viewLodScale;
+
+	int lod = (int)( dist / radius );
+	if( r_lodscale->integer ) {
+		lod /= r_lodscale->integer;
+	}
+	lod += r_lodbias->integer;
+
+	if( lod < 1 ) {
+		return 0;
+	}
+	return lod;
+}
+
+void R_LightForOrigin( const vec3_t origin, vec3_t dir, vec4_t ambient, vec4_t diffuse, float radius, bool noWorldLight ) {
+	int i, j;
+	int k, s;
+	int vi[3], elem[4];
+	float t[8];
+	vec3_t vf, vf2, tdir;
+	vec3_t ambientLocal, diffuseLocal;
+	vec_t *gridSize, *gridMins;
+	int *gridBounds;
+	mgridlight_t lightarray[8];
+
+	VectorSet( ambientLocal, 0, 0, 0 );
+	VectorSet( diffuseLocal, 0, 0, 0 );
+
+	if( noWorldLight ) {
+		VectorSet( dir, 0.0f, 0.0f, 0.0f );
+		goto dynamic;
+	}
+	if( !rsh.worldModel || !rsh.worldBrushModel->lightgrid || !rsh.worldBrushModel->numlightgridelems ) {
+		VectorSet( dir, 0.1f, 0.2f, 0.7f );
+		goto dynamic;
+	}
+
+	gridSize = rsh.worldBrushModel->gridSize;
+	gridMins = rsh.worldBrushModel->gridMins;
+	gridBounds = rsh.worldBrushModel->gridBounds;
+
+	for( i = 0; i < 3; i++ ) {
+		vf[i] = ( origin[i] - gridMins[i] ) / gridSize[i];
+		vi[i] = (int)vf[i];
+		vf[i] = vf[i] - floor( vf[i] );
+		vf2[i] = 1.0f - vf[i];
+	}
+
+	elem[0] = vi[2] * gridBounds[3] + vi[1] * gridBounds[0] + vi[0];
+	elem[1] = elem[0] + gridBounds[0];
+	elem[2] = elem[0] + gridBounds[3];
+	elem[3] = elem[2] + gridBounds[0];
+
+	for( i = 0; i < 4; i++ ) {
+		lightarray[i * 2 + 0] = rsh.worldBrushModel->lightgrid[rsh.worldBrushModel->lightarray[bound( 0, elem[i] + 0,
+																									  (int)rsh.worldBrushModel->numlightarrayelems - 1 )]];
+		lightarray[i * 2 + 1] = rsh.worldBrushModel->lightgrid[rsh.worldBrushModel->lightarray[bound( 1, elem[i] + 1,
+																									  (int)rsh.worldBrushModel->numlightarrayelems - 1 )]];
+	}
+
+	t[0] = vf2[0] * vf2[1] * vf2[2];
+	t[1] = vf[0] * vf2[1] * vf2[2];
+	t[2] = vf2[0] * vf[1] * vf2[2];
+	t[3] = vf[0] * vf[1] * vf2[2];
+	t[4] = vf2[0] * vf2[1] * vf[2];
+	t[5] = vf[0] * vf2[1] * vf[2];
+	t[6] = vf2[0] * vf[1] * vf[2];
+	t[7] = vf[0] * vf[1] * vf[2];
+
+	VectorClear( dir );
+
+	for( i = 0; i < 4; i++ ) {
+		R_LatLongToNorm( lightarray[i * 2].direction, tdir );
+		VectorScale( tdir, t[i * 2], tdir );
+		for( k = 0; k < MAX_LIGHTMAPS && ( s = lightarray[i * 2].styles[k] ) != 255; k++ ) {
+			dir[0] += lightStyles[s].rgb[0] * tdir[0];
+			dir[1] += lightStyles[s].rgb[1] * tdir[1];
+			dir[2] += lightStyles[s].rgb[2] * tdir[2];
+		}
+
+		R_LatLongToNorm( lightarray[i * 2 + 1].direction, tdir );
+		VectorScale( tdir, t[i * 2 + 1], tdir );
+		for( k = 0; k < MAX_LIGHTMAPS && ( s = lightarray[i * 2 + 1].styles[k] ) != 255; k++ ) {
+			dir[0] += lightStyles[s].rgb[0] * tdir[0];
+			dir[1] += lightStyles[s].rgb[1] * tdir[1];
+			dir[2] += lightStyles[s].rgb[2] * tdir[2];
+		}
+	}
+
+	for( j = 0; j < 3; j++ ) {
+		if( ambient ) {
+			for( i = 0; i < 4; i++ ) {
+				for( k = 0; k < MAX_LIGHTMAPS; k++ ) {
+					if( ( s = lightarray[i * 2].styles[k] ) != 255 ) {
+						ambientLocal[j] += t[i * 2] * lightarray[i * 2].ambient[k][j] * lightStyles[s].rgb[j];
+					}
+					if( ( s = lightarray[i * 2 + 1].styles[k] ) != 255 ) {
+						ambientLocal[j] += t[i * 2 + 1] * lightarray[i * 2 + 1].ambient[k][j] * lightStyles[s].rgb[j];
+					}
+				}
+			}
+		}
+		if( diffuse || radius ) {
+			for( i = 0; i < 4; i++ ) {
+				for( k = 0; k < MAX_LIGHTMAPS; k++ ) {
+					if( ( s = lightarray[i * 2].styles[k] ) != 255 ) {
+						diffuseLocal[j] += t[i * 2] * lightarray[i * 2].diffuse[k][j] * lightStyles[s].rgb[j];
+					}
+					if( ( s = lightarray[i * 2 + 1].styles[k] ) != 255 ) {
+						diffuseLocal[j] += t[i * 2 + 1] * lightarray[i * 2 + 1].diffuse[k][j] * lightStyles[s].rgb[j];
+					}
+				}
+			}
+		}
+	}
+
+	// convert to grayscale
+	if( r_lighting_grayscale->integer ) {
+		vec_t grey;
+
+		if( ambient ) {
+			grey = ColorGrayscale( ambientLocal );
+			ambientLocal[0] = ambientLocal[1] = ambientLocal[2] = bound( 0, grey, 255 );
+		}
+
+		if( diffuse || radius ) {
+			grey = ColorGrayscale( diffuseLocal );
+			diffuseLocal[0] = diffuseLocal[1] = diffuseLocal[2] = bound( 0, grey, 255 );
+		}
+	}
+
+	dynamic:
+	// add dynamic lights
+	if( radius ) {
+		wsw::ref::Frontend::instance()->dynLightDirForOrigin( origin, radius, dir, diffuseLocal, ambientLocal );
+	}
+
+	VectorNormalizeFast( dir );
+
+	if( r_fullbright->integer ) {
+		VectorSet( ambientLocal, 1, 1, 1 );
+		VectorSet( diffuseLocal, 1, 1, 1 );
+	} else {
+		const float scale = ( 1 << mapConfig.overbrightBits ) / 255.0f;
+
+		for( i = 0; i < 3; i++ ) {
+			ambientLocal[i] = ambientLocal[i] * scale * bound( 0.0f, r_lighting_ambientscale->value, 1.0f );
+		}
+		ColorNormalize( ambientLocal, ambientLocal );
+
+		for( i = 0; i < 3; i++ ) {
+			diffuseLocal[i] = diffuseLocal[i] * scale * bound( 0.0f, r_lighting_directedscale->value, 1.0f );
+		}
+		ColorNormalize( diffuseLocal, diffuseLocal );
+	}
+
+	if( ambient ) {
+		VectorCopy( ambientLocal, ambient );
+		ambient[3] = 1.0f;
+	}
+
+	if( diffuse ) {
+		VectorCopy( diffuseLocal, diffuse );
+		diffuse[3] = 1.0f;
+	}
+}
+
+void R_NormToLatLong( const vec_t *normal, uint8_t latlong[2] ) {
+	float flatlong[2];
+
+	NormToLatLong( normal, flatlong );
+	latlong[0] = (int)( flatlong[0] * 255.0 / M_TWOPI ) & 255;
+	latlong[1] = (int)( flatlong[1] * 255.0 / M_TWOPI ) & 255;
+}
+
+void R_LatLongToNorm4( const uint8_t latlong[2], vec4_t out ) {
+	static float * const sinTable = rsh.sinTableByte;
+	float sin_a, sin_b, cos_a, cos_b;
+
+	cos_a = sinTable[( latlong[0] + 64 ) & 255];
+	sin_a = sinTable[latlong[0]];
+	cos_b = sinTable[( latlong[1] + 64 ) & 255];
+	sin_b = sinTable[latlong[1]];
+
+	Vector4Set( out, cos_b * sin_a, sin_b * sin_a, cos_a, 0 );
+}
+
+void R_LatLongToNorm( const uint8_t latlong[2], vec3_t out ) {
+	vec4_t t;
+	R_LatLongToNorm4( latlong, t );
+	VectorCopy( t, out );
+}
+
+void R_BuildTangentVectors( int numVertexes, vec4_t *xyzArray, vec4_t *normalsArray,
+							vec2_t *stArray, int numTris, elem_t *elems, vec4_t *sVectorsArray ) {
+	vec3_t stackTVectorsArray[128];
+	vec3_t *tVectorsArray;
+
+	if( numVertexes > sizeof( stackTVectorsArray ) / sizeof( stackTVectorsArray[0] ) ) {
+		tVectorsArray = (vec3_t *)Q_malloc( sizeof( vec3_t ) * numVertexes );
+	} else {
+		tVectorsArray = stackTVectorsArray;
+	}
+
+	// assuming arrays have already been allocated
+	// this also does some nice precaching
+	memset( sVectorsArray, 0, numVertexes * sizeof( *sVectorsArray ) );
+	memset( tVectorsArray, 0, numVertexes * sizeof( *tVectorsArray ) );
+
+	for( int i = 0; i < numTris; i++, elems += 3 ) {
+		float *v[3], *tc[3];
+		for( int j = 0; j < 3; j++ ) {
+			v[j] = ( float * )( xyzArray + elems[j] );
+			tc[j] = ( float * )( stArray + elems[j] );
+		}
+
+		vec3_t stvec[3];
+		// calculate two mostly perpendicular edge directions
+		VectorSubtract( v[1], v[0], stvec[0] );
+		VectorSubtract( v[2], v[0], stvec[1] );
+
+		vec3_t cross;
+		// we have two edge directions, we can calculate the normal then
+		CrossProduct( stvec[1], stvec[0], cross );
+
+		for( int j = 0; j < 3; j++ ) {
+			stvec[0][j] = ( ( tc[1][1] - tc[0][1] ) * ( v[2][j] - v[0][j] ) - ( tc[2][1] - tc[0][1] ) * ( v[1][j] - v[0][j] ) );
+			stvec[1][j] = ( ( tc[1][0] - tc[0][0] ) * ( v[2][j] - v[0][j] ) - ( tc[2][0] - tc[0][0] ) * ( v[1][j] - v[0][j] ) );
+		}
+
+		// inverse tangent vectors if their cross product goes in the opposite
+		// direction to triangle normal
+		CrossProduct( stvec[1], stvec[0], stvec[2] );
+		if( DotProduct( stvec[2], cross ) < 0 ) {
+			VectorInverse( stvec[0] );
+			VectorInverse( stvec[1] );
+		}
+
+		for( int j = 0; j < 3; j++ ) {
+			VectorAdd( sVectorsArray[elems[j]], stvec[0], sVectorsArray[elems[j]] );
+			VectorAdd( tVectorsArray[elems[j]], stvec[1], tVectorsArray[elems[j]] );
+		}
+	}
+
+	// normalize
+	float *s = *sVectorsArray, *t = *tVectorsArray, *n = *normalsArray;
+	for( int i = 0; i < numVertexes; i++ ) {
+		// keep s\t vectors perpendicular
+		float d = -DotProduct( s, n );
+		VectorMA( s, d, n, s );
+		VectorNormalize( s );
+
+		d = -DotProduct( t, n );
+		VectorMA( t, d, n, t );
+
+		vec3_t cross;
+		// store polarity of t-vector in the 4-th coordinate of s-vector
+		CrossProduct( n, s, cross );
+		if( DotProduct( cross, t ) < 0 ) {
+			s[3] = -1;
+		} else {
+			s[3] = 1;
+		}
+
+		s += 4, t += 3, n += 4;
+	}
+
+	if( tVectorsArray != stackTVectorsArray ) {
+		Q_free( tVectorsArray );
 	}
 }
