@@ -149,30 +149,6 @@ enum {
 //====================================================================
 
 typedef struct {
-	int _extMarker;
-
-	//
-	// only uint8_ts must follow the extensionsBoolMarker
-	//
-
-	char
-	texture_filter_anisotropic
-	,compressed_ETC1_RGB8_texture
-	,bgra
-	,gamma_control
-	,swap_control
-	,gpu_memory_info
-	,meminfo
-	,get_program_binary
-	,ES3_compatibility
-	,texture_array
-	,gpu_shader5
-	,multisample
-	,pixel_format
-	;
-} glextinfo_t;
-
-typedef struct {
 	const char      *rendererString;
 	const char      *vendorString;
 	const char      *versionString;
@@ -215,7 +191,11 @@ typedef struct {
 
 	bool sSRGB;
 
-	glextinfo_t ext;
+	struct {
+		bool texture_filter_anisotropic;
+		bool gpu_shader5;
+		bool multisample;
+	} ext;
 } glconfig_t;
 
 extern glconfig_t glConfig;

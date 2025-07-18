@@ -748,100 +748,8 @@ bool RF_LerpTag( orientation_t *orient, const model_t *mod, int oldframe, int fr
 	return false;
 }
 
-static void R_FinalizeGLExtensions( void );
-
 static void R_InitVolatileAssets( void );
 static void R_DestroyVolatileAssets( void );
-
-//=======================================================================
-
-#define GLINF_FOFS( x ) offsetof( glextinfo_t,x )
-#define GLINF_EXMRK() GLINF_FOFS( _extMarker )
-#define GLINF_FROM( from,ofs ) ( *( (char *)from + ofs ) )
-
-typedef struct {
-	const char *name;               // constant pointer to constant string
-	void **pointer;                 // constant pointer to function's pointer (function itself)
-} gl_extension_func_t;
-
-typedef struct {
-	const char * prefix;            // constant pointer to constant string
-	const char * name;
-	const char * cvar_default;
-	bool cvar_readonly;
-	bool mandatory;
-	gl_extension_func_t *funcs;     // constant pointer to array of functions
-	size_t offset;                  // offset to respective variable
-	size_t depOffset;               // offset to required pre-initialized variable
-} gl_extension_t;
-
-#define GL_EXTENSION_FUNC_EXT( name,func ) { name, (void ** const)func }
-#define GL_EXTENSION_FUNC( name ) GL_EXTENSION_FUNC_EXT( "gl"#name,&( qgl ## name ) )
-
-/* GL_ARB_get_program_binary */
-static const gl_extension_func_t gl_ext_get_program_binary_ARB_funcs[] =
-	{
-		GL_EXTENSION_FUNC( ProgramParameteri )
-		,GL_EXTENSION_FUNC( GetProgramBinary )
-		,GL_EXTENSION_FUNC( ProgramBinary )
-
-		,GL_EXTENSION_FUNC_EXT( NULL,NULL )
-	};
-
-#ifndef USE_SDL2
-
-#ifdef GLX_VERSION
-
-/* GLX_SGI_swap_control */
-static const gl_extension_func_t glx_ext_swap_control_SGI_funcs[] =
-{
-	GL_EXTENSION_FUNC_EXT( "glXSwapIntervalSGI",&qglXSwapIntervalSGI )
-
-	,GL_EXTENSION_FUNC_EXT( NULL,NULL )
-};
-
-#endif
-
-#endif // USE_SDL2
-
-#undef GL_EXTENSION_FUNC
-#undef GL_EXTENSION_FUNC_EXT
-
-//=======================================================================
-
-#define GL_EXTENSION_EXT( pre,name,val,ro,mnd,funcs,dep ) { #pre, #name, #val, ro, mnd, (gl_extension_func_t * const)funcs, GLINF_FOFS( name ), GLINF_FOFS( dep ) }
-#define GL_EXTENSION( pre,name,ro,mnd,funcs ) GL_EXTENSION_EXT( pre,name,1,ro,mnd,funcs,_extMarker )
-
-//
-// OpenGL extensions list
-//
-// short notation: vendor, name, default value, list of functions
-// extended notation: vendor, name, default value, list of functions, required extension
-static const gl_extension_t gl_extensions_decl[] =
-	{
-		GL_EXTENSION( ARB, get_program_binary, false, false, &gl_ext_get_program_binary_ARB_funcs )
-		,GL_EXTENSION( ARB, ES3_compatibility, false, false, NULL )
-		,GL_EXTENSION( EXT, texture_array, false, false, NULL )
-		,GL_EXTENSION( ARB, gpu_shader5, false, false, NULL )
-
-		// memory info
-		,GL_EXTENSION( NVX, gpu_memory_info, true, false, NULL )
-		,GL_EXTENSION( ATI, meminfo, true, false, NULL )
-
-		,GL_EXTENSION( EXT, texture_filter_anisotropic, true, false, NULL )
-		,GL_EXTENSION( EXT, bgra, true, false, NULL )
-
-#ifndef USE_SDL2
-		#ifdef GLX_VERSION
-	,GL_EXTENSION( GLX_SGI, swap_control, true, false, &glx_ext_swap_control_SGI_funcs )
-#endif
-#endif
-	};
-
-static const int num_gl_extensions = sizeof( gl_extensions_decl ) / sizeof( gl_extensions_decl[0] );
-
-#undef GL_EXTENSION
-#undef GL_EXTENSION_EXT
 
 static bool isExtensionSupported( const char *ext ) {
 	GLint numExtensions;
@@ -855,131 +763,13 @@ static bool isExtensionSupported( const char *ext ) {
 	return false;
 }
 
-static bool isPlatformExtensionSupported( const char *ext ) {
-	return strstr( qglGetGLWExtensionsString(), ext ) != nullptr;
-}
-
 static bool R_RegisterGLExtensions( void ) {
-	memset( &glConfig.ext, 0, sizeof( glextinfo_t ) );
+	memset( &glConfig.ext, 0, sizeof( glConfig.ext ) );
 
-	for( int i = 0; i < num_gl_extensions; i++ ) {
-		const gl_extension_t *const extension = &gl_extensions_decl[i];
+	glConfig.ext.texture_filter_anisotropic = isExtensionSupported( "GL_EXT_texture_filter_anisotropic" );
+	glConfig.ext.gpu_shader5                = isExtensionSupported( "GL_EXT_gpu_shader5" );
+	glConfig.ext.multisample                = false;
 
-		char name[128];
-		Q_snprintfz( name, sizeof( name ), "gl_ext_%s", extension->name );
-
-		// register a cvar and check if this extension is explicitly disabled
-		cvar_flag_t cvar_flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO;
-#ifdef PUBLIC_BUILD
-		if( extension->cvar_readonly ) {
-			cvar_flags |= CVAR_READONLY;
-		}
-#endif
-
-		cvar_t *cvar = Cvar_Get( name, extension->cvar_default ? extension->cvar_default : "0", cvar_flags );
-		if( !cvar->integer ) {
-			continue;
-		}
-
-		char *var;
-		// an alternative extension of higher priority is available so ignore this one
-		var = &( GLINF_FROM( &glConfig.ext, extension->offset ) );
-		if( *var ) {
-			continue;
-		}
-
-		// required extension is not available, ignore
-		if( extension->depOffset != GLINF_EXMRK() && !GLINF_FROM( &glConfig.ext, extension->depOffset ) ) {
-			continue;
-		}
-
-		// let's see what the driver's got to say about this...
-		if( *extension->prefix ) {
-			auto testFunc = isExtensionSupported;
-			for( const char *prefix : { "WGL", "GLX", "EGL" } ) {
-				if( !strncmp( extension->prefix, prefix, 3 ) ) {
-					testFunc = isPlatformExtensionSupported;
-					break;
-				}
-			}
-
-			Q_snprintfz( name, sizeof( name ), "%s_%s", extension->prefix, extension->name );
-			if( !testFunc( name ) ) {
-				continue;
-			}
-		}
-
-		// initialize function pointers
-		const auto *func = extension->funcs;
-		if( func ) {
-			do {
-				*( func->pointer ) = ( void * )qglGetProcAddress( (const GLubyte *)func->name );
-				if( !*( func->pointer ) ) {
-					break;
-				}
-			} while( ( ++func )->name );
-
-			// some function is missing
-			if( func->name ) {
-				gl_extension_func_t *func2 = extension->funcs;
-
-				// whine about buggy driver
-				if( *extension->prefix ) {
-					rWarning() << "Broken" << wsw::StringView( cvar->name ) << "support, contact your video card vendor";
-				}
-
-				// reset previously initialized functions back to NULL
-				do {
-					*( func2->pointer ) = NULL;
-				} while( ( ++func2 )->name && func2 != func );
-
-				continue;
-			}
-		}
-
-		// mark extension as available
-		*var = true;
-
-	}
-
-	for( int i = 0; i < num_gl_extensions; i++ ) {
-		auto *extension = &gl_extensions_decl[i];
-		if( !extension->mandatory ) {
-			continue;
-		}
-
-		char *var;
-		var = &( GLINF_FROM( &glConfig.ext, extension->offset ) );
-
-		if( !*var ) {
-			Sys_Error( "R_RegisterGLExtensions: '%s_%s' is not available, aborting\n",
-					   extension->prefix, extension->name );
-			return false;
-		}
-	}
-
-	R_FinalizeGLExtensions();
-	return true;
-}
-
-static void R_PrintGLExtensionsInfo( void ) {
-	int i;
-	size_t lastOffset;
-	const gl_extension_t *extension;
-
-	for( i = 0, lastOffset = 0, extension = gl_extensions_decl; i < num_gl_extensions; i++, extension++ ) {
-		if( lastOffset != extension->offset ) {
-			lastOffset = extension->offset;
-			if( GLINF_FROM( &glConfig.ext, lastOffset ) ) {
-				rNotice() << wsw::StringView( extension->name ) << "enabled";
-			} else {
-				rNotice() << wsw::StringView( extension->name ) << "disabled";
-			}
-		}
-	}
-}
-
-static void R_FinalizeGLExtensions( void ) {
 	int versionMajor = 0, versionMinor = 0;
 	sscanf( glConfig.versionString, "%d.%d", &versionMajor, &versionMinor );
 	glConfig.version = versionMajor * 100 + versionMinor * 10;
@@ -1015,18 +805,12 @@ static void R_FinalizeGLExtensions( void ) {
 
 	/* GL_EXT_texture_filter_anisotropic */
 	glConfig.maxTextureFilterAnisotropic = 0;
-	if( isExtensionSupported( "GL_EXT_texture_filter_anisotropic" ) ) {
+	if( isExtensionSupported( "" ) ) {
 		qglGetIntegerv( GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &glConfig.maxTextureFilterAnisotropic );
 	}
 
-	/* GL_EXT_texture3D and GL_EXT_texture_array */
 	qglGetIntegerv( GL_MAX_3D_TEXTURE_SIZE, &glConfig.maxTexture3DSize );
-
-	glConfig.maxTextureLayers = 0;
-	if( isExtensionSupported( "GL_EXT_texture_array" ) ) {
-		glConfig.ext.texture_array = true;
-		qglGetIntegerv( GL_MAX_ARRAY_TEXTURE_LAYERS_EXT, &glConfig.maxTextureLayers );
-	}
+	qglGetIntegerv( GL_MAX_ARRAY_TEXTURE_LAYERS, &glConfig.maxTextureLayers );
 
 	versionMajor = versionMinor = 0;
 	sscanf( glConfig.shadingLanguageVersionString, "%d.%d", &versionMajor, &versionMinor );
@@ -1057,12 +841,6 @@ static void R_FinalizeGLExtensions( void ) {
 
 	glConfig.sSRGB = false;
 
-	cvar_t *cvar = Cvar_Get( "gl_ext_vertex_buffer_object_hack", "0", CVAR_ARCHIVE | CVAR_NOSET );
-	if( cvar && !cvar->integer ) {
-		Cvar_ForceSet( cvar->name, "1" );
-		Cvar_ForceSet( "gl_ext_vertex_buffer_object", "1" );
-	}
-
 	qglGetIntegerv( GL_MAX_SAMPLES, &glConfig.maxFramebufferSamples );
 
 	glConfig.maxObjectLabelLen = 0;
@@ -1081,6 +859,8 @@ static void R_FinalizeGLExtensions( void ) {
 		!( glConfig.maxTextureSize / 4 < wsw::min( QF_LIGHTMAP_WIDTH,QF_LIGHTMAP_HEIGHT ) * 2 ) ) {
 		Cvar_ForceSet( "r_lighting_maxlmblocksize", va_r( tmp, sizeof( tmp ), "%i", glConfig.maxTextureSize / 4 ) );
 	}
+
+	return true;
 }
 
 /*
@@ -1224,10 +1004,6 @@ static void R_Register( const char *screenshotsPrefix ) {
 	}
 }
 
-static void R_PrintInfo() {
-	R_PrintGLExtensionsInfo();
-}
-
 rserr_t R_Init( const char *applicationName, const char *screenshotPrefix, int startupColor,
 				int iconResource, const int *iconXPM,
 				void *hinstance, void *wndproc, void *parenthWnd,
@@ -1339,10 +1115,6 @@ static rserr_t R_PostInit( void ) {
 
 	R_FillStartupBackgroundColor( COLOR_R( glConfig.startupColor ) / 255.0f,
 								  COLOR_G( glConfig.startupColor ) / 255.0f, COLOR_B( glConfig.startupColor ) / 255.0f );
-
-	if( r_verbose ) {
-		R_PrintInfo();
-	}
 
 	// load and compile GLSL programs
 	RP_Init();

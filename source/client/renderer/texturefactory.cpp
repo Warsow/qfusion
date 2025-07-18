@@ -49,15 +49,18 @@ bool TextureFactory::tryUpdatingFilterOrAniso( TextureFilter filter, int givenAn
 											   bool *doApplyFilter, bool *doApplyAniso ) {
 	*doApplyFilter = m_textureFilter != filter;
 
-	*anisoToApply = wsw::clamp( givenAniso, 1, glConfig.maxTextureFilterAnisotropic );
-	// TODO: The extension spec allows specifying aniso with non-trilinear filtering modes.
-	// Should we really allow doing that?
-	const bool shouldApplyAniso = m_anisoLevel != *anisoToApply;
-	const bool canApplyAniso = glConfig.ext.texture_filter_anisotropic;
-	*doApplyAniso = shouldApplyAniso && canApplyAniso;
+	if( glConfig.ext.texture_filter_anisotropic ) {
+		*anisoToApply = wsw::clamp( givenAniso, 1, glConfig.maxTextureFilterAnisotropic );
+		// TODO: The extension spec allows specifying aniso with non-trilinear filtering modes.
+		// Should we really allow doing that?
+		*doApplyAniso = m_anisoLevel != *anisoToApply;
+	} else {
+		*anisoToApply = 1;
+		*doApplyAniso = false;
+	}
 
 	m_textureFilter = filter;
-	m_anisoLevel = *anisoToApply;
+	m_anisoLevel    = *anisoToApply;
 	return *doApplyFilter || *doApplyAniso;
 }
 
@@ -641,7 +644,7 @@ auto TextureFactory::createLightmapArray( unsigned w, unsigned h, unsigned numLa
 	}
 
 	const auto [internalFormat, format] = getLightmapFormatsForSamples( samples );
-	const GLenum target = GL_TEXTURE_2D_ARRAY_EXT;
+	const GLenum target = GL_TEXTURE_2D;
 	const GLuint handle = generateHandle( wsw::StringView() );
 	bindToModify( target, handle );
 

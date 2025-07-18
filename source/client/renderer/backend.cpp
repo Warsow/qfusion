@@ -73,9 +73,7 @@ void RB_BeginRegistration() {
 		RB_SelectTextureUnit( i );
 
 		qglBindTexture( GL_TEXTURE_CUBE_MAP, 0 );
-		if( glConfig.ext.texture_array ) {
-			qglBindTexture( GL_TEXTURE_2D_ARRAY_EXT, 0 );
-		}
+		qglBindTexture( GL_TEXTURE_2D_ARRAY, 0 );
 		qglBindTexture( GL_TEXTURE_3D, 0 );
 		qglBindTexture( GL_TEXTURE_2D, 0 );
 	}
