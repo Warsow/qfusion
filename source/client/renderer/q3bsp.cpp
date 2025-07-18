@@ -359,7 +359,6 @@ static void R_BuildLightmaps( model_t *mod, int numLightmaps, int w, int h, cons
 
 	mapConfig.maxLightmapSize = 0;
 	mapConfig.lightmapArrays = false && mapConfig.lightmapsPacking
-							   && glConfig.ext.texture_array
 							   && ( glConfig.maxVertexAttribs > VATTRIB_LMLAYERS0123 )
 							   && ( glConfig.maxVaryingFloats >= ( 9 * 4 ) ) // 9th varying is required by material shaders
 							   && ( layerWidth <= glConfig.maxTextureSize ) && ( h <= glConfig.maxTextureSize );

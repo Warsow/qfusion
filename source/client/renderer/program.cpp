@@ -1631,10 +1631,6 @@ bool ShaderProgramCache::loadFragmentShaderSource( GLuint id, const wsw::StringV
 		sourceBuilder.add( QF_GLSL_ENABLE_ARB_GPU_SHADER5 );
 	}
 
-	if( glConfig.ext.texture_array ) {
-		sourceBuilder.add( QF_GLSL_ENABLE_EXT_TEXTURE_ARRAY );
-	}
-
 	sourceBuilder.add( shaderVersion.data() );
 	sourceBuilder.add( "#define FRAGMENT_SHADER\n" );
 
@@ -2374,9 +2370,7 @@ bool ShaderProgramCache::bindAttributeLocations( GLuint programId ) {
 	qglBindAttribLocation( programId, VATTRIB_LMCOORDS01, "a_LightmapCoord01" );
 	qglBindAttribLocation( programId, VATTRIB_LMCOORDS23, "a_LightmapCoord23" );
 
-	if( glConfig.ext.texture_array ) {
-		qglBindAttribLocation( programId, VATTRIB_LMLAYERS0123, "a_LightmapLayer0123" );
-	}
+	qglBindAttribLocation( programId, VATTRIB_LMLAYERS0123, "a_LightmapLayer0123" );
 
 	qglBindAttribLocation( programId, VATTRIB_INSTANCE_QUAT, "a_InstanceQuat" );
 	qglBindAttribLocation( programId, VATTRIB_INSTANCE_XYZS, "a_InstancePosAndScale" );

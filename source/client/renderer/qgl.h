@@ -498,9 +498,9 @@ const char              *qglGetGLWExtensionsString();
 #define EGL_DEPTH_ENCODING_NONE_NV                          0
 #define EGL_DEPTH_ENCODING_NONLINEAR_NV                     0x30E3
 
-#define GL_TEXTURE_2D_ARRAY_EXT                             0x8C1A
-#define GL_TEXTURE_BINDING_2D_ARRAY_EXT                     0x8C1D
-#define GL_MAX_ARRAY_TEXTURE_LAYERS_EXT                     0x88FF
+#define GL_TEXTURE_2D_ARRAY                             0x8C1A
+#define GL_TEXTURE_BINDING_2D_ARRAY                     0x8C1D
+#define GL_MAX_ARRAY_TEXTURE_LAYERS                     0x88FF
 
 #define GL_DEPTH_STENCIL                                0x84F9
 #define GL_UNSIGNED_INT_24_8                            0x84FA

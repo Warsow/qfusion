@@ -250,7 +250,7 @@ class LightmapArray : public Texture {
 		this->texnum = handle;
 		this->width = w;
 		this->height = h;
-		this->target = GL_TEXTURE_2D_ARRAY_EXT;
+		this->target = GL_TEXTURE_2D_ARRAY;
 		this->samples = samples;
 		this->layers = layers;
 		this->flags = flags;
