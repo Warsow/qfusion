@@ -96,10 +96,6 @@ static const struct DomainTraits {
 	{ "AI", { "com_overrideOutputCategoryMask_AI"_asView, { .byDefault = MessageCategoryFlags::None, .flags = 0 } } },
 };
 
-static BoolConfigVar v_enableOutputDomainPrefix { "com_enableOutputDomainPrefix"_asView, {
-	.byDefault = false, .flags = CVAR_ARCHIVE,
-}};
-
 extern qmutex_t *com_print_mutex;
 extern cvar_t *logconsole;
 extern cvar_t *logconsole_append;
@@ -226,14 +222,7 @@ void wsw::submitRegularMessageStream( wsw::RegularMessageStream *stream ) {
 			const auto indexForCategory = (unsigned)stream->m_category;
 			assert( indexForCategory <= std::size( kPrintedMessageColorForCategory ) );
 			const char *color = kPrintedMessageColorForCategory[indexForCategory];
-			if( v_enableOutputDomainPrefix.initialized() && v_enableOutputDomainPrefix.get() ) {
-				const auto indexForDomain = (unsigned)stream->m_domain;
-				assert( indexForDomain <= std::size( g_domainTraits ) );
-				const char *prefix = g_domainTraits[indexForDomain].printedPrefix;
-				Com_Printf( S_COLOR_GREY "[%s] %s%s\n", prefix, color, stream->m_data );
-			} else {
-				Com_Printf( "%s%s\n", color, stream->m_data );
-			}
+			Com_Printf( "%s%s\n", color, stream->m_data );
 		} else {
 			Com_Printf( S_COLOR_RED "A null line stream was used. The line content was discarded\n" );
 		}
