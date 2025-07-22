@@ -57,6 +57,8 @@ SOFTWARE.
 
 namespace wsw::ui {
 
+constexpr QVideoFrame::PixelFormat kDesiredPixelFormat = QVideoFrame::Format_BGRA32;
+
 void VideoSource::setFilePath( const QByteArray &filePath ) {
 	if( m_filePath != filePath ) {
 		m_filePath = filePath;
@@ -91,16 +93,15 @@ void VideoSource::setVideoSurface( QAbstractVideoSurface *videoSurface ) {
 		Status status = m_status;
 		if( videoSurface ) {
 			bool supportsDesiredFormat = false;
-			const auto desiredFormat = QVideoFrame::Format_ARGB32;
 			for( const QVideoFrame::PixelFormat &pixelFormat: videoSurface->supportedPixelFormats() ) {
-				if( pixelFormat == desiredFormat ) {
+				if( pixelFormat == kDesiredPixelFormat ) {
 					supportsDesiredFormat = true;
 				}
 			}
 			if( !supportsDesiredFormat ) {
 				status = Error;
 			} else {
-				if( !videoSurface->start( QVideoSurfaceFormat( QSize(), desiredFormat ) ) ) {
+				if( !videoSurface->start( QVideoSurfaceFormat( QSize(), kDesiredPixelFormat ) ) ) {
 					status = Error;
 				}
 			}
@@ -256,8 +257,11 @@ void VideoDecoder::decodeVideoCallback( plm_t *plm, void *opaqueFrame, void *use
 	const QSize frameSize( (int)frame->width, (int)frame->height );
 
 	// TODO: How to send 3 planes without this slow conversion
-	QVideoFrame qFrame( sizeInBytes, frameSize, lineStride, QVideoFrame::Format_ARGB32 );
+	QVideoFrame qFrame( sizeInBytes, frameSize, lineStride, kDesiredPixelFormat );
 	qFrame.map( QAbstractVideoBuffer::WriteOnly );
+	// Clear alpha (wtf?)
+	memset( qFrame.bits(), 0, sizeInBytes );
+	// Note: Converting to ARGB intentionally (wtf?). Only this setup works.
 	plm_frame_to_argb( frame, qFrame.bits(), lineStride );
 	qFrame.unmap();
 
