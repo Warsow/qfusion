@@ -186,6 +186,8 @@ VideoDecoder::~VideoDecoder() noexcept {
 }
 
 void VideoDecoder::onUpdateRequested( int64_t timestamp ) {
+	// Note: This condition is not reachable for looping videos
+	// TODO: Check decoding errors here?
 	if( !plm_has_ended( m_plm ) ) {
 		if( const int64_t diffMillis = timestamp - m_lastUpdateTimestamp; diffMillis > 0 ) {
 			const double frameSeconds = wsw::min( (double)diffMillis * 1e-3, 1.0 / 30.0 );
@@ -225,12 +227,21 @@ void VideoDecoder::fillBufferCallback( plm_buffer_t *buffer, void *userData ) {
 			assert( bytesToReadThisStep < std::size( decoder->m_readFileBuffer ) );
 		}
 		assert( decoder->m_fileHandle != std::nullopt );
-		if( !decoder->m_fileHandle->readExact( decoder->m_readFileBuffer, std::size( decoder->m_readFileBuffer ) ) ) {
-			uiError() << "Failed to read" << totalBytesToRead << "of file data";
+		if( decoder->m_fileHandle->isAtEof() ) {
+			if( !decoder->m_fileHandle->rewind() ) {
+				uiWarning() << "Failed to rewind the video file";
+				// TODO: What do we do with reading errors?
+				break;
+			}
+		}
+		const std::optional<size_t> bytesRead = decoder->m_fileHandle->read( decoder->m_readFileBuffer, bytesToReadThisStep );
+		// TODO: Same as above
+		if( bytesRead == std::nullopt ) {
+			uiWarning() << "Failed to read the video file";
 			break;
 		}
-		totalBytesRead += bytesToReadThisStep;
-		plm_buffer_write( buffer, decoder->m_readFileBuffer, bytesToReadThisStep );
+		totalBytesRead += *bytesRead;
+		plm_buffer_write( buffer, decoder->m_readFileBuffer, *bytesRead );
 	}
 
 	assert( plm_buffer_get_size( buffer ) <= kPlmBufferInitialCapacity );
