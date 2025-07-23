@@ -163,7 +163,7 @@ public:
 	void simulateFrame( int64_t currTime );
 	void submitToScene( int64_t currTime, DrawSceneRequest *drawSceneRequest, unsigned povPlayerMask );
 private:
-	void startSound( const SoundSet *sound, const float *origin, float attenuation = 1.0f );
+	void startEffectSound( const SoundSet *sound, const float *origin, float attenuation );
 
 	void spawnExplosionEffect( const float *origin, const float *dir, const SoundSet *sound, float radius, bool addSoundLfe );
 

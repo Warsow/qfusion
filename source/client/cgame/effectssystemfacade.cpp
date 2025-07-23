@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/configvars.h>
 #include <common/facilities/profilerscope.h>
 
-void EffectsSystemFacade::startSound( const SoundSet *sound, const float *origin, float attenuation ) {
+void EffectsSystemFacade::startEffectSound( const SoundSet *sound, const float *origin, float attenuation ) {
 	// TODO: We can save plenty of computations if we do this check earlier in the call stack
 	if( getPrimaryViewState()->allowSounds ) {
 		cg.soundSystem->startFixedSound( sound, origin, CHAN_AUTO, v_volumeEffects.get(), attenuation );
@@ -361,10 +361,10 @@ void EffectsSystemFacade::spawnExplosionEffect( const float *origin, const float
 		spawnMultipleLiquidImpactEffects( liquidImpacts, 1.0f, { 0.7f, 0.9f }, std::make_pair( 0u, 100u ) );
 	}
 
-	startSound( sound, almostExactOrigin, ATTN_DISTANT );
+	startEffectSound( sound, almostExactOrigin, ATTN_DISTANT );
 
 	if( addSoundLfe ) {
-		startSound( cgs.media.sndExplosionLfe, almostExactOrigin, ATTN_NORM );
+		startEffectSound( cgs.media.sndExplosionLfe, almostExactOrigin, ATTN_NORM );
 	}
 
 	if( v_particles.get() && !( contentsAtFireOrigin & MASK_WATER ) ) {
@@ -485,7 +485,7 @@ static const LightLifespan kPlasmaParticlesFlareProps[1] {
 void EffectsSystemFacade::spawnPlasmaExplosionEffect( const float *origin, const float *impactNormal, int mode ) {
 	const vec3_t soundOrigin { origin[0] + impactNormal[0], origin[1] + impactNormal[1], origin[2] + impactNormal[2] };
 	const SoundSet *sound = ( mode == FIRE_MODE_STRONG ) ? cgs.media.sndPlasmaStrongHit : cgs.media.sndPlasmaWeakHit;
-	startSound( sound, soundOrigin, ATTN_IDLE );
+	startEffectSound( sound, soundOrigin, ATTN_IDLE );
 
 	// plasma particle trail effect
 
@@ -789,7 +789,7 @@ void EffectsSystemFacade::spawnElectroboltHitEffect( const float *origin, const 
 	}
 
 	const vec3_t soundOrigin { origin[0] + impactNormal[0], origin[1] + impactNormal[1], origin[2] + impactNormal[2] };
-	startSound( cgs.media.sndElectroboltHit, soundOrigin, ATTN_STATIC );
+	startEffectSound( cgs.media.sndElectroboltHit, soundOrigin, ATTN_STATIC );
 
 	m_transientEffectsSystem.spawnElectroboltHitEffect( origin, impactNormal, decalColor, energyColor, spawnDecal );
 }
@@ -900,7 +900,7 @@ void EffectsSystemFacade::spawnInstagunHitEffect( const float *origin, const flo
 
 	// TODO: Don't we need an IG-specific sound
 	const vec3_t soundOrigin { origin[0] + impactNormal[0], origin[1] + impactNormal[1], origin[2] + impactNormal[2] };
-	startSound( cgs.media.sndElectroboltHit, soundOrigin, ATTN_STATIC );
+	startEffectSound( cgs.media.sndElectroboltHit, soundOrigin, ATTN_STATIC );
 
 	m_transientEffectsSystem.spawnInstagunHitEffect( origin, impactNormal, decalColor, energyColor, spawnDecal );
 }
@@ -936,12 +936,12 @@ void EffectsSystemFacade::spawnGunbladeBladeHitEffect( const float *pos, const f
 
 		if( isHittingFlesh ) {
 			// TODO: Check sound origin
-			startSound( cgs.media.sndBladeFleshHit, pos, ATTN_NORM );
+			startEffectSound( cgs.media.sndBladeFleshHit, pos, ATTN_NORM );
 		} else {
 			m_transientEffectsSystem.spawnGunbladeBladeImpactEffect( trace.endpos, trace.plane.normal );
 
 			// TODO: Check sound origin
-			startSound( cgs.media.sndBladeWallHit, pos, ATTN_NORM );
+			startEffectSound( cgs.media.sndBladeWallHit, pos, ATTN_NORM );
 
 			if( v_particles.get() ) {
 				ConicalFlockParams flockParams {
@@ -1007,7 +1007,7 @@ static const LightLifespan kGunbladeBlastFlareProps[1] {
 };
 
 void EffectsSystemFacade::spawnGunbladeBlastHitEffect( const float *origin, const float *dir ) {
-	startSound( cgs.media.sndGunbladeStrongHit, origin, ATTN_IDLE );
+	startEffectSound( cgs.media.sndGunbladeStrongHit, origin, ATTN_IDLE );
 
 	if( v_particles.get() ) {
 		SolidImpactsVector solidImpacts;
@@ -2616,7 +2616,7 @@ void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, const
 		cg.delayedExecutionSystem.post( delay, [=, this] {
 			// Check the quotum during the actual execution
 			if( m_solidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), group, capturedParams ) ) {
-				startSound( sound, capturedSoundOrigin.Data() );
+				startEffectSound( sound, capturedSoundOrigin.Data(), ATTN_STATIC );
 			}
 		});
 	}
@@ -2631,7 +2631,7 @@ void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, const
 		cg.delayedExecutionSystem.post( delay, [=, this]() {
 			// Check the quotum during the actual execution
 			if( m_liquidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), capturedParams ) ) {
-				startSound( sound, capturedSoundOrigin.Data() );
+				startEffectSound( sound, capturedSoundOrigin.Data(), ATTN_STATIC );
 			}
 		});
 	}
