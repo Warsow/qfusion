@@ -1932,7 +1932,7 @@ void EffectsSystemFacade::spawnBulletImpactEffect( unsigned delay, const SolidIm
 	} else {
 		spawnBulletGenericImpactRosette( delay, flockOrientation, 0.5f, 1.0f );
 		spawnBulletImpactModel( delay, impact.origin, impact.normal );
-		sound = cgs.media.sndImpactSolid;
+		sound = cgs.media.sndImpactGeneric;
 	}
 
 	startSoundForImpactUsingLimiter( delay, sound, impact, EventRateLimiterParams {
@@ -2040,20 +2040,25 @@ void EffectsSystemFacade::spawnBulletLikeImpactRingUsingLimiter( unsigned delay,
 }
 
 auto EffectsSystemFacade::getImpactSoundForMaterial( SurfImpactMaterial impactMaterial ) -> const SoundSet * {
-	using IM = SurfImpactMaterial;
-	if( impactMaterial == IM::Metal ) {
-		return cgs.media.sndImpactMetal;
+	switch( impactMaterial ) {
+		case SurfImpactMaterial::Unknown:
+			return cgs.media.sndImpactGeneric;
+		case SurfImpactMaterial::Stone:
+			return cgs.media.sndImpactStone;
+		case SurfImpactMaterial::Stucco:
+			return cgs.media.sndImpactSoft;
+		case SurfImpactMaterial::Wood:
+			return cgs.media.sndImpactWood;
+		case SurfImpactMaterial::Dirt:
+			[[fallthrough]];
+		case SurfImpactMaterial::Sand:
+			return cgs.media.sndImpactSoft;
+		case SurfImpactMaterial::Metal:
+			return cgs.media.sndImpactMetal;
+		case SurfImpactMaterial::Glass:
+			return cgs.media.sndImpactGlass;
 	}
-	if( impactMaterial == IM::Stucco || impactMaterial == IM::Dirt || impactMaterial == IM::Sand ) {
-		return cgs.media.sndImpactSoft;
-	}
-	if( impactMaterial == IM::Wood ) {
-		return cgs.media.sndImpactWood;
-	}
-	if( impactMaterial == IM::Glass ) {
-		return cgs.media.sndImpactGlass;
-	}
-	return cgs.media.sndImpactSolid;
+	wsw::failWithLogicError( "Unreachable" );
 }
 
 void EffectsSystemFacade::spawnPelletImpactParticleEffectForMaterial( unsigned delay,
@@ -2468,7 +2473,7 @@ void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const Soli
 			const FlockOrientation orientation = makeRicochetFlockOrientation( impact, &m_rng );
 			spawnBulletGenericImpactRosette( delay, orientation, 0.1f, 0.5f, i, impacts.size() );
 			spawnBulletImpactModel( delay, impact.origin, impact.normal );
-			startSoundForImpactUsingLimiter( delay, cgs.media.sndImpactSolid, impact, limiterParams );
+			startSoundForImpactUsingLimiter( delay, cgs.media.sndImpactGeneric, impact, limiterParams );
 		}
 	}
 }

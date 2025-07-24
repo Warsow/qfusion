@@ -88,7 +88,8 @@ public:
 	CachedSound sndImpactGlass { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_glass*" } } };
 	CachedSound sndImpactWood { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_wood*" } } };
 	CachedSound sndImpactSoft { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_soft*" } } };
-	CachedSound sndImpactSolid { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_solid*" } } };
+	CachedSound sndImpactStone { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_stone*" } } };
+	CachedSound sndImpactGeneric { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_generic*" } } };
 	CachedSound sndImpactWater { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_water*" } } };
 
 	CachedSound sndWeaponKill { this, SoundSetProps { .name = SoundSetProps::Exact { S_WEAPON_KILL } } };
