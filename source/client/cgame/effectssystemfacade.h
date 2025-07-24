@@ -250,10 +250,7 @@ private:
 														unsigned lightFrameAffinityIndex, unsigned lightFrameAffinityModulo );
 
 	[[nodiscard]]
-	static auto getImpactSfxGroupForMaterial( SurfImpactMaterial impactMaterial ) -> unsigned;
-
-	[[nodiscard]]
-	auto getSfxForImpactGroup( unsigned group ) -> const SoundSet *;
+	static auto getImpactSoundForMaterial( SurfImpactMaterial ) -> const SoundSet *;
 
 	void spawnMultipleExplosionImpactEffects( std::span<const SolidImpact> impacts, float percentageScale );
 
@@ -269,7 +266,7 @@ private:
 
 	void spawnBulletLikeImpactRingUsingLimiter( unsigned delay, const SolidImpact &impact );
 
-	void startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound, uintptr_t groupTag,
+	void startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound,
 										  const SolidImpact &impact, const EventRateLimiterParams &params );
 	void startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound, const LiquidImpact &impact,
 										  const EventRateLimiterParams &params );
