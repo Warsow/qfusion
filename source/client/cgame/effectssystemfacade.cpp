@@ -1928,7 +1928,9 @@ void EffectsSystemFacade::spawnBulletImpactEffect( unsigned delay, const SolidIm
 		if( impactMaterial == IM::Metal || impactMaterial == IM::Glass ) {
 			spawnBulletLikeImpactRingUsingLimiter( delay, impact );
 		}
-		sound = getImpactSoundForMaterial( impactMaterial );
+		const auto soundAndDelay = getImpactSoundForMaterial( impactMaterial );
+		sound = soundAndDelay.first;
+		delay += soundAndDelay.second;
 	} else {
 		spawnBulletGenericImpactRosette( delay, flockOrientation, 0.5f, 1.0f );
 		spawnBulletImpactModel( delay, impact.origin, impact.normal );
@@ -2039,24 +2041,16 @@ void EffectsSystemFacade::spawnBulletLikeImpactRingUsingLimiter( unsigned delay,
 	}
 }
 
-auto EffectsSystemFacade::getImpactSoundForMaterial( SurfImpactMaterial impactMaterial ) -> const SoundSet * {
+auto EffectsSystemFacade::getImpactSoundForMaterial( SurfImpactMaterial impactMaterial ) -> std::pair<const SoundSet *, unsigned> {
 	switch( impactMaterial ) {
-		case SurfImpactMaterial::Unknown:
-			return cgs.media.sndImpactGeneric;
-		case SurfImpactMaterial::Stone:
-			return cgs.media.sndImpactStone;
-		case SurfImpactMaterial::Stucco:
-			return cgs.media.sndImpactSoft;
-		case SurfImpactMaterial::Wood:
-			return cgs.media.sndImpactWood;
-		case SurfImpactMaterial::Dirt:
-			[[fallthrough]];
-		case SurfImpactMaterial::Sand:
-			return cgs.media.sndImpactSoft;
-		case SurfImpactMaterial::Metal:
-			return cgs.media.sndImpactMetal;
-		case SurfImpactMaterial::Glass:
-			return cgs.media.sndImpactGlass;
+		case SurfImpactMaterial::Unknown: return { cgs.media.sndImpactGeneric, 0 };
+		case SurfImpactMaterial::Stone: return { cgs.media.sndImpactStone, 0 };
+		case SurfImpactMaterial::Stucco: return { cgs.media.sndImpactSoft, 75 };
+		case SurfImpactMaterial::Wood: return { cgs.media.sndImpactWood, 75 };
+		case SurfImpactMaterial::Dirt: return { cgs.media.sndImpactSoft, 75 };
+		case SurfImpactMaterial::Sand: return { cgs.media.sndImpactSoft, 50 };
+		case SurfImpactMaterial::Metal: return { cgs.media.sndImpactMetal, 0 };
+		case SurfImpactMaterial::Glass: return { cgs.media.sndImpactGlass, 75 };
 	}
 	wsw::failWithLogicError( "Unreachable" );
 }
@@ -2392,12 +2386,15 @@ const EffectsSystemFacade::EventRateLimiterParams EffectsSystemFacade::kLiquidIm
 	.startDroppingAtTimeDiff  = 150,
 };
 
+static constexpr unsigned kLiquidImpactSoundExtraDelay = 50;
+
 void EffectsSystemFacade::spawnBulletLiquidImpactEffect( unsigned delay, const LiquidImpact &impact ) {
 	spawnLiquidImpactParticleEffect( delay, impact, 1.0f, { 0.70f, 0.95f } );
 
 	spawnWaterImpactRing( delay, impact.origin );
 
-	startSoundForImpactUsingLimiter( delay, cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
+	const unsigned soundDelay = delay + kLiquidImpactSoundExtraDelay;
+	startSoundForImpactUsingLimiter( soundDelay, cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
 }
 
 void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const SolidImpact> impacts,
@@ -2463,8 +2460,8 @@ void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const Soli
 				numRosetteImpactsSoFar++;
 			}
 
-			const SoundSet *sound = getImpactSoundForMaterial( decodeSurfImpactMaterial( impact.surfFlags ) );
-			startSoundForImpactUsingLimiter( delay, sound, impact, limiterParams );
+			const auto [sound, extraDelay] = getImpactSoundForMaterial( decodeSurfImpactMaterial( impact.surfFlags ) );
+			startSoundForImpactUsingLimiter( delay + extraDelay, sound, impact, limiterParams );
 		}
 	} else {
 		for( unsigned i = 0; i < impacts.size(); ++i ) {
@@ -2555,7 +2552,8 @@ void EffectsSystemFacade::spawnMultipleLiquidImpactEffects( std::span<const Liqu
 		const unsigned delay       = scaledDelays[i];
 		const LiquidImpact &impact = impacts[i];
 		spawnWaterImpactRing( delay, impact.origin );
-		startSoundForImpactUsingLimiter( delay, cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
+		const unsigned soundDelay  = delay + kLiquidImpactSoundExtraDelay;
+		startSoundForImpactUsingLimiter( soundDelay, cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
 	}
 }
 
