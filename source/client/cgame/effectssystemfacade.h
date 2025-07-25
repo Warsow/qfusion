@@ -163,7 +163,7 @@ public:
 	void simulateFrame( int64_t currTime );
 	void submitToScene( int64_t currTime, DrawSceneRequest *drawSceneRequest, unsigned povPlayerMask );
 private:
-	void startEffectSound( const SoundSet *sound, const float *origin, float attenuation );
+	void startEffectSound( const SoundSet *sound, const float *origin, float attenuation, float volumeScale = 1.0f );
 
 	void spawnExplosionEffect( const float *origin, const float *dir, const SoundSet *sound, float radius, bool addSoundLfe );
 
@@ -250,7 +250,7 @@ private:
 														unsigned lightFrameAffinityIndex, unsigned lightFrameAffinityModulo );
 
 	[[nodiscard]]
-	static auto getImpactSoundForMaterial( SurfImpactMaterial ) -> std::pair<const SoundSet *, unsigned>;
+	static auto getImpactSoundForMaterial( SurfImpactMaterial, unsigned *extraDelay, float *volumeScale ) -> const SoundSet *;
 
 	void spawnMultipleExplosionImpactEffects( std::span<const SolidImpact> impacts, float percentageScale );
 
@@ -266,10 +266,10 @@ private:
 
 	void spawnBulletLikeImpactRingUsingLimiter( unsigned delay, const SolidImpact &impact );
 
-	void startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound,
+	void startSoundForImpactUsingLimiter( unsigned delay, float volumeScale, const SoundSet *sound,
 										  const SolidImpact &impact, const EventRateLimiterParams &params );
-	void startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound, const LiquidImpact &impact,
-										  const EventRateLimiterParams &params );
+	void startSoundForImpactUsingLimiter( unsigned delay, float volumeScale, const SoundSet *sound,
+										  const LiquidImpact &impact, const EventRateLimiterParams &params );
 
 	void spawnLiquidImpactParticleEffect( unsigned delay, const LiquidImpact &impact, float percentageScale,
 										  std::pair<float, float> randomRotationAngleCosineRange );

@@ -26,10 +26,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/configvars.h>
 #include <common/facilities/profilerscope.h>
 
-void EffectsSystemFacade::startEffectSound( const SoundSet *sound, const float *origin, float attenuation ) {
+void EffectsSystemFacade::startEffectSound( const SoundSet *sound, const float *origin, float attenuation, float volumeScale ) {
 	// TODO: We can save plenty of computations if we do this check earlier in the call stack
 	if( getPrimaryViewState()->allowSounds ) {
-		cg.soundSystem->startFixedSound( sound, origin, CHAN_AUTO, v_volumeEffects.get(), attenuation );
+		cg.soundSystem->startFixedSound( sound, origin, CHAN_AUTO, volumeScale * v_volumeEffects.get(), attenuation );
 	}
 }
 
@@ -1907,6 +1907,8 @@ void EffectsSystemFacade::spawnBulletImpactEffect( unsigned delay, const SolidIm
 	const FlockOrientation flockOrientation = makeRicochetFlockOrientation( impact, &m_rng );
 
 	const SoundSet *sound;
+	float volumeScale   = 1.0f;
+	unsigned extraDelay = 0;
 	if( v_particles.get() ) {
 		const SurfImpactMaterial impactMaterial = decodeSurfImpactMaterial( impact.surfFlags );
 		const unsigned materialParam            = decodeSurfImpactMaterialParam( impact.surfFlags );
@@ -1928,16 +1930,14 @@ void EffectsSystemFacade::spawnBulletImpactEffect( unsigned delay, const SolidIm
 		if( impactMaterial == IM::Metal || impactMaterial == IM::Glass ) {
 			spawnBulletLikeImpactRingUsingLimiter( delay, impact );
 		}
-		const auto soundAndDelay = getImpactSoundForMaterial( impactMaterial );
-		sound = soundAndDelay.first;
-		delay += soundAndDelay.second;
+		sound = getImpactSoundForMaterial( impactMaterial, &extraDelay, &volumeScale );
 	} else {
 		spawnBulletGenericImpactRosette( delay, flockOrientation, 0.5f, 1.0f );
 		spawnBulletImpactModel( delay, impact.origin, impact.normal );
 		sound = cgs.media.sndImpactGeneric;
 	}
 
-	startSoundForImpactUsingLimiter( delay, sound, impact, EventRateLimiterParams {
+	startSoundForImpactUsingLimiter( delay + extraDelay, volumeScale, sound, impact, EventRateLimiterParams {
 		.dropChanceAtZeroDistance = 0.5f,
 		.startDroppingAtDistance  = 144.0f,
 		.dropChanceAtZeroTimeDiff = 1.0f,
@@ -2041,16 +2041,33 @@ void EffectsSystemFacade::spawnBulletLikeImpactRingUsingLimiter( unsigned delay,
 	}
 }
 
-auto EffectsSystemFacade::getImpactSoundForMaterial( SurfImpactMaterial impactMaterial ) -> std::pair<const SoundSet *, unsigned> {
+auto EffectsSystemFacade::getImpactSoundForMaterial( SurfImpactMaterial impactMaterial,
+													 unsigned *extraDelay, float *volumeScale ) -> const SoundSet * {
 	switch( impactMaterial ) {
-		case SurfImpactMaterial::Unknown: return { cgs.media.sndImpactGeneric, 0 };
-		case SurfImpactMaterial::Stone: return { cgs.media.sndImpactStone, 0 };
-		case SurfImpactMaterial::Stucco: return { cgs.media.sndImpactSoft, 75 };
-		case SurfImpactMaterial::Wood: return { cgs.media.sndImpactWood, 75 };
-		case SurfImpactMaterial::Dirt: return { cgs.media.sndImpactSoft, 75 };
-		case SurfImpactMaterial::Sand: return { cgs.media.sndImpactSoft, 50 };
-		case SurfImpactMaterial::Metal: return { cgs.media.sndImpactMetal, 0 };
-		case SurfImpactMaterial::Glass: return { cgs.media.sndImpactGlass, 75 };
+		case SurfImpactMaterial::Unknown:
+			*extraDelay = 75, *volumeScale = 1.0f;
+			return cgs.media.sndImpactGeneric;
+		case SurfImpactMaterial::Stone:
+			*extraDelay = 75, *volumeScale = 2.0f;
+			return cgs.media.sndImpactStone;
+		case SurfImpactMaterial::Stucco:
+			*extraDelay = 75, *volumeScale = 2.0f;
+			return cgs.media.sndImpactSoft;
+		case SurfImpactMaterial::Wood:
+			*extraDelay = 75, *volumeScale = 1.5f;
+			return cgs.media.sndImpactWood;
+		case SurfImpactMaterial::Dirt:
+			*extraDelay = 75, *volumeScale = 2.0f;
+			return cgs.media.sndImpactSoft;
+		case SurfImpactMaterial::Sand:
+			*extraDelay = 75, *volumeScale = 1.5f;
+			return cgs.media.sndImpactSoft;
+		case SurfImpactMaterial::Metal:
+			*extraDelay = 0, *volumeScale = 1.0f;
+			return cgs.media.sndImpactMetal;
+		case SurfImpactMaterial::Glass:
+			*extraDelay = 50, *volumeScale = 2.0f;
+			return cgs.media.sndImpactGlass;
 	}
 	wsw::failWithLogicError( "Unreachable" );
 }
@@ -2387,14 +2404,15 @@ const EffectsSystemFacade::EventRateLimiterParams EffectsSystemFacade::kLiquidIm
 };
 
 static constexpr unsigned kLiquidImpactSoundExtraDelay = 50;
+static constexpr float kLiquidImpactSoundVolumeScale   = 1.5f;
 
 void EffectsSystemFacade::spawnBulletLiquidImpactEffect( unsigned delay, const LiquidImpact &impact ) {
 	spawnLiquidImpactParticleEffect( delay, impact, 1.0f, { 0.70f, 0.95f } );
 
 	spawnWaterImpactRing( delay, impact.origin );
 
-	const unsigned soundDelay = delay + kLiquidImpactSoundExtraDelay;
-	startSoundForImpactUsingLimiter( soundDelay, cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
+	startSoundForImpactUsingLimiter( delay + kLiquidImpactSoundExtraDelay, kLiquidImpactSoundVolumeScale,
+									 cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
 }
 
 void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const SolidImpact> impacts,
@@ -2460,8 +2478,11 @@ void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const Soli
 				numRosetteImpactsSoFar++;
 			}
 
-			const auto [sound, extraDelay] = getImpactSoundForMaterial( decodeSurfImpactMaterial( impact.surfFlags ) );
-			startSoundForImpactUsingLimiter( delay + extraDelay, sound, impact, limiterParams );
+			float volumeScale         = 1.0f;
+			unsigned extraDelay       = 0;
+			const auto impactMaterial = decodeSurfImpactMaterial( impact.surfFlags );
+			const SoundSet *sound     = getImpactSoundForMaterial( impactMaterial, &extraDelay, &volumeScale );
+			startSoundForImpactUsingLimiter( delay + extraDelay, volumeScale, sound, impact, limiterParams );
 		}
 	} else {
 		for( unsigned i = 0; i < impacts.size(); ++i ) {
@@ -2470,7 +2491,7 @@ void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const Soli
 			const FlockOrientation orientation = makeRicochetFlockOrientation( impact, &m_rng );
 			spawnBulletGenericImpactRosette( delay, orientation, 0.1f, 0.5f, i, impacts.size() );
 			spawnBulletImpactModel( delay, impact.origin, impact.normal );
-			startSoundForImpactUsingLimiter( delay, cgs.media.sndImpactGeneric, impact, limiterParams );
+			startSoundForImpactUsingLimiter( delay, 1.0f, cgs.media.sndImpactGeneric, impact, limiterParams );
 		}
 	}
 }
@@ -2552,8 +2573,8 @@ void EffectsSystemFacade::spawnMultipleLiquidImpactEffects( std::span<const Liqu
 		const unsigned delay       = scaledDelays[i];
 		const LiquidImpact &impact = impacts[i];
 		spawnWaterImpactRing( delay, impact.origin );
-		const unsigned soundDelay  = delay + kLiquidImpactSoundExtraDelay;
-		startSoundForImpactUsingLimiter( soundDelay, cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
+		startSoundForImpactUsingLimiter( delay + kLiquidImpactSoundExtraDelay, kLiquidImpactSoundVolumeScale,
+										 cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
 	}
 }
 
@@ -2586,7 +2607,7 @@ void EffectsSystemFacade::spawnWaterImpactRing( unsigned delay, const float *ori
 	}
 }
 
-void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound,
+void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, float volumeScale, const SoundSet *sound,
 														   const SolidImpact &impact, const EventRateLimiterParams &params ) {
 	assert( std::fabs( VectorLengthFast( impact.normal ) - 1.0f ) < 1e-2f );
 	if( sound ) {
@@ -2597,13 +2618,13 @@ void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, const
 			const auto group = (uintptr_t)sound;
 			// Check the quotum during the actual execution
 			if( m_solidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), group, capturedParams ) ) {
-				startEffectSound( sound, capturedSoundOrigin.Data(), ATTN_STATIC );
+				startEffectSound( sound, capturedSoundOrigin.Data(), ATTN_STATIC, volumeScale );
 			}
 		});
 	}
 }
 
-void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound,
+void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, float volumeScale, const SoundSet *sound,
 														   const LiquidImpact &impact, const EventRateLimiterParams &params ) {
 	if( sound ) {
 		Vec3 capturedSoundOrigin( Vec3( impact.origin ) + Vec3( impact.burstDir ) );
@@ -2612,7 +2633,7 @@ void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, const
 		cg.delayedExecutionSystem.post( delay, [=, this]() {
 			// Check the quotum during the actual execution
 			if( m_liquidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), capturedParams ) ) {
-				startEffectSound( sound, capturedSoundOrigin.Data(), ATTN_STATIC );
+				startEffectSound( sound, capturedSoundOrigin.Data(), ATTN_STATIC, volumeScale );
 			}
 		});
 	}
