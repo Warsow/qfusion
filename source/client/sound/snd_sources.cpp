@@ -49,9 +49,9 @@ static void S_AdjustGain( src_t *src ) {
 	}
 
 	if( src->volumeVar ) {
-		alSourcef( src->source, AL_GAIN, clampSourceGain( src->fvol * src->volumeVar->value ) );
+		alSourcef( src->source, AL_GAIN, checkSourceGain( src->fvol * src->volumeVar->value ) );
 	} else {
-		alSourcef( src->source, AL_GAIN, clampSourceGain( src->fvol * s_volume->value ) );
+		alSourcef( src->source, AL_GAIN, checkSourceGain( src->fvol * s_volume->value ) );
 	}
 }
 
@@ -84,7 +84,7 @@ static void source_setup( src_t *src, const SoundSet *sfx, std::pair<ALuint, uns
 
 	alSourcefv( src->source, AL_POSITION, vec3_origin );
 	alSourcefv( src->source, AL_VELOCITY, vec3_origin );
-	alSourcef( src->source, AL_GAIN, clampSourceGain( fvol * s_volume->value ) );
+	alSourcef( src->source, AL_GAIN, checkSourceGain( fvol * s_volume->value ) );
 	alSourcef( src->source, AL_PITCH, chosenPitch );
 	alSourcei( src->source, AL_SOURCE_RELATIVE, AL_FALSE );
 	alSourcei( src->source, AL_LOOPING, AL_FALSE );

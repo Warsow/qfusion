@@ -78,8 +78,9 @@ extern cvar_t *s_hrtf;
 #define SRCPRI_STREAM   4   // Streams (music, cutscenes)
 
 [[nodiscard]]
-static inline auto clampSourceGain( float givenVolume ) -> float {
-	return wsw::clamp( givenVolume, 0.0f, 1.0f );
+static inline auto checkSourceGain( float givenVolume ) -> float {
+	assert( givenVolume >= 0.0f && givenVolume < 1000.0f );
+	return givenVolume;
 }
 
 // playing

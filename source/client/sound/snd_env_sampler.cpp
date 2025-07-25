@@ -100,9 +100,9 @@ void ENV_UnregisterSource( src_t *src ) {
 	alSourcei( src->source, AL_DIRECT_FILTER, AL_FILTER_NULL );
 	// Restore the original source gain
 	if( src->volumeVar ) {
-		alSourcef( src->source, AL_GAIN, clampSourceGain( src->fvol * src->volumeVar->value ) );
+		alSourcef( src->source, AL_GAIN, checkSourceGain( src->fvol * src->volumeVar->value ) );
 	} else {
-		alSourcef( src->source, AL_GAIN, clampSourceGain( src->fvol * s_volume->value ) );
+		alSourcef( src->source, AL_GAIN, checkSourceGain( src->fvol * s_volume->value ) );
 	}
 }
 

@@ -191,7 +191,7 @@ static void S_RawSamples_( int entNum, float fvol, float attenuation,
 	rs->samples_length += (ALuint)( (ALfloat)samples * 1000.0 / rate + 0.5f );
 
 	rs->src->fvol = fvol;
-	alSourcef( rs->source, AL_GAIN, clampSourceGain( rs->src->fvol * rs->src->volumeVar->value ) );
+	alSourcef( rs->source, AL_GAIN, checkSourceGain( rs->src->fvol * rs->src->volumeVar->value ) );
 
 	alGetSourcei( rs->source, AL_SOURCE_STATE, &state );
 	if( state != AL_PLAYING ) {
