@@ -92,6 +92,8 @@ public:
 	CachedSound sndImpactGeneric { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_generic*" } } };
 	CachedSound sndImpactWater { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_water*" } } };
 
+	CachedSound sndBulletFlyby { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/bullet_flyby*" } } };
+
 	CachedSound sndWeaponKill { this, SoundSetProps { .name = SoundSetProps::Exact { S_WEAPON_KILL } } };
 	CachedSound sndWeaponHitTeam { this, SoundSetProps { .name = SoundSetProps::Exact { S_WEAPON_HIT_TEAM } } };
 	CachedSound sndWeaponUp { this, SoundSetProps { .name = SoundSetProps::Exact { S_WEAPON_SWITCH } } };

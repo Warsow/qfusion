@@ -271,6 +271,8 @@ private:
 	void startSoundForImpactUsingLimiter( unsigned delay, float volumeScale, const SoundSet *sound,
 										  const LiquidImpact &impact, const EventRateLimiterParams &params );
 
+	void startPreImpactBulletFlybySound( unsigned delay, const Vec3 &origin );
+
 	void spawnLiquidImpactParticleEffect( unsigned delay, const LiquidImpact &impact, float percentageScale,
 										  std::pair<float, float> randomRotationAngleCosineRange );
 

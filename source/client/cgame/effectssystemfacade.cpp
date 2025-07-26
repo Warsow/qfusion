@@ -2613,14 +2613,13 @@ void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, float
 	if( sound ) {
 		Vec3 capturedSoundOrigin( Vec3( impact.origin ) + Vec3( impact.normal ) );
 		assert( !( CG_PointContents( capturedSoundOrigin.Data() ) & MASK_SOLID ) );
-		EventRateLimiterParams capturedParams = params;
-		cg.delayedExecutionSystem.post( delay, [=, this] {
-			const auto group = (uintptr_t)sound;
-			// Check the quotum during the actual execution
-			if( m_solidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), group, capturedParams ) ) {
+		const auto group = (uintptr_t)sound;
+		if( m_solidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), group, params ) ) {
+			startPreImpactBulletFlybySound( delay, capturedSoundOrigin );
+			cg.delayedExecutionSystem.post( delay, [=, this] {
 				startEffectSound( sound, capturedSoundOrigin.Data(), ATTN_STATIC, volumeScale );
-			}
-		});
+			});
+		}
 	}
 }
 
@@ -2629,13 +2628,22 @@ void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, float
 	if( sound ) {
 		Vec3 capturedSoundOrigin( Vec3( impact.origin ) + Vec3( impact.burstDir ) );
 		assert( !( CG_PointContents( capturedSoundOrigin.Data() ) & MASK_SOLID ) );
-		EventRateLimiterParams capturedParams = params;
-		cg.delayedExecutionSystem.post( delay, [=, this]() {
-			// Check the quotum during the actual execution
-			if( m_liquidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), capturedParams ) ) {
+		if( m_liquidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), params ) ) {
+			startPreImpactBulletFlybySound( delay, capturedSoundOrigin );
+			cg.delayedExecutionSystem.post( delay, [=, this]() {
 				startEffectSound( sound, capturedSoundOrigin.Data(), ATTN_STATIC, volumeScale );
-			}
-		});
+			});
+		}
+	}
+}
+
+void EffectsSystemFacade::startPreImpactBulletFlybySound( unsigned delay, const Vec3 &origin ) {
+	constexpr unsigned minVolumeDelay  = 75;
+	constexpr unsigned fullVolumeDelay = 250;
+	if( delay > minVolumeDelay ) {
+		const float rcpDelayRange = Q_Rcp( (float)( fullVolumeDelay - minVolumeDelay ) );
+		const float volumeScale   = wsw::min( 1.0f, (float)( delay - minVolumeDelay ) * rcpDelayRange );
+		startEffectSound( cgs.media.sndBulletFlyby, origin.Data(), ATTN_STATIC, volumeScale );
 	}
 }
 
