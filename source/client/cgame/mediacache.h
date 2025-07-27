@@ -84,12 +84,15 @@ public:
 		{ this, SoundSetProps { .name = SoundSetProps::Exact { "sounds/misc/hit_plus_3" } } },
 	};
 
+	CachedSound sndImpactGeneric { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_generic*" } } };
+	CachedSound sndImpactStone { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_stone*" } } };
+	CachedSound sndImpactStucco { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_stucco*" } } };
+	CachedSound sndImpactWood { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_wood*" } } };
+	CachedSound sndImpactDirt { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_dirt*" } } };
+	CachedSound sndImpactSand { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_sand*" } } };
 	CachedSound sndImpactMetal { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_metal*" } } };
 	CachedSound sndImpactGlass { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_glass*" } } };
-	CachedSound sndImpactWood { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_wood*" } } };
-	CachedSound sndImpactSoft { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_soft*" } } };
-	CachedSound sndImpactStone { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_stone*" } } };
-	CachedSound sndImpactGeneric { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_generic*" } } };
+
 	CachedSound sndImpactWater { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/impact_water*" } } };
 
 	CachedSound sndBulletFlyby { this, SoundSetProps { .name = SoundSetProps::Pattern { "sounds/weapons/bullet_flyby*" } } };

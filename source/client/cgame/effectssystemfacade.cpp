@@ -2048,20 +2048,20 @@ auto EffectsSystemFacade::getImpactSoundForMaterial( SurfImpactMaterial impactMa
 			*extraDelay = 75, *volumeScale = 1.0f;
 			return cgs.media.sndImpactGeneric;
 		case SurfImpactMaterial::Stone:
-			*extraDelay = 75, *volumeScale = 2.0f;
+			*extraDelay = 50, *volumeScale = 1.0f;
 			return cgs.media.sndImpactStone;
 		case SurfImpactMaterial::Stucco:
 			*extraDelay = 75, *volumeScale = 2.0f;
-			return cgs.media.sndImpactSoft;
+			return cgs.media.sndImpactStucco;
 		case SurfImpactMaterial::Wood:
 			*extraDelay = 75, *volumeScale = 1.5f;
 			return cgs.media.sndImpactWood;
 		case SurfImpactMaterial::Dirt:
 			*extraDelay = 75, *volumeScale = 2.0f;
-			return cgs.media.sndImpactSoft;
+			return cgs.media.sndImpactDirt;
 		case SurfImpactMaterial::Sand:
 			*extraDelay = 75, *volumeScale = 1.5f;
-			return cgs.media.sndImpactSoft;
+			return cgs.media.sndImpactSand;
 		case SurfImpactMaterial::Metal:
 			*extraDelay = 0, *volumeScale = 1.0f;
 			return cgs.media.sndImpactMetal;
