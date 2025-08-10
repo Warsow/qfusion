@@ -1906,9 +1906,12 @@ void EffectsSystemFacade::spawnGlassImpactParticles( unsigned delay, const Flock
 void EffectsSystemFacade::spawnBulletImpactEffect( unsigned delay, const SolidImpact &impact ) {
 	const FlockOrientation flockOrientation = makeRicochetFlockOrientation( impact, &m_rng );
 
-	const SoundSet *sound;
-	float volumeScale   = 1.0f;
-	unsigned extraDelay = 0;
+	const SoundSet *impactSound;
+	const SoundSet *ricochetSound;
+	float ricochetChance      = 0.0f;
+	float ricochetVolumeScale = 0.0f;
+	float impactVolumeScale   = 0.0f;
+	unsigned extraDelay       = 0;
 	if( v_particles.get() ) {
 		const SurfImpactMaterial impactMaterial = decodeSurfImpactMaterial( impact.surfFlags );
 		const unsigned materialParam            = decodeSurfImpactMaterialParam( impact.surfFlags );
@@ -1930,14 +1933,17 @@ void EffectsSystemFacade::spawnBulletImpactEffect( unsigned delay, const SolidIm
 		if( impactMaterial == IM::Metal || impactMaterial == IM::Glass ) {
 			spawnBulletLikeImpactRingUsingLimiter( delay, impact );
 		}
-		sound = getImpactSoundForMaterial( impactMaterial, &extraDelay, &volumeScale );
+		impactSound   = getImpactSoundForMaterial( impactMaterial, &extraDelay, &impactVolumeScale );
+		ricochetSound = getRicochetSoundForMaterial( impactMaterial, &ricochetChance, &ricochetVolumeScale );
 	} else {
 		spawnBulletGenericImpactRosette( delay, flockOrientation, 0.5f, 1.0f );
 		spawnBulletImpactModel( delay, impact.origin, impact.normal );
-		sound = cgs.media.sndImpactGeneric;
+		impactSound   = getImpactSoundForMaterial( SurfImpactMaterial::Unknown, &extraDelay, &impactVolumeScale );
+		ricochetSound = getRicochetSoundForMaterial( SurfImpactMaterial::Unknown, &ricochetChance, &ricochetVolumeScale );
 	}
 
-	startSoundForImpactUsingLimiter( delay + extraDelay, volumeScale, sound, impact, EventRateLimiterParams {
+	startSoundForImpactUsingLimiter( delay + extraDelay, impactSound, impactVolumeScale,
+									 ricochetSound, ricochetVolumeScale, impact, ricochetChance, EventRateLimiterParams {
 		.dropChanceAtZeroDistance = 0.5f,
 		.startDroppingAtDistance  = 144.0f,
 		.dropChanceAtZeroTimeDiff = 1.0f,
@@ -2070,6 +2076,29 @@ auto EffectsSystemFacade::getImpactSoundForMaterial( SurfImpactMaterial impactMa
 			return cgs.media.sndImpactGlass;
 	}
 	wsw::failWithLogicError( "Unreachable" );
+}
+
+auto EffectsSystemFacade::getRicochetSoundForMaterial( SurfImpactMaterial impactMaterial,
+													   float *ricochetChance, float *volumeScale ) -> const SoundSet * {
+	// Currently they are combined with the respective impact sounds
+#if 0
+	if( impactMaterial == SurfImpactMaterial::Metal ) {
+		*ricochetChance = 1.0f;
+		*volumeScale    = 1.0f;
+		return cgs.media.sndRicochet;
+	}
+#endif
+	if( impactMaterial == SurfImpactMaterial::Stone ) {
+		*ricochetChance = 0.5f;
+		*volumeScale    = 1.0f;
+		return cgs.media.sndRicochet;
+	}
+	if( impactMaterial == SurfImpactMaterial::Unknown ) {
+		*ricochetChance = 0.7f;
+		*volumeScale    = 1.0f;
+		return cgs.media.sndRicochet;
+	}
+	return nullptr;
 }
 
 void EffectsSystemFacade::spawnPelletImpactParticleEffectForMaterial( unsigned delay,
@@ -2411,8 +2440,8 @@ void EffectsSystemFacade::spawnBulletLiquidImpactEffect( unsigned delay, const L
 
 	spawnWaterImpactRing( delay, impact.origin );
 
-	startSoundForImpactUsingLimiter( delay + kLiquidImpactSoundExtraDelay, kLiquidImpactSoundVolumeScale,
-									 cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
+	startSoundForImpactUsingLimiter( delay + kLiquidImpactSoundExtraDelay, cgs.media.sndImpactWater,
+									 kLiquidImpactSoundVolumeScale, impact, kLiquidImpactSoundLimiterParams );
 }
 
 void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const SolidImpact> impacts,
@@ -2424,6 +2453,7 @@ void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const Soli
 		.startDroppingAtTimeDiff = 250,
 	};
 
+	constexpr float pelletRicochetChanceScale = 0.75f;
 	if( v_particles.get() ) {
 		using IM = SurfImpactMaterial;
 		assert( impacts.size() <= 64 );
@@ -2478,20 +2508,31 @@ void EffectsSystemFacade::spawnMultiplePelletImpactEffects( std::span<const Soli
 				numRosetteImpactsSoFar++;
 			}
 
-			float volumeScale         = 1.0f;
-			unsigned extraDelay       = 0;
-			const auto impactMaterial = decodeSurfImpactMaterial( impact.surfFlags );
-			const SoundSet *sound     = getImpactSoundForMaterial( impactMaterial, &extraDelay, &volumeScale );
-			startSoundForImpactUsingLimiter( delay + extraDelay, volumeScale, sound, impact, limiterParams );
+			float impactVolumeScale       = 0.0f;
+			float ricochetVolumeScale     = 0.0f;
+			float ricochetChance          = 0.0f;
+			unsigned extraDelay           = 0;
+			const auto impactMaterial     = decodeSurfImpactMaterial( impact.surfFlags );
+			const SoundSet *impactSound   = getImpactSoundForMaterial( impactMaterial, &extraDelay, &impactVolumeScale );
+			const SoundSet *ricochetSound = getRicochetSoundForMaterial( SurfImpactMaterial::Unknown,
+																		 &ricochetChance, &ricochetVolumeScale );
+			startSoundForImpactUsingLimiter( delay + extraDelay, impactSound, impactVolumeScale,
+											 ricochetSound, ricochetVolumeScale, impact,
+											 ricochetChance * pelletRicochetChanceScale, limiterParams );
 		}
 	} else {
+		float ricochetChance          = 0.0f;
+		float ricochetVolumeScale     = 0.0f;
+		const SoundSet *ricochetSound = getRicochetSoundForMaterial( SurfImpactMaterial::Unknown,
+																	 &ricochetChance, &ricochetVolumeScale );
 		for( unsigned i = 0; i < impacts.size(); ++i ) {
 			const SolidImpact &impact = impacts[i];
 			const unsigned delay      = delays[i];
 			const FlockOrientation orientation = makeRicochetFlockOrientation( impact, &m_rng );
 			spawnBulletGenericImpactRosette( delay, orientation, 0.1f, 0.5f, i, impacts.size() );
 			spawnBulletImpactModel( delay, impact.origin, impact.normal );
-			startSoundForImpactUsingLimiter( delay, 1.0f, cgs.media.sndImpactGeneric, impact, limiterParams );
+			startSoundForImpactUsingLimiter( delay, cgs.media.sndImpactGeneric, 1.0f, ricochetSound, ricochetVolumeScale,
+											 impact, ricochetChance * pelletRicochetChanceScale, limiterParams );
 		}
 	}
 }
@@ -2573,8 +2614,8 @@ void EffectsSystemFacade::spawnMultipleLiquidImpactEffects( std::span<const Liqu
 		const unsigned delay       = scaledDelays[i];
 		const LiquidImpact &impact = impacts[i];
 		spawnWaterImpactRing( delay, impact.origin );
-		startSoundForImpactUsingLimiter( delay + kLiquidImpactSoundExtraDelay, kLiquidImpactSoundVolumeScale,
-										 cgs.media.sndImpactWater, impact, kLiquidImpactSoundLimiterParams );
+		startSoundForImpactUsingLimiter( delay + kLiquidImpactSoundExtraDelay, cgs.media.sndImpactWater,
+										 kLiquidImpactSoundVolumeScale, impact, kLiquidImpactSoundLimiterParams );
 	}
 }
 
@@ -2607,23 +2648,31 @@ void EffectsSystemFacade::spawnWaterImpactRing( unsigned delay, const float *ori
 	}
 }
 
-void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, float volumeScale, const SoundSet *sound,
-														   const SolidImpact &impact, const EventRateLimiterParams &params ) {
+void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay,
+														   const SoundSet *impactSound, float impactVolumeScale,
+														   const SoundSet *ricochetSound, float ricochetVolumeScale,
+														   const SolidImpact &impact, float ricochetChance,
+														   const EventRateLimiterParams &params ) {
 	assert( std::fabs( VectorLengthFast( impact.normal ) - 1.0f ) < 1e-2f );
-	if( sound ) {
+	if( impactSound ) {
 		Vec3 capturedSoundOrigin( Vec3( impact.origin ) + Vec3( impact.normal ) );
 		assert( !( CG_PointContents( capturedSoundOrigin.Data() ) & MASK_SOLID ) );
-		const auto group = (uintptr_t)sound;
+		const auto group = (uintptr_t)impactSound;
 		if( m_solidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), group, params ) ) {
 			startPreImpactBulletFlybySound( delay, capturedSoundOrigin );
 			cg.delayedExecutionSystem.post( delay, [=, this] {
-				startEffectSound( sound, capturedSoundOrigin.Data(), ATTN_STATIC, volumeScale );
+				startEffectSound( impactSound, capturedSoundOrigin.Data(), ATTN_STATIC, impactVolumeScale );
+				if( ricochetSound ) {
+					if( m_rng.tryWithChance( ricochetChance ) ) {
+						startEffectSound( ricochetSound, capturedSoundOrigin.Data(), ATTN_STATIC, ricochetVolumeScale );
+					}
+				}
 			});
 		}
 	}
 }
 
-void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, float volumeScale, const SoundSet *sound,
+void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound, float volumeScale,
 														   const LiquidImpact &impact, const EventRateLimiterParams &params ) {
 	if( sound ) {
 		Vec3 capturedSoundOrigin( Vec3( impact.origin ) + Vec3( impact.burstDir ) );

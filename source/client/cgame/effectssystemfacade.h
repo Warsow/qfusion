@@ -252,6 +252,9 @@ private:
 	[[nodiscard]]
 	static auto getImpactSoundForMaterial( SurfImpactMaterial, unsigned *extraDelay, float *volumeScale ) -> const SoundSet *;
 
+	[[nodiscard]]
+	static auto getRicochetSoundForMaterial( SurfImpactMaterial, float *ricochetChance, float *volumeScale ) -> const SoundSet *;
+
 	void spawnMultipleExplosionImpactEffects( std::span<const SolidImpact> impacts, float percentageScale );
 
 	struct EventRateLimiterParams {
@@ -266,9 +269,11 @@ private:
 
 	void spawnBulletLikeImpactRingUsingLimiter( unsigned delay, const SolidImpact &impact );
 
-	void startSoundForImpactUsingLimiter( unsigned delay, float volumeScale, const SoundSet *sound,
-										  const SolidImpact &impact, const EventRateLimiterParams &params );
-	void startSoundForImpactUsingLimiter( unsigned delay, float volumeScale, const SoundSet *sound,
+	void startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *impactSound, float impactVolumeScale,
+										  const SoundSet *ricochetSound, float ricochetVolumeScale,
+										  const SolidImpact &impact, float ricochetChance,
+										  const EventRateLimiterParams &params );
+	void startSoundForImpactUsingLimiter( unsigned delay, const SoundSet *sound, float volumeScale,
 										  const LiquidImpact &impact, const EventRateLimiterParams &params );
 
 	void startPreImpactBulletFlybySound( unsigned delay, const Vec3 &origin );
