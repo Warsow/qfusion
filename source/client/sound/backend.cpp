@@ -593,6 +593,27 @@ void Backend::unlinkAndFree( SoundSet *soundSet ) {
 	m_soundSetsAllocator.free( soundSet );
 }
 
+[[nodiscard]]
+static auto choseIndex( unsigned limit, unsigned lastChosenIndex, RandomGenerator *rng ) -> unsigned {
+	assert( limit < std::numeric_limits<uint8_t>::max() );
+	if( limit < 2 ) [[likely]] {
+		return 0;
+	} else if( limit > 2 ) [[likely]] {
+		for( unsigned attempt = 0; attempt < 20; ++attempt ) {
+			if( const unsigned index = rng->nextBounded( limit ); index != lastChosenIndex ) {
+				return index;
+			}
+		}
+		wsw::failWithRuntimeError( "RNG bug" );
+	} else {
+		assert( limit == 2 && lastChosenIndex < 2 );
+		// Allow chosing the last chosen item, but reduce the chance
+		const unsigned altIndex = ( lastChosenIndex + 1 ) % 2;
+		const unsigned values[3] { altIndex, lastChosenIndex, altIndex };
+		return values[rng->nextBounded( std::size( values ) )];
+	}
+}
+
 auto Backend::getBufferForPlayback( const SoundSet *soundSet, bool preferStereo ) -> std::optional<std::pair<ALuint, unsigned>> {
 	if( soundSet ) {
 		if( !soundSet->isLoaded ) {
@@ -608,7 +629,7 @@ auto Backend::getBufferForPlayback( const SoundSet *soundSet, bool preferStereo 
 		}
 		const unsigned numBuffers = soundSet->numBuffers;
 		assert( numBuffers > 0 );
-		const unsigned index = ( numBuffers < 2 ) ? 0 : m_rng.nextBounded( numBuffers );
+		const unsigned index = choseIndex( numBuffers, soundSet->lastChosenBufferIndex, &m_rng );
 		ALuint chosenBuffer;
 		if( preferStereo ) {
 			chosenBuffer = soundSet->stereoBuffers[index];
@@ -622,17 +643,21 @@ auto Backend::getBufferForPlayback( const SoundSet *soundSet, bool preferStereo 
 			chosenBuffer = soundSet->buffers[index];
 		}
 		assert( alIsBuffer( chosenBuffer ) );
+		soundSet->lastChosenBufferIndex = (uint8_t)index;
 		return std::make_pair( chosenBuffer, index );
 	}
 	return std::nullopt;
 }
 
+// TODO: We don't need to disallow using previously chosen pitch
+// if we guarantee choosing a different buffer (if the number of buffers > 2)
 auto Backend::getPitchForPlayback( const SoundSet *soundSet ) -> float {
 	if( soundSet ) {
 		if( const auto numPitchVariations = soundSet->numPitchVariations; numPitchVariations > 0 ) {
-			const auto index = ( numPitchVariations < 2 ) ? 0 : m_rng.nextBounded( numPitchVariations );
+			const auto index  = choseIndex( numPitchVariations, soundSet->lastChosenPitchIndex, &m_rng );
 			const float pitch = soundSet->pitchVariations[index];
 			assert( pitch > 0.0f );
+			soundSet->lastChosenPitchIndex = (uint8_t)index;
 			return pitch;
 		}
 	}

@@ -57,6 +57,8 @@ struct SoundSet {
 
 	bool hasFailedLoading { false };
 	bool isLoaded { false };
+	mutable uint8_t lastChosenBufferIndex { 0 };
+	mutable uint8_t lastChosenPitchIndex { 0 };
 };
 
 extern cvar_t *s_volume;
