@@ -250,10 +250,10 @@ private:
 														unsigned lightFrameAffinityIndex, unsigned lightFrameAffinityModulo );
 
 	[[nodiscard]]
-	static auto getImpactSoundForMaterial( SurfImpactMaterial, unsigned *extraDelay, float *volumeScale ) -> const SoundSet *;
+	auto getImpactSoundForMaterial( SurfImpactMaterial, unsigned *extraDelay, float *volumeScale ) -> const SoundSet *;
 
 	[[nodiscard]]
-	static auto getRicochetSoundForMaterial( SurfImpactMaterial, float *ricochetChance, float *volumeScale ) -> const SoundSet *;
+	auto getRicochetSoundForMaterial( SurfImpactMaterial, float *ricochetChance, float *volumeScale ) -> const SoundSet *;
 
 	void spawnMultipleExplosionImpactEffects( std::span<const SolidImpact> impacts, float percentageScale );
 

@@ -2080,23 +2080,25 @@ auto EffectsSystemFacade::getImpactSoundForMaterial( SurfImpactMaterial impactMa
 
 auto EffectsSystemFacade::getRicochetSoundForMaterial( SurfImpactMaterial impactMaterial,
 													   float *ricochetChance, float *volumeScale ) -> const SoundSet * {
-	// Currently they are combined with the respective impact sounds
-#if 0
 	if( impactMaterial == SurfImpactMaterial::Metal ) {
-		*ricochetChance = 1.0f;
-		*volumeScale    = 1.0f;
-		return cgs.media.sndRicochet;
+		*ricochetChance = 0.8f;
+		if( m_rng.tryWithChance( 0.5f ) ) {
+			*volumeScale = 1.0f;
+			return cgs.media.sndRicochetMetal;
+		} else {
+			*volumeScale = 1.5f;
+			return cgs.media.sndRicochetGeneric;
+		}
 	}
-#endif
 	if( impactMaterial == SurfImpactMaterial::Stone ) {
 		*ricochetChance = 0.5f;
-		*volumeScale    = 1.0f;
-		return cgs.media.sndRicochet;
+		*volumeScale    = 1.5f;
+		return cgs.media.sndRicochetGeneric;
 	}
 	if( impactMaterial == SurfImpactMaterial::Unknown ) {
 		*ricochetChance = 0.7f;
-		*volumeScale    = 1.0f;
-		return cgs.media.sndRicochet;
+		*volumeScale    = 1.5f;
+		return cgs.media.sndRicochetGeneric;
 	}
 	return nullptr;
 }
