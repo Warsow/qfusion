@@ -806,7 +806,7 @@ int VID_GetPixelRatio( void ) {
 	return wsw::clamp( Sys_GetPixelRatio(), 1, 2 );
 }
 
-static rserr_t VID_ChangeMode( void ) {
+rserr_t VID_ApplyPendingMode( rserr_t ( *tryToApplyFn )( int, int, int, int, int, const VidModeOptions & ) ) {
 	vid_fullscreen->modified = false;
 
 	const int frequency = vid_displayfrequency->integer;
@@ -831,7 +831,7 @@ static rserr_t VID_ChangeMode( void ) {
 		return rserr_restart_required;
 	}
 
-	rserr_t err = R_TrySettingMode( x, y, w, h, frequency, options );
+	rserr_t err = tryToApplyFn( x, y, w, h, frequency, options );
 	if( err == rserr_restart_required ) {
 		return err;
 	}
@@ -864,7 +864,7 @@ static rserr_t VID_ChangeMode( void ) {
 
 			// Try again without the fullscreen flag
 			options.fullscreen = false;
-			err = R_TrySettingMode( x, y, w, h, frequency, options );
+			err = tryToApplyFn( x, y, w, h, frequency, options );
 		}
 
 		if( err == rserr_invalid_mode ) {
@@ -877,7 +877,7 @@ static rserr_t VID_ChangeMode( void ) {
 				h = vid_ref_prevheight;
 				Cvar_ForceSet( vid_height->name, va( "%i", h ) );
 
-				err = R_TrySettingMode( x, y, w, h, frequency, options );
+				err = tryToApplyFn( x, y, w, h, frequency, options );
 				if( err == rserr_invalid_fullscreen ) {
 					clWarning() << "Could not revert to safe fullscreen mode";
 
@@ -886,7 +886,7 @@ static rserr_t VID_ChangeMode( void ) {
 
 					// Try again without the fullscreen flag
 					options.fullscreen = false;
-					err = R_TrySettingMode( x, y, w, h, frequency, options );
+					err = tryToApplyFn( x, y, w, h, frequency, options );
 				}
 			}
 
@@ -1021,9 +1021,6 @@ static void RestartVideoAndAllMedia( bool vid_ref_was_active, bool verbose ) {
 	if( rserr_t err = VID_Sys_Init_( STR_TO_POINTER( vid_parentwid->string ), vid_ref_verbose ); err != rserr_ok ) {
 		Sys_Error( "VID_Init() failed with code %i", err );
 	}
-	if( rserr_t err = VID_ChangeMode(); err != rserr_ok ) {
-		Sys_Error( "VID_ChangeMode() failed with code %i", err );
-	}
 
 	vid_ref_active = true;
 
@@ -1081,7 +1078,7 @@ void VID_CheckChanges( void ) {
 	if( vid_fullscreen->modified ) {
 		if( vid_ref_active ) {
 			// try to change video mode without vid_restart
-			if( const rserr_t err = VID_ChangeMode(); err == rserr_restart_required ) {
+			if( const rserr_t err = VID_ApplyPendingMode( R_TrySettingMode ); err == rserr_restart_required ) {
 				vid_ref_modified = true;
 			}
 		}

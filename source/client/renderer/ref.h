@@ -695,6 +695,7 @@ enum rserr_t : int {
 	rserr_unknown
 };
 
+// Assumes that the renderer has already been initialized at start
 rserr_t R_TrySettingMode( int x, int y, int width, int height, int displayFrequency, const VidModeOptions &options );
 
 void RF_BeginRegistration();

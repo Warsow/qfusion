@@ -32,6 +32,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/profilerscope.h>
 #include <common/facilities/syspublic.h>
 #include <common/common.h>
+#include <client/vid.h>
 
 r_globals_t rf;
 
@@ -144,9 +145,6 @@ cvar_t *r_multithreading;
 cvar_t *r_showShaderCache;
 
 extern cvar_t *cl_multithreading;
-
-static bool r_verbose;
-static bool r_postinit;
 
 // Currently it's just a proxy for global function calls, so the lifecycle is trivial
 static RenderSystem g_renderSystem;
@@ -972,10 +970,6 @@ rserr_t R_Init( const char *applicationName, const char *screenshotPrefix, int s
 	const char *dllname = "";
 	qgl_initerr_t initerr;
 
-	r_verbose = verbose;
-
-	r_postinit = true;
-
 	if( !applicationName ) {
 		applicationName = "Qfusion";
 	}
@@ -992,6 +986,7 @@ rserr_t R_Init( const char *applicationName, const char *screenshotPrefix, int s
 	if( driver ) {
 		dllname = driver->dllname;
 	}
+
 	init_qgl:
 	initerr = QGL_Init( gl_driver ? gl_driver->string : dllname );
 	if( initerr != qgl_initerr_ok ) {
@@ -1017,10 +1012,10 @@ rserr_t R_Init( const char *applicationName, const char *screenshotPrefix, int s
 	glConfig.screenshotPrefix = Q_strdup( screenshotPrefix );
 	glConfig.startupColor = startupColor;
 
-	return rserr_ok;
-}
+	if( rserr_t err = VID_ApplyPendingMode( GLimp_SetMode ); err != rserr_ok ) {
+		return err;
+	}
 
-static rserr_t R_PostInit( void ) {
 	if( QGL_PostInit() != qgl_initerr_ok ) {
 		return rserr_unknown;
 	}
@@ -1095,11 +1090,11 @@ static rserr_t R_PostInit( void ) {
 
 	R_InitVolatileAssets();
 
-	// TODO:......
-	const GLenum glerr = qglGetError();
-	if( glerr != GL_NO_ERROR ) {
-		Com_Printf( "glGetError() = 0x%x\n", glerr );
-	}
+	// TODO: This could fail depending of resolution
+	RB_Init();
+
+	// TODO: This could fail depending of resolution
+	TextureCache::instance()->createPrimaryRenderTargetAttachments();
 
 	return rserr_ok;
 }
@@ -1112,18 +1107,13 @@ rserr_t R_TrySettingMode( int x, int y, int width, int height, int displayFreque
 		}
 	}
 
-	if( TextureCache *instance = TextureCache::maybeInstance() ) {
-		instance->releasePrimaryRenderTargetAttachments();
-	}
+	TextureCache::instance()->releasePrimaryRenderTargetAttachments();
 
 	RB_Shutdown();
 
 	rserr_t err = GLimp_SetMode( x, y, width, height, displayFrequency, options );
 	if( err != rserr_ok ) {
 		rError() << "Could not GLimp_SetMode()";
-	} else if( r_postinit ) {
-		err = R_PostInit();
-		r_postinit = false;
 	}
 
 	if( err != rserr_ok ) {

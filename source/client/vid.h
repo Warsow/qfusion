@@ -35,7 +35,7 @@ typedef struct {
 // Video module initialisation etc
 void VID_Init( void );
 void VID_Shutdown( void );
-void VID_CheckChanges( void );
+rserr_t VID_ApplyPendingMode( rserr_t ( *tryToApplyFn )( int, int, int, int, int, const VidModeOptions & ) );
 void VID_Restart( bool verbose, bool soundRestart );
 // The sound module may require the handle when using directsound
 void *VID_GetWindowHandle( void );
