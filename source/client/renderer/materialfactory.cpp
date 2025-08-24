@@ -380,7 +380,7 @@ void MaterialFactory::loadMaterial( Texture **images, const wsw::StringView &ful
 	images[0] = textureCache->getMaterial2DTexture( fullName, kNormSuffix, ( addFlags | IT_NORMALMAP ) );
 
 	// load glossmap image
-	if( r_lighting_specular->integer ) {
+	if( v_lighting_specular.get() ) {
 		images[1] = textureCache->getMaterial2DTexture( fullName, kGlossSuffix, addFlags );
 	}
 

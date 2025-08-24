@@ -693,9 +693,9 @@ void Frontend::addVisibleWorldSurfacesToSortList( StateForCamera *stateForCamera
 	auto *const worldEnt = scene->m_worldent;
 
 	const bool worldOutlines = mapConfig.forceWorldOutlines || ( stateForCamera->refdef.rdflags & RDF_WORLDOUTLINES );
-	if( worldOutlines && ( stateForCamera->viewCluster != -1 ) && r_outlines_scale->value > 0 ) {
+	if( worldOutlines && ( stateForCamera->viewCluster != -1 ) && v_outlinesScale.get() > 0 ) {
 		// TODO: Shouldn't it affect culling?
-		worldEnt->outlineHeight = wsw::max( 0.0f, r_outlines_world->value );
+		worldEnt->outlineHeight = wsw::max( 0.0f, v_outlinesWorld.get() );
 	} else {
 		worldEnt->outlineHeight = 0;
 	}
@@ -823,7 +823,7 @@ void Frontend::processWorldPortalSurfaces( StateForCamera *stateForCamera, Scene
 	// Note: Looks like we have to properly update portal surfaces even if portals are disabled (for sorting reasons).
 	// Check whether actual drawing is enabled upon doing that.
 	if( !isCameraAPortalCamera && !( stateForCamera->refdef.rdflags & RDF_LOWDETAIL ) ) {
-		if( stateForCamera->viewCluster >= 0 && !r_fastsky->integer ) {
+		if( stateForCamera->viewCluster >= 0 && !v_fastSky.get() ) {
 			for( unsigned i = 0; i < stateForCamera->numPortalSurfaces; ++i ) {
 				if( validPortalSurfacesMask & ( 1u << i ) ) {
 					prepareDrawingPortalSurface( stateForCamera, scene, &stateForCamera->portalSurfaces[i] );

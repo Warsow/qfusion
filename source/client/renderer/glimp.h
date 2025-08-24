@@ -88,10 +88,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define GAMMARAMP_STRIDE                4096
 
-#include <common/facilities/cvar.h>
+#include <common/facilities/configvars.h>
 
-extern cvar_t *r_stencilbits;
-extern cvar_t *gl_driver;
+extern IntConfigVar v_stencilBits;
 
 //====================================================================
 

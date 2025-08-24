@@ -430,11 +430,11 @@ auto Frontend::setupStateForCamera( const refdef_t *fd, unsigned sceneIndex,
 	stateForCamera->sceneIndex  = sceneIndex;
 
 	stateForCamera->renderFlags = 0;
-	if( r_lightmap->integer ) {
+	if( v_lightmap.get() ) {
 		stateForCamera->renderFlags |= RF_LIGHTMAP;
 	}
 
-	if( r_drawflat->integer ) {
+	if( v_drawFlat.get() ) {
 		stateForCamera->renderFlags |= RF_DRAWFLAT;
 	}
 
@@ -628,7 +628,7 @@ auto Frontend::coBeginPreparingRenderingFromTheseCameras( CoroTask::StartInfo si
 	for( unsigned cameraIndex = 0; cameraIndex < scenesAndCameras.size(); ++cameraIndex ) {
 		StateForCamera *const stateForCamera = scenesAndCameras[cameraIndex].second;
 		if( !( stateForCamera->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-			if( r_drawworld->integer && rsh.worldModel ) {
+			if( v_drawWorld.get() && rsh.worldModel ) {
 				statesForValidCameras.push_back( stateForCamera );
 				scenesForValidCameras.push_back( scenesAndCameras[cameraIndex].first );
 			}
@@ -800,7 +800,7 @@ auto Frontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, 
 	}
 
 	workloadStorage->dynamicMeshFillDataWorkload.clear();
-	if( r_drawentities->integer ) {
+	if( v_drawEntities.get() ) {
 		for( auto [scene, stateForCamera] : scenesAndCameras ) {
 			const std::span<const Frustum> occluderFrusta { stateForCamera->occluderFrusta, stateForCamera->numOccluderFrusta };
 			self->collectVisibleDynamicMeshes( stateForCamera, scene, occluderFrusta, &self->m_dynamicMeshOffsetsOfVerticesAndIndices );
@@ -820,7 +820,7 @@ auto Frontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, 
 	// Note: Dynamically submitted entities may add lights
 	std::span<const uint16_t> visibleProgramLightIndices[MAX_REF_CAMERAS];
 	std::span<const uint16_t> visibleCoronaLightIndices[MAX_REF_CAMERAS];
-	if( r_dynamiclight->integer ) {
+	if( v_dynamicLight.get() ) {
 		for( unsigned cameraIndex = 0; cameraIndex < scenesAndCameras.size(); ++cameraIndex ) {
 			auto [scene, stateForCamera] = scenesAndCameras[cameraIndex];
 			const std::span<const Frustum> occluderFrusta { stateForCamera->occluderFrusta, stateForCamera->numOccluderFrusta };
@@ -869,7 +869,7 @@ auto Frontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, 
 
 		self->collectVisiblePolys( stateForCamera, scene, occluderFrusta );
 
-		if( const int dynamicLightValue = r_dynamiclight->integer ) {
+		if( const int dynamicLightValue = v_dynamicLight.get() ) {
 			if( dynamicLightValue & 2 ) {
 				self->addCoronaLightsToSortList( stateForCamera, scene->m_polyent, scene->m_dynamicLights.data(), visibleCoronaLightIndices[i] );
 			}
@@ -885,7 +885,7 @@ auto Frontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, 
 			self->addVisibleWorldSurfacesToSortList( stateForCamera, scene );
 		}
 
-		if( r_drawentities->integer ) {
+		if( v_drawEntities.get() ) {
 			self->collectVisibleEntities( stateForCamera, scene, occluderFrusta );
 		}
 
@@ -950,14 +950,14 @@ void Frontend::performPreparedRenderingFromThisCamera( Scene *scene, StateForCam
 			}
 		}
 	}
-	if( r_portalonly->integer ) {
+	if( v_portalOnly.get() ) {
 		return;
 	}
 
 	bool drawWorld = false;
 
 	if( !( stateForCamera->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-		if( r_drawworld->integer && rsh.worldModel ) {
+		if( v_drawWorld.get() && rsh.worldModel ) {
 			drawWorld = true;
 		}
 	}
@@ -1021,7 +1021,7 @@ void Frontend::performPreparedRenderingFromThisCamera( Scene *scene, StateForCam
 
 	submitDrawActionsList( stateForCamera, scene );
 
-	if( r_showtris->integer && !( renderFlags & RF_SHADOWMAPVIEW ) ) {
+	if( v_showTris.get() && !( renderFlags & RF_SHADOWMAPVIEW ) ) {
 		RB_EnableWireframe( true );
 
 		submitDrawActionsList( stateForCamera, scene );
@@ -1097,11 +1097,11 @@ void DrawSceneRequest::addEntity( const entity_t *ent ) {
 		}
 
 		if( added ) {
-			if( r_outlines_scale->value <= 0 ) {
+			if( v_outlinesScale.get() <= 0 ) {
 				added->outlineHeight = 0;
 			}
 
-			if( !r_lerpmodels->integer ) {
+			if( !v_lerpModels.get() ) {
 				added->backlerp = 0;
 			}
 
@@ -1139,7 +1139,7 @@ void DrawSceneRequest::addPortalEntity( const entity_t *ent ) {
 void DrawSceneRequest::addLight( const float *origin, float programRadius, float coronaRadius, float r, float g, float b ) {
 	assert( ( r >= 0.0f && r >= 0.0f && b >= 0.0f ) && ( r > 0.0f || g > 0.0f || b > 0.0f ) );
 	if( !m_dynamicLights.full() ) [[likely]] {
-		if( const int cvarValue = r_dynamiclight->integer ) [[likely]] {
+		if( const int cvarValue = v_dynamicLight.get() ) [[likely]] {
 			const bool hasProgramLight = programRadius > 0.0f && ( cvarValue & 1 ) != 0;
 			const bool hasCoronaLight = coronaRadius > 0.0f && ( cvarValue & 2 ) != 0;
 			if( hasProgramLight | hasCoronaLight ) [[likely]] {

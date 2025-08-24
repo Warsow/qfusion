@@ -1876,7 +1876,7 @@ void RP_UpdateDiffuseLightUniforms( int elem,
 		qglUniform3f( program->loc.LightDiffuse, lightDiffuse[0], lightDiffuse[1], lightDiffuse[2] );
 	}
 	if( program->loc.LightingIntensity >= 0 ) {
-		qglUniform1f( program->loc.LightingIntensity, r_lighting_intensity->value );
+		qglUniform1f( program->loc.LightingIntensity, v_lighting_intensity.get() );
 	}
 }
 
@@ -1928,7 +1928,7 @@ void RP_UpdateOutlineUniforms( int elem, float projDistance ) {
 		qglUniform1f( program->loc.OutlineHeight, projDistance );
 	}
 	if( program->loc.OutlineCutOff >= 0 ) {
-		qglUniform1f( program->loc.OutlineCutOff, wsw::max( 0.0f, r_outlines_cutoff->value ) );
+		qglUniform1f( program->loc.OutlineCutOff, wsw::max( 0.0f, v_outlinesCutoff.get() ) );
 	}
 }
 

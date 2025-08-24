@@ -504,7 +504,7 @@ bool MaterialParser::tryMatchingPortalMap( const wsw::StringView &texNameToken )
 		m_sort = 0; // reset sorting so we can figure it out later. FIXME?
 	}
 
-	m_flags |= SHADER_PORTAL | ( r_portalmaps->integer ? SHADER_PORTAL_CAPTURE : 0 );
+	m_flags |= SHADER_PORTAL | ( v_portalMaps.get() ? SHADER_PORTAL_CAPTURE : 0 );
 	return true;
 }
 
@@ -750,7 +750,7 @@ bool MaterialParser::parseMaterial() {
 			pass->images[1] = findImage( token, imageFlags | IT_NORMALMAP );
 			pass->program_type = GLSL_PROGRAM_TYPE_MATERIAL;
 		} else if( !pass->images[2] ) {
-			if( !isAPlaceholder( token ) && r_lighting_specular->integer ) {
+			if( !isAPlaceholder( token ) && v_lighting_specular.get() ) {
 				pass->images[2] = findImage( token, imageFlags );
 			} else {
 				// set gloss to rsh.blackTexture so we know we have already parsed the gloss image
@@ -795,7 +795,7 @@ bool MaterialParser::parseMaterial() {
 	pass->images[1] = textureCache->getMaterial2DTexture( m_name, kNormSuffix, imageFlags );
 
 	// load glossmap image
-	if( r_lighting_specular->integer ) {
+	if( v_lighting_specular.get() ) {
 		pass->images[2] = textureCache->getMaterial2DTexture( m_name, kGlossSuffix, imageFlags );
 	}
 
@@ -807,7 +807,7 @@ bool MaterialParser::parseMaterial() {
 }
 
 bool MaterialParser::parseDistortion() {
-	if( !r_portalmaps->integer ) {
+	if( !v_portalMaps.get() ) {
 	    // TODO:....
 		//Com_DPrintf( S_COLOR_YELLOW "WARNING: shader %s has a distortion stage, while GLSL is not supported\n", shader->name );
 		return m_lexer->skipToEndOfLine();
@@ -1464,7 +1464,7 @@ bool MaterialParser::getBoolConditionVarValue( BoolConditionVar var ) {
 		case BoolConditionVar::TextureCubeMap: return true;
 		case BoolConditionVar::Glsl: return true;
 		case BoolConditionVar::DeluxeMaps: return mapConfig.deluxeMaps;
-		case BoolConditionVar::PortalMaps: return r_portalmaps->integer;
+		case BoolConditionVar::PortalMaps: return v_portalMaps.get();
 		default: wsw::failWithLogicError( "unreachable" );
 	}
 }
@@ -1675,7 +1675,7 @@ void MaterialParser::fixFlagsAndSortingOrder() {
 }
 
 shader_t *MaterialParser::build() {
-	if( r_lighting_vertexlight->integer ) {
+	if( v_lighting_vertexLight.get() ) {
 		fixLightmapsForVertexLight();
 	}
 

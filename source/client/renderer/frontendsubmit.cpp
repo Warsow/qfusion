@@ -665,7 +665,7 @@ void Frontend::prepareDynamicMesh( DynamicMeshFillDataWorkload *workload ) {
 	unsigned numAffectingLights     = 0;
 	uint16_t *affectingLightIndices = nullptr;
 	std::span<const uint16_t> lightIndicesSpan;
-	if( dynamicMesh->applyVertexDynLight && r_dynamiclight->integer && workload->stateForCamera->numAllVisibleLights ) {
+	if( dynamicMesh->applyVertexDynLight && v_dynamicLight.get() && workload->stateForCamera->numAllVisibleLights ) {
 		std::span<const uint16_t> availableLights { workload->stateForCamera->allVisibleLightIndices,
 													workload->stateForCamera->numAllVisibleLights };
 

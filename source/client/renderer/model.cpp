@@ -1465,7 +1465,7 @@ static void R_InitMapConfig( const char *model ) {
 	VectorClear( mapConfig.ambient );
 	VectorClear( mapConfig.outlineColor );
 
-	if( r_lighting_packlightmaps->integer ) {
+	if( v_lighting_packLightmaps.get() ) {
 		char lightmapsPath[MAX_QPATH], *p;
 
 		mapConfig.lightmapsPacking = true;
@@ -1490,7 +1490,7 @@ static void R_InitMapConfig( const char *model ) {
 */
 static void R_FinishMapConfig( const model_t *mod ) {
 	// ambient lighting
-	if( r_fullbright->integer ) {
+	if( v_fullbright.get() ) {
 		VectorSet( mapConfig.ambient, 1, 1, 1 );
 		mapConfig.averageLightingIntensity = 1;
 	} else {
@@ -1587,10 +1587,11 @@ int R_LODForSphere( const vec3_t origin, float radius, const float *viewOrigin, 
 	dist /= viewLodScale;
 
 	int lod = (int)( dist / radius );
-	if( r_lodscale->integer ) {
-		lod /= r_lodscale->integer;
+	// TODO: Specify var bounds?
+	if( const float scale = v_lodScale.get(); scale != 0.0f ) {
+		lod /= scale;
 	}
-	lod += r_lodbias->integer;
+	lod += v_lodBias.get();
 
 	if( lod < 1 ) {
 		return 0;
@@ -1701,7 +1702,7 @@ void R_LightForOrigin( const vec3_t origin, vec3_t dir, vec4_t ambient, vec4_t d
 	}
 
 	// convert to grayscale
-	if( r_lighting_grayscale->integer ) {
+	if( v_lighting_grayscale.get() ) {
 		vec_t grey;
 
 		if( ambient ) {
@@ -1723,19 +1724,21 @@ void R_LightForOrigin( const vec3_t origin, vec3_t dir, vec4_t ambient, vec4_t d
 
 	VectorNormalizeFast( dir );
 
-	if( r_fullbright->integer ) {
+	if( v_fullbright.get() ) {
 		VectorSet( ambientLocal, 1, 1, 1 );
 		VectorSet( diffuseLocal, 1, 1, 1 );
 	} else {
 		const float scale = ( 1 << mapConfig.overbrightBits ) / 255.0f;
 
 		for( i = 0; i < 3; i++ ) {
-			ambientLocal[i] = ambientLocal[i] * scale * bound( 0.0f, r_lighting_ambientscale->value, 1.0f );
+			// TODO: Specify the var bounds
+			ambientLocal[i] = ambientLocal[i] * scale * bound( 0.0f, v_lighting_ambientScale.get(), 1.0f );
 		}
 		ColorNormalize( ambientLocal, ambientLocal );
 
 		for( i = 0; i < 3; i++ ) {
-			diffuseLocal[i] = diffuseLocal[i] * scale * bound( 0.0f, r_lighting_directedscale->value, 1.0f );
+			// TODO: Specify the var bounds
+			diffuseLocal[i] = diffuseLocal[i] * scale * bound( 0.0f, v_lighting_directedScale.get(), 1.0f );
 		}
 		ColorNormalize( diffuseLocal, diffuseLocal );
 	}

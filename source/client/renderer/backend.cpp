@@ -1001,7 +1001,8 @@ static void RB_EnableVertexAttribs( void ) {
 }
 
 void RB_DrawElementsReal( const DrawCallData &drawCallData ) {
-	if( !( r_drawelements->integer || rb.currentEntity == &rb.nullEnt ) ) [[unlikely]] {
+	// TODO: What's the purpose of v_drawElements
+	if( !( v_drawElements.get() || rb.currentEntity == &rb.nullEnt ) ) [[unlikely]] {
 		return;
 	}
 

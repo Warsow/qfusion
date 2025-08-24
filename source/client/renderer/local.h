@@ -1326,110 +1326,56 @@ extern lightstyle_t lightStyles[MAX_LIGHTSTYLES];
 
 constexpr const unsigned kWorldEntNumber = 0;
 
-extern cvar_t *r_norefresh;
-extern cvar_t *r_drawentities;
-extern cvar_t *r_drawworld;
-extern cvar_t *r_speeds;
-extern cvar_t *r_drawelements;
-extern cvar_t *r_fullbright;
-extern cvar_t *r_lightmap;
-extern cvar_t *r_novis;
-extern cvar_t *r_nocull;
-extern cvar_t *r_lerpmodels;
-extern cvar_t *r_brightness;
-extern cvar_t *r_sRGB;
+#include <common/facilities/configvars.h>
 
-extern cvar_t *r_dynamiclight;
-extern cvar_t *r_detailtextures;
-extern cvar_t *r_subdivisions;
-extern cvar_t *r_showtris;
-extern cvar_t *r_shownormals;
-extern cvar_t *r_draworder;
+extern BoolConfigVar v_fullbright, v_lightmap, v_drawEntities, v_drawWorld, v_lerpModels, v_drawElements;
+extern IntConfigVar v_showTris;
 
-extern cvar_t *r_fastsky;
-extern cvar_t *r_portalonly;
-extern cvar_t *r_portalmaps;
-extern cvar_t *r_portalmaps_maxtexsize;
+extern BoolConfigVar v_detailTextures;
 
-extern cvar_t *r_lighting_deluxemapping;
-extern cvar_t *r_lighting_specular;
-extern cvar_t *r_lighting_glossintensity;
-extern cvar_t *r_lighting_glossexponent;
-extern cvar_t *r_lighting_ambientscale;
-extern cvar_t *r_lighting_directedscale;
-extern cvar_t *r_lighting_packlightmaps;
-extern cvar_t *r_lighting_maxlmblocksize;
-extern cvar_t *r_lighting_vertexlight;
-extern cvar_t *r_lighting_maxglsldlights;
-extern cvar_t *r_lighting_grayscale;
-extern cvar_t *r_lighting_intensity;
+extern IntConfigVar v_dynamicLight, v_subdivisions;
 
-extern cvar_t *r_offsetmapping;
-extern cvar_t *r_offsetmapping_scale;
-extern cvar_t *r_offsetmapping_reliefmapping;
+extern BoolConfigVar v_fastSky, v_portalOnly, v_portalMaps;
+extern IntConfigVar v_portalMaps_maxTexSize;
 
-extern cvar_t *r_shadows;
-extern cvar_t *r_shadows_alpha;
-extern cvar_t *r_shadows_nudge;
-extern cvar_t *r_shadows_projection_distance;
-extern cvar_t *r_shadows_maxtexsize;
-extern cvar_t *r_shadows_pcf;
-extern cvar_t *r_shadows_self_shadow;
-extern cvar_t *r_shadows_dither;
+extern BoolConfigVar v_lighting_deluxeMapping, v_lighting_specular, v_lighting_vertexLight;
+extern BoolConfigVar v_lighting_packLightmaps, v_lighting_grayscale;
+extern IntConfigVar v_lighting_maxLmBlockSize;
+extern FloatConfigVar v_lighting_glossIntensity, v_lighting_glossExponent;
+extern FloatConfigVar v_lighting_ambientScale, v_lighting_directedScale;
+extern FloatConfigVar v_lighting_intensity;
+extern IntConfigVar v_lighting_maxGlslDlights;
 
-extern cvar_t *r_outlines_world;
-extern cvar_t *r_outlines_scale;
-extern cvar_t *r_outlines_cutoff;
+extern IntConfigVar v_offsetMapping;
+extern FloatConfigVar v_offsetMapping_scale;
+extern BoolConfigVar v_offsetMapping_reliefMapping;
 
-extern cvar_t *r_soft_particles;
-extern cvar_t *r_soft_particles_scale;
+extern FloatConfigVar v_outlinesWorld, v_outlinesScale, v_outlinesCutoff;
 
-extern cvar_t *r_hdr;
-extern cvar_t *r_hdr_gamma;
-extern cvar_t *r_hdr_exposure;
+extern BoolConfigVar v_softParticles;
+extern FloatConfigVar v_softParticles_scale;
 
-extern cvar_t *r_bloom;
+extern BoolConfigVar v_hdr;
+extern FloatConfigVar v_hdrGamma, v_hdrExposure;
 
-extern cvar_t *r_fxaa;
-extern cvar_t *r_samples;
+extern IntConfigVar v_lodBias;
+extern FloatConfigVar v_lodScale;
 
-extern cvar_t *r_lodbias;
-extern cvar_t *r_lodscale;
+extern FloatConfigVar v_gamma;
 
-extern cvar_t *r_gamma;
-extern cvar_t *r_texturefilter;
-extern cvar_t *r_anisolevel;
-extern cvar_t *r_texturecompression;
-extern cvar_t *r_mode;
-extern cvar_t *r_picmip;
-extern cvar_t *r_polyblend;
-extern cvar_t *r_lockpvs;
-extern cvar_t *r_screenshot_fmtstr;
-extern cvar_t *r_screenshot_jpeg;
-extern cvar_t *r_screenshot_jpeg_quality;
-extern cvar_t *r_swapinterval;
-extern cvar_t *r_swapinterval_min;
+extern StringConfigVar v_textureFilter;
+extern IntConfigVar v_anisoLevel;
+extern BoolConfigVar v_textureCompression;
 
-extern cvar_t *r_temp1;
+// TODO: should we allow configuring it?
+extern IntConfigVar v_stencilBits;
 
-extern cvar_t *r_drawflat;
-extern cvar_t *r_wallcolor;
-extern cvar_t *r_floorcolor;
+extern BoolConfigVar v_drawFlat;
+extern ColorConfigVar v_wallColor, v_floorColor;
 
-extern cvar_t *r_usenotexture;
+extern IntConfigVar v_swapInterval;
 
-extern cvar_t *r_maxglslbones;
-
-extern cvar_t *r_multithreading;
-
-extern cvar_t *r_showShaderCache;
-
-extern cvar_t *gl_cull;
-
-extern cvar_t *vid_displayfrequency;
-extern cvar_t *vid_multiscreen_head;
-
-//====================================================================
+extern BoolConfigVar v_showShaderCache;
 
 void R_NormToLatLong( const vec_t *normal, uint8_t latlong[2] );
 void R_LatLongToNorm( const uint8_t latlong[2], vec3_t out );
@@ -1477,7 +1423,7 @@ void        R_BeginFrame( bool forceClear, int swapInterval );
 void        R_EndFrame( void );
 int         R_SetSwapInterval( int swapInterval, int oldSwapInterval );
 void        R_SetGamma( float gamma );
-void        R_SetWallFloorColors( const vec3_t wallColor, const vec3_t floorColor );
+void        R_SetWallFloorColors( int wallColor, int floorColor );
 void        R_Set2DMode( bool enable );
 void        R_Flush( void );
 

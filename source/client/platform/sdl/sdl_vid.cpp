@@ -231,7 +231,7 @@ rserr_t GLimp_SetMode( int x, int y, int width, int height, int displayFrequency
 	GLimp_CreateWindow( x, y, width, height );
 
 	// init all the gl stuff for the window
-	if( !GLimp_InitGL( r_stencilbits->integer ) ) {
+	if( !GLimp_InitGL( v_stencilBits.get() ) ) {
 		Com_Printf( "VID_CreateWindow() - GLimp_InitGL failed\n" );
 		return rserr_invalid_mode;
 	}

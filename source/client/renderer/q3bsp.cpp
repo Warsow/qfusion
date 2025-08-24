@@ -147,11 +147,11 @@ static void Mod_CheckDeluxemaps( const lump_t *l, uint8_t *lmData ) {
 	}
 
 	mapConfig.deluxeMaps = true;
-	mapConfig.deluxeMappingEnabled = r_lighting_deluxemapping->integer ? true : false;
+	mapConfig.deluxeMappingEnabled = v_lighting_deluxeMapping.get();
 }
 
 static void R_BuildLightmap( int w, int h, bool deluxe, const uint8_t *data, uint8_t *dest, int blockWidth, int samples ) {
-	if( !data || ( r_fullbright->integer && !deluxe ) ) {
+	if( !data || ( v_fullbright.get() && !deluxe ) ) {
 		const size_t stride = (unsigned)w * (unsigned)samples;
 		const int val = deluxe ? 127 : 255;
 		for( int y = 0; y < h; y++ ) {
@@ -160,7 +160,7 @@ static void R_BuildLightmap( int w, int h, bool deluxe, const uint8_t *data, uin
 		return;
 	}
 
-	if( deluxe || !r_lighting_grayscale->integer ) { // samples == LIGHTMAP_BYTES in this case
+	if( deluxe || !v_lighting_grayscale.get() ) { // samples == LIGHTMAP_BYTES in this case
 		const size_t stride = (unsigned)w * (unsigned)LIGHTMAP_BYTES;
 		uint8_t *rgba = dest;
 		for( int y = 0; y < h; y++ ) {
@@ -171,7 +171,7 @@ static void R_BuildLightmap( int w, int h, bool deluxe, const uint8_t *data, uin
 		return;
 	}
 
-	if( r_lighting_grayscale->integer ) {
+	if( v_lighting_grayscale.get() ) {
 		for( int y = 0; y < h; y++ ) {
 			uint8_t *rgba = dest + y * blockWidth;
 			for( int x = 0; x < w; x++ ) {
@@ -352,7 +352,7 @@ static int R_PackLightmaps( int num, int w, int h, int dataSize, int stride, int
 static void R_BuildLightmaps( model_t *mod, int numLightmaps, int w, int h, const uint8_t *data, mlightmapRect_t *rects ) {
 	mbrushmodel_t *loadbmodel = ( ( mbrushmodel_t * )mod->extradata );
 
-	const int samples = ( ( r_lighting_grayscale->integer && !mapConfig.deluxeMappingEnabled ) ? 1 : LIGHTMAP_BYTES );
+	const int samples = ( ( v_lighting_grayscale.get() && !mapConfig.deluxeMappingEnabled ) ? 1 : LIGHTMAP_BYTES );
 
 	const int layerWidth = w * ( 1 + ( int )mapConfig.deluxeMappingEnabled );
 	const int numBlocks = numLightmaps;
@@ -372,7 +372,7 @@ static void R_BuildLightmaps( model_t *mod, int numLightmaps, int w, int h, cons
 		if( !mapConfig.lightmapsPacking ) {
 			size = wsw::max( w, h );
 		} else {
-			for( size = 1; ( size < r_lighting_maxlmblocksize->integer )
+			for( size = 1; ( size < v_lighting_maxLmBlockSize.get() )
 						   && ( size < glConfig.maxTextureSize ); size <<= 1 ) ;
 		}
 
@@ -600,7 +600,7 @@ static void Mod_LoadLighting( const lump_t *l, const lump_t *faces ) {
 	R_InitLightStyles( loadmodel );
 
 	// we don't need lightmaps for vertex lighting
-	if( r_lighting_vertexlight->integer ) {
+	if( v_lighting_vertexLight.get() ) {
 		return;
 	}
 
@@ -629,7 +629,7 @@ static void Mod_FaceToRavenFace( const dface_t *in, rdface_t *rdf ) {
 	rdf->facetype = in->facetype;
 	rdf->lm_texnum[0] = in->lm_texnum;
 	rdf->vertexStyles[0] = 0;
-	if( rdf->lightmapStyles[0] == 255 || LittleLong( in->lm_texnum ) < 0 || r_lighting_vertexlight->integer ) {
+	if( rdf->lightmapStyles[0] == 255 || LittleLong( in->lm_texnum ) < 0 || v_lighting_vertexLight.get() ) {
 		rdf->lightmapStyles[0] = 255;
 	} else {
 		rdf->lightmapStyles[0] = 0;
@@ -678,11 +678,11 @@ static void Mod_PreloadFaces( const lump_t *l ) {
 			for( j = 0; j < MAX_LIGHTMAPS; j++ ) {
 				int lmNum = LittleLong( in->lm_texnum[j] );
 				// disable lightstyles for fullbright mode
-				if( j > 0 && r_fullbright->integer ) {
+				if( j > 0 && v_fullbright.get() ) {
 					lmNum = -1;
 					in->vertexStyles[j] = 255;
 				}
-				if( lmNum < 0 || in->lightmapStyles[j] == 255 || r_lighting_vertexlight->integer ) {
+				if( lmNum < 0 || in->lightmapStyles[j] == 255 || v_lighting_vertexLight.get() ) {
 					in->lm_texnum[j] = LittleLong( -1 );
 					in->lightmapStyles[j] = 255;
 				}
@@ -852,12 +852,12 @@ static void Mod_LoadVertexes( const lump_t *l ) {
 			out_lmst[j] = LittleFloat( in->lm_st[j] );
 		}
 
-		if( r_fullbright->integer ) {
+		if( v_fullbright.get() ) {
 			out_colors[0] = 255;
 			out_colors[1] = 255;
 			out_colors[2] = 255;
 			out_colors[3] = in->color[3];
-		} else if( r_lighting_grayscale->integer ) {
+		} else if( v_lighting_grayscale.get() ) {
 			vec_t grey = ColorGrayscale( in->color );
 			out_colors[0] = out_colors[1] = out_colors[2] = bound( 0, grey, 255 );
 			out_colors[3] = in->color[3];
@@ -920,12 +920,12 @@ static void Mod_LoadVertexes_RBSP( const lump_t *l ) {
 			out_lmst[j][0] = LittleFloat( in->lm_st[j][0] );
 			out_lmst[j][1] = LittleFloat( in->lm_st[j][1] );
 
-			if( r_fullbright->integer ) {
+			if( v_fullbright.get() ) {
 				out_colors[j][0] = 255;
 				out_colors[j][1] = 255;
 				out_colors[j][2] = 255;
 				out_colors[j][3] = in->color[j][3];
-			} else if( r_lighting_grayscale->integer ) {
+			} else if( v_lighting_grayscale.get() ) {
 				vec_t grey = ColorGrayscale( in->color[j] );
 				out_colors[j][0] = out_colors[j][1] = out_colors[j][2] = bound( 0, grey, 255 );
 				out_colors[j][3] = in->color[j][3];
@@ -1047,7 +1047,8 @@ static int Mod_AddUpdatePatchGroup( const rdface_t *in ) {
 		lodMaxs[i] = in->maxs[i];
 	}
 
-	subdivLevel = bound( SUBDIVISIONS_MIN, r_subdivisions->value, SUBDIVISIONS_MAX );
+	// TODO: Specify var value bounds in the var definitions
+	subdivLevel = bound( SUBDIVISIONS_MIN, v_subdivisions.get(), SUBDIVISIONS_MAX );
 	inFirstVert = LittleLong( in->firstvert );
 
 	// find the degree of subdivision in the u and v directions

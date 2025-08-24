@@ -134,7 +134,7 @@ static auto getTextureInternalFormat( int samples, int flags ) -> std::pair<GLui
 	// TODO: Unset this flag in LDR modes
 	const bool sRGB = false;//( flags & IT_SRGB ) != 0;
 
-	if( !( flags & IT_NOCOMPRESS ) && r_texturecompression->integer ) {
+	if( !( flags & IT_NOCOMPRESS ) && v_textureCompression.get() ) {
 		if( samples == 4 ) {
 			return { sRGB ? GL_COMPRESSED_SRGB_ALPHA : GL_COMPRESSED_RGBA, kSwizzleMaskIdentity };
 		}

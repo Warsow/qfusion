@@ -312,8 +312,9 @@ rserr_t GLimp_SetMode( int x, int y, int width, int height, int displayFrequency
 
 	GLimp_SetFullscreenMode( displayFrequency, fullscreen );
 
-	if( r_stencilbits->integer == 8 || r_stencilbits->integer == 16 ) {
-		glConfig.stencilBits = r_stencilbits->integer;
+	const int varValue = v_stencilBits.get();
+	if( varValue == 8 || varValue == 16 ) {
+		glConfig.stencilBits = varValue;
 	} else {
 		glConfig.stencilBits = 0;
 	}

@@ -391,7 +391,7 @@ auto MaterialCache::readRawContents( const wsw::StringView &fileName ) -> const 
 	pathName.append( kScriptsPrefix.data(), kScriptsPrefix.size() );
 	pathName.append( fileName.data(), fileName.size() );
 
-	if ( r_showShaderCache && r_showShaderCache->integer ) {
+	if ( v_showShaderCache.get() ) {
 		rNotice() << "Loading" << pathName;
 	}
 

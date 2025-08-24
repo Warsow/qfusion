@@ -85,7 +85,7 @@ TextureCache::TextureCache() {
 		wsw::failWithRuntimeError( "Failed to create miniview render target" );
 	}
 
-	const auto portalBufferSide = wsw::min<unsigned>( 1 << Q_log2( wsw::max( 1, r_portalmaps_maxtexsize->integer ) ),
+	const auto portalBufferSide = wsw::min<unsigned>( 1 << Q_log2( wsw::max( 1, v_portalMaps_maxTexSize.get() ) ),
 													  wsw::min( 1024, glConfig.maxRenderbufferSize ) );
 
 	// TODO: Should we use separate depth buffers?

@@ -28,11 +28,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/sysclock.h>
 #include <common/helpers/scopeexitaction.h>
 #include <common/facilities/cvar.h>
+#include <common/facilities/configvars.h>
 #include <common/facilities/fscompat.h>
 #include <common/facilities/profilerscope.h>
 #include <common/facilities/syspublic.h>
 #include <common/common.h>
 #include <client/vid.h>
+
+using wsw::operator""_asView;
 
 r_globals_t rf;
 
@@ -44,105 +47,82 @@ glconfig_t glConfig;
 
 r_shared_t rsh;
 
-cvar_t *r_norefresh;
-cvar_t *r_drawentities;
-cvar_t *r_drawworld;
-cvar_t *r_speeds;
-cvar_t *r_drawelements;
-cvar_t *r_fullbright;
-cvar_t *r_lightmap;
-cvar_t *r_novis;
-cvar_t *r_nocull;
-cvar_t *r_lerpmodels;
-cvar_t *r_brightness;
-cvar_t *r_sRGB;
+BoolConfigVar v_fullbright { "r_fullbright"_asView, { .byDefault = false, .flags = CVAR_LATCH_VIDEO } };
+BoolConfigVar v_lightmap { "r_lightOnly"_asView, { .byDefault = false } };
+BoolConfigVar v_drawEntities { "r_drawEntities"_asView, { .byDefault = true, .flags = CVAR_CHEAT } };
+BoolConfigVar v_drawWorld { "r_drawWorld"_asView, { .byDefault = true, .flags = CVAR_CHEAT } };
+BoolConfigVar v_lerpModels { "r_lerpModels"_asView, { .byDefault = true } };
+BoolConfigVar v_drawElements { "r_drawElements"_asView, { .byDefault = true, .flags = CVAR_CHEAT } };
+IntConfigVar v_showTris { "r_showTris"_asView, { .byDefault = 0, .flags = CVAR_CHEAT } };
 
-cvar_t *r_dynamiclight;
-cvar_t *r_detailtextures;
-cvar_t *r_subdivisions;
-cvar_t *r_showtris;
-cvar_t *r_shownormals;
-cvar_t *r_draworder;
+BoolConfigVar v_detailTextures { "r_detailTextures"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } };
+// TODO: Enum|EnumFlags
+IntConfigVar v_dynamicLight { "r_dynamicLight"_asView, { .byDefault = -1, .flags = CVAR_ARCHIVE } };
+IntConfigVar v_subdivisions { "r_subdivisions"_asView, { .byDefault = SUBDIVISIONS_DEFAULT, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
 
-cvar_t *r_fastsky;
-cvar_t *r_portalonly;
-cvar_t *r_portalmaps;
-cvar_t *r_portalmaps_maxtexsize;
+BoolConfigVar v_fastSky { "r_fastSky"_asView, { .byDefault = false, .flags = CVAR_ARCHIVE } };
+BoolConfigVar v_portalOnly { "r_portalOnly"_asView, { .byDefault = false, .flags = CVAR_CHEAT } };
+BoolConfigVar v_portalMaps { "r_portalMaps"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+IntConfigVar v_portalMaps_maxTexSize { "r_portalMaps_maxTexSize"_asView, { .byDefault = 1024,.flags = CVAR_ARCHIVE } };
 
-cvar_t *r_lighting_deluxemapping;
-cvar_t *r_lighting_specular;
-cvar_t *r_lighting_glossintensity;
-cvar_t *r_lighting_glossexponent;
-cvar_t *r_lighting_ambientscale;
-cvar_t *r_lighting_directedscale;
-cvar_t *r_lighting_packlightmaps;
-cvar_t *r_lighting_maxlmblocksize;
-cvar_t *r_lighting_vertexlight;
-cvar_t *r_lighting_maxglsldlights;
-cvar_t *r_lighting_grayscale;
-cvar_t *r_lighting_intensity;
+BoolConfigVar v_lighting_deluxeMapping { "r_lighting_deluxemapping"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+BoolConfigVar v_lighting_specular { "r_lighting_specular"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+FloatConfigVar v_lighting_glossIntensity { "r_lighting_glossIntensity"_asView, { .byDefault = 1.5f, .flags = CVAR_ARCHIVE } };
+FloatConfigVar v_lighting_glossExponent { "r_lighting_glossExponent"_asView, { .byDefault = 24.0f, .flags = CVAR_ARCHIVE } };
+FloatConfigVar v_lighting_ambientScale { "r_lighting_ambientScale"_asView, { .byDefault = 1.0f } };
+FloatConfigVar v_lighting_directedScale { "r_lighting_directedScale"_asView, { .byDefault = 1.0f } };
 
-cvar_t *r_offsetmapping;
-cvar_t *r_offsetmapping_scale;
-cvar_t *r_offsetmapping_reliefmapping;
+BoolConfigVar v_lighting_packLightmaps { "r_lighting_packLightmaps"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+IntConfigVar v_lighting_maxLmBlockSize { "r_lighting_maxLmBlockSize"_asView, { .byDefault = 2048, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+BoolConfigVar v_lighting_vertexLight { "r_lighting_vertexLight"_asView, { .byDefault = false, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+IntConfigVar v_lighting_maxGlslDlights { "r_lighting_maxGlslDlights"_asView, { .byDefault = 16, .flags = CVAR_ARCHIVE } };
+BoolConfigVar v_lighting_grayscale { "r_lighting_grayscale"_asView, { .byDefault = false, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+FloatConfigVar v_lighting_intensity { "r_lighting_intensity"_asView, { .byDefault = 1.5f, .flags = CVAR_ARCHIVE } };
 
-cvar_t *r_shadows;
-cvar_t *r_shadows_alpha;
-cvar_t *r_shadows_nudge;
-cvar_t *r_shadows_projection_distance;
-cvar_t *r_shadows_maxtexsize;
-cvar_t *r_shadows_pcf;
-cvar_t *r_shadows_self_shadow;
-cvar_t *r_shadows_dither;
+// TODO: Enum|EnumFlags
+IntConfigVar v_offsetMapping { "r_offsetMapping"_asView, { .byDefault = 2, .flags = CVAR_ARCHIVE } };
+FloatConfigVar v_offsetMapping_scale { "r_offsetMapping_scale"_asView, { .byDefault = 0.02f, .flags = CVAR_ARCHIVE } };
+BoolConfigVar v_offsetMapping_reliefMapping { "r_offsetMapping_reliefMapping"_asView, { .byDefault = false, .flags = CVAR_ARCHIVE } };
 
-cvar_t *r_outlines_world;
-cvar_t *r_outlines_scale;
-cvar_t *r_outlines_cutoff;
+FloatConfigVar v_outlinesWorld { "r_outlinesWorld"_asView, { .byDefault = 1.8f, .flags = CVAR_ARCHIVE } };
+FloatConfigVar v_outlinesScale { "r_outlinesScale"_asView, { .byDefault = 1.0f, .min = inclusive( 0.0f ), .max = inclusive( 3.0f ), .flags = CVAR_ARCHIVE } };
+FloatConfigVar v_outlinesCutoff { "r_outlinesCutoff"_asView, { .byDefault = 712.0f, .flags = CVAR_ARCHIVE } };
 
-cvar_t *r_soft_particles;
-cvar_t *r_soft_particles_scale;
+BoolConfigVar v_softParticles { "r_softParticles"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } };
+FloatConfigVar v_softParticles_scale { "r_softParticles_scale"_asView, { .byDefault = 0.02f, .flags = CVAR_ARCHIVE } };
 
-cvar_t *r_hdr;
-cvar_t *r_hdr_gamma;
-cvar_t *r_hdr_exposure;
+BoolConfigVar v_hdr { "r_hdr"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } };
+FloatConfigVar v_hdrGamma { "r_hdrGamma"_asView, { .byDefault = 2.2f, .flags = CVAR_ARCHIVE } };
+FloatConfigVar v_hdrExposure { "r_hdrExposure"_asView, { .byDefault = 1.0f, .flags = CVAR_ARCHIVE } };
 
-cvar_t *r_bloom;
+IntConfigVar v_lodBias { "r_lodbias"_asView, { .byDefault = 0, .flags = CVAR_ARCHIVE } };
+FloatConfigVar v_lodScale { "r_lodscale"_asView, { .byDefault = 5.0f, .flags = CVAR_ARCHIVE } };
 
-cvar_t *r_fxaa;
-cvar_t *r_samples;
+FloatConfigVar v_gamma { "r_gamma"_asView, { .byDefault = 1.0f, .flags = CVAR_ARCHIVE } };
 
-cvar_t *r_lodbias;
-cvar_t *r_lodscale;
+StringConfigVar v_textureFilter { "r_textureFilter"_asView, { .byDefault = "trilinear"_asView, .flags = CVAR_ARCHIVE } };
+IntConfigVar v_anisoLevel { "r_anisoLevel"_asView, { .byDefault = 4, .flags = CVAR_ARCHIVE } };
+BoolConfigVar v_textureCompression { "r_textureCompression"_asView, { .byDefault = false, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+// TODO: should we allow configuring it?
+IntConfigVar v_stencilBits { "r_stencilBits"_asView, { .byDefault = 0, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
 
-cvar_t *r_stencilbits;
-cvar_t *r_gamma;
-cvar_t *r_texturefilter;
-cvar_t *r_anisolevel;
-cvar_t *r_texturecompression;
-cvar_t *r_picmip;
-cvar_t *r_polyblend;
-cvar_t *r_lockpvs;
-cvar_t *r_screenshot_fmtstr;
-cvar_t *r_screenshot_jpeg;
-cvar_t *r_screenshot_jpeg_quality;
-cvar_t *r_swapinterval;
-cvar_t *r_swapinterval_min;
+BoolConfigVar v_drawFlat { "r_drawFlat"_asView, { .byDefault = false, .flags = CVAR_ARCHIVE } };
+ColorConfigVar v_wallColor { "r_wallColor"_asView, { .byDefault = COLOR_RGB( 128, 80, 192 ), .flags = CVAR_ARCHIVE } };
+ColorConfigVar v_floorColor { "r_floorColor"_asView, { .byDefault = COLOR_RGB( 144, 48, 72 ), .flags = CVAR_ARCHIVE } };
 
-cvar_t *r_temp1;
+#if defined( GLX_VERSION ) && !defined( USE_SDL2 )
+IntConfigVar v_swapInterval { "r_swapInterval"_asView, { .byDefault = 0, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+#else
+IntConfigVar v_swapInterval { "r_swapInterval"_asView, { .byDefault = 0, .flags = CVAR_ARCHIVE } };
+#endif
 
-cvar_t *r_drawflat;
-cvar_t *r_wallcolor;
-cvar_t *r_floorcolor;
+BoolConfigVar v_showShaderCache { "r_showShaderCache"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } };
 
-cvar_t *r_usenotexture;
-
-cvar_t *r_maxglslbones;
-
-cvar_t *gl_driver;
-cvar_t *gl_cull;
-cvar_t *r_multithreading;
-
-cvar_t *r_showShaderCache;
+static VarModificationTracker g_textureFilterVarTracker { &v_textureFilter };
+static VarModificationTracker g_anisoLevelVarTracker { &v_anisoLevel };
+static VarModificationTracker g_wallColorVarTracker { &v_wallColor };
+static VarModificationTracker g_floorColorVarTracker { &v_floorColor };
+static VarModificationTracker g_gammaVarTracker { &v_gamma };
 
 extern cvar_t *cl_multithreading;
 
@@ -302,11 +282,14 @@ void R_SetGamma( float gamma ) {
 	}
 }
 
-void R_SetWallFloorColors( const vec3_t wallColor, const vec3_t floorColor ) {
-	for( unsigned i = 0; i < 3; i++ ) {
-		rsh.wallColor[i] = bound( 0, floor( wallColor[i] ) / 255.0, 1.0 );
-		rsh.floorColor[i] = bound( 0, floor( floorColor[i] ) / 255.0, 1.0 );
-	}
+void R_SetWallFloorColors( int wallColor, int floorColor ) {
+	// TODO: Use some general conversion subroutines
+	rsh.wallColor[0] = bound( 0, COLOR_R( wallColor ) / 255.0, 1.0 );
+	rsh.floorColor[0] = bound( 0, COLOR_R( floorColor ) / 255.0, 1.0 );
+	rsh.wallColor[1] = bound( 0, COLOR_G( wallColor ) / 255.0, 1.0 );
+	rsh.floorColor[1] = bound( 0, COLOR_G( floorColor ) / 255.0, 1.0 );
+	rsh.wallColor[2] = bound( 0, COLOR_B( wallColor ) / 255.0, 1.0 );
+	rsh.floorColor[2] = bound( 0, COLOR_B( floorColor ) / 255.0, 1.0 );
 }
 
 auto suggestNumExtraWorkerThreads( const SuggestNumWorkerThreadsArgs &args ) -> unsigned {
@@ -634,36 +617,17 @@ void RF_Shutdown( bool verbose ) {
 
 static void RF_CheckCvars( void ) {
 	// update gamma
-	if( r_gamma->modified ) {
-		r_gamma->modified = false;
-		R_SetGamma( r_gamma->value );
+	if( g_gammaVarTracker.checkAndReset() ) {
+		R_SetGamma( v_gamma.get() );
 	}
 
-	if( r_texturefilter->modified || r_anisolevel->modified ) {
-		r_texturefilter->modified = false;
-		r_anisolevel->modified = false;
-		TextureCache::instance()->applyFilter( wsw::StringView( r_texturefilter->string ), r_anisolevel->integer );
+	// Force eager evaluation by using |, otherwise applying second var changes could get postponed to the next frame
+	if( g_textureFilterVarTracker.checkAndReset() | g_anisoLevelVarTracker.checkAndReset() ) {
+		TextureCache::instance()->applyFilter( v_textureFilter.get(), v_anisoLevel.get() );
 	}
 
-	if( r_wallcolor->modified || r_floorcolor->modified ) {
-		vec3_t wallColor, floorColor;
-
-		sscanf( r_wallcolor->string,  "%3f %3f %3f", &wallColor[0], &wallColor[1], &wallColor[2] );
-		sscanf( r_floorcolor->string, "%3f %3f %3f", &floorColor[0], &floorColor[1], &floorColor[2] );
-
-		r_wallcolor->modified = r_floorcolor->modified = false;
-
-		R_SetWallFloorColors( wallColor, floorColor );
-	}
-
-	// keep r_outlines_cutoff value in sane bounds to prevent wallhacking
-	if( r_outlines_scale->modified ) {
-		if( r_outlines_scale->value < 0 ) {
-			Cvar_ForceSet( r_outlines_scale->name, "0" );
-		} else if( r_outlines_scale->value > 3 ) {
-			Cvar_ForceSet( r_outlines_scale->name, "3" );
-		}
-		r_outlines_scale->modified = false;
+	if( g_wallColorVarTracker.checkAndReset() | g_floorColorVarTracker.checkAndReset() ) {
+		R_SetWallFloorColors( v_wallColor.get(), v_floorColor.get() );
 	}
 }
 
@@ -672,8 +636,9 @@ void RF_BeginFrame( bool forceClear, bool forceVsync, bool uncappedFPS ) {
 
 	R_DataSync();
 
-	int swapInterval = r_swapinterval->integer || forceVsync ? 1 : 0;
-	clamp_low( swapInterval, r_swapinterval_min->integer );
+	// TODO: Should it be a boolean variable?
+	int swapInterval = ( v_swapInterval.get() || forceVsync ) ? 1 : 0;
+	///clamp_low( swapInterval, r_swapinterval_min->integer );
 
 	R_BeginFrame( forceClear, swapInterval );
 }
@@ -783,14 +748,14 @@ static bool R_RegisterGLExtensions( void ) {
 	qglGetIntegerv( GL_MAX_FRAGMENT_UNIFORM_COMPONENTS, &glConfig.maxFragmentUniformComponents );
 
 	// keep the maximum number of bones we can do in GLSL sane
-	if( r_maxglslbones->integer > MAX_GLSL_UNIFORM_BONES ) {
-		Cvar_ForceSet( r_maxglslbones->name, r_maxglslbones->dvalue );
-	}
+	//if( r_maxglslbones->integer > MAX_GLSL_UNIFORM_BONES ) {
+	//	Cvar_ForceSet( r_maxglslbones->name, r_maxglslbones->dvalue );
+	//}
 
 	// require GLSL 1.20+ for GPU skinning
 	if( glConfig.shadingLanguageVersion >= 120 ) {
 		// the maximum amount of bones we can handle in a vertex shader (2 vec4 uniforms per vertex)
-		glConfig.maxGLSLBones = bound( 0, glConfig.maxVertexUniformComponents / 8 - 19, r_maxglslbones->integer );
+		glConfig.maxGLSLBones = wsw::max( 0, glConfig.maxVertexUniformComponents / 8 - 19 );
 	} else {
 		glConfig.maxGLSLBones = 0;
 	}
@@ -813,9 +778,9 @@ static bool R_RegisterGLExtensions( void ) {
 	Cvar_Get( "r_soft_particles_available", "1", CVAR_READONLY );
 
 	// don't allow too high values for lightmap block size as they negatively impact performance
-	if( r_lighting_maxlmblocksize->integer > glConfig.maxTextureSize / 4 &&
+	if( v_lighting_maxLmBlockSize.get() > glConfig.maxTextureSize / 4 &&
 		!( glConfig.maxTextureSize / 4 < wsw::min( QF_LIGHTMAP_WIDTH,QF_LIGHTMAP_HEIGHT ) * 2 ) ) {
-		Cvar_ForceSet( "r_lighting_maxlmblocksize", va_r( tmp, sizeof( tmp ), "%i", glConfig.maxTextureSize / 4 ) );
+		v_lighting_maxLmBlockSize.setImmediately( glConfig.maxTextureSize / 4 );
 	}
 
 	return true;
@@ -834,139 +799,10 @@ static void R_FillStartupBackgroundColor( float r, float g, float b ) {
 	GLimp_EndFrame();
 }
 
-static void R_Register( const char *screenshotsPrefix ) {
-	char tmp[128];
-
-	r_norefresh = Cvar_Get( "r_norefresh", "0", 0 );
-	r_fullbright = Cvar_Get( "r_fullbright", "0", CVAR_LATCH_VIDEO );
-	r_lightmap = Cvar_Get( "r_lightmap", "0", 0 );
-	r_drawentities = Cvar_Get( "r_drawentities", "1", CVAR_CHEAT );
-	r_drawworld = Cvar_Get( "r_drawworld", "1", CVAR_CHEAT );
-	r_novis = Cvar_Get( "r_novis", "0", 0 );
-	r_nocull = Cvar_Get( "r_nocull", "0", 0 );
-	r_lerpmodels = Cvar_Get( "r_lerpmodels", "1", 0 );
-	r_speeds = Cvar_Get( "r_speeds", "0", 0 );
-	r_drawelements = Cvar_Get( "r_drawelements", "1", 0 );
-	r_showtris = Cvar_Get( "r_showtris", "0", CVAR_CHEAT );
-	r_lockpvs = Cvar_Get( "r_lockpvs", "0", CVAR_CHEAT );
-	r_picmip = Cvar_Get( "r_picmip", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-	r_polyblend = Cvar_Get( "r_polyblend", "1", 0 );
-
-	r_brightness = Cvar_Get( "r_brightness", "0", CVAR_ARCHIVE );
-	r_sRGB = Cvar_Get( "r_sRGB", "0", CVAR_DEVELOPER | CVAR_LATCH_VIDEO );
-
-	r_detailtextures = Cvar_Get( "r_detailtextures", "1", CVAR_ARCHIVE );
-
-	r_dynamiclight = Cvar_Get( "r_dynamiclight", "-1", CVAR_ARCHIVE );
-	r_subdivisions = Cvar_Get( "r_subdivisions", STR_TOSTR( SUBDIVISIONS_DEFAULT ), CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-	r_shownormals = Cvar_Get( "r_shownormals", "0", CVAR_CHEAT );
-	r_draworder = Cvar_Get( "r_draworder", "0", CVAR_CHEAT );
-
-	r_fastsky = Cvar_Get( "r_fastsky", "0", CVAR_ARCHIVE );
-	r_portalonly = Cvar_Get( "r_portalonly", "0", 0 );
-	r_portalmaps = Cvar_Get( "r_portalmaps", "1", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-	r_portalmaps_maxtexsize = Cvar_Get( "r_portalmaps_maxtexsize", "1024", CVAR_ARCHIVE );
-
-	r_lighting_deluxemapping = Cvar_Get( "r_lighting_deluxemapping", "1", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-	r_lighting_specular = Cvar_Get( "r_lighting_specular", "1", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-	r_lighting_glossintensity = Cvar_Get( "r_lighting_glossintensity", "1.5", CVAR_ARCHIVE );
-	r_lighting_glossexponent = Cvar_Get( "r_lighting_glossexponent", "24", CVAR_ARCHIVE );
-	r_lighting_ambientscale = Cvar_Get( "r_lighting_ambientscale", "1", 0 );
-	r_lighting_directedscale = Cvar_Get( "r_lighting_directedscale", "1", 0 );
-
-	r_lighting_packlightmaps = Cvar_Get( "r_lighting_packlightmaps", "1", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-	r_lighting_maxlmblocksize = Cvar_Get( "r_lighting_maxlmblocksize", "2048", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-	r_lighting_vertexlight = Cvar_Get( "r_lighting_vertexlight", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-	r_lighting_maxglsldlights = Cvar_Get( "r_lighting_maxglsldlights", "16", CVAR_ARCHIVE );
-	r_lighting_grayscale = Cvar_Get( "r_lighting_grayscale", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-	r_lighting_intensity = Cvar_Get( "r_lighting_intensity", "1.75", CVAR_ARCHIVE );
-
-	r_offsetmapping = Cvar_Get( "r_offsetmapping", "2", CVAR_ARCHIVE );
-	r_offsetmapping_scale = Cvar_Get( "r_offsetmapping_scale", "0.02", CVAR_ARCHIVE );
-	r_offsetmapping_reliefmapping = Cvar_Get( "r_offsetmapping_reliefmapping", "0", CVAR_ARCHIVE );
-
-#ifdef CGAMEGETLIGHTORIGIN
-	r_shadows = Cvar_Get( "cg_shadows", "1", CVAR_ARCHIVE );
-#else
-	r_shadows = Cvar_Get( "r_shadows", "0", CVAR_ARCHIVE );
-#endif
-	r_shadows_alpha = Cvar_Get( "r_shadows_alpha", "0.7", CVAR_ARCHIVE );
-	r_shadows_nudge = Cvar_Get( "r_shadows_nudge", "1", CVAR_ARCHIVE );
-	r_shadows_projection_distance = Cvar_Get( "r_shadows_projection_distance", "64", CVAR_CHEAT );
-	r_shadows_maxtexsize = Cvar_Get( "r_shadows_maxtexsize", "64", CVAR_ARCHIVE );
-	r_shadows_pcf = Cvar_Get( "r_shadows_pcf", "1", CVAR_ARCHIVE );
-	r_shadows_self_shadow = Cvar_Get( "r_shadows_self_shadow", "0", CVAR_ARCHIVE );
-	r_shadows_dither = Cvar_Get( "r_shadows_dither", "0", CVAR_ARCHIVE );
-
-	r_outlines_world = Cvar_Get( "r_outlines_world", "1.8", CVAR_ARCHIVE );
-	r_outlines_scale = Cvar_Get( "r_outlines_scale", "1", CVAR_ARCHIVE );
-	r_outlines_cutoff = Cvar_Get( "r_outlines_cutoff", "712", CVAR_ARCHIVE );
-
-	r_soft_particles = Cvar_Get( "r_soft_particles", "1", CVAR_ARCHIVE );
-	r_soft_particles_scale = Cvar_Get( "r_soft_particles_scale", "0.02", CVAR_ARCHIVE );
-
-	r_hdr = Cvar_Get( "r_hdr", "1", CVAR_ARCHIVE );
-	r_hdr_gamma = Cvar_Get( "r_hdr_gamma", "2.2", CVAR_ARCHIVE );
-	r_hdr_exposure = Cvar_Get( "r_hdr_exposure", "1.0", CVAR_ARCHIVE );
-
-	r_bloom = Cvar_Get( "r_bloom", "1", CVAR_ARCHIVE );
-
-	r_fxaa = Cvar_Get( "r_fxaa", "0", CVAR_ARCHIVE );
-	r_samples = Cvar_Get( "r_samples", "0", CVAR_ARCHIVE );
-
-	r_lodbias = Cvar_Get( "r_lodbias", "0", CVAR_ARCHIVE );
-	r_lodscale = Cvar_Get( "r_lodscale", "5.0", CVAR_ARCHIVE );
-
-	r_gamma = Cvar_Get( "r_gamma", "1.0", CVAR_ARCHIVE );
-	r_texturefilter = Cvar_Get( "r_texturefilter", "trilinear", CVAR_ARCHIVE );
-	r_anisolevel = Cvar_Get( "r_anisolevel", "4", CVAR_ARCHIVE );
-	r_texturecompression = Cvar_Get( "r_texturecompression", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-	r_stencilbits = Cvar_Get( "r_stencilbits", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-
-	r_screenshot_jpeg = Cvar_Get( "r_screenshot_jpeg", "1", CVAR_ARCHIVE );
-	r_screenshot_jpeg_quality = Cvar_Get( "r_screenshot_jpeg_quality", "90", CVAR_ARCHIVE );
-	r_screenshot_fmtstr = Cvar_Get( "r_screenshot_fmtstr", va_r( tmp, sizeof( tmp ), "%s%%y%%m%%d_%%H%%M%%S", screenshotsPrefix ), CVAR_ARCHIVE );
-
-#if defined( GLX_VERSION ) && !defined( USE_SDL2 )
-	r_swapinterval = Cvar_Get( "r_swapinterval", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-#else
-	r_swapinterval = Cvar_Get( "r_swapinterval", "0", CVAR_ARCHIVE );
-#endif
-	r_swapinterval_min = Cvar_Get( "r_swapinterval_min", "0", CVAR_READONLY ); // exposes vsync support to UI
-
-	r_temp1 = Cvar_Get( "r_temp1", "0", 0 );
-
-	r_drawflat = Cvar_Get( "r_drawflat", "0", CVAR_ARCHIVE );
-	r_wallcolor = Cvar_Get( "r_wallcolor", "128 80 192", CVAR_ARCHIVE );
-	r_floorcolor = Cvar_Get( "r_floorcolor", "144 48 72", CVAR_ARCHIVE );
-
-	// make sure we rebuild our 3D texture after vid_restart
-	r_wallcolor->modified = r_floorcolor->modified = true;
-
-	// set to 1 to enable use of the checkerboard texture for missing world and model images
-	r_usenotexture = Cvar_Get( "r_usenotexture", "0", CVAR_ARCHIVE );
-
-	r_maxglslbones = Cvar_Get( "r_maxglslbones", STR_TOSTR( MAX_GLSL_UNIFORM_BONES ), CVAR_LATCH_VIDEO );
-
-	r_multithreading = Cvar_Get( "r_multithreading", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-
-	r_showShaderCache = Cvar_Get( "r_showShaderCache", "1", CVAR_ARCHIVE );
-
-	gl_cull = Cvar_Get( "gl_cull", "1", 0 );
-
-	const qgl_driverinfo_t *driver = QGL_GetDriverInfo();
-	if( driver && driver->dllcvarname ) {
-		gl_driver = Cvar_Get( driver->dllcvarname, driver->dllname, CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-	} else {
-		gl_driver = NULL;
-	}
-}
-
 rserr_t R_Init( const char *applicationName, const char *screenshotPrefix, int startupColor,
 				int iconResource, const int *iconXPM,
 				void *hinstance, void *wndproc, void *parenthWnd,
 				bool verbose ) {
-	const qgl_driverinfo_t *driver;
 	const char *dllname = "";
 	qgl_initerr_t initerr;
 
@@ -976,8 +812,15 @@ rserr_t R_Init( const char *applicationName, const char *screenshotPrefix, int s
 	if( !screenshotPrefix ) {
 		screenshotPrefix = "";
 	}
+	(void)screenshotPrefix;
 
-	R_Register( screenshotPrefix );
+	cvar_t *gl_driver;
+	const qgl_driverinfo_t *driver = QGL_GetDriverInfo();
+	if( driver && driver->dllcvarname ) {
+		gl_driver = Cvar_Get( driver->dllcvarname, driver->dllname, CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
+	} else {
+		gl_driver = NULL;
+	}
 
 	memset( &glConfig, 0, sizeof( glConfig ) );
 
@@ -1021,9 +864,6 @@ rserr_t R_Init( const char *applicationName, const char *screenshotPrefix, int s
 	}
 
 	glConfig.hwGamma = GLimp_GetGammaRamp( GAMMARAMP_STRIDE, &glConfig.gammaRampSize, glConfig.originalGammaRamp );
-	if( glConfig.hwGamma ) {
-		r_gamma->modified = true;
-	}
 
 	/*
 	** get our various GL strings
@@ -1078,7 +918,7 @@ rserr_t R_Init( const char *applicationName, const char *screenshotPrefix, int s
 
 	TextureCache::init();
 
-	TextureCache::instance()->applyFilter( wsw::StringView( r_texturefilter->string ), r_anisolevel->integer );
+	TextureCache::instance()->applyFilter( v_textureFilter.get(), v_anisoLevel.get() );
 
 	MaterialCache::init();
 

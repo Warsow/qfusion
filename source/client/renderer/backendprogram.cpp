@@ -644,8 +644,10 @@ static uint64_t RB_DlightbitsToProgramFeatures( unsigned int dlightBits ) {
 	}
 
 	numDlights = Q_bitcount( dlightBits );
-	if( r_lighting_maxglsldlights->integer && numDlights > r_lighting_maxglsldlights->integer ) {
-		numDlights = r_lighting_maxglsldlights->integer;
+	const int varValue = v_lighting_maxGlslDlights.get();
+	// TODO: This should be some kind of OptIntVar
+	if( varValue && numDlights > varValue ) {
+		numDlights = varValue;
 	}
 
 	if( numDlights <= 4 ) {
@@ -807,7 +809,7 @@ static void RB_UpdateCommonUniforms( int program, const shaderpass_t *pass, mat4
 
 	RP_UpdateBlendMixUniform( program, blendMix );
 
-	RP_UpdateSoftParticlesUniforms( program, r_soft_particles_scale->value );
+	RP_UpdateSoftParticlesUniforms( program, v_softParticles_scale.get() );
 }
 
 /*
@@ -861,13 +863,13 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 	}
 
 	if( normalmap->samples == 4 ) {
-		offsetmappingScale = r_offsetmapping_scale->value * rb.currentShader->offsetmappingScale;
+		offsetmappingScale = v_offsetMapping_scale.get() * rb.currentShader->offsetmappingScale;
 	} else { // no alpha in normalmap, don't bother with offset mapping
 		offsetmappingScale = 0;
 	}
 
-	glossIntensity = rb.currentShader->glossIntensity ? rb.currentShader->glossIntensity : r_lighting_glossintensity->value;
-	glossExponent = rb.currentShader->glossExponent ? rb.currentShader->glossExponent : r_lighting_glossexponent->value;
+	glossIntensity = rb.currentShader->glossIntensity ? rb.currentShader->glossIntensity : v_lighting_glossIntensity.get();
+	glossExponent = rb.currentShader->glossExponent ? rb.currentShader->glossExponent : v_lighting_glossExponent.get();
 
 	applyDecal = decalmap != NULL;
 
@@ -883,7 +885,7 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 
 	if( rb.currentModelType == mod_brush ) {
 		// brush models
-		if( !( r_offsetmapping->integer & 1 ) ) {
+		if( !( v_offsetMapping.get() & 1 ) ) {
 			offsetmappingScale = 0;
 		}
 		if( rb.renderFlags & RF_LIGHTMAP ) {
@@ -894,12 +896,12 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 		}
 	} else if( rb.currentModelType == mod_bad ) {
 		// polys
-		if( !( r_offsetmapping->integer & 2 ) ) {
+		if( !( v_offsetMapping.get() & 2 ) ) {
 			offsetmappingScale = 0;
 		}
 	} else {
 		// regular models
-		if( !( r_offsetmapping->integer & 4 ) ) {
+		if( !( v_offsetMapping.get() & 4 ) ) {
 			offsetmappingScale = 0;
 		}
 	#ifdef CELSHADEDMATERIAL
@@ -962,7 +964,7 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 	}
 
 	if( offsetmappingScale > 0 ) {
-		programFeatures |= r_offsetmapping_reliefmapping->integer ?
+		programFeatures |= v_offsetMapping_reliefMapping.get() ?
 						   GLSL_SHADER_MATERIAL_RELIEFMAPPING : GLSL_SHADER_MATERIAL_OFFSETMAPPING;
 	}
 
@@ -1208,7 +1210,7 @@ static void RB_RenderMeshGLSL_Outline( const shaderpass_t *pass, uint64_t progra
 
 	RB_UpdateCommonUniforms( program, pass, texMatrix );
 
-	RP_UpdateOutlineUniforms( program, rb.currentEntity->outlineHeight * r_outlines_scale->value );
+	RP_UpdateOutlineUniforms( program, rb.currentEntity->outlineHeight * v_offsetMapping_scale.get() );
 
 	if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
 		RB_UpdateFogUniforms( program, rb.fog );
@@ -1647,7 +1649,7 @@ static void RB_RenderMeshGLSL_ColorCorrection( const shaderpass_t *pass, uint64_
 		if( glConfig.sSRGB ) {
 			programFeatures |= GLSL_SHADER_COMMON_SRGB2LINEAR;
 		}
-		if( r_hdr->integer ) {
+		if( v_hdr.get() ) {
 			programFeatures |= GLSL_SHADER_COLOR_CORRECTION_HDR;
 		}
 	}
@@ -1673,7 +1675,7 @@ static void RB_RenderMeshGLSL_ColorCorrection( const shaderpass_t *pass, uint64_
 	if( RB_BindProgram( program ) ) {
 		RB_UpdateCommonUniforms( program, pass, texMatrix );
 
-		RP_UpdateColorCorrectionUniforms( program, r_hdr_gamma->value, rb.hdrExposure );
+		RP_UpdateColorCorrectionUniforms( program, v_hdrGamma.get(), rb.hdrExposure );
 
 		RB_DrawElementsReal( rb.drawCallData );
 	}
@@ -2043,7 +2045,7 @@ static void RB_SetShaderState( void ) {
 	int shaderFlags = rb.currentShader->flags;
 
 	// Face culling
-	if( !gl_cull->integer || rb.currentEntity->rtype == RT_SPRITE ) {
+	if( rb.currentEntity->rtype == RT_SPRITE ) {
 		RB_Cull( 0 );
 	} else if( shaderFlags & SHADER_CULL_FRONT ) {
 		RB_Cull( GL_FRONT );
@@ -2109,7 +2111,7 @@ static bool RB_CleanSinglePass( void ) {
 * RB_TriangleLinesColor
 */
 static inline const vec_t *RB_TriangleLinesColor( void ) {
-	if( r_showtris->integer != 2 ) {
+	if( v_showTris.get() != 2 ) {
 		return colorWhite;
 	}
 
@@ -2187,7 +2189,7 @@ void RB_DrawShadedElements( const FrontendToBackendShared *fsh ) {
 	RB_SetShaderState();
 
 	for( i = 0, pass = rb.currentShader->passes; i < rb.currentShader->numpasses; i++, pass++ ) {
-		if( ( pass->flags & SHADERPASS_DETAIL ) && !r_detailtextures->integer ) {
+		if( ( pass->flags & SHADERPASS_DETAIL ) && !v_detailTextures.get() ) {
 			continue;
 		}
 		if( pass->flags & SHADERPASS_LIGHTMAP ) {
