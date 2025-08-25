@@ -2,7 +2,7 @@
 Name=Warsow
 GenericName=Fast First Person Shooter
 Comment=Multiplayer FPS based on the QFusion engine
-Icon=warsow
+Icon=net.warsow.Warsow
 Exec=warsow
 Terminal=false
 Type=Application
