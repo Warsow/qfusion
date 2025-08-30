@@ -968,7 +968,6 @@ static auto getBestFittingMode( int requestedWidth, int requestedHeight ) -> std
 
 static void RestartVideoAndAllMedia( bool vid_ref_was_active, bool verbose ) {
 	const bool cgameActive = cls.cgameActive;
-	cls.disable_screen = 1;
 
 	CL_ShutdownMedia();
 
@@ -1037,8 +1036,6 @@ static void RestartVideoAndAllMedia( bool vid_ref_was_active, bool verbose ) {
 	}
 
 	CL_InitMedia();
-
-	cls.disable_screen = 0;
 
 	SCR_CloseConsole();
 
@@ -1374,7 +1371,6 @@ void SCR_BeginLoadingPlaque( void ) {
 }
 
 void SCR_EndLoadingPlaque( void ) {
-	cls.disable_screen = 0;
 	Con_ClearNotify();
 }
 
@@ -1391,7 +1387,7 @@ void SCR_ShutDownConsoleMedia( void ) {
 void SCR_UpdateScreen( void ) {
 	WSW_PROFILER_SCOPE();
 
-	assert( !cls.disable_screen && scr_initialized && con_initialized && cls.mediaInitialized );
+	assert( scr_initialized && con_initialized && cls.mediaInitialized );
 
 	Con_CheckResize();
 
@@ -5526,19 +5522,13 @@ void CL_Frame( int realMsec, int gameMsec ) {
 		// allow rendering DLL change
 		VID_CheckChanges();
 
-		if( !cls.disable_screen && scr_initialized && con_initialized && cls.mediaInitialized ) {
+		if( scr_initialized && con_initialized && cls.mediaInitialized ) {
 			SCR_UpdateScreen();
 		}
 
 		// update audio
 		if( cls.state != CA_ACTIVE ) {
-			// if the loading plaque is up, clear everything out to make sure we aren't looping a dirty
-			// dma buffer while loading
-			if( cls.disable_screen ) {
-				SoundSystem::instance()->stopSounds( SoundSystem::StopMusic );
-			} else {
-				SoundSystem::instance()->updateListener( -1, vec3_origin, vec3_origin, axis_identity );
-			}
+			SoundSystem::instance()->updateListener( -1, vec3_origin, vec3_origin, axis_identity );
 		}
 
 		// advance local effects for next frame
@@ -5759,7 +5749,6 @@ void CL_Init( void ) {
 	}
 
 	SCR_InitScreen();
-	cls.disable_screen = true; // don't draw yet
 
 	CL_InitLocal();
 	CL_InitInput();

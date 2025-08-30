@@ -243,10 +243,6 @@ typedef struct {
 	int mediaRandomSeed;
 	bool mediaInitialized;
 
-	unsigned int disable_screen;    // showing loading plaque between levels
-	                                // or changing rendering dlls
-	                                // if time gets > 30 seconds ahead, break it
-
 	// connection information
 	char *servername;               // name of server from original connect
 	socket_type_t servertype;       // socket type used to connect to the server
