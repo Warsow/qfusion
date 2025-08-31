@@ -962,14 +962,12 @@ void IN_Activate( bool active ) {
 * Called every frame, even if not generating commands
 */
 void IN_Frame( void ) {
-	extern cvar_t *vid_fullscreen;
-
 	if( !mouseinitialized ) {
 		return;
 	}
 
-	if( vid_fullscreen ) {
-		if( !vid_fullscreen->integer || cl_parent_hwnd ) {
+	if( true ) {
+		if( !Cvar_Value( "vid_fullscreen" ) || cl_parent_hwnd ) {
 			extern cvar_t *in_grabinconsole;
 
 			// if we have a parent window (say, a browser plugin window) and

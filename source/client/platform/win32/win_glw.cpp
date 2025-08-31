@@ -32,6 +32,7 @@
 #include <assert.h>
 #include <client/renderer/local.h>
 #include <common/facilities/syspublic.h>
+#include <common/facilities/cvar.h>
 #include "win_glw.h"
 
 #include <QVariant>

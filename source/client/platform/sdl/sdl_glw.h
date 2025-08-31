@@ -22,7 +22,6 @@
 #define __SDL_GLW_H_
 
 #include <SDL.h>
-#include <common/facilities/cvar.h>
 
 typedef int (* wndproc_t)( void *, int, int, int );
 
@@ -39,7 +38,6 @@ typedef struct {
 
 extern glwstate_t glw_state;
 
-extern cvar_t *vid_fullscreen;
-extern cvar_t *vid_multiscreen_head;
+extern class BoolConfigVar v_fullscreen;
 
 #endif // __SDL_GLW_H_

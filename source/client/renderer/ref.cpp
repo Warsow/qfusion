@@ -124,7 +124,7 @@ static VarModificationTracker g_wallColorVarTracker { &v_wallColor };
 static VarModificationTracker g_floorColorVarTracker { &v_floorColor };
 static VarModificationTracker g_gammaVarTracker { &v_gamma };
 
-extern cvar_t *cl_multithreading;
+extern BoolConfigVar v_multiThreading;
 
 // Currently it's just a proxy for global function calls, so the lifecycle is trivial
 static RenderSystem g_renderSystem;
@@ -293,7 +293,7 @@ void R_SetWallFloorColors( int wallColor, int floorColor ) {
 }
 
 auto suggestNumExtraWorkerThreads( const SuggestNumWorkerThreadsArgs &args ) -> unsigned {
-	if( cl_multithreading->integer ) {
+	if( v_multiThreading.get() ) {
 		// This should be cheap to query as it's cached.
 		if( const auto maybeNumberOfProcessors = Sys_GetNumberOfProcessors() ) {
 			const auto numPhysicalProcessors = maybeNumberOfProcessors->first;

@@ -1,14 +1,17 @@
 #include <SDL.h>
 #include <client/client.h>
 #include <common/facilities/cvar.h>
+#include <common/facilities/configvars.h>
 #include <common/facilities/sysclock.h>
 
 cvar_t *in_grabinconsole;
 cvar_t *in_disablemacosxmouseaccel;
 cvar_t *in_mousehack;
 
-extern cvar_t *vid_xpos;
-extern cvar_t *vid_ypos;
+extern IntConfigVar v_xPos;
+extern IntConfigVar v_yPos;
+extern VarModificationTracker g_xPosVarTracker;
+extern VarModificationTracker g_yPosVarTracker;
 
 extern SDL_Window *sdl_window;
 
@@ -382,10 +385,10 @@ static void IN_HandleEvents( void ) {
 						break;
 					case SDL_WINDOWEVENT_MOVED:
 						// FIXME: move this somewhere else
-						Cvar_SetValue( "vid_xpos", event.window.data1 );
-						Cvar_SetValue( "vid_ypos", event.window.data2 );
-						vid_xpos->modified = false;
-						vid_ypos->modified = false;
+						v_xPos.set( event.window.data1 );
+						v_yPos.set( event.window.data2 );
+						(void)g_xPosVarTracker.checkAndReset();
+						(void)g_yPosVarTracker.checkAndReset();
 						break;
 				}
 				break;

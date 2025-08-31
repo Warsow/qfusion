@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <float.h>
 #include <client/client.h>
 #include <common/facilities/cvar.h>
+#include <common/facilities/configvars.h>
 #include "winquake.h"
 #include "win_input.h"
 #include "resource.h"
@@ -68,12 +69,13 @@ typedef struct {
 
 static UINT MSH_MOUSEWHEEL;
 
-// Console variables that we need to access from this module
-extern cvar_t *vid_xpos;          // X coordinate of window position
-extern cvar_t *vid_ypos;          // Y coordinate of window position
-extern cvar_t *vid_fullscreen;
-extern cvar_t *win_noalttab;
-extern cvar_t *win_nowinkeys;
+extern BoolConfigVar v_fullscreen;
+extern BoolConfigVar v_winNoAltTab;
+extern BoolConfigVar v_winNoWinKeys;
+extern IntConfigVar v_xPos;
+extern IntConfigVar v_yPos;
+extern VarModificationTracker g_xPosVarTracker;
+extern VarModificationTracker g_yPosVarTracker;
 
 // Global variables used internally by this module
 HWND cl_hwnd;           // Main window handle for life of program
@@ -284,10 +286,10 @@ void AppActivate( BOOL fActive, BOOL minimize, BOOL destroy ) {
 		}
 	}
 
-	if( win_noalttab->integer ) {
+	if( v_winNoAltTab.get() ) {
 		VID_EnableAltTab( !ActiveApp );
 	}
-	if( win_nowinkeys->integer ) {
+	if( v_winNoWinKeys.get() ) {
 		VID_EnableWinKeys( !ActiveApp );
 	}
 
@@ -355,7 +357,7 @@ LONG WINAPI MainWndProc(
 				SetForegroundWindow( cl_hwnd );
 				ShowWindow( cl_hwnd, SW_RESTORE );
 			} else {
-				if( vid_fullscreen->integer || fMinimized ) {
+				if( v_fullscreen.get() || fMinimized ) {
 					ShowWindow( cl_hwnd, SW_MINIMIZE );
 				}
 			}
@@ -368,7 +370,7 @@ LONG WINAPI MainWndProc(
 			RECT r;
 			int style;
 
-			if( !vid_fullscreen->integer ) {
+			if( !v_fullscreen.get() ) {
 				xPos = (short) LOWORD( lParam ); // horizontal position
 				yPos = (short) HIWORD( lParam ); // vertical position
 
@@ -380,10 +382,10 @@ LONG WINAPI MainWndProc(
 				style = GetWindowLong( hWnd, GWL_STYLE );
 				AdjustWindowRect( &r, style, FALSE );
 
-				Cvar_SetValue( "vid_xpos", xPos + r.left );
-				Cvar_SetValue( "vid_ypos", yPos + r.top );
-				vid_xpos->modified = false;
-				vid_ypos->modified = false;
+				v_xPos.set( xPos + r.left );
+				v_yPos.set( yPos + r.top );
+				(void)g_xPosVarTracker.checkAndReset();
+				(void)g_yPosVarTracker.checkAndReset();
 				if( ActiveApp ) {
 					IN_Activate( true );
 				}
