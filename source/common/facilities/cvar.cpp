@@ -439,10 +439,9 @@ void Cvar_GetLatchedVars( cvar_flag_t flags ) {
 	for( i = 0; i < dump->size; ++i ) {
 		cvar_t *const var = (cvar_t *) dump->key_value_vector[i].value;
 		Q_free( var->string );
-		var->string = var->latched_string;
+		setValueString( var, var->latched_string );
+		Q_free( var->latched_string );
 		var->latched_string = NULL;
-		var->value = atof( var->string );
-		var->integer = Q_rint( var->value );
 	}
 	Trie_FreeDump( dump );
 }
@@ -468,9 +467,7 @@ void Cvar_FixCheatVars( void ) {
 	for( i = 0; i < dump->size; ++i ) {
 		cvar_t *const var = (cvar_t *) dump->key_value_vector[i].value;
 		Q_free( var->string );
-		var->string = Q_strdup( var->dvalue );
-		var->value = atof( var->string );
-		var->integer = Q_rint( var->value );
+		setValueString( var, var->dvalue );
 	}
 	Trie_FreeDump( dump );
 }
