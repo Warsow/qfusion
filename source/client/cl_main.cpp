@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/asyncstream.h>
 #include <common/facilities/cmdsystem.h>
 #include <common/facilities/protocol.h>
+#include <common/facilities/configvars.h>
 #include <common/helpers/mmuuid.h>
 #include <common/helpers/singletonholder.h>
 #include <common/helpers/pipeutils.h>
@@ -106,24 +107,34 @@ static cvar_t *s_module = nullptr;
 
 SoundSystem *SoundSystem::s_instance = nullptr;
 
-static cvar_t *vid_width, *vid_height;
-static cvar_t *vid_pixelRatio;
-cvar_t *vid_xpos;          // X coordinate of window position
-cvar_t *vid_ypos;          // Y coordinate of window position
-cvar_t *vid_fullscreen;
-static cvar_t *vid_borderless;
-cvar_t *vid_displayfrequency;
-cvar_t *vid_multiscreen_head;
-static cvar_t *vid_parentwid;      // parent window identifier
-cvar_t *win_noalttab;
-cvar_t *win_nowinkeys;
+static UnsignedConfigVar v_width { "vid_width"_asView, { .byDefault = 0, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+static UnsignedConfigVar v_height { "vid_height"_asView, { .byDefault = 0, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+static UnsignedConfigVar v_pixelRatio { "vid_pixelRatio"_asView, { .byDefault = 0, .flags = CVAR_DEVELOPER | CVAR_LATCH_VIDEO } };
 
-cvar_t *cl_multithreading;
+IntConfigVar v_xPos { "vid_xPos"_asView, { .byDefault = 0, .flags = CVAR_ARCHIVE } };
+IntConfigVar v_yPos { "vid_yPos"_asView, { .byDefault = 0, .flags = CVAR_ARCHIVE } };
+VarModificationTracker g_xPosVarTracker { &v_xPos };
+VarModificationTracker g_yPosVarTracker { &v_yPos };
+
+BoolConfigVar v_fullscreen { "vid_fullscreen"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } };
+static BoolConfigVar v_borderless { "vid_borderless"_asView, { .byDefault = false, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+static VarModificationTracker g_fullscreenVarTracker { &v_fullscreen };
+static VarModificationTracker g_borderlessVarTracker { &v_borderless };
+
+static UnsignedConfigVar v_displayFrequency { "v_displayFrequency"_asView, { .byDefault = 0, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
+
+BoolConfigVar v_winNoAltTab { "win_noAltTab"_asView, { .byDefault = false, .flags = CVAR_ARCHIVE } };
+BoolConfigVar v_winNoWinKeys { "win_noWinKeys"_asView, { .byDefault = false, .flags = CVAR_ARCHIVE } };
+
+static VarModificationTracker g_noAltTabVarTracker { &v_winNoAltTab };
+static VarModificationTracker g_noWinKeysVarTracker { &v_winNoWinKeys };
+
+BoolConfigVar v_multiThreading { "cl_multiThreading"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
 
 // Global variables used internally by this module
 viddef_t viddef;             // global video state; used by other modules
 
-static int vid_ref_prevwidth, vid_ref_prevheight;
+static unsigned vid_ref_prevwidth, vid_ref_prevheight;
 static bool vid_ref_modified;
 static bool vid_ref_verbose;
 static bool vid_ref_sound_restart;
@@ -906,7 +917,8 @@ int VID_GetWindowHeight( void ) {
 }
 
 int VID_GetPixelRatio( void ) {
-	if( int value = vid_pixelRatio->integer; value > 0 ) {
+	// TODO: Should we limit the var upper bound? It's more consistent if it's applied here though.
+	if( int value = (int)v_pixelRatio.get(); value > 0 ) {
 		return wsw::clamp( value, 1, 2 );
 	}
 	return wsw::clamp( Sys_GetPixelRatio(), 1, 2 );
@@ -917,26 +929,27 @@ std::span<const VideoMode> VID_GetValidVideoModes() {
 }
 
 rserr_t VID_ApplyPendingMode( rserr_t ( *tryToApplyFn )( int, int, int, int, int, const VidModeOptions & ) ) {
-	vid_fullscreen->modified = false;
+	(void)g_fullscreenVarTracker.checkAndReset();
 
-	const int frequency = vid_displayfrequency->integer;
+	const int frequency = v_displayFrequency.get();
 
-	VidModeOptions options { .fullscreen = vid_fullscreen->integer != 0, .borderless = vid_borderless->integer != 0 };
+	VidModeOptions options { .fullscreen = v_fullscreen.get(), .borderless = v_borderless.get() };
 
-	int x, y, w, h;
+	int x, y;
+	unsigned w, h;
 	if( options.fullscreen && options.borderless ) {
 		x = 0, y = 0;
 		const VideoMode defaultMode = g_videoModeCache->getDefaultMode();
-		w = (int)defaultMode.width;
-		h = (int)defaultMode.height;
+		w = defaultMode.width;
+		h = defaultMode.height;
 	} else {
-		x = vid_xpos->integer;
-		y = vid_ypos->integer;
-		w = vid_width->integer;
-		h = vid_height->integer;
+		x = v_xPos.get();
+		y = v_yPos.get();
+		w = v_width.get();
+		h = v_height.get();
 	}
 
-	if( vid_ref_active && ( w != (int)viddef.width || h != (int)viddef.height ) ) {
+	if( vid_ref_active && ( w != viddef.width || h != viddef.height ) ) {
 		return rserr_restart_required;
 	}
 
@@ -968,8 +981,8 @@ rserr_t VID_ApplyPendingMode( rserr_t ( *tryToApplyFn )( int, int, int, int, int
 		if( err == rserr_invalid_fullscreen ) {
 			clWarning() << "Fullscreen unavailable in this mode";
 
-			Cvar_ForceSet( vid_fullscreen->name, "0" );
-			vid_fullscreen->modified = false;
+			v_fullscreen.setImmediately( false );
+			(void)g_fullscreenVarTracker.checkAndReset();
 
 			// Try again without the fullscreen flag
 			options.fullscreen = false;
@@ -982,16 +995,16 @@ rserr_t VID_ApplyPendingMode( rserr_t ( *tryToApplyFn )( int, int, int, int, int
 			// Try setting it back to something safe
 			if( w != vid_ref_prevwidth || h != vid_ref_prevheight ) {
 				w = vid_ref_prevwidth;
-				Cvar_ForceSet( vid_width->name, va( "%i", w ) );
+				v_width.setImmediately( w );
 				h = vid_ref_prevheight;
-				Cvar_ForceSet( vid_height->name, va( "%i", h ) );
+				v_height.setImmediately( h );
 
 				err = tryToApplyFn( x, y, w, h, frequency, options );
 				if( err == rserr_invalid_fullscreen ) {
 					clWarning() << "Could not revert to safe fullscreen mode";
 
-					Cvar_ForceSet( vid_fullscreen->name, "0" );
-					vid_fullscreen->modified = false;
+					v_fullscreen.setImmediately( false );
+					(void)g_fullscreenVarTracker.checkAndReset();
 
 					// Try again without the fullscreen flag
 					options.fullscreen = false;
@@ -1046,36 +1059,34 @@ static void RestartVideoAndAllMedia( bool vid_ref_was_active, bool verbose ) {
 		Sys_Error( "VID_LoadRefresh() failed" );
 	}
 
-	char buffer[16];
-
 	// handle vid size changes
-	if( ( vid_width->integer <= 0 ) || ( vid_height->integer <= 0 ) ) {
-		const auto [width, height] =  g_videoModeCache->getDefaultMode();
-		Cvar_ForceSet( vid_width->name, va_r( buffer, sizeof( buffer ), "%d", width ) );
-		Cvar_ForceSet( vid_height->name, va_r( buffer, sizeof( buffer ), "%d", height ) );
+	if( v_width.get() <= 0 || v_height.get() <= 0 ) {
+		const VideoMode &defaultMode = g_videoModeCache->getDefaultMode();
+		v_width.setImmediately( defaultMode.width );
+		v_height.setImmediately( defaultMode.height );
 	}
 
-	if( const auto maxModeWidth = g_videoModeCache->getMaxWidth(); vid_width->integer > (int)maxModeWidth ) {
-		Cvar_ForceSet( vid_width->name, va_r( buffer, sizeof( buffer ), "%d", maxModeWidth ) );
+	if( const unsigned maxModeWidth = g_videoModeCache->getMaxWidth(); v_width.get() > maxModeWidth ) {
+		v_width.setImmediately( maxModeWidth );
 	}
-	if( const auto maxModeHeight = g_videoModeCache->getMaxHeight(); vid_height->integer > (int)maxModeHeight ) {
-		Cvar_ForceSet( vid_height->name, va_r( buffer, sizeof( buffer ), "%d", maxModeHeight ) );
+	if( const unsigned maxModeHeight = g_videoModeCache->getMaxHeight(); v_height.get() > maxModeHeight ) {
+		v_height.setImmediately( maxModeHeight );
 	}
 
-	if( vid_fullscreen->integer ) {
+	if( v_fullscreen.get() ) {
 		// snap to the closest fullscreen resolution, width has priority over height
-		const auto requestedWidth          = (unsigned)vid_width->integer;
-		const auto requestedHeight         = (unsigned)vid_height->integer;
-		const auto [bestWidth, bestHeight] = g_videoModeCache->getBestFittingMode( requestedWidth, requestedHeight );
-		if( bestWidth != requestedWidth ) {
-			Cvar_ForceSet( vid_width->name, va_r( buffer, sizeof( buffer ), "%d", bestWidth ) );
+		const unsigned requestedWidth  = v_width.get();
+		const unsigned requestedHeight = v_height.get();
+		const VideoMode &bestMode      = g_videoModeCache->getBestFittingMode( requestedWidth, requestedHeight );
+		if( bestMode.width != requestedWidth ) {
+			v_width.setImmediately( bestMode.width );
 		}
-		if( bestHeight != requestedHeight ) {
-			Cvar_ForceSet( vid_height->name, va_r( buffer, sizeof( buffer ), "%d", bestHeight ) );
+		if( bestMode.height != requestedHeight ) {
+			v_height.setImmediately( bestMode.height );
 		}
 	}
 
-	if( rserr_t err = VID_Sys_Init_( STR_TO_POINTER( vid_parentwid->string ), vid_ref_verbose ); err != rserr_ok ) {
+	if( rserr_t err = VID_Sys_Init_( nullptr, vid_ref_verbose ); err != rserr_ok ) {
 		Sys_Error( "VID_Init() failed with code %i", err );
 	}
 
@@ -1120,59 +1131,37 @@ void VID_CheckChanges( void ) {
 	const bool vid_ref_was_active = vid_ref_active;
 	const bool verbose = vid_ref_verbose || vid_ref_sound_restart;
 
-	if( win_noalttab->modified ) {
-		VID_EnableAltTab( win_noalttab->integer ? false : true );
-		win_noalttab->modified = false;
+	if( g_noAltTabVarTracker.checkAndReset() ) {
+		VID_EnableAltTab( !v_winNoAltTab.get() );
 	}
 
-	if( win_nowinkeys->modified ) {
-		VID_EnableWinKeys( win_nowinkeys->integer ? false : true );
-		win_nowinkeys->modified = false;
+	if( g_noWinKeysVarTracker.checkAndReset() ) {
+		VID_EnableWinKeys( !v_winNoWinKeys.get() );
 	}
 
-	if( vid_fullscreen->modified ) {
+	if( g_fullscreenVarTracker.checkAndReset() ) {
 		if( vid_ref_active ) {
 			// try to change video mode without vid_restart
 			if( const rserr_t err = VID_ApplyPendingMode( R_TrySettingMode ); err == rserr_restart_required ) {
 				vid_ref_modified = true;
 			}
 		}
-
-		vid_fullscreen->modified = false;
 	}
 
 	if( vid_ref_modified ) {
 		RestartVideoAndAllMedia( vid_ref_was_active, verbose );
 	}
 
-	if( vid_xpos->modified || vid_ypos->modified ) {
-		if( !vid_fullscreen->integer && !vid_borderless->integer ) {
-			VID_UpdateWindowPosAndSize( vid_xpos->integer, vid_ypos->integer );
+	if( g_xPosVarTracker.checkAndReset() | g_yPosVarTracker.checkAndReset() ) {
+		if( !v_fullscreen.get() && !v_borderless.get() ) {
+			VID_UpdateWindowPosAndSize( v_xPos.get(), v_yPos.get() );
 		}
-		vid_xpos->modified = false;
-		vid_ypos->modified = false;
 	}
 }
 
 void VID_Init( void ) {
 	if( !vid_initialized ) {
 		g_videoModeCache = VideoModeCache();
-
-		vid_width = Cvar_Get( "vid_width", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-		vid_height = Cvar_Get( "vid_height", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-		vid_pixelRatio = Cvar_Get( "vid_pixelRatio", "0", CVAR_DEVELOPER | CVAR_LATCH_VIDEO );
-		vid_xpos = Cvar_Get( "vid_xpos", "0", CVAR_ARCHIVE );
-		vid_ypos = Cvar_Get( "vid_ypos", "0", CVAR_ARCHIVE );
-		vid_fullscreen = Cvar_Get( "vid_fullscreen", "1", CVAR_ARCHIVE );
-		vid_borderless = Cvar_Get( "vid_borderless", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-		vid_displayfrequency = Cvar_Get( "vid_displayfrequency", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
-		vid_multiscreen_head = Cvar_Get( "vid_multiscreen_head", "-1", CVAR_ARCHIVE );
-		vid_parentwid = Cvar_Get( "vid_parentwid", "0", CVAR_NOSET );
-
-		win_noalttab = Cvar_Get( "win_noalttab", "0", CVAR_ARCHIVE );
-		win_nowinkeys = Cvar_Get( "win_nowinkeys", "0", CVAR_ARCHIVE );
-
-		cl_multithreading = Cvar_Get( "cl_multithreading", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
 
 		/* Add some console commands that we want to handle */
 		CL_Cmd_Register( "vid_restart"_asView, VID_Restart_f );
@@ -1184,8 +1173,9 @@ void VID_Init( void ) {
 		vid_ref_verbose = true;
 		vid_initialized = true;
 		vid_ref_sound_restart = false;
-		vid_fullscreen->modified = false;
-		vid_borderless->modified = false;
+
+		(void)g_fullscreenVarTracker.checkAndReset();
+		(void)g_borderlessVarTracker.checkAndReset();
 
 		vid_ref_prevwidth = g_videoModeCache->getSafestMode().width;
 		vid_ref_prevheight = g_videoModeCache->getSafestMode().height;
