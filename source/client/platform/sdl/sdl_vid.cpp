@@ -81,22 +81,24 @@ void VID_EnableWinKeys( bool enable ) {
 void VID_FlashWindow( int count ) {
 }
 
-unsigned int VID_GetSysModes( vidmode_t *modes ) {
+bool VID_GetSysModes( wsw::PodVector<VideoMode> *modes ) {
 #ifdef __APPLE__
 	// only support borderless fullscreen because Alt+Tab doesn't work in fullscreen
 	if( modes ) {
-		VID_GetDefaultMode( &modes[0].width, &modes[0].height );
+		int width = 0, height = 0;
+		VID_GetDefaultMode( &width, &height );
+		models->emplace_back( { (unsigned)width, (unsigned)height } );
 	}
-	return 1;
+	return true;
 #else
+
 	int num;
 	SDL_DisplayMode mode;
 	int prevwidth = 0, prevheight = 0;
-	unsigned int ret = 0;
 
 	num = SDL_GetNumDisplayModes( 0 );
 	if( num < 1 ) {
-		return 0;
+		return false;
 	}
 
 	while( num-- ) { // reverse to help the sorting a little
@@ -112,18 +114,13 @@ unsigned int VID_GetSysModes( vidmode_t *modes ) {
 			continue;
 		}
 
-		if( modes ) {
-			modes[ret].width = mode.w;
-			modes[ret].height = mode.h;
-		}
+		modes->emplace_back( { (unsigned)mode.w, (unsigned)mode.h } );
 
 		prevwidth = mode.w;
 		prevheight = mode.h;
-
-		ret++;
 	}
 
-	return ret;
+	return true;
 #endif
 }
 

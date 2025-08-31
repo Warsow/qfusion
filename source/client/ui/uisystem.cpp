@@ -982,10 +982,9 @@ void QtUISystem::registerContextProperties( QQmlContext *context, SandboxKind sa
 }
 
 void QtUISystem::retrieveVideoModes() {
-	int width, height;
-	for( unsigned i = 0; VID_GetModeInfo( &width, &height, i ); ++i ) {
-		s_videoModeWidthValuesList.append( width );
-		s_videoModeHeightValuesList.append( height );
+	for( const auto [width, height]: VID_GetValidVideoModes() ) {
+		s_videoModeWidthValuesList.append( (int)width );
+		s_videoModeHeightValuesList.append( (int)height );
 		s_videoModeHeadingsList.append( QString::asprintf( "%dx%d", width, height ) );
 	}
 }

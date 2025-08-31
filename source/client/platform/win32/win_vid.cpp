@@ -557,9 +557,9 @@ bool VID_GetDefaultMode( int *width, int *height ) {
 	return true;
 }
 
-unsigned int VID_GetSysModes( vidmode_t *modes ) {
+bool VID_GetSysModes( wsw::PodVector<VideoMode> *modes ) {
 	DEVMODE dm;
-	unsigned int i, count = 0, prevwidth = 0, prevheight = 0;
+	unsigned int i, prevwidth = 0, prevheight = 0;
 
 	memset( &dm, 0, sizeof( dm ) );
 	dm.dmSize = sizeof( dm );
@@ -577,18 +577,13 @@ unsigned int VID_GetSysModes( vidmode_t *modes ) {
 			continue;
 		}
 
-		if( modes ) {
-			modes[count].width = dm.dmPelsWidth;
-			modes[count].height = dm.dmPelsHeight;
-		}
+		modes->emplace_back( { (unsigned)dm.dmPelsWidth, (unsigned)dm.dmPelsHeight } );
 
 		prevwidth = dm.dmPelsWidth;
 		prevheight = dm.dmPelsHeight;
-
-		count++;
 	}
 
-	return count;
+	return true;
 }
 
 void VID_FlashWindow( int count ) {

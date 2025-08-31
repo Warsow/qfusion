@@ -22,15 +22,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef __VID_H__
 #define __VID_H__
 
+#include <common/types/podvector.h>
+
 typedef struct {
 	unsigned width, height;             // coordinates from main game
 } viddef_t;
 
 extern viddef_t viddef;             // global video state
 
-typedef struct {
-	int width, height;
-} vidmode_t;
+struct VideoMode {
+	unsigned width;
+	unsigned height;
+};
 
 // Video module initialisation etc
 void VID_Init( void );
@@ -42,8 +45,8 @@ void *VID_GetWindowHandle( void );
 void VID_WindowInitialized();
 void VID_FlashWindow( int count );
 bool VID_GetDefaultMode( int *width, int *height );
-unsigned int VID_GetSysModes( vidmode_t *modes );
-bool VID_GetModeInfo( int *width, int *height, unsigned int mode );
+bool VID_GetSysModes( wsw::PodVector<VideoMode> *modes );
+std::span<const VideoMode> VID_GetValidVideoModes();
 void VID_AppActivate( bool active, bool minimize, bool destroy );
 bool VID_RefreshIsActive( void );
 bool VID_AppIsActive( void );

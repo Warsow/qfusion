@@ -106,11 +106,6 @@ static cvar_t *s_module = nullptr;
 
 SoundSystem *SoundSystem::s_instance = nullptr;
 
-static unsigned vid_num_modes;
-static unsigned vid_max_width_mode_index;
-static unsigned vid_max_height_mode_index;
-static vidmode_t *vid_modes;
-
 static cvar_t *vid_width, *vid_height;
 static cvar_t *vid_pixelRatio;
 cvar_t *vid_xpos;          // X coordinate of window position
@@ -754,18 +749,129 @@ void VID_Restart_f( const CmdArgs &cmdArgs ) {
 	VID_Restart( ( Cmd_Argc() >= 2 ? true : false ), false );
 }
 
-bool VID_GetModeInfo( int *width, int *height, unsigned int mode ) {
-	if( mode < vid_num_modes ) {
-		*width  = vid_modes[mode].width;
-		*height = vid_modes[mode].height;
-		return true;
+class VideoModeCache {
+public:
+	VideoModeCache() {
+		if( !VID_GetSysModes( &m_modes ) ) {
+			wsw::failWithRuntimeError( "Failed to retrieve system video modes" );
+		}
+
+		size_t numKeptModes = 0;
+		for( const VideoMode &mode: m_modes ) {
+			if( mode.width >= 1024 && mode.height >= 720 ) {
+				m_modes[numKeptModes++] = mode;
+			}
+		}
+
+		if( !numKeptModes ) {
+			wsw::failWithRuntimeError( "Failed to find compatible (width >= 1024, height >= 720) video modes" );
+		}
+
+		m_modes.erase( m_modes.begin() + numKeptModes, m_modes.end() );
+		assert( m_modes.size() == numKeptModes );
+		wsw::sortPodNonSpeedCritical( m_modes.begin(), m_modes.end(), []( const VideoMode &lhs, const VideoMode &rhs ) {
+			if( lhs.width == rhs.width ) {
+				return lhs.height < rhs.height;
+			}
+			return lhs.width < rhs.width;
+		});
+
+		// Remove duplicate modes in case the sys code failed to do so.
+
+		numKeptModes        = 0;
+		unsigned prevWidth  = 0;
+		unsigned prevHeight = 0;
+
+		assert( m_maxHeight == 0 );
+		for( const VideoMode &mode: m_modes ) {
+			if( mode.width != prevWidth || mode.height != prevHeight ) {
+				prevWidth   = mode.width;
+				prevHeight  = mode.height;
+				m_maxHeight = wsw::max( m_maxHeight, mode.height );
+			}
+			m_modes[numKeptModes++] = mode;
+		}
+
+		assert( numKeptModes );
+		m_modes.erase( m_modes.begin() + numKeptModes, m_modes.end() );
+		m_modes.shrink_to_fit();
 	}
-	return false;
-}
+
+	[[nodiscard]]
+	auto getBestFittingMode( unsigned requestedWidth, unsigned requestedHeight ) -> VideoMode {
+		unsigned chosenWidth  = 0;
+		unsigned chosenHeight = 0;
+
+		unsigned leastWidthPenalty = std::numeric_limits<unsigned>::max();
+		// Get a best matching mode for width first (which has a priority over height)
+		for( const VideoMode &mode: m_modes ) {
+			const auto absDiff = (unsigned)std::abs( (int)mode.width - (int)requestedWidth );
+			assert( absDiff < std::numeric_limits<int>::max() >> 1 );
+			// Set a penalty bit for modes with lesser than requested width
+			const unsigned penalty = ( absDiff << 1u ) | ( mode.width >= requestedWidth ? 0 : 1 );
+			if( leastWidthPenalty > penalty ) {
+				leastWidthPenalty = penalty;
+				chosenWidth = mode.width;
+				if( chosenWidth == requestedWidth ) [[unlikely]] {
+					break;
+				}
+			}
+		}
+
+		unsigned leastHeightPenalty = std::numeric_limits<unsigned>::max();
+		// Get a best matching mode for height preserving the selected width
+		for( const VideoMode &mode: m_modes ) {
+			// Require an exact match of the chosen width
+			if( mode.width == chosenWidth ) {
+				const auto absDiff = (unsigned)std::abs( (int)mode.height - (int)requestedHeight );
+				assert( absDiff < std::numeric_limits<unsigned>::max() >> 1 );
+				// Set a penalty bit for modes with lesser than requested height
+				const unsigned penalty = ( absDiff << 1u ) | ( mode.height >= requestedHeight ? 0 : 1 );
+				if( leastHeightPenalty > penalty ) {
+					leastHeightPenalty = penalty;
+					chosenHeight = mode.height;
+					if( chosenHeight == requestedHeight ) [[unlikely]] {
+						break;
+					}
+				}
+			}
+		}
+
+		assert( chosenWidth > 0 && chosenHeight > 0 );
+		return VideoMode { .width = chosenWidth, .height = chosenHeight };
+	}
+
+	[[nodiscard]]
+	auto getMaxWidth() const { return m_modes.back().width; }
+	[[nodiscard]]
+	auto getMaxHeight() const { return m_maxHeight; }
+
+	[[nodiscard]]
+	std::span<const VideoMode> getAllModes() const { return m_modes; }
+
+	[[nodiscard]]
+	auto getSafestMode() const -> VideoMode { return m_modes[0]; }
+
+	[[nodiscard]]
+	auto getDefaultMode() const -> VideoMode {
+		int width = 0, height = 0;
+		// TODO: Cache it?
+		// TODO: Check whether it really belongs to the list?
+		if( VID_GetDefaultMode( &width, &height ) ) {
+			return VideoMode { (unsigned)width, (unsigned)height };
+		}
+		return getSafestMode();
+	}
+private:
+	wsw::PodVector<VideoMode> m_modes;
+	unsigned m_maxHeight { 0 };
+};
+
+static std::optional<VideoModeCache> g_videoModeCache;
 
 static void VID_ModeList_f( const CmdArgs & ) {
-	for( unsigned i = 0; i < vid_num_modes; i++ ) {
-		Com_Printf( "* %ix%i\n", vid_modes[i].width, vid_modes[i].height );
+	for( const VideoMode &mode: g_videoModeCache->getAllModes() ) {
+		Com_Printf( "* %ix%i\n", mode.width, mode.height );
 	}
 }
 
@@ -806,6 +912,10 @@ int VID_GetPixelRatio( void ) {
 	return wsw::clamp( Sys_GetPixelRatio(), 1, 2 );
 }
 
+std::span<const VideoMode> VID_GetValidVideoModes() {
+	return g_videoModeCache->getAllModes();
+}
+
 rserr_t VID_ApplyPendingMode( rserr_t ( *tryToApplyFn )( int, int, int, int, int, const VidModeOptions & ) ) {
 	vid_fullscreen->modified = false;
 
@@ -816,10 +926,9 @@ rserr_t VID_ApplyPendingMode( rserr_t ( *tryToApplyFn )( int, int, int, int, int
 	int x, y, w, h;
 	if( options.fullscreen && options.borderless ) {
 		x = 0, y = 0;
-		if( !VID_GetDefaultMode( &w, &h ) ) {
-			w = vid_modes[0].width;
-			h = vid_modes[0].height;
-		}
+		const VideoMode defaultMode = g_videoModeCache->getDefaultMode();
+		w = (int)defaultMode.width;
+		h = (int)defaultMode.height;
 	} else {
 		x = vid_xpos->integer;
 		y = vid_ypos->integer;
@@ -920,52 +1029,6 @@ static bool VID_LoadRefresh() {
 	return true;
 }
 
-[[nodiscard]]
-static auto getBestFittingMode( int requestedWidth, int requestedHeight ) -> std::pair<int, int> {
-	assert( vid_num_modes );
-
-	int width = -1;
-	unsigned leastWidthPenalty = std::numeric_limits<unsigned>::max();
-	// Get a best matching mode for width first (which has a priority over height)
-	for( unsigned i = 0; i < vid_num_modes; ++i ) {
-		const auto &mode = vid_modes[i];
-		const auto absDiff = std::abs( mode.width - requestedWidth );
-		assert( absDiff < std::numeric_limits<int>::max() >> 1 );
-		// Set a penalty bit for modes with lesser than requested width
-		const unsigned penalty = ( absDiff << 1u ) | ( mode.width >= requestedWidth ? 0 : 1 );
-		if( leastWidthPenalty > penalty ) {
-			leastWidthPenalty = penalty;
-			width = mode.width;
-			if( width == requestedWidth ) [[unlikely]] {
-				break;
-			}
-		}
-	}
-
-	int height = -1;
-	unsigned leastHeightPenalty = std::numeric_limits<unsigned>::max();
-	// Get a best matching mode for height preserving the selected width
-	for( unsigned i = 0; i < vid_num_modes; ++i ) {
-		// Require an exact match of the chosen width
-		if( const auto &mode = vid_modes[i]; mode.width == width ) {
-			const auto absDiff = (unsigned)std::abs( mode.height - requestedHeight );
-			assert( absDiff < std::numeric_limits<unsigned>::max() >> 1 );
-			// Set a penalty bit for modes with lesser than requested height
-			const unsigned penalty = ( absDiff << 1u ) | ( mode.height >= requestedHeight ? 0 : 1 );
-			if( leastHeightPenalty > penalty ) {
-				leastHeightPenalty = penalty;
-				height = mode.height;
-				if( height == requestedHeight ) [[unlikely]] {
-					break;
-				}
-			}
-		}
-	}
-
-	assert( width > 0 && height > 0 );
-	return { width, height };
-}
-
 static void RestartVideoAndAllMedia( bool vid_ref_was_active, bool verbose ) {
 	const bool cgameActive = cls.cgameActive;
 
@@ -987,28 +1050,23 @@ static void RestartVideoAndAllMedia( bool vid_ref_was_active, bool verbose ) {
 
 	// handle vid size changes
 	if( ( vid_width->integer <= 0 ) || ( vid_height->integer <= 0 ) ) {
-		// set the mode to the default
-		int w, h;
-		if( !VID_GetDefaultMode( &w, &h ) ) {
-			w = vid_modes[0].width;
-			h = vid_modes[0].height;
-		}
-		Cvar_ForceSet( vid_width->name, va_r( buffer, sizeof( buffer ), "%d", w ) );
-		Cvar_ForceSet( vid_height->name, va_r( buffer, sizeof( buffer ), "%d", h ) );
+		const auto [width, height] =  g_videoModeCache->getDefaultMode();
+		Cvar_ForceSet( vid_width->name, va_r( buffer, sizeof( buffer ), "%d", width ) );
+		Cvar_ForceSet( vid_height->name, va_r( buffer, sizeof( buffer ), "%d", height ) );
 	}
 
-	if( const auto &mode = vid_modes[vid_max_width_mode_index]; vid_width->integer > mode.width ) {
-		Cvar_ForceSet( vid_width->name, va_r( buffer, sizeof( buffer ), "%d", mode.width ) );
+	if( const auto maxModeWidth = g_videoModeCache->getMaxWidth(); vid_width->integer > (int)maxModeWidth ) {
+		Cvar_ForceSet( vid_width->name, va_r( buffer, sizeof( buffer ), "%d", maxModeWidth ) );
 	}
-	if( const auto &mode = vid_modes[vid_max_height_mode_index]; vid_height->integer > mode.height ) {
-		Cvar_ForceSet( vid_height->name, va_r( buffer, sizeof( buffer ), "%d", mode.width ) );
+	if( const auto maxModeHeight = g_videoModeCache->getMaxHeight(); vid_height->integer > (int)maxModeHeight ) {
+		Cvar_ForceSet( vid_height->name, va_r( buffer, sizeof( buffer ), "%d", maxModeHeight ) );
 	}
 
 	if( vid_fullscreen->integer ) {
 		// snap to the closest fullscreen resolution, width has priority over height
-		const int requestedWidth = vid_width->integer;
-		const int requestedHeight = vid_height->integer;
-		const auto [bestWidth, bestHeight] = getBestFittingMode( requestedWidth, requestedHeight );
+		const auto requestedWidth          = (unsigned)vid_width->integer;
+		const auto requestedHeight         = (unsigned)vid_height->integer;
+		const auto [bestWidth, bestHeight] = g_videoModeCache->getBestFittingMode( requestedWidth, requestedHeight );
 		if( bestWidth != requestedWidth ) {
 			Cvar_ForceSet( vid_width->name, va_r( buffer, sizeof( buffer ), "%d", bestWidth ) );
 		}
@@ -1096,63 +1154,9 @@ void VID_CheckChanges( void ) {
 	}
 }
 
-static int VID_CompareModes( const vidmode_t *first, const vidmode_t *second ) {
-	if( first->width == second->width ) {
-		return first->height - second->height;
-	}
-
-	return first->width - second->width;
-}
-
-void VID_InitModes( void ) {
-	const unsigned numAllModes = VID_GetSysModes( nullptr );
-	if( !numAllModes ) {
-		Sys_Error( "Failed to get video modes" );
-	}
-
-	assert( !vid_modes );
-	vid_modes = (vidmode_t *)Q_malloc( numAllModes * sizeof( vidmode_t ) );
-
-	if( const unsigned nextNumAllModes = VID_GetSysModes( vid_modes ); nextNumAllModes != numAllModes ) {
-		Sys_Error( "Failed to get video modes again" );
-	}
-
-	unsigned numModes = 0;
-	for( unsigned i = 0; i < numAllModes; ++i ) {
-		if( vid_modes[i].width >= 1024 && vid_modes[i].height >= 720 ) {
-			vid_modes[numModes++] = vid_modes[i];
-		}
-	}
-
-	if( !numModes ) {
-		Sys_Error( "Failed to find at least a single supported video mode" );
-	}
-
-	qsort( vid_modes, numModes, sizeof( vidmode_t ), ( int ( * )( const void *, const void * ) )VID_CompareModes );
-
-	// Remove duplicate modes in case the sys code failed to do so.
-	vid_num_modes = 0;
-	vid_max_height_mode_index = 0;
-	int prevWidth = 0, prevHeight = 0;
-	for( unsigned i = 0; i < numModes; i++ ) {
-		const int width = vid_modes[i].width;
-		const int height = vid_modes[i].height;
-		if( width != prevWidth || height != prevHeight ) {
-			if( height > vid_modes[vid_max_height_mode_index].height ) {
-				vid_max_height_mode_index = i;
-			}
-			vid_modes[vid_num_modes++] = vid_modes[i];
-			prevWidth = width;
-			prevHeight = height;
-		}
-	}
-
-	vid_max_width_mode_index = vid_num_modes - 1;
-}
-
 void VID_Init( void ) {
 	if( !vid_initialized ) {
-		VID_InitModes();
+		g_videoModeCache = VideoModeCache();
 
 		vid_width = Cvar_Get( "vid_width", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
 		vid_height = Cvar_Get( "vid_height", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
@@ -1182,8 +1186,9 @@ void VID_Init( void ) {
 		vid_ref_sound_restart = false;
 		vid_fullscreen->modified = false;
 		vid_borderless->modified = false;
-		vid_ref_prevwidth = vid_modes[0].width; // the smallest mode is the "safe mode"
-		vid_ref_prevheight = vid_modes[0].height;
+
+		vid_ref_prevwidth = g_videoModeCache->getSafestMode().width;
+		vid_ref_prevheight = g_videoModeCache->getSafestMode().height;
 
 		FTLIB_Init( true );
 
@@ -1199,8 +1204,6 @@ void VID_Shutdown( void ) {
 
 		CL_Cmd_Unregister( "vid_restart"_asView );
 		CL_Cmd_Unregister( "vid_modelist"_asView );
-
-		Q_free( vid_modes );
 
 		vid_initialized = false;
 	}
