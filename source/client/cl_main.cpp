@@ -703,31 +703,22 @@ void CL_SoundModule_Shutdown( bool verbose ) {
 	SoundSystem::shutdown( verbose );
 }
 
-void RestartVideoAndAllMedia( bool vid_ref_was_active, bool verbose ) {
-	const bool cgameActive = cls.cgameActive;
-
+static void PrepareToVideoAndMediaRestart() {
 	CL_ShutdownMedia();
 
 	// stop and free all sounds
 	CL_SoundModule_Shutdown( false );
 
 	FTLIB_FreeFonts( false );
+}
 
-	Cvar_GetLatchedVars( CVAR_LATCH_VIDEO );
-
-	VID_DoRestart();
-
-	// stop and free all sounds
+static void StartVideoAndMedia( bool cgameActive, bool verbose ) {
 	CL_SoundModule_Init( verbose );
 
 	RF_BeginRegistration();
 	SoundSystem::instance()->beginRegistration();
 
 	FTLIB_PrecacheFonts( verbose );
-
-	if( vid_ref_was_active ) {
-		IN_Restart( CmdArgs {} );
-	}
 
 	CL_InitMedia();
 
@@ -4513,6 +4504,18 @@ void CL_RestartMedia( void ) {
 	}
 }
 
+static void VID_CheckChanges() {
+	const bool cgameActive        = cls.cgameActive;
+	const auto [restart, verbose] = VID_CheckChangesOrAskForRestart();
+	if( restart ) {
+		PrepareToVideoAndMediaRestart();
+		VID_DoRestart();
+		IN_Restart( {} );
+		StartVideoAndMedia( cgameActive, verbose );
+	}
+	VID_FinalizePossibleChanges();
+}
+
 /*
 * CL_S_Restart
 *
@@ -5262,6 +5265,7 @@ void CL_Init( void ) {
 	sanitizeEnvironment( { "QT"_asView, "QML"_asView, "QSG"_asView, "QV4"_asView, "Q_"_asView } );
 
 	VID_Init();
+	StartVideoAndMedia( false, true );
 
 	CL_ClearState();
 

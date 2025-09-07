@@ -39,8 +39,6 @@ void VID_UpdateWindowPosAndSize( int x, int y );
 void VID_EnableAltTab( bool enable );
 void VID_EnableWinKeys( bool enable );
 
-void RestartVideoAndAllMedia( bool vid_ref_was_active, bool verbose );
-
 using wsw::operator""_asView;
 
 static UnsignedConfigVar v_width { "vid_width"_asView, { .byDefault = 0, .flags = CVAR_ARCHIVE | CVAR_LATCH_VIDEO } };
@@ -272,8 +270,7 @@ std::span<const VideoMode> VID_GetValidVideoModes() {
 * is to check to see if any of the video mode parameters have changed, and if they have to
 * update the rendering DLL and/or video mode to match.
 */
-void VID_CheckChanges( void ) {
-	const bool vid_ref_was_active = vid_ref_active;
+std::pair<bool, bool> VID_CheckChangesOrAskForRestart() {
 	const bool verbose = vid_ref_verbose || vid_ref_sound_restart;
 
 	if( g_noAltTabVarTracker.checkAndReset() ) {
@@ -293,10 +290,10 @@ void VID_CheckChanges( void ) {
 		}
 	}
 
-	if( vid_ref_modified ) {
-		RestartVideoAndAllMedia( vid_ref_was_active, verbose );
-	}
+	return { vid_ref_modified, verbose };
+}
 
+void VID_FinalizePossibleChanges() {
 	if( g_xPosVarTracker.checkAndReset() | g_yPosVarTracker.checkAndReset() ) {
 		if( !v_fullscreen.get() && !v_borderless.get() ) {
 			VID_UpdateWindowPosAndSize( v_xPos.get(), v_yPos.get() );
@@ -305,6 +302,8 @@ void VID_CheckChanges( void ) {
 }
 
 void VID_DoRestart() {
+	Cvar_GetLatchedVars( CVAR_LATCH_VIDEO );
+
 	if( vid_ref_active ) {
 		RF_Shutdown( false );
 		vid_ref_active = false;
@@ -469,7 +468,9 @@ void VID_Init( void ) {
 
 		FTLIB_Init( true );
 
-		VID_CheckChanges();
+		(void)VID_CheckChangesOrAskForRestart();
+		VID_DoRestart();
+		VID_FinalizePossibleChanges();
 	} else {
 		abort();
 	}

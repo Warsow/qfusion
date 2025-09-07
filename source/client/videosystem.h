@@ -51,7 +51,10 @@ void VID_Restart( bool verbose, bool soundRestart );
 void VID_DoRestart();
 // The sound module may require the handle when using directsound
 void *VID_GetWindowHandle( void );
-void VID_CheckChanges();
+
+std::pair<bool, bool> VID_CheckChangesOrAskForRestart();
+void VID_FinalizePossibleChanges();
+
 void VID_WindowInitialized();
 void VID_FlashWindow( int count );
 bool VID_GetDefaultMode( int *width, int *height );
