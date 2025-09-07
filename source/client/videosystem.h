@@ -17,22 +17,30 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
-// vid.h -- video driver defs
 
-#ifndef __VID_H__
-#define __VID_H__
+#ifndef WSW_9f8b11be_6d3e_4138_927d_dd7f70cc0bb0_H
+#define WSW_9f8b11be_6d3e_4138_927d_dd7f70cc0bb0_H
 
 #include <common/types/podvector.h>
-
-typedef struct {
-	unsigned width, height;             // coordinates from main game
-} viddef_t;
-
-extern viddef_t viddef;             // global video state
+#include <span>
 
 struct VideoMode {
 	unsigned width;
 	unsigned height;
+};
+
+struct VidModeOptions {
+	bool fullscreen { false };
+	bool borderless { false };
+};
+
+enum rserr_t : int {
+	rserr_ok,
+	rserr_invalid_fullscreen,
+	rserr_invalid_mode,
+	rserr_invalid_driver,
+	rserr_restart_required,
+	rserr_unknown
 };
 
 // Video module initialisation etc
@@ -40,8 +48,10 @@ void VID_Init( void );
 void VID_Shutdown( void );
 rserr_t VID_ApplyPendingMode( rserr_t ( *tryToApplyFn )( int, int, int, int, int, const VidModeOptions & ) );
 void VID_Restart( bool verbose, bool soundRestart );
+void VID_DoRestart();
 // The sound module may require the handle when using directsound
 void *VID_GetWindowHandle( void );
+void VID_CheckChanges();
 void VID_WindowInitialized();
 void VID_FlashWindow( int count );
 bool VID_GetDefaultMode( int *width, int *height );

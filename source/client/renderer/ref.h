@@ -681,19 +681,8 @@ private:
 	wsw::ScopedResource<Draw2DRequest *, Draw2DRequestScopedOps> varName( \
 		renderSystem->createDraw2DRequest(), Draw2DRequestScopedOps( renderSystem ) )
 
-struct VidModeOptions {
-	bool fullscreen { false };
-	bool borderless { false };
-};
-
-enum rserr_t : int {
-	rserr_ok,
-	rserr_invalid_fullscreen,
-	rserr_invalid_mode,
-	rserr_invalid_driver,
-	rserr_restart_required,
-	rserr_unknown
-};
+struct VidModeOptions;
+enum rserr_t: int;
 
 // Assumes that the renderer has already been initialized at start
 rserr_t R_TrySettingMode( int x, int y, int width, int height, int displayFrequency, const VidModeOptions &options );

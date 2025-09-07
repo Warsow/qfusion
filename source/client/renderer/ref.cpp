@@ -33,7 +33,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/profilerscope.h>
 #include <common/facilities/syspublic.h>
 #include <common/common.h>
-#include <client/vid.h>
+#include <client/videosystem.h>
 
 using wsw::operator""_asView;
 

@@ -32,7 +32,7 @@
 #include "ftlib.h"
 #include "snd_public.h"
 
-#include "vid.h"
+#include "videosystem.h"
 #include "input.h"
 #include "keys.h"
 #include "console.h"
@@ -376,7 +376,6 @@ connstate_t CL_GetClientState( void );  // wsw : aiwa : we need this information
 void CL_ClearState( void );
 void CL_ReadPackets( void );
 void CL_Disconnect_f( const CmdArgs & );
-void CL_S_Restart( bool noVideo );
 
 bool CL_IsBrowserAvailable( void );
 void CL_OpenURLInBrowser( const char *url );

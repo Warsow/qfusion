@@ -30,6 +30,7 @@
 **
 */
 #include <assert.h>
+#include <client/videosystem.h>
 #include <client/renderer/local.h>
 #include <common/facilities/syspublic.h>
 #include <common/facilities/cvar.h>
