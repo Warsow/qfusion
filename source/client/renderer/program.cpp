@@ -1786,8 +1786,8 @@ void RP_UpdateShaderUniforms( int elem,
 void RP_UpdateViewUniforms( int elem,
 							const mat4_t modelviewMatrix, const mat4_t modelviewProjectionMatrix,
 							const vec3_t viewOrigin, const mat3_t viewAxis,
-							const float mirrorSide,
-							int viewport[4],
+							float mirrorSide,
+							const int *viewport,
 							float zNear, float zFar ) {
 	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
 

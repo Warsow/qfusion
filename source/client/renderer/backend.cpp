@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "program.h"
 #include "frontend.h"
 #include "backendlocal.h"
+#include "glstateproxy.h"
 #include <common/helpers/memspecbuilder.h>
 #include <common/facilities/sysclock.h>
 
@@ -32,17 +33,12 @@ static elem_t dynamicStreamElems[RB_VBO_NUM_STREAMS][MAX_STREAM_VBO_ELEMENTS];
 
 rbackend_t rb;
 
-static void RB_SetGLDefaults();
 static void RB_RegisterStreamVBOs();
-static void RB_SelectTextureUnit( int tmu );
 
 void RB_Init() {
 	memset( &rb, 0, sizeof( rb ) );
 
-	// set default OpenGL state
-	RB_SetGLDefaults();
-	rb.gl.scissor[2] = glConfig.width;
-	rb.gl.scissor[3] = glConfig.height;
+	rb.glStateProxy = new GLStateProxy( glConfig.width, glConfig.height, glConfig.stencilBits );
 
 	// initialize shading
 	RB_InitShading();
@@ -62,6 +58,8 @@ void RB_Shutdown() {
 		Q_free( fru.iboData );
 		fru.iboData = nullptr;
 	}
+	delete rb.glStateProxy;
+	rb.glStateProxy = nullptr;
 }
 
 void RB_BeginRegistration() {
@@ -69,16 +67,7 @@ void RB_BeginRegistration() {
 	RB_BindVBO( 0, 0 );
 
 	// unbind all texture targets on all TMUs
-	for( int i = MAX_TEXTURE_UNITS - 1; i >= 0; i-- ) {
-		RB_SelectTextureUnit( i );
-
-		qglBindTexture( GL_TEXTURE_CUBE_MAP, 0 );
-		qglBindTexture( GL_TEXTURE_2D_ARRAY, 0 );
-		qglBindTexture( GL_TEXTURE_3D, 0 );
-		qglBindTexture( GL_TEXTURE_2D, 0 );
-	}
-
-	RB_FlushTextureCache();
+	rb.glStateProxy->unbindAllTextures();
 }
 
 void RB_EndRegistration() {
@@ -105,99 +94,26 @@ void RB_BeginFrame() {
 void RB_EndFrame() {
 }
 
-static void RB_SetGLDefaults( void ) {
-	if( glConfig.stencilBits ) {
-		qglStencilMask( ( GLuint ) ~0 );
-		qglStencilFunc( GL_EQUAL, 128, 0xFF );
-		qglStencilOp( GL_KEEP, GL_KEEP, GL_INCR );
-	}
-
-	qglDisable( GL_CULL_FACE );
-	qglFrontFace( GL_CCW );
-	qglDisable( GL_BLEND );
-	qglDepthFunc( GL_LEQUAL );
-	qglDepthMask( GL_FALSE );
-	qglDisable( GL_POLYGON_OFFSET_FILL );
-	qglPolygonOffset( -1.0f, 0.0f ); // units will be handled by RB_DepthOffset
-	qglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
-	qglEnable( GL_DEPTH_TEST );
-	qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-	qglFrontFace( GL_CCW );
-	qglEnable( GL_SCISSOR_TEST );
-}
-
-static void RB_SelectTextureUnit( int tmu ) {
-	if( tmu != rb.gl.currentTMU ) {
-		rb.gl.currentTMU = tmu;
-		qglActiveTexture( tmu + GL_TEXTURE0 );
-	}
-}
-
 void RB_FlushTextureCache( void ) {
-	rb.gl.flushTextures = true;
-}
-
-void RB_BindImage( int tmu, const Texture *tex ) {
-	assert( tex != NULL );
-	assert( tex->texnum != 0 );
-
-	if( rb.gl.flushTextures ) {
-		rb.gl.flushTextures = false;
-		memset( rb.gl.currentTextures, 0, sizeof( rb.gl.currentTextures ) );
-	}
-
-	const GLuint texnum = tex->texnum;
-	if( rb.gl.currentTextures[tmu] != texnum ) {
-		rb.gl.currentTextures[tmu] = texnum;
-		RB_SelectTextureUnit( tmu );
-		qglBindTexture( tex->target, tex->texnum );
+	if( rb.glStateProxy ) {
+		rb.glStateProxy->flushTextureCache();
 	}
 }
 
 void RB_DepthRange( float depthmin, float depthmax ) {
-	Q_clamp( depthmin, 0.0f, 1.0f );
-	Q_clamp( depthmax, 0.0f, 1.0f );
-	rb.gl.depthmin = depthmin;
-	rb.gl.depthmax = depthmax;
-	// depthmin == depthmax is a special case when a specific depth value is going to be written
-	if( ( depthmin != depthmax ) && !rb.gl.depthoffset ) {
-		depthmin += 4.0f / 65535.0f;
-	}
-	qglDepthRange( depthmin, depthmax );
+	rb.glStateProxy->setDepthRange( depthmin, depthmax );
 }
 
 void RB_GetDepthRange( float* depthmin, float *depthmax ) {
-	*depthmin = rb.gl.depthmin;
-	*depthmax = rb.gl.depthmax;
+	rb.glStateProxy->getDepthRange( depthmin, depthmax );
 }
 
 void RB_SaveDepthRange() {
-	assert( !rb.gl.hasSavedDepth );
-	rb.gl.savedDepthmin = rb.gl.depthmin;
-	rb.gl.savedDepthmax = rb.gl.depthmax;
-	rb.gl.hasSavedDepth = true;
+	rb.glStateProxy->saveDepthRange();
 }
 
 void RB_RestoreDepthRange() {
-	assert( rb.gl.hasSavedDepth );
-	RB_DepthRange( rb.gl.savedDepthmin, rb.gl.savedDepthmax );
-	rb.gl.hasSavedDepth = false;
-}
-
-void RB_DepthOffset( bool enable ) {
-	float depthmin = rb.gl.depthmin;
-	float depthmax = rb.gl.depthmax;
-	rb.gl.depthoffset = enable;
-	if( depthmin != depthmax ) {
-		if( !enable ) {
-			depthmin += 4.0f / 65535.0f;
-		}
-		qglDepthRange( depthmin, depthmax );
-	}
-}
-
-void RB_ClearDepth( float depth ) {
-	qglClearDepth( depth );
+	rb.glStateProxy->restoreDepthRange();
 }
 
 void RB_LoadCameraMatrix( const mat4_t m ) {
@@ -215,248 +131,24 @@ void RB_LoadProjectionMatrix( const mat4_t m ) {
 	Matrix4_Multiply( m, rb.modelviewMatrix, rb.modelviewProjectionMatrix );
 }
 
-void RB_Cull( int cull ) {
-	if( rb.gl.faceCull != cull ) {
-		if( cull ) {
-			if( !rb.gl.faceCull ) {
-				qglEnable( GL_CULL_FACE );
-			}
-			qglCullFace( cull );
-			rb.gl.faceCull = cull;
-		} else {
-			qglDisable( GL_CULL_FACE );
-			rb.gl.faceCull = 0;
-		}
-	}
-}
-
-void RB_SetState( int state ) {
-	const int diff = rb.gl.state ^ state;
-	if( !diff ) {
-		return;
-	}
-
-	if( diff & GLSTATE_BLEND_MASK ) {
-		if( state & GLSTATE_BLEND_MASK ) {
-			int blendsrc, blenddst;
-
-			switch( state & GLSTATE_SRCBLEND_MASK ) {
-				case GLSTATE_SRCBLEND_ZERO:
-					blendsrc = GL_ZERO;
-					break;
-				case GLSTATE_SRCBLEND_DST_COLOR:
-					blendsrc = GL_DST_COLOR;
-					break;
-				case GLSTATE_SRCBLEND_ONE_MINUS_DST_COLOR:
-					blendsrc = GL_ONE_MINUS_DST_COLOR;
-					break;
-				case GLSTATE_SRCBLEND_SRC_ALPHA:
-					blendsrc = GL_SRC_ALPHA;
-					break;
-				case GLSTATE_SRCBLEND_ONE_MINUS_SRC_ALPHA:
-					blendsrc = GL_ONE_MINUS_SRC_ALPHA;
-					break;
-				case GLSTATE_SRCBLEND_DST_ALPHA:
-					blendsrc = GL_DST_ALPHA;
-					break;
-				case GLSTATE_SRCBLEND_ONE_MINUS_DST_ALPHA:
-					blendsrc = GL_ONE_MINUS_DST_ALPHA;
-					break;
-				default:
-				case GLSTATE_SRCBLEND_ONE:
-					blendsrc = GL_ONE;
-					break;
-			}
-
-			switch( state & GLSTATE_DSTBLEND_MASK ) {
-				case GLSTATE_DSTBLEND_ONE:
-					blenddst = GL_ONE;
-					break;
-				case GLSTATE_DSTBLEND_SRC_COLOR:
-					blenddst = GL_SRC_COLOR;
-					break;
-				case GLSTATE_DSTBLEND_ONE_MINUS_SRC_COLOR:
-					blenddst = GL_ONE_MINUS_SRC_COLOR;
-					break;
-				case GLSTATE_DSTBLEND_SRC_ALPHA:
-					blenddst = GL_SRC_ALPHA;
-					break;
-				case GLSTATE_DSTBLEND_ONE_MINUS_SRC_ALPHA:
-					blenddst = GL_ONE_MINUS_SRC_ALPHA;
-					break;
-				case GLSTATE_DSTBLEND_DST_ALPHA:
-					blenddst = GL_DST_ALPHA;
-					break;
-				case GLSTATE_DSTBLEND_ONE_MINUS_DST_ALPHA:
-					blenddst = GL_ONE_MINUS_DST_ALPHA;
-					break;
-				default:
-				case GLSTATE_DSTBLEND_ZERO:
-					blenddst = GL_ZERO;
-					break;
-			}
-
-			if( !( rb.gl.state & GLSTATE_BLEND_MASK ) ) {
-				qglEnable( GL_BLEND );
-			}
-
-			qglBlendFuncSeparate( blendsrc, blenddst, GL_ONE, GL_ONE );
-		} else {
-			qglDisable( GL_BLEND );
-		}
-	}
-
-	if( diff & ( GLSTATE_NO_COLORWRITE | GLSTATE_ALPHAWRITE ) ) {
-		if( state & GLSTATE_NO_COLORWRITE ) {
-			qglColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
-		} else {
-			qglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, ( state & GLSTATE_ALPHAWRITE ) ? GL_TRUE : GL_FALSE );
-		}
-	}
-
-	if( diff & ( GLSTATE_DEPTHFUNC_EQ | GLSTATE_DEPTHFUNC_GT ) ) {
-		if( state & GLSTATE_DEPTHFUNC_EQ ) {
-			qglDepthFunc( GL_EQUAL );
-		} else if( state & GLSTATE_DEPTHFUNC_GT ) {
-			qglDepthFunc( GL_GREATER );
-		} else {
-			qglDepthFunc( GL_LEQUAL );
-		}
-	}
-
-	if( diff & GLSTATE_DEPTHWRITE ) {
-		if( state & GLSTATE_DEPTHWRITE ) {
-			qglDepthMask( GL_TRUE );
-		} else {
-			qglDepthMask( GL_FALSE );
-		}
-	}
-
-	if( diff & GLSTATE_NO_DEPTH_TEST ) {
-		if( state & GLSTATE_NO_DEPTH_TEST ) {
-			qglDisable( GL_DEPTH_TEST );
-		} else {
-			qglEnable( GL_DEPTH_TEST );
-		}
-	}
-
-	if( diff & GLSTATE_OFFSET_FILL ) {
-		if( state & GLSTATE_OFFSET_FILL ) {
-			qglEnable( GL_POLYGON_OFFSET_FILL );
-			RB_DepthOffset( true );
-		} else {
-			qglDisable( GL_POLYGON_OFFSET_FILL );
-			RB_DepthOffset( false );
-		}
-	}
-
-	if( diff & GLSTATE_STENCIL_TEST ) {
-		if( glConfig.stencilBits ) {
-			if( state & GLSTATE_STENCIL_TEST ) {
-				qglEnable( GL_STENCIL_TEST );
-			} else {
-				qglDisable( GL_STENCIL_TEST );
-			}
-		}
-	}
-
-	if( diff & GLSTATE_ALPHATEST ) {
-		if( glConfig.ext.multisample ) {
-			if( state & GLSTATE_ALPHATEST ) {
-				qglEnable( GL_SAMPLE_ALPHA_TO_COVERAGE );
-			} else {
-				qglDisable( GL_SAMPLE_ALPHA_TO_COVERAGE );
-			}
-		}
-	}
-
-	rb.gl.state = state;
-}
-
-void RB_FrontFace( bool front ) {
-	qglFrontFace( front ? GL_CW : GL_CCW );
-	rb.gl.frontFace = front;
-}
-
 void RB_FlipFrontFace( void ) {
-	RB_FrontFace( !rb.gl.frontFace );
-}
-
-void RB_BindArrayBuffer( int buffer ) {
-	if( buffer != rb.gl.currentArrayVBO ) {
-		qglBindBuffer( GL_ARRAY_BUFFER, buffer );
-		rb.gl.currentArrayVBO = buffer;
-		rb.gl.lastVAttribs = 0;
-	}
-}
-
-void RB_BindElementArrayBuffer( int buffer ) {
-	if( buffer != rb.gl.currentElemArrayVBO ) {
-		qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, buffer );
-		rb.gl.currentElemArrayVBO = buffer;
-	}
-}
-
-static void RB_EnableVertexAttrib( int index, bool enable ) {
-	const unsigned bit = 1 << index;
-	const unsigned diff = ( rb.gl.vertexAttribEnabled & bit ) ^ ( enable ? bit : 0 );
-	if( diff ) {
-		if( enable ) {
-			rb.gl.vertexAttribEnabled |= bit;
-			qglEnableVertexAttribArray( index );
-		} else {
-			rb.gl.vertexAttribEnabled &= ~bit;
-			qglDisableVertexAttribArray( index );
-		}
-	}
+	rb.glStateProxy->flipFrontFace();
 }
 
 void RB_Scissor( int x, int y, int w, int h ) {
-	if( ( rb.gl.scissor[0] == x ) && ( rb.gl.scissor[1] == y ) &&
-		( rb.gl.scissor[2] == w ) && ( rb.gl.scissor[3] == h ) ) {
-		return;
-	}
-
-	rb.gl.scissor[0] = x;
-	rb.gl.scissor[1] = y;
-	rb.gl.scissor[2] = w;
-	rb.gl.scissor[3] = h;
-	rb.gl.scissorChanged = true;
+	rb.glStateProxy->setScissor( x, y, w, h );
 }
 
 void RB_GetScissor( int *x, int *y, int *w, int *h ) {
-	if( x ) {
-		*x = rb.gl.scissor[0];
-	}
-	if( y ) {
-		*y = rb.gl.scissor[1];
-	}
-	if( w ) {
-		*w = rb.gl.scissor[2];
-	}
-	if( h ) {
-		*h = rb.gl.scissor[3];
-	}
-}
-
-void RB_ApplyScissor( void ) {
-	if( rb.gl.scissorChanged ) {
-		rb.gl.scissorChanged = false;
-		const int h = rb.gl.scissor[3];
-		qglScissor( rb.gl.scissor[0], rb.gl.fbHeight - h - rb.gl.scissor[1], rb.gl.scissor[2], h );
-	}
+	rb.glStateProxy->getScissor( x, y, w, h );
 }
 
 void RB_Viewport( int x, int y, int w, int h ) {
-	rb.gl.viewport[0] = x;
-	rb.gl.viewport[1] = y;
-	rb.gl.viewport[2] = w;
-	rb.gl.viewport[3] = h;
-	qglViewport( x, rb.gl.fbHeight - h - y, w, h );
+	rb.glStateProxy->setViewport( x, y, w, h );
 }
 
 void RB_Clear( int bits, float r, float g, float b, float a ) {
-	int state = rb.gl.state;
+	unsigned state = rb.glStateProxy->getState();
 
 	if( bits & GL_DEPTH_BUFFER_BIT ) {
 		state |= GLSTATE_DEPTHWRITE;
@@ -471,81 +163,18 @@ void RB_Clear( int bits, float r, float g, float b, float a ) {
 		qglClearColor( r, g, b, a );
 	}
 
-	RB_SetState( state );
+	rb.glStateProxy->setState( state );
 
-	RB_ApplyScissor();
+	rb.glStateProxy->applyScissor();
 
 	qglClear( bits );
 
-	RB_DepthRange( 0.0f, 1.0f );
+	rb.glStateProxy->setDepthRange( 0.0f, 1.0f );
 }
 
 void RB_BindFrameBufferObject( RenderTargetComponents *components ) {
-	const int width  = components ? components->texture->width : glConfig.width;
-	const int height = components ? components->texture->height : glConfig.height;
-
-	if( rb.gl.fbHeight != height ) {
-		rb.gl.scissorChanged = true;
-	}
-
-	rb.gl.fbWidth = width;
-	rb.gl.fbHeight = height;
-
-	// TODO: Track the currently bound FBO
-	if( components ) {
-		RenderTarget            *const renderTarget           = components->renderTarget;
-		RenderTargetTexture     *const oldAttachedTexture     = components->renderTarget->attachedTexture;
-		RenderTargetDepthBuffer *const oldAttachedDepthBuffer = components->renderTarget->attachedDepthBuffer;
-		RenderTargetTexture     *const newTexture             = components->texture;
-		RenderTargetDepthBuffer *const newDepthBuffer         = components->depthBuffer;
-
-		bool hasChanges = false;
-		qglBindFramebuffer( GL_FRAMEBUFFER, renderTarget->fboId );
-		if( oldAttachedTexture != newTexture ) {
-			if( oldAttachedTexture ) {
-				oldAttachedTexture->attachedToRenderTarget = nullptr;
-			}
-			if( RenderTarget *oldTarget = newTexture->attachedToRenderTarget ) {
-				assert( oldTarget != renderTarget );
-				// TODO: Do we have to bind it and call detach?
-				oldTarget->attachedTexture = nullptr;
-			}
-			renderTarget->attachedTexture      = newTexture;
-			newTexture->attachedToRenderTarget = renderTarget;
-			qglFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, newTexture->texnum, 0 );
-			hasChanges = true;
-		}
-		if( oldAttachedDepthBuffer != newDepthBuffer ) {
-			if( oldAttachedDepthBuffer ) {
-				oldAttachedDepthBuffer->attachedToRenderTarget = nullptr;
-			}
-			if( RenderTarget *oldTarget = newDepthBuffer->attachedToRenderTarget ) {
-				assert( oldTarget != renderTarget );
-				// TODO: Do we have to bind it and call detach?
-				oldTarget->attachedDepthBuffer = nullptr;
-			}
-			renderTarget->attachedDepthBuffer      = newDepthBuffer;
-			newDepthBuffer->attachedToRenderTarget = renderTarget;
-			qglFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, newDepthBuffer->rboId );
-			hasChanges = true;
-		}
-		if( hasChanges ) {
-			// TODO: What to do in this case
-			if( qglCheckFramebufferStatus( GL_FRAMEBUFFER ) != GL_FRAMEBUFFER_COMPLETE ) {
-				// Just make sure that the status of attachments remains correct
-				assert( renderTarget->attachedTexture == newTexture );
-				assert( renderTarget->attachedDepthBuffer == newDepthBuffer );
-				qglFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0 );
-				qglFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0 );
-				renderTarget->attachedTexture          = nullptr;
-				renderTarget->attachedDepthBuffer      = nullptr;
-				newTexture->attachedToRenderTarget     = nullptr;
-				newDepthBuffer->attachedToRenderTarget = nullptr;
-			}
-		}
-	} else {
-		qglBindFramebuffer( GL_FRAMEBUFFER, 0 );
-	}
+	// TODO: Resolve object lifetime problems/initialization order so we don't have to call it like this...
+	GLStateProxy::bindFramebufferObject( rb.glStateProxy, components );
 }
 
 /*
@@ -605,14 +234,13 @@ void RB_BindVBO( int id, int primitive ) {
 
 	rb.currentVBOId = id;
 	rb.currentVBO = vbo;
-	if( !vbo ) {
-		RB_BindArrayBuffer( 0 );
-		RB_BindElementArrayBuffer( 0 );
-		return;
+	if( vbo ) {
+		rb.glStateProxy->bindVertexBuffer( vbo->vertexId );
+		rb.glStateProxy->bindIndexBuffer( vbo->elemId );
+	} else {
+		rb.glStateProxy->bindVertexBuffer( 0 );
+		rb.glStateProxy->bindIndexBuffer( 0 );
 	}
-
-	RB_BindArrayBuffer( vbo->vertexId );
-	RB_BindElementArrayBuffer( vbo->elemId );
 }
 
 int RB_VBOIdForFrameUploads( unsigned group ) {
@@ -875,129 +503,7 @@ void RB_FlushDynamicMeshes() {
 }
 
 static void RB_EnableVertexAttribs( void ) {
-	const vattribmask_t vattribs = rb.currentVAttribs;
-	const mesh_vbo_t *vbo = rb.currentVBO;
-	const vattribmask_t hfa = vbo->halfFloatAttribs;
-
-	assert( vattribs & VATTRIB_POSITION_BIT );
-
-	if( ( vattribs == rb.gl.lastVAttribs ) && ( hfa == rb.gl.lastHalfFloatVAttribs ) ) {
-		return;
-	}
-
-	rb.gl.lastVAttribs = vattribs;
-	rb.gl.lastHalfFloatVAttribs = hfa;
-
-	// xyz position
-	RB_EnableVertexAttrib( VATTRIB_POSITION, true );
-	qglVertexAttribPointer( VATTRIB_POSITION, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_POSITION_BIT, hfa ),
-							   GL_FALSE, vbo->vertexSize, ( const GLvoid * )0 );
-
-	// normal
-	if( vattribs & VATTRIB_NORMAL_BIT ) {
-		RB_EnableVertexAttrib( VATTRIB_NORMAL, true );
-		qglVertexAttribPointer( VATTRIB_NORMAL, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_NORMAL_BIT, hfa ),
-								   GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->normalsOffset );
-	} else {
-		RB_EnableVertexAttrib( VATTRIB_NORMAL, false );
-	}
-
-	// s-vector
-	if( vattribs & VATTRIB_SVECTOR_BIT ) {
-		RB_EnableVertexAttrib( VATTRIB_SVECTOR, true );
-		qglVertexAttribPointer( VATTRIB_SVECTOR, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_SVECTOR_BIT, hfa ),
-								   GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->sVectorsOffset );
-	} else {
-		RB_EnableVertexAttrib( VATTRIB_SVECTOR, false );
-	}
-
-	// color
-	if( vattribs & VATTRIB_COLOR0_BIT ) {
-		RB_EnableVertexAttrib( VATTRIB_COLOR0, true );
-		qglVertexAttribPointer( VATTRIB_COLOR0, 4, GL_UNSIGNED_BYTE,
-								   GL_TRUE, vbo->vertexSize, (const GLvoid * )vbo->colorsOffset[0] );
-	} else {
-		RB_EnableVertexAttrib( VATTRIB_COLOR0, false );
-	}
-
-	// texture coordinates
-	if( vattribs & VATTRIB_TEXCOORDS_BIT ) {
-		RB_EnableVertexAttrib( VATTRIB_TEXCOORDS, true );
-		qglVertexAttribPointer( VATTRIB_TEXCOORDS, 2, FLOAT_VATTRIB_GL_TYPE( VATTRIB_TEXCOORDS_BIT, hfa ),
-								   GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->stOffset );
-	} else {
-		RB_EnableVertexAttrib( VATTRIB_TEXCOORDS, false );
-	}
-
-	if( ( vattribs & VATTRIB_AUTOSPRITE_BIT ) == VATTRIB_AUTOSPRITE_BIT ) {
-		// submit sprite point
-		RB_EnableVertexAttrib( VATTRIB_SPRITEPOINT, true );
-		qglVertexAttribPointer( VATTRIB_SPRITEPOINT, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_AUTOSPRITE_BIT, hfa ),
-								   GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->spritePointsOffset );
-	} else {
-		RB_EnableVertexAttrib( VATTRIB_SPRITEPOINT, false );
-	}
-
-	// bones (skeletal models)
-	if( ( vattribs & VATTRIB_BONES_BITS ) == VATTRIB_BONES_BITS ) {
-		// submit indices
-		RB_EnableVertexAttrib( VATTRIB_BONESINDICES, true );
-		qglVertexAttribPointer( VATTRIB_BONESINDICES, 4, GL_UNSIGNED_BYTE,
-								   GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->bonesIndicesOffset );
-
-		// submit weights
-		RB_EnableVertexAttrib( VATTRIB_BONESWEIGHTS, true );
-		qglVertexAttribPointer( VATTRIB_BONESWEIGHTS, 4, GL_UNSIGNED_BYTE,
-								   GL_TRUE, vbo->vertexSize, ( const GLvoid * )vbo->bonesWeightsOffset );
-	} else {
-		// lightmap texture coordinates - aliasing bones, so not disabling bones
-		int lmattr = VATTRIB_LMCOORDS01;
-		int lmattrbit = VATTRIB_LMCOORDS0_BIT;
-
-		for( int i = 0; i < ( MAX_LIGHTMAPS + 1 ) / 2; i++ ) {
-			if( vattribs & lmattrbit ) {
-				RB_EnableVertexAttrib( lmattr, true );
-				qglVertexAttribPointer( lmattr, vbo->lmstSize[i],
-										   FLOAT_VATTRIB_GL_TYPE( VATTRIB_LMCOORDS0_BIT, hfa ),
-										   GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->lmstOffset[i] );
-			} else {
-				RB_EnableVertexAttrib( lmattr, false );
-			}
-
-			lmattr++;
-			lmattrbit <<= 2;
-		}
-
-		// lightmap array texture layers
-		lmattr = VATTRIB_LMLAYERS0123;
-
-		for( int i = 0; i < ( MAX_LIGHTMAPS + 3 ) / 4; i++ ) {
-			if( vattribs & ( VATTRIB_LMLAYERS0123_BIT << i ) ) {
-				RB_EnableVertexAttrib( lmattr, true );
-				qglVertexAttribPointer( lmattr, 4, GL_UNSIGNED_BYTE,
-										   GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->lmlayersOffset[i] );
-			} else {
-				RB_EnableVertexAttrib( lmattr, false );
-			}
-
-			lmattr++;
-		}
-	}
-
-	if( ( vattribs & VATTRIB_INSTANCES_BITS ) == VATTRIB_INSTANCES_BITS ) {
-		RB_EnableVertexAttrib( VATTRIB_INSTANCE_QUAT, true );
-		qglVertexAttribPointer( VATTRIB_INSTANCE_QUAT, 4, GL_FLOAT, GL_FALSE, 8 * sizeof( vec_t ),
-								   ( const GLvoid * )vbo->instancesOffset );
-		qglVertexAttribDivisor( VATTRIB_INSTANCE_QUAT, 1 );
-
-		RB_EnableVertexAttrib( VATTRIB_INSTANCE_XYZS, true );
-		qglVertexAttribPointer( VATTRIB_INSTANCE_XYZS, 4, GL_FLOAT, GL_FALSE, 8 * sizeof( vec_t ),
-								   ( const GLvoid * )( vbo->instancesOffset + sizeof( vec_t ) * 4 ) );
-		qglVertexAttribDivisor( VATTRIB_INSTANCE_XYZS, 1 );
-	} else {
-		RB_EnableVertexAttrib( VATTRIB_INSTANCE_QUAT, false );
-		RB_EnableVertexAttrib( VATTRIB_INSTANCE_XYZS, false );
-	}
+	rb.glStateProxy->enableVertexAttribs( rb.currentVAttribs, rb.currentVBO );
 }
 
 void RB_DrawElementsReal( const DrawCallData &drawCallData ) {
@@ -1006,7 +512,7 @@ void RB_DrawElementsReal( const DrawCallData &drawCallData ) {
 		return;
 	}
 
-	RB_ApplyScissor();
+	rb.glStateProxy->applyScissor();
 
 	if( const auto *mdSpan = std::get_if<MultiDrawElemSpan>( &drawCallData ) ) {
 		qglMultiDrawElements( rb.primitive, mdSpan->counts, GL_UNSIGNED_SHORT, mdSpan->indices, mdSpan->numDraws );

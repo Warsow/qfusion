@@ -755,17 +755,13 @@ void RB_LoadProjectionMatrix( const mat4_t m );
 
 void RB_DepthRange( float depthmin, float depthmax );
 void RB_GetDepthRange( float* depthmin, float *depthmax );
-void RB_DepthOffset( bool enable );
+//void RB_DepthOffset( bool enable );
 void RB_SaveDepthRange();
 void RB_RestoreDepthRange();
-void RB_ClearDepth( float depth );
-void RB_Cull( int cull );
-void RB_SetState( int state );
-void RB_FrontFace( bool front );
+
 void RB_FlipFrontFace();
 void RB_Scissor( int x, int y, int w, int h );
 void RB_GetScissor( int *x, int *y, int *w, int *h );
-void RB_ApplyScissor();
 void RB_Viewport( int x, int y, int w, int h );
 void RB_Clear( int bits, float r, float g, float b, float a );
 void RB_SetZClip( float zNear, float zFar );
