@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "local.h"
 #include "program.h"
 #include "backendlocal.h"
+#include "glstateproxy.h"
 
 #define FTABLE_SIZE_POW 12
 #define FTABLE_SIZE ( 1 << FTABLE_SIZE_POW )
@@ -75,8 +76,8 @@ void RP_UpdateShaderUniforms( int elem,
 void RP_UpdateViewUniforms( int elem,
 							const mat4_t modelviewMatrix, const mat4_t modelviewProjectionMatrix,
 							const vec3_t viewOrigin, const mat3_t viewAxis,
-							const float mirrorSide,
-							int viewport[4],
+							float mirrorSide,
+							const int *viewport,
 							float zNear, float zFar );
 
 void RP_UpdateBlendMixUniform( int elem, vec2_t blendMask );
@@ -783,11 +784,12 @@ static void RB_UpdateCommonUniforms( int program, const shaderpass_t *pass, mat4
 						   rb.modelviewMatrix, rb.modelviewProjectionMatrix,
 						   rb.cameraOrigin, rb.cameraAxis,
 						   rb.renderFlags & RF_MIRRORVIEW ? -1 : 1,
-						   rb.gl.viewport,
+						   rb.glStateProxy->getViewport(),
 						   rb.zNear, rb.zFar
 						   );
 
-	if( RB_IsAlphaBlending( rb.gl.state & GLSTATE_SRCBLEND_MASK, rb.gl.state & GLSTATE_DSTBLEND_MASK ) ) {
+	const auto glState = rb.glStateProxy->getState();
+	if( RB_IsAlphaBlending( glState & GLSTATE_SRCBLEND_MASK, glState & GLSTATE_DSTBLEND_MASK ) ) {
 		blendMix[1] = 1;
 		if( rb.alphaHack ) {
 			constColor[3] *= rb.hackedAlpha;
@@ -919,7 +921,7 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 
 	Matrix4_Identity( texMatrix );
 
-	RB_BindImage( 0, base );
+	rb.glStateProxy->bindTexture( 0, base );
 
 	// convert rgbgen and alphagen to GLSL feature defines
 	programFeatures |= RB_RGBAlphaGenToProgramFeatures( &pass->rgbgen, &pass->alphagen );
@@ -929,11 +931,11 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 
 	// we only send S-vectors to GPU and recalc T-vectors as cross product
 	// in vertex shader
-	RB_BindImage( 1, normalmap );         // normalmap
+	rb.glStateProxy->bindTexture( 1, normalmap );         // normalmap
 
 	if( glossmap && glossIntensity ) {
 		programFeatures |= GLSL_SHADER_MATERIAL_SPECULAR;
-		RB_BindImage( 2, glossmap ); // gloss
+		rb.glStateProxy->bindTexture( 2, glossmap ); // gloss
 	}
 
 	if( applyDecal ) {
@@ -949,7 +951,7 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 			}
 		}
 
-		RB_BindImage( 3, decalmap ); // decal
+		rb.glStateProxy->bindTexture( 3, decalmap ); // decal
 	}
 
 	if( entdecalmap ) {
@@ -960,7 +962,7 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 			programFeatures |= GLSL_SHADER_MATERIAL_ENTITY_DECAL_ADD;
 		}
 
-		RB_BindImage( 4, entdecalmap ); // decal
+		rb.glStateProxy->bindTexture( 4, entdecalmap ); // decal
 	}
 
 	if( offsetmappingScale > 0 ) {
@@ -975,7 +977,7 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 
 			// bind lightmap textures and set program's features for lightstyles
 			for( i = 0; i < MAX_LIGHTMAPS && lightStyle->lightmapStyles[i] != 255; i++ )
-				RB_BindImage( i + 4, rsh.worldBrushModel->lightmapImages[lightStyle->lightmapNum[i]] );
+				rb.glStateProxy->bindTexture( i + 4, rsh.worldBrushModel->lightmapImages[lightStyle->lightmapNum[i]] );
 
 			programFeatures |= ( i * GLSL_SHADER_MATERIAL_LIGHTSTYLE0 );
 
@@ -1143,7 +1145,7 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, uint64_t pro
 
 	Matrix4_Identity( texMatrix );
 
-	RB_BindImage( 0, dudvmap );
+	rb.glStateProxy->bindTexture( 0, dudvmap );
 
 	// convert rgbgen and alphagen to GLSL feature defines
 	programFeatures |= RB_RGBAlphaGenToProgramFeatures( &pass->rgbgen, &pass->alphagen );
@@ -1157,11 +1159,11 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, uint64_t pro
 		// eyeDot
 		programFeatures |= GLSL_SHADER_DISTORTION_EYEDOT;
 
-		RB_BindImage( 1, normalmap );
+		rb.glStateProxy->bindTexture( 1, normalmap );
 	}
 
-	RB_BindImage( 2, portaltexture[0] );           // reflection
-	RB_BindImage( 3, portaltexture[1] );           // refraction
+	rb.glStateProxy->bindTexture( 2, portaltexture[0] );           // reflection
+	rb.glStateProxy->bindTexture( 3, portaltexture[1] );           // refraction
 
 	// update uniforms
 	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_DISTORTION, NULL,
@@ -1181,7 +1183,6 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, uint64_t pro
 * RB_RenderMeshGLSL_Outline
 */
 static void RB_RenderMeshGLSL_Outline( const shaderpass_t *pass, uint64_t programFeatures ) {
-	int faceCull;
 	int program;
 	mat4_t texMatrix;
 
@@ -1202,8 +1203,8 @@ static void RB_RenderMeshGLSL_Outline( const shaderpass_t *pass, uint64_t progra
 
 	Matrix4_Identity( texMatrix );
 
-	faceCull = rb.gl.faceCull;
-	RB_Cull( GL_BACK );
+	const auto faceCull = rb.glStateProxy->getCull();
+	rb.glStateProxy->setCull( GL_BACK );
 
 	// set shaderpass state (blending, depthwrite, etc)
 	RB_SetShaderpassState( pass->flags );
@@ -1223,7 +1224,7 @@ static void RB_RenderMeshGLSL_Outline( const shaderpass_t *pass, uint64_t progra
 
 	RB_DrawElementsReal( rb.drawCallData );
 
-	RB_Cull( faceCull );
+	rb.glStateProxy->setCull( faceCull );
 }
 
 /*
@@ -1361,7 +1362,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, con
 		programFeatures |= GLSL_SHADER_Q3_ALPHA_MASK;
 	}
 
-	RB_BindImage( 0, image );
+	rb.glStateProxy->bindTexture( 0, image );
 
 	// convert rgbgen and alphagen to GLSL feature defines
 	programFeatures |= RB_RGBAlphaGenToProgramFeatures( &pass->rgbgen, &pass->alphagen );
@@ -1386,7 +1387,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, con
 
 	/*
 	if( programFeatures & GLSL_SHADER_COMMON_SOFT_PARTICLE ) {
-		RB_BindImage( 3, rb.st.screenDepthTexCopy );
+		rb.glStateProxy->bindTexture( 3, rb.st.screenDepthTexCopy );
 	}*/
 
 	if( isLightmapped ) {
@@ -1394,7 +1395,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, con
 
 		// bind lightmap textures and set program's features for lightstyles
 		for( i = 0; i < MAX_LIGHTMAPS && lightStyle->lightmapStyles[i] != 255; i++ )
-			RB_BindImage( i + 4, rsh.worldBrushModel->lightmapImages[lightStyle->lightmapNum[i]] ); // lightmap
+			rb.glStateProxy->bindTexture( i + 4, rsh.worldBrushModel->lightmapImages[lightStyle->lightmapNum[i]] ); // lightmap
 		programFeatures |= ( i * GLSL_SHADER_Q3_LIGHTSTYLE0 );
 		if( mapConfig.lightmapArrays ) {
 			programFeatures |= GLSL_SHADER_Q3_LIGHTMAP_ARRAYS;
@@ -1459,7 +1460,7 @@ static void RB_RenderMeshGLSL_Celshade( const shaderpass_t *pass, uint64_t progr
 	mat4_t texMatrix;
 	Matrix4_Identity( texMatrix );
 
-	RB_BindImage( 0, base );
+	rb.glStateProxy->bindTexture( 0, base );
 
 	mat4_t reflectionMatrix;
 	RB_VertexTCCelshadeMatrix( reflectionMatrix );
@@ -1502,7 +1503,7 @@ static void RB_RenderMeshGLSL_Celshade( const shaderpass_t *pass, uint64_t progr
 			} \
 		} \
 		if( btex ) { \
-			RB_BindImage( tmu, btex ); \
+			rb.glStateProxy->bindTexture( tmu, btex ); \
 		} \
 	}
 
@@ -1580,7 +1581,7 @@ static void RB_RenderMeshGLSL_FXAA( const shaderpass_t *pass, uint64_t programFe
 
 	Matrix4_Identity( texMatrix );
 
-	RB_BindImage( 0, image );
+	rb.glStateProxy->bindTexture( 0, image );
 
 	if( glConfig.ext.gpu_shader5 ) {
 		fxaa3 = true;
@@ -1612,9 +1613,9 @@ static void RB_RenderMeshGLSL_YUV( const shaderpass_t *pass, uint64_t programFea
 	// set shaderpass state (blending, depthwrite, etc)
 	RB_SetShaderpassState( pass->flags );
 
-	RB_BindImage( 0, pass->images[0] );
-	RB_BindImage( 1, pass->images[1] );
-	RB_BindImage( 2, pass->images[2] );
+	rb.glStateProxy->bindTexture( 0, pass->images[0] );
+	rb.glStateProxy->bindTexture( 1, pass->images[1] );
+	rb.glStateProxy->bindTexture( 2, pass->images[2] );
 
 	// update uniforms
 	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_YUV, NULL,
@@ -1659,13 +1660,13 @@ static void RB_RenderMeshGLSL_ColorCorrection( const shaderpass_t *pass, uint64_
 
 	Matrix4_Identity( texMatrix );
 
-	RB_BindImage( 0, pass->images[0] );
+	rb.glStateProxy->bindTexture( 0, pass->images[0] );
 	if( pass->images[1] ) {
-		RB_BindImage( 1, pass->images[1] );
+		rb.glStateProxy->bindTexture( 1, pass->images[1] );
 	}
 	for( i = 0; i < NUM_BLOOM_LODS; i++ ) {
 		if( pass->images[3 + i] ) {
-			RB_BindImage( 2 + i, pass->images[3 + i] );
+			rb.glStateProxy->bindTexture( 2 + i, pass->images[3 + i] );
 		}
 	}
 
@@ -1691,7 +1692,7 @@ static void RB_RenderMeshGLSL_KawaseBlur( const shaderpass_t *pass, uint64_t pro
 	// set shaderpass state (blending, depthwrite, etc)
 	RB_SetShaderpassState( pass->flags );
 
-	RB_BindImage( 0, pass->images[0] );
+	rb.glStateProxy->bindTexture( 0, pass->images[0] );
 
 	Matrix4_Identity( texMatrix );
 
@@ -2022,7 +2023,7 @@ static void RB_RenderPass( const FrontendToBackendShared *fsh, const shaderpass_
 		rb.dirtyUniformState = false;
 	}
 
-	if( rb.gl.state & GLSTATE_DEPTHWRITE ) {
+	if( rb.glStateProxy->getState() & GLSTATE_DEPTHWRITE ) {
 		rb.doneDepthPass = true;
 	}
 
@@ -2041,21 +2042,20 @@ void RB_SetShaderStateMask( int ANDmask, int ORmask ) {
 * RB_SetShaderState
 */
 static void RB_SetShaderState( void ) {
-	int state;
 	int shaderFlags = rb.currentShader->flags;
 
 	// Face culling
 	if( rb.currentEntity->rtype == RT_SPRITE ) {
-		RB_Cull( 0 );
+		rb.glStateProxy->setCull( 0 );
 	} else if( shaderFlags & SHADER_CULL_FRONT ) {
-		RB_Cull( GL_FRONT );
+		rb.glStateProxy->setCull( GL_FRONT );
 	} else if( shaderFlags & SHADER_CULL_BACK ) {
-		RB_Cull( GL_BACK );
+		rb.glStateProxy->setCull( GL_BACK );
 	} else {
-		RB_Cull( 0 );
+		rb.glStateProxy->setCull( 0 );
 	}
 
-	state = 0;
+	unsigned state = 0;
 
 	if( shaderFlags & SHADER_POLYGONOFFSET ) {
 		state |= GLSTATE_OFFSET_FILL;
@@ -2088,7 +2088,8 @@ static void RB_SetShaderpassState( int state ) {
 	if( rb.depthEqual && ( state & GLSTATE_DEPTHWRITE ) ) {
 		state |= GLSTATE_DEPTHFUNC_EQ;
 	}
-	RB_SetState( state );
+
+	rb.glStateProxy->setState( state );
 }
 
 /*

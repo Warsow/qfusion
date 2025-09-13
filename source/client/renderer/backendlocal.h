@@ -52,37 +52,10 @@ typedef struct {
 	VertElemSpan drawElements;
 } rbDynamicDraw_t;
 
+class GLStateProxy;
+
 typedef struct r_backend_s {
-	mempool_t           *mempool;
-
-	struct {
-		int state;
-
-		int currentArrayVBO;
-		int currentElemArrayVBO;
-
-		int faceCull;
-		bool frontFace;
-
-		int viewport[4];
-		int scissor[4];
-		bool scissorChanged;
-
-		unsigned int vertexAttribEnabled;
-		vattribmask_t lastVAttribs, lastHalfFloatVAttribs;
-
-		int fbWidth, fbHeight;
-
-		float depthmin, depthmax;
-		float savedDepthmin, savedDepthmax;
-		bool hasSavedDepth;
-
-		bool depthoffset;
-
-		bool flushTextures;
-		int currentTMU;
-		unsigned currentTextures[MAX_TEXTURE_UNITS];
-	} gl;
+	GLStateProxy *glStateProxy;
 
 	int64_t time;
 
@@ -185,9 +158,6 @@ void RB_DrawShadedElements( const FrontendToBackendShared *fsh );
 int RB_RegisterProgram( int type, const char *name, const DeformSig &deformSig,
 						const deformv_t *deforms, int numDeforms, uint64_t features );
 int RB_BindProgram( int program );
-void RB_BindImage( int tmu, const Texture *tex );
-void RB_BindArrayBuffer( int buffer );
-void RB_BindElementArrayBuffer( int buffer );
 void RB_SetInstanceData( int numInstances, instancePoint_t *instances );
 
 #endif // R_BACKEND_LOCAL_H
