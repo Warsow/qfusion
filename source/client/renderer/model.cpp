@@ -1719,7 +1719,7 @@ void R_LightForOrigin( const vec3_t origin, vec3_t dir, vec4_t ambient, vec4_t d
 	dynamic:
 	// add dynamic lights
 	if( radius ) {
-		wsw::ref::Frontend::instance()->dynLightDirForOrigin( origin, radius, dir, diffuseLocal, ambientLocal );
+		wsw::RendererFrontend::instance()->dynLightDirForOrigin( origin, radius, dir, diffuseLocal, ambientLocal );
 	}
 
 	VectorNormalizeFast( dir );

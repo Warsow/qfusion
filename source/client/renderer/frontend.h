@@ -55,20 +55,20 @@ struct alignas( 32 )Frustum {
 #define SHOW_OCCLUDERS_FRUSTA
 #endif
 
-namespace wsw::ref {
+namespace wsw {
 
-class alignas( 32 ) Frontend {
+class alignas( 32 ) RendererFrontend {
 	friend struct BatchedMeshBuilder;
 
 public:
-	Frontend();
-	~Frontend();
+	RendererFrontend();
+	~RendererFrontend();
 
 	static void init();
 	static void shutdown();
 
 	[[nodiscard]]
-	static auto instance() -> Frontend *;
+	static auto instance() -> RendererFrontend *;
 
 	// TODO: See the remark along with m_taskSystem definition
 	[[nodiscard]]
@@ -304,9 +304,9 @@ private:
 							  std::optional<CameraOverrideParams> overrideParams = std::nullopt ) -> StateForCamera *;
 
 	[[nodiscard]]
-	static auto coBeginProcessingDrawSceneRequests( CoroTask::StartInfo si, Frontend *self, std::span<DrawSceneRequest *> requests ) -> CoroTask;
+	static auto coBeginProcessingDrawSceneRequests( CoroTask::StartInfo si, RendererFrontend *self, std::span<DrawSceneRequest *> requests ) -> CoroTask;
 	[[nodiscard]]
-	static auto coEndProcessingDrawSceneRequests( CoroTask::StartInfo si, Frontend *self, std::span<DrawSceneRequest *> requests ) -> CoroTask;
+	static auto coEndProcessingDrawSceneRequests( CoroTask::StartInfo si, RendererFrontend *self, std::span<DrawSceneRequest *> requests ) -> CoroTask;
 
 	[[nodiscard]]
 	auto beginPreparingRenderingFromTheseCameras( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
@@ -317,11 +317,11 @@ private:
 												bool areCamerasPortalCameras ) -> TaskHandle;
 
 	[[nodiscard]]
-	static auto coBeginPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, Frontend *self,
+	static auto coBeginPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, RendererFrontend *self,
 														   std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
 														   bool areCamerasPortalCameras ) -> CoroTask;
 	[[nodiscard]]
-	static auto coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, Frontend *self,
+	static auto coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, RendererFrontend *self,
 														 std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
 														 bool areCamerasPortalCameras ) -> CoroTask;
 
@@ -566,13 +566,13 @@ private:
 								  MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable );
 
 	[[nodiscard]]
-	static auto coPrepareOccluders( CoroTask::StartInfo si, Frontend *self, StateForCamera *stateForCamera ) -> CoroTask;
+	static auto coPrepareOccluders( CoroTask::StartInfo si, RendererFrontend *self, StateForCamera *stateForCamera ) -> CoroTask;
 
 	[[nodiscard]]
-	static auto coExecPassUponInitialCullingOfLeaves( CoroTask::StartInfo si, Frontend *self, StateForCamera *stateForCamera ) -> CoroTask;
+	static auto coExecPassUponInitialCullingOfLeaves( CoroTask::StartInfo si, RendererFrontend *self, StateForCamera *stateForCamera ) -> CoroTask;
 
 	[[nodiscard]]
-	static auto coExecPassUponPreparingOccluders( CoroTask::StartInfo si, Frontend *self, StateForCamera *stateForCamera ) -> CoroTask;
+	static auto coExecPassUponPreparingOccluders( CoroTask::StartInfo si, RendererFrontend *self, StateForCamera *stateForCamera ) -> CoroTask;
 
 	[[nodiscard]]
 	auto cullEntriesWithBounds( StateForCamera *stateForCamera, const void *entries,
@@ -656,14 +656,14 @@ private:
 	void submitRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2,
 								  float angle, const float *color, const shader_s *material );
 
-	auto ( Frontend::*m_collectVisibleWorldLeavesArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
-	auto ( Frontend::*m_collectVisibleOccludersArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
-	auto ( Frontend::*m_buildFrustaOfOccludersArchMethod )( StateForCamera *, std::span<const SortedOccluder> ) -> std::span<const Frustum>;
-	void ( Frontend::*m_cullSurfacesByOccludersArchMethod )( StateForCamera *, std::span<const unsigned>,
+	auto ( RendererFrontend::*m_collectVisibleWorldLeavesArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
+	auto ( RendererFrontend::*m_collectVisibleOccludersArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
+	auto ( RendererFrontend::*m_buildFrustaOfOccludersArchMethod )( StateForCamera *, std::span<const SortedOccluder> ) -> std::span<const Frustum>;
+	void ( RendererFrontend::*m_cullSurfacesByOccludersArchMethod )( StateForCamera *, std::span<const unsigned>,
 															 std::span<const Frustum>, MergedSurfSpan *, uint8_t * );
-	auto ( Frontend::*m_cullEntriesWithBoundsArchMethod )( StateForCamera *, const void *, unsigned, unsigned, unsigned, const Frustum *,
+	auto ( RendererFrontend::*m_cullEntriesWithBoundsArchMethod )( StateForCamera *, const void *, unsigned, unsigned, unsigned, const Frustum *,
 														   std::span<const Frustum>, uint16_t * ) -> std::span<const uint16_t>;
-	auto ( Frontend::*m_cullEntryPtrsWithBoundsArchMethod )( StateForCamera *stateForCamera, const void **, unsigned, unsigned, const Frustum *,
+	auto ( RendererFrontend::*m_cullEntryPtrsWithBoundsArchMethod )( StateForCamera *stateForCamera, const void **, unsigned, unsigned, const Frustum *,
 															 std::span<const Frustum>, uint16_t * ) -> std::span<const uint16_t>;
 
 	shader_t *m_coronaShader { nullptr };

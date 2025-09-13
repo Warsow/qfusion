@@ -71,13 +71,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "frontendcull.inc"
 
-namespace wsw::ref {
+namespace wsw {
 
-void Frontend::cullSurfacesByOccludersAvx( StateForCamera *stateForCamera,
-										   std::span<const unsigned> indicesOfSurfaces,
-										   std::span<const Frustum> occluderFrusta,
-										   MergedSurfSpan *mergedSurfSpans,
-										   uint8_t *surfVisTable ) {
+void RendererFrontend::cullSurfacesByOccludersAvx( StateForCamera *stateForCamera,
+												   std::span<const unsigned> indicesOfSurfaces,
+												   std::span<const Frustum> occluderFrusta,
+												   MergedSurfSpan *mergedSurfSpans,
+												   uint8_t *surfVisTable ) {
 	_mm256_zeroupper();
 	cullSurfacesByOccludersArch<Avx>( stateForCamera, indicesOfSurfaces, occluderFrusta, mergedSurfSpans, surfVisTable );
 	_mm256_zeroupper();

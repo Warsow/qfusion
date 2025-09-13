@@ -83,7 +83,7 @@ void R_TransformForEntity( const entity_t *e ) {
 	RB_LoadObjectMatrix( objectMatrix );
 }
 
-namespace wsw::ref {
+namespace wsw {
 
 using drawSurf_cb = void (*)( const FrontendToBackendShared *, const entity_t *, const struct shader_s *,
 							  const struct mfog_s *, const struct portalSurface_s *, const void * );
@@ -111,8 +111,9 @@ static const drawSurf_cb r_drawSurfCb[ST_MAX_TYPES] = {
 	( drawSurf_cb ) & R_SubmitNullSurfToBackend,
 };
 
-auto Frontend::registerBuildingBatchedSurf( StateForCamera *stateForCamera, Scene *scene, unsigned surfType,
-											std::span<const sortedDrawSurf_t> batchSpan ) -> std::pair<SubmitBatchedSurfFn, unsigned> {
+auto RendererFrontend::registerBuildingBatchedSurf( StateForCamera *stateForCamera, Scene *scene, unsigned surfType,
+													std::span<const sortedDrawSurf_t> batchSpan )
+	-> std::pair<SubmitBatchedSurfFn, unsigned> {
 	assert( !r_drawSurfCb[surfType] );
 
 	SubmitBatchedSurfFn resultFn;
@@ -158,7 +159,7 @@ auto Frontend::registerBuildingBatchedSurf( StateForCamera *stateForCamera, Scen
 	return { resultFn, resultOffset };
 }
 
-void Frontend::processSortList( StateForCamera *stateForCamera, Scene *scene ) {
+void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *scene ) {
 	stateForCamera->drawActionsList->clear();
 
 	stateForCamera->preparePolysWorkload->clear();
@@ -483,8 +484,8 @@ auto getQuadPolySpanStorageRequirements( std::span<const sortedDrawSurf_t> batch
 	return std::make_optional( std::make_pair( numVertices, numIndices ) );
 }
 
-void Frontend::markBuffersOfBatchedDynamicsForUpload( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
-													  DynamicStuffWorkloadStorage *workloadStorage ) {
+void RendererFrontend::markBuffersOfBatchedDynamicsForUpload( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
+															  DynamicStuffWorkloadStorage *workloadStorage ) {
 	workloadStorage->selectedPolysWorkload.clear();
 	workloadStorage->selectedCoronasWorkload.clear();
 	workloadStorage->selectedParticlesWorkload.clear();
@@ -559,7 +560,7 @@ void Frontend::markBuffersOfBatchedDynamicsForUpload( std::span<std::pair<Scene 
 	}
 }
 
-void Frontend::submitDrawActionsList( StateForCamera *stateForCamera, Scene *scene ) {
+void RendererFrontend::submitDrawActionsList( StateForCamera *stateForCamera, Scene *scene ) {
 	FrontendToBackendShared fsh;
 	fsh.dynamicLights               = scene->m_dynamicLights.data();
 	fsh.particleAggregates          = scene->m_particles.data();
@@ -579,7 +580,7 @@ void Frontend::submitDrawActionsList( StateForCamera *stateForCamera, Scene *sce
 	}
 }
 
-void Frontend::submitDebugStuffToBackend( StateForCamera *stateForCamera, Scene *scene ) {
+void RendererFrontend::submitDebugStuffToBackend( StateForCamera *stateForCamera, Scene *scene ) {
 	// TODO: Reduce this copying
 	vec4_t verts[2];
 	byte_vec4_t colors[2] { { 0, 0, 0, 1 }, { 0, 0, 0, 1 } };
@@ -605,7 +606,7 @@ void Frontend::submitDebugStuffToBackend( StateForCamera *stateForCamera, Scene 
 	stateForCamera->debugLines->clear();
 }
 
-void Frontend::addDebugLine( StateForCamera *stateForCamera, const float *p1, const float *p2, int color ) {
+void RendererFrontend::addDebugLine( StateForCamera *stateForCamera, const float *p1, const float *p2, int color ) {
 	int rgbaColor = color;
 	if( !COLOR_A( rgbaColor ) ) {
 		rgbaColor = COLOR_RGBA( COLOR_R( color ), COLOR_G( color ), COLOR_B( color ), 255 );
@@ -657,7 +658,7 @@ struct MeshBuilder {
 
 static thread_local MeshBuilder tl_meshBuilder;
 
-void Frontend::prepareDynamicMesh( DynamicMeshFillDataWorkload *workload ) {
+void RendererFrontend::prepareDynamicMesh( DynamicMeshFillDataWorkload *workload ) {
 	assert( workload->drawSurface );
 	const DynamicMesh *dynamicMesh = workload->drawSurface->dynamicMesh;
 	assert( dynamicMesh );
@@ -999,7 +1000,7 @@ static void buildMeshForSparkParticles( MeshBuilder *meshBuilder,
 	}
 }
 
-void Frontend::prepareBatchedParticles( PrepareBatchedSurfWorkload *workload ) {
+void RendererFrontend::prepareBatchedParticles( PrepareBatchedSurfWorkload *workload ) {
 	const auto *const scene          = workload->scene;
 	const auto *const stateForCamera = workload->stateForCamera;
 	const auto surfSpan              = workload->batchSpan;
@@ -1037,7 +1038,7 @@ void Frontend::prepareBatchedParticles( PrepareBatchedSurfWorkload *workload ) {
 	uploadBatchedMesh( meshBuilder, workload->stateForCamera->batchedSurfVertSpans->data() + workload->vertSpanOffset );
 }
 
-void Frontend::prepareBatchedCoronas( PrepareBatchedSurfWorkload *workload ) {
+void RendererFrontend::prepareBatchedCoronas( PrepareBatchedSurfWorkload *workload ) {
 	vec3_t v_left, v_up;
 	VectorCopy( &workload->stateForCamera->viewAxis[AXIS_RIGHT], v_left );
 	VectorCopy( &workload->stateForCamera->viewAxis[AXIS_UP], v_up );
@@ -1091,7 +1092,7 @@ void Frontend::prepareBatchedCoronas( PrepareBatchedSurfWorkload *workload ) {
 	uploadBatchedMesh( meshBuilder, workload->stateForCamera->batchedSurfVertSpans->data() + workload->vertSpanOffset );
 }
 
-void Frontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *workload ) {
+void RendererFrontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *workload ) {
 	MeshBuilder *const meshBuilder = &tl_meshBuilder;
 	meshBuilder->reserveForNumQuads( kMaxTwistedBeamSegments * kMaxNumDrawnPlanesForBeam * workload->batchSpan.size() );
 
@@ -1288,7 +1289,7 @@ void Frontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *workload ) {
 	uploadBatchedMesh( meshBuilder, workload->stateForCamera->batchedSurfVertSpans->data() + workload->vertSpanOffset );
 }
 
-void Frontend::prepareLegacySprite( PrepareSpriteSurfWorkload *workload ) {
+void RendererFrontend::prepareLegacySprite( PrepareSpriteSurfWorkload *workload ) {
 	StateForCamera *const stateForCamera     = workload->stateForCamera;
 	PreparedSpriteMesh *const preparedMeshes = stateForCamera->preparedSpriteMeshes->data() + workload->firstMeshOffset;
 	const float *const viewAxis              = stateForCamera->viewAxis;
@@ -1354,8 +1355,8 @@ void Frontend::prepareLegacySprite( PrepareSpriteSurfWorkload *workload ) {
 	}
 }
 
-void Frontend::submitRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2, float angle,
-										const float *color, const shader_s *material ) {
+void RendererFrontend::submitRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2, float angle,
+												const float *color, const shader_s *material ) {
 	vec4_t pic_xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
 	vec4_t pic_normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
 	vec2_t pic_st[4];

@@ -36,42 +36,44 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "frontend.h"
 #include "frontendcull.inc"
 
-namespace wsw::ref {
+namespace wsw {
 
-auto Frontend::collectVisibleWorldLeavesSse2( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
+auto RendererFrontend::collectVisibleWorldLeavesSse2( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
 	return collectVisibleWorldLeavesArch<Sse2>( stateForCamera );
 }
 
-auto Frontend::collectVisibleOccludersSse2( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
+auto RendererFrontend::collectVisibleOccludersSse2( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
 	return collectVisibleOccludersArch<Sse2>( stateForCamera );
 }
 
-auto Frontend::buildFrustaOfOccludersSse2( StateForCamera *stateForCamera, std::span<const SortedOccluder> sortedOccluders )
+auto RendererFrontend::buildFrustaOfOccludersSse2( StateForCamera *stateForCamera,
+												   std::span<const SortedOccluder> sortedOccluders )
 	-> std::span<const Frustum> {
 	return buildFrustaOfOccludersArch<Sse2>( stateForCamera, sortedOccluders );
 }
 
-void Frontend::cullSurfacesByOccludersSse2( StateForCamera *stateForCamera,
-											std::span<const unsigned> indicesOfSurfaces,
-											std::span<const Frustum> occluderFrusta,
-											MergedSurfSpan *mergedSurfSpans,
-											uint8_t *surfVisTable ) {
+void RendererFrontend::cullSurfacesByOccludersSse2( StateForCamera *stateForCamera,
+													std::span<const unsigned> indicesOfSurfaces,
+													std::span<const Frustum> occluderFrusta,
+													MergedSurfSpan *mergedSurfSpans,
+													uint8_t *surfVisTable ) {
 	return cullSurfacesByOccludersArch<Sse2>( stateForCamera, indicesOfSurfaces, occluderFrusta, mergedSurfSpans, surfVisTable );
 }
 
-auto Frontend::cullEntriesWithBoundsSse2( StateForCamera *stateForCamera, const void *entries,
-										  unsigned numEntries, unsigned boundsFieldOffset,
-										  unsigned strideInBytes, const Frustum *__restrict primaryFrustum,
-										  std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices )
+auto RendererFrontend::cullEntriesWithBoundsSse2( StateForCamera *stateForCamera, const void *entries,
+												  unsigned numEntries, unsigned boundsFieldOffset,
+												  unsigned strideInBytes, const Frustum *__restrict primaryFrustum,
+												  std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices )
 	-> std::span<const uint16_t> {
 	return cullEntriesWithBoundsArch<Sse2>( stateForCamera, entries, numEntries, boundsFieldOffset, strideInBytes,
 											primaryFrustum, occluderFrusta, tmpIndices );
 }
 
-auto Frontend::cullEntryPtrsWithBoundsSse2( StateForCamera *stateForCamera, const void **entryPtrs,
-											unsigned numEntries, unsigned boundsFieldOffset,
-											const Frustum *__restrict primaryFrustum, std::span<const Frustum> occluderFrusta,
-											uint16_t *tmpIndices )
+auto RendererFrontend::cullEntryPtrsWithBoundsSse2( StateForCamera *stateForCamera, const void **entryPtrs,
+													unsigned numEntries, unsigned boundsFieldOffset,
+													const Frustum *__restrict primaryFrustum,
+													std::span<const Frustum> occluderFrusta,
+													uint16_t *tmpIndices )
 	-> std::span<const uint16_t> {
 	return cullEntryPtrsWithBoundsArch<Sse2>( stateForCamera, entryPtrs, numEntries, boundsFieldOffset,
 											  primaryFrustum, occluderFrusta, tmpIndices );

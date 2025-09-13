@@ -107,9 +107,9 @@ auto findLightsThatAffectBounds( const Scene::DynamicLight *lights, std::span<co
 	return numAffectingLights;
 }
 
-namespace wsw::ref {
+namespace wsw {
 
-void Frontend::collectVisiblePolys( StateForCamera *stateForCamera, Scene *scene, std::span<const Frustum> frusta ) {
+void RendererFrontend::collectVisiblePolys( StateForCamera *stateForCamera, Scene *scene, std::span<const Frustum> frusta ) {
 	VisTestedModel *tmpModels = stateForCamera->visTestedModelsBuffer->reserveAndGet( MAX_QUAD_POLYS );
 	QuadPoly **quadPolys      = scene->m_quadPolys.data();
 
@@ -140,7 +140,7 @@ void Frontend::collectVisiblePolys( StateForCamera *stateForCamera, Scene *scene
 	}
 }
 
-void Frontend::collectVisibleEntities( StateForCamera *stateForCamera, Scene *scene, std::span<const Frustum> frusta ) {
+void RendererFrontend::collectVisibleEntities( StateForCamera *stateForCamera, Scene *scene, std::span<const Frustum> frusta ) {
 	uint16_t indices[MAX_ENTITIES], indices2[MAX_ENTITIES];
 
 	VisTestedModel *const visModels = stateForCamera->visTestedModelsBuffer->reserveAndGet( MAX_ENTITIES );
@@ -170,14 +170,15 @@ void Frontend::collectVisibleEntities( StateForCamera *stateForCamera, Scene *sc
 	addSpriteEntitiesToSortList( stateForCamera, spriteEntities.data(), spriteModelIndices );
 }
 
-void Frontend::collectVisibleParticles( StateForCamera *stateForCamera, Scene *scene, std::span<const Frustum> frusta ) {
+void RendererFrontend::collectVisibleParticles( StateForCamera *stateForCamera, Scene *scene, std::span<const Frustum> frusta ) {
 	uint16_t tmpIndices[1024];
 	const auto visibleAggregateIndices = cullParticleAggregates( stateForCamera, scene->m_particles, frusta, tmpIndices );
 	addParticlesToSortList( stateForCamera, scene->m_polyent, scene->m_particles.data(), visibleAggregateIndices );
 }
 
-void Frontend::collectVisibleDynamicMeshes( StateForCamera *stateForCamera,  Scene *scene, std::span<const Frustum> occluderFrusta,
-											std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
+void RendererFrontend::collectVisibleDynamicMeshes( StateForCamera *stateForCamera,  Scene *scene,
+													std::span<const Frustum> occluderFrusta,
+													std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
 	uint16_t tmpIndices[wsw::max( Scene::kMaxDynamicMeshes, Scene::kMaxCompoundDynamicMeshes )];
 
 	const std::span<const DynamicMesh *> meshes = scene->m_dynamicMeshes;
@@ -193,7 +194,7 @@ void Frontend::collectVisibleDynamicMeshes( StateForCamera *stateForCamera,  Sce
 										visibleCompoundMeshesIndices, offsetsOfVerticesAndIndices );
 }
 
-auto Frontend::collectVisibleLights( StateForCamera *stateForCamera, Scene *scene, std::span<const Frustum> occluderFrusta )
+auto RendererFrontend::collectVisibleLights( StateForCamera *stateForCamera, Scene *scene, std::span<const Frustum> occluderFrusta )
 	-> std::pair<std::span<const uint16_t>, std::span<const uint16_t>> {
 	static_assert( decltype( Scene::m_dynamicLights )::capacity() == kMaxLightsInScene );
 
@@ -243,8 +244,8 @@ auto Frontend::collectVisibleLights( StateForCamera *stateForCamera, Scene *scen
 	return { { stateForCamera->visibleProgramLightIndices, stateForCamera->numVisibleProgramLights }, visibleCoronaLightIndices };
 }
 
-void Frontend::markSurfacesOfLeavesAsVisible( std::span<const unsigned> indicesOfLeaves,
-											  MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable ) {
+void RendererFrontend::markSurfacesOfLeavesAsVisible( std::span<const unsigned> indicesOfLeaves,
+													  MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable ) {
 	const auto surfaces = rsh.worldBrushModel->surfaces;
 	const auto leaves   = rsh.worldBrushModel->visleafs;
 	for( const unsigned leafNum: indicesOfLeaves ) {
@@ -262,9 +263,9 @@ void Frontend::markSurfacesOfLeavesAsVisible( std::span<const unsigned> indicesO
 	}
 }
 
-void Frontend::markLightsOfSurfaces( StateForCamera *stateForCamera, const Scene *scene,
-									 std::span<std::span<const unsigned>> spansOfLeaves,
-									 std::span<const uint16_t> visibleLightIndices ) {
+void RendererFrontend::markLightsOfSurfaces( StateForCamera *stateForCamera, const Scene *scene,
+											 std::span<std::span<const unsigned>> spansOfLeaves,
+											 std::span<const uint16_t> visibleLightIndices ) {
 	unsigned *const lightBitsOfSurfaces = stateForCamera->leafLightBitsOfSurfacesBuffer
 		->reserveZeroedAndGet( rsh.worldBrushModel->numsurfaces );
 
@@ -275,10 +276,10 @@ void Frontend::markLightsOfSurfaces( StateForCamera *stateForCamera, const Scene
 	}
 }
 
-void Frontend::markLightsOfLeaves( StateForCamera *stateForCamera, const Scene *scene,
-								   std::span<const unsigned> indicesOfLeaves,
-								   std::span<const uint16_t> visibleLightIndices,
-								   unsigned *leafLightBitsOfSurfaces ) {
+void RendererFrontend::markLightsOfLeaves( StateForCamera *stateForCamera, const Scene *scene,
+										   std::span<const unsigned> indicesOfLeaves,
+										   std::span<const uint16_t> visibleLightIndices,
+										   unsigned *leafLightBitsOfSurfaces ) {
 	const unsigned numVisibleLights = visibleLightIndices.size();
 	const auto leaves               = rsh.worldBrushModel->visleafs;
 
@@ -309,9 +310,9 @@ void Frontend::markLightsOfLeaves( StateForCamera *stateForCamera, const Scene *
 	}
 }
 
-auto Frontend::cullNullModelEntities( StateForCamera *stateForCamera, std::span<const entity_t> entitiesSpan,
-									  std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices,
-									  VisTestedModel *tmpModels ) -> std::span<const uint16_t> {
+auto RendererFrontend::cullNullModelEntities( StateForCamera *stateForCamera, std::span<const entity_t> entitiesSpan,
+											  std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices,
+											  VisTestedModel *tmpModels ) -> std::span<const uint16_t> {
 	const auto *const entities  = entitiesSpan.data();
 	const unsigned numEntities  = entitiesSpan.size();
 
@@ -329,9 +330,9 @@ auto Frontend::cullNullModelEntities( StateForCamera *stateForCamera, std::span<
 								  sizeof( VisTestedModel ), &stateForCamera->frustum, occluderFrusta, tmpIndices );
 }
 
-auto Frontend::cullAliasModelEntities( StateForCamera *stateForCamera, std::span<const entity_t> entitiesSpan,
-									   std::span<const Frustum> occluderFrusta, uint16_t *tmpIndicesBuffer,
-									   VisTestedModel *selectedModelsBuffer ) -> std::span<const uint16_t> {
+auto RendererFrontend::cullAliasModelEntities( StateForCamera *stateForCamera, std::span<const entity_t> entitiesSpan,
+											   std::span<const Frustum> occluderFrusta, uint16_t *tmpIndicesBuffer,
+											   VisTestedModel *selectedModelsBuffer ) -> std::span<const uint16_t> {
 	const auto *const entities = entitiesSpan.data();
 	const unsigned numEntities = entitiesSpan.size();
 
@@ -408,9 +409,9 @@ auto Frontend::cullAliasModelEntities( StateForCamera *stateForCamera, std::span
 	return { tmpIndicesBuffer, numPassedOtherEnts + numWeaponModelFlagEnts };
 }
 
-auto Frontend::cullSkeletalModelEntities( StateForCamera *stateForCamera, std::span<const entity_t> entitiesSpan,
-										  std::span<const Frustum> occluderFrusta, uint16_t *tmpIndicesBuffer,
-										  VisTestedModel *selectedModelsBuffer ) -> std::span<const uint16_t> {
+auto RendererFrontend::cullSkeletalModelEntities( StateForCamera *stateForCamera, std::span<const entity_t> entitiesSpan,
+												  std::span<const Frustum> occluderFrusta, uint16_t *tmpIndicesBuffer,
+												  VisTestedModel *selectedModelsBuffer ) -> std::span<const uint16_t> {
 	const auto *const entities = entitiesSpan.data();
 	const unsigned numEntities = entitiesSpan.size();
 
@@ -447,9 +448,9 @@ auto Frontend::cullSkeletalModelEntities( StateForCamera *stateForCamera, std::s
 								  sizeof( VisTestedModel ), &stateForCamera->frustum, occluderFrusta, tmpIndicesBuffer );
 }
 
-auto Frontend::cullBrushModelEntities( StateForCamera *stateForCamera, std::span<const entity_t> entitiesSpan,
-									   std::span<const Frustum> occluderFrusta, uint16_t *tmpIndicesBuffer,
-									   VisTestedModel *selectedModelsBuffer ) -> std::span<const uint16_t> {
+auto RendererFrontend::cullBrushModelEntities( StateForCamera *stateForCamera, std::span<const entity_t> entitiesSpan,
+											   std::span<const Frustum> occluderFrusta, uint16_t *tmpIndicesBuffer,
+											   VisTestedModel *selectedModelsBuffer ) -> std::span<const uint16_t> {
 	const auto *const entities = entitiesSpan.data();
 	const unsigned numEntities = entitiesSpan.size();
 
@@ -475,9 +476,9 @@ auto Frontend::cullBrushModelEntities( StateForCamera *stateForCamera, std::span
 								  sizeof( VisTestedModel ), &stateForCamera->frustum, occluderFrusta, tmpIndicesBuffer );
 }
 
-auto Frontend::cullSpriteEntities( StateForCamera *stateForCamera, std::span<const entity_t> entitiesSpan,
-								   std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices,
-								   uint16_t *tmpIndices2, VisTestedModel *tmpModels ) -> std::span<const uint16_t> {
+auto RendererFrontend::cullSpriteEntities( StateForCamera *stateForCamera, std::span<const entity_t> entitiesSpan,
+										   std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices,
+										   uint16_t *tmpIndices2, VisTestedModel *tmpModels ) -> std::span<const uint16_t> {
 	const auto *const entities = entitiesSpan.data();
 	const unsigned numEntities = entitiesSpan.size();
 
@@ -523,12 +524,12 @@ auto Frontend::cullSpriteEntities( StateForCamera *stateForCamera, std::span<con
 	return { tmpIndices, numResultEntities };
 }
 
-auto Frontend::cullLights( StateForCamera *stateForCamera,
-						   std::span<const Scene::DynamicLight> lightsSpan,
-						   std::span<const Frustum> occluderFrusta,
-						   uint16_t *tmpAllLightIndices,
-						   uint16_t *tmpCoronaLightIndices,
-						   uint16_t *tmpProgramLightIndices )
+auto RendererFrontend::cullLights( StateForCamera *stateForCamera,
+								   std::span<const Scene::DynamicLight> lightsSpan,
+								   std::span<const Frustum> occluderFrusta,
+								   uint16_t *tmpAllLightIndices,
+								   uint16_t *tmpCoronaLightIndices,
+								   uint16_t *tmpProgramLightIndices )
 	-> std::tuple<std::span<const uint16_t>, std::span<const uint16_t>, std::span<const uint16_t>> {
 
 	const auto *const lights = lightsSpan.data();
@@ -556,23 +557,27 @@ auto Frontend::cullLights( StateForCamera *stateForCamera,
 			 { tmpProgramLightIndices, numPassedProgramLights } };
 }
 
-auto Frontend::cullParticleAggregates( StateForCamera *stateForCamera, std::span<const Scene::ParticlesAggregate> aggregatesSpan,
-									   std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices ) -> std::span<const uint16_t> {
+auto RendererFrontend::cullParticleAggregates( StateForCamera *stateForCamera,
+											   std::span<const Scene::ParticlesAggregate> aggregatesSpan,
+											   std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices )
+   -> std::span<const uint16_t> {
 	static_assert( offsetof( Scene::ParticlesAggregate, mins ) + 16 == offsetof( Scene::ParticlesAggregate, maxs ) );
 	return cullEntriesWithBounds( stateForCamera, aggregatesSpan.data(), aggregatesSpan.size(),
 								  offsetof( Scene::ParticlesAggregate, mins ), sizeof( Scene::ParticlesAggregate ),
 								  &stateForCamera->frustum, occluderFrusta, tmpIndices );
 }
 
-auto Frontend::cullCompoundDynamicMeshes( StateForCamera *stateForCamera, std::span<const Scene::CompoundDynamicMesh> meshesSpan,
-										  std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices ) -> std::span<const uint16_t> {
+auto RendererFrontend::cullCompoundDynamicMeshes( StateForCamera *stateForCamera,
+												  std::span<const Scene::CompoundDynamicMesh> meshesSpan,
+												  std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices )
+	-> std::span<const uint16_t> {
 	static_assert( offsetof( Scene::CompoundDynamicMesh, cullMins ) + 16 == offsetof( Scene::CompoundDynamicMesh, cullMaxs ) );
 	return cullEntriesWithBounds( stateForCamera, meshesSpan.data(), meshesSpan.size(),
 								  offsetof( Scene::CompoundDynamicMesh, cullMins ), sizeof( Scene::CompoundDynamicMesh ),
 								  &stateForCamera->frustum, occluderFrusta, tmpIndices );
 }
 
-auto Frontend::cullQuadPolys( StateForCamera *stateForCamera, QuadPoly **polys, unsigned numPolys,
+auto RendererFrontend::cullQuadPolys( StateForCamera *stateForCamera, QuadPoly **polys, unsigned numPolys,
 							  std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices,
 							  VisTestedModel *tmpModels ) -> std::span<const uint16_t> {
 	for( unsigned polyNum = 0; polyNum < numPolys; ++polyNum ) {
@@ -589,10 +594,10 @@ auto Frontend::cullQuadPolys( StateForCamera *stateForCamera, QuadPoly **polys, 
 								  sizeof( VisTestedModel ), &stateForCamera->frustum, occluderFrusta, tmpIndices );
 }
 
-auto Frontend::cullDynamicMeshes( StateForCamera *stateForCamera,
-								  const DynamicMesh **meshes, unsigned numMeshes,
-								  std::span<const Frustum> occluderFrusta,
-								  uint16_t *tmpIndices ) -> std::span<const uint16_t> {
+auto RendererFrontend::cullDynamicMeshes( StateForCamera *stateForCamera,
+										  const DynamicMesh **meshes, unsigned numMeshes,
+										  std::span<const Frustum> occluderFrusta,
+										  uint16_t *tmpIndices ) -> std::span<const uint16_t> {
 #ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
@@ -607,44 +612,44 @@ auto Frontend::cullDynamicMeshes( StateForCamera *stateForCamera,
 									&stateForCamera->frustum, occluderFrusta, tmpIndices );
 }
 
-auto Frontend::collectVisibleWorldLeaves( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
+auto RendererFrontend::collectVisibleWorldLeaves( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
 	WSW_PROFILER_SCOPE();
 	return ( this->*m_collectVisibleWorldLeavesArchMethod )( stateForCamera );
 }
 
-auto Frontend::collectVisibleOccluders( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
+auto RendererFrontend::collectVisibleOccluders( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
 	WSW_PROFILER_SCOPE();
 	return ( this->*m_collectVisibleOccludersArchMethod )( stateForCamera );
 }
 
-auto Frontend::buildFrustaOfOccluders( StateForCamera *stateForCamera, std::span<const SortedOccluder> sortedOccluders )
+auto RendererFrontend::buildFrustaOfOccluders( StateForCamera *stateForCamera, std::span<const SortedOccluder> sortedOccluders )
 	-> std::span<const Frustum> {
 	WSW_PROFILER_SCOPE();
 	return ( this->*m_buildFrustaOfOccludersArchMethod )( stateForCamera, sortedOccluders );
 }
 
-void Frontend::cullSurfacesByOccluders( StateForCamera *stateForCamera, std::span<const unsigned> indicesOfSurfaces,
-										std::span<const Frustum> occluderFrusta,
-										MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable ) {
+void RendererFrontend::cullSurfacesByOccluders( StateForCamera *stateForCamera, std::span<const unsigned> indicesOfSurfaces,
+												std::span<const Frustum> occluderFrusta,
+												MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable ) {
 	WSW_PROFILER_SCOPE();
 	return ( this->*m_cullSurfacesByOccludersArchMethod )( stateForCamera, indicesOfSurfaces, occluderFrusta,
 														   mergedSurfSpans, surfVisTable );
 }
 
-auto Frontend::cullEntriesWithBounds( StateForCamera *stateForCamera, const void *entries,
-									  unsigned numEntries, unsigned boundsFieldOffset,
-									  unsigned strideInBytes, const Frustum *__restrict primaryFrustum,
-									  std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices )
+auto RendererFrontend::cullEntriesWithBounds( StateForCamera *stateForCamera, const void *entries,
+											  unsigned numEntries, unsigned boundsFieldOffset,
+											  unsigned strideInBytes, const Frustum *__restrict primaryFrustum,
+											  std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices )
 	-> std::span<const uint16_t> {
 	WSW_PROFILER_SCOPE();
 	return ( this->*m_cullEntriesWithBoundsArchMethod )( stateForCamera, entries, numEntries, boundsFieldOffset,
 														 strideInBytes, primaryFrustum, occluderFrusta, tmpIndices );
 }
 
-auto Frontend::cullEntryPtrsWithBounds( StateForCamera *stateForCamera, const void **entryPtrs,
-										unsigned numEntries, unsigned boundsFieldOffset,
-										const Frustum *__restrict primaryFrustum, std::span<const Frustum> occluderFrusta,
-										uint16_t *tmpIndices )
+auto RendererFrontend::cullEntryPtrsWithBounds( StateForCamera *stateForCamera, const void **entryPtrs,
+												unsigned numEntries, unsigned boundsFieldOffset,
+												const Frustum *__restrict primaryFrustum,
+												std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices )
 	-> std::span<const uint16_t> {
 	WSW_PROFILER_SCOPE();
 	return ( this->*m_cullEntryPtrsWithBoundsArchMethod )( stateForCamera, entryPtrs, numEntries, boundsFieldOffset,
@@ -654,7 +659,7 @@ auto Frontend::cullEntryPtrsWithBounds( StateForCamera *stateForCamera, const vo
 [[nodiscard]]
 static auto calcOccluderAreaScore( const OccluderDataEntry &occluder, const float *mvpMatrix ) -> float;
 
-auto Frontend::calcOccluderScores( StateForCamera *stateForCamera, std::span<const unsigned> visibleOccluders ) -> TaskHandle {
+auto RendererFrontend::calcOccluderScores( StateForCamera *stateForCamera, std::span<const unsigned> visibleOccluders ) -> TaskHandle {
 	SortedOccluder *const sortedOccluders = stateForCamera->sortedOccludersBuffer->get();
 	const auto *const occluderEntries     = rsh.worldBrushModel->occluderDataEntries;
 	const float *const mvpMatrix          = stateForCamera->cameraProjectionMatrix;
@@ -669,8 +674,9 @@ auto Frontend::calcOccluderScores( StateForCamera *stateForCamera, std::span<con
 	return m_taskSystem.addForSubrangesInRange( { 0u, (unsigned)visibleOccluders.size() }, 16, {}, std::move( fn ) );
 }
 
-auto Frontend::pruneAndSortOccludersByScores( StateForCamera *stateForCamera,
-											  std::span<const unsigned> visibleOccluders ) -> std::span<const SortedOccluder> {
+auto RendererFrontend::pruneAndSortOccludersByScores( StateForCamera *stateForCamera,
+													  std::span<const unsigned> visibleOccluders )
+	-> std::span<const SortedOccluder> {
 	// Note: The area units are in NDC, also we don't divide cross products by 2 to get triangle areas,
 	// hence the area of the entire screen appears to be equal to len([-1,+1]) * len([-1,+1]) * 2 = 8
 #if 1

@@ -78,10 +78,10 @@ static int R_PackDistKey( int renderFx, const shader_t *shader, float dist, unsi
 
 #define WORLDSURF_DIST 1024.0f                  // hack the draw order for world surfaces
 
-namespace wsw::ref {
+namespace wsw {
 
-void Frontend::addAliasModelEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *aliasModelEntities,
-												std::span<const VisTestedModel> models, std::span<const uint16_t> indices ) {
+void RendererFrontend::addAliasModelEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *aliasModelEntities,
+														std::span<const VisTestedModel> models, std::span<const uint16_t> indices ) {
 	MaterialCache *const materialCache = MaterialCache::instance();
 
 	for( const auto modelIndex: indices ) {
@@ -128,8 +128,8 @@ void Frontend::addAliasModelEntitiesToSortList( StateForCamera *stateForCamera, 
 	}
 }
 
-void Frontend::addSkeletalModelEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *skeletalModelEntities,
-												   std::span<const VisTestedModel> models, std::span<const uint16_t> indices ) {
+void RendererFrontend::addSkeletalModelEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *skeletalModelEntities,
+														   std::span<const VisTestedModel> models, std::span<const uint16_t> indices ) {
 	MaterialCache *const materialCache = MaterialCache::instance();
 
 	for( const auto modelIndex: indices ) {
@@ -171,8 +171,8 @@ void Frontend::addSkeletalModelEntitiesToSortList( StateForCamera *stateForCamer
 	}
 }
 
-void Frontend::addNullModelEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *nullModelEntities,
-											   std::span<const uint16_t> indices ) {
+void RendererFrontend::addNullModelEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *nullModelEntities,
+													   std::span<const uint16_t> indices ) {
 	for( const auto index: indices ) {
 		addEntryToSortList( stateForCamera, nullModelEntities + index, nullptr, rsh.whiteShader, 0, 0, nullptr, nullptr, ST_NULLMODEL );
 	}
@@ -207,9 +207,10 @@ struct MultiDrawSpanBuilder {
 	}
 };
 
-void Frontend::addBrushModelEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *brushModelEntities,
-												std::span<const VisTestedModel> models,
-												std::span<const uint16_t> indices, std::span<const Scene::DynamicLight> lights ) {
+void RendererFrontend::addBrushModelEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *brushModelEntities,
+														std::span<const VisTestedModel> models,
+														std::span<const uint16_t> indices,
+														std::span<const Scene::DynamicLight> lights ) {
 	const MergedBspSurface *const mergedSurfaces = rsh.worldBrushModel->mergedSurfaces;
 	const msurface_t *const surfaces             = rsh.worldBrushModel->surfaces;
 
@@ -260,8 +261,8 @@ void Frontend::addBrushModelEntitiesToSortList( StateForCamera *stateForCamera, 
 	}
 }
 
-void Frontend::addSpriteEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *spriteEntities,
-											std::span<const uint16_t> indices ) {
+void RendererFrontend::addSpriteEntitiesToSortList( StateForCamera *stateForCamera, const entity_t *spriteEntities,
+													std::span<const uint16_t> indices ) {
 	for( const unsigned index: indices ) {
 		const entity_t *const __restrict entity = spriteEntities + index;
 
@@ -274,7 +275,7 @@ void Frontend::addSpriteEntitiesToSortList( StateForCamera *stateForCamera, cons
 	}
 }
 
-void Frontend::calcSubspansOfMergedSurfSpans( StateForCamera *stateForCamera ) {
+void RendererFrontend::calcSubspansOfMergedSurfSpans( StateForCamera *stateForCamera ) {
 	const MergedBspSurface *const mergedSurfs = rsh.worldBrushModel->mergedSurfaces;
 	const uint8_t *const surfVisTable         = stateForCamera->surfVisTableBuffer->get();
 	const msurface_t *const surfaces          = rsh.worldBrushModel->surfaces;
@@ -382,9 +383,9 @@ void Frontend::calcSubspansOfMergedSurfSpans( StateForCamera *stateForCamera ) {
 	stateForCamera->drawSurfMultiDrawDataOffset = multiDrawSpanBuilder.m_offset;
 }
 
-void Frontend::addMergedBspSurfToSortList( StateForCamera *stateForCamera, const entity_t *entity,
-										   const MergedSurfSpan &surfSpan, unsigned mergedSurfNum,
-										   const float *maybeOrigin, std::span<const Scene::DynamicLight> lightsSpan ) {
+void RendererFrontend::addMergedBspSurfToSortList( StateForCamera *stateForCamera, const entity_t *entity,
+												   const MergedSurfSpan &surfSpan, unsigned mergedSurfNum,
+												   const float *maybeOrigin, std::span<const Scene::DynamicLight> lightsSpan ) {
 	assert( mergedSurfNum < rsh.worldBrushModel->numMergedSurfaces );
 	assert( surfSpan.firstSurface <= surfSpan.lastSurface );
 	assert( surfSpan.numSubspans );
@@ -471,9 +472,9 @@ void Frontend::addMergedBspSurfToSortList( StateForCamera *stateForCamera, const
 	}
 }
 
-void Frontend::addParticlesToSortList( StateForCamera *stateForCamera, const entity_t *particleEntity,
-									   const Scene::ParticlesAggregate *particles,
-									   std::span<const uint16_t> aggregateIndices ) {
+void RendererFrontend::addParticlesToSortList( StateForCamera *stateForCamera, const entity_t *particleEntity,
+											   const Scene::ParticlesAggregate *particles,
+											   std::span<const uint16_t> aggregateIndices ) {
 	const float *const __restrict forwardAxis = stateForCamera->viewAxis;
 	const float *const __restrict viewOrigin  = stateForCamera->viewOrigin;
 
@@ -548,9 +549,9 @@ void Frontend::addParticlesToSortList( StateForCamera *stateForCamera, const ent
 	}
 }
 
-void Frontend::addDynamicMeshesToSortList( StateForCamera *stateForCamera, const entity_t *meshEntity,
-										   const DynamicMesh **meshes, std::span<const uint16_t> indicesOfMeshes,
-										   std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
+void RendererFrontend::addDynamicMeshesToSortList( StateForCamera *stateForCamera, const entity_t *meshEntity,
+												   const DynamicMesh **meshes, std::span<const uint16_t> indicesOfMeshes,
+												   std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
 	const float *const __restrict viewOrigin = stateForCamera->viewOrigin;
 
 	for( const unsigned meshIndex: indicesOfMeshes ) {
@@ -564,10 +565,10 @@ void Frontend::addDynamicMeshesToSortList( StateForCamera *stateForCamera, const
 	}
 }
 
-void Frontend::addCompoundDynamicMeshesToSortList( StateForCamera *stateForCamera, const entity_t *meshEntity,
-												   const Scene::CompoundDynamicMesh *meshes,
-												   std::span<const uint16_t> indicesOfMeshes,
-												   std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
+void RendererFrontend::addCompoundDynamicMeshesToSortList( StateForCamera *stateForCamera, const entity_t *meshEntity,
+														   const Scene::CompoundDynamicMesh *meshes,
+														   std::span<const uint16_t> indicesOfMeshes,
+														   std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
 	const float *const __restrict viewOrigin = stateForCamera->viewOrigin;
 
 	float distances[Scene::kMaxCompoundDynamicMeshes];
@@ -634,9 +635,9 @@ void Frontend::addCompoundDynamicMeshesToSortList( StateForCamera *stateForCamer
 	}
 }
 
-void Frontend::addDynamicMeshToSortList( StateForCamera *stateForCamera, const entity_t *meshEntity,
-										 const DynamicMesh *mesh, float distance,
-										 std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
+void RendererFrontend::addDynamicMeshToSortList( StateForCamera *stateForCamera, const entity_t *meshEntity,
+												 const DynamicMesh *mesh, float distance,
+												 std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
 	DynamicMeshDrawSurface *const drawSurface = stateForCamera->dynamicMeshDrawSurfaces +
 												stateForCamera->numDynamicMeshDrawSurfaces;
 	// Dynamic mesh lod code is special
@@ -670,8 +671,8 @@ void Frontend::addDynamicMeshToSortList( StateForCamera *stateForCamera, const e
 	}
 }
 
-void Frontend::addCoronaLightsToSortList( StateForCamera *stateForCamera, const entity_t *polyEntity,
-										  const Scene::DynamicLight *lights, std::span<const uint16_t> indices ) {
+void RendererFrontend::addCoronaLightsToSortList( StateForCamera *stateForCamera, const entity_t *polyEntity,
+												  const Scene::DynamicLight *lights, std::span<const uint16_t> indices ) {
 	const float *const __restrict forwardAxis = stateForCamera->viewAxis;
 	const float *const __restrict viewOrigin  = stateForCamera->viewOrigin;
 
@@ -689,7 +690,7 @@ void Frontend::addCoronaLightsToSortList( StateForCamera *stateForCamera, const 
 	}
 }
 
-void Frontend::addVisibleWorldSurfacesToSortList( StateForCamera *stateForCamera, Scene *scene ) {
+void RendererFrontend::addVisibleWorldSurfacesToSortList( StateForCamera *stateForCamera, Scene *scene ) {
 	auto *const worldEnt = scene->m_worldent;
 
 	const bool worldOutlines = mapConfig.forceWorldOutlines || ( stateForCamera->refdef.rdflags & RDF_WORLDOUTLINES );
@@ -714,11 +715,11 @@ void Frontend::addVisibleWorldSurfacesToSortList( StateForCamera *stateForCamera
 	}
 }
 
-auto Frontend::addEntryToSortList( StateForCamera *stateForCamera, const entity_t *e, const mfog_t *fog,
-								   const shader_t *shader, float dist, unsigned order, const portalSurface_t *portalSurf,
-								   const void *drawSurf, unsigned surfType,
-								   unsigned mergeabilitySeparator, int overrideParamsIndex )
-								   -> std::optional<unsigned> {
+auto RendererFrontend::addEntryToSortList( StateForCamera *stateForCamera, const entity_t *e, const mfog_t *fog,
+										   const shader_t *shader, float dist, unsigned order,
+										   const portalSurface_t *portalSurf, const void *drawSurf, unsigned surfType,
+										   unsigned mergeabilitySeparator, int overrideParamsIndex )
+	-> std::optional<unsigned> {
 	if( shader ) [[likely]] {
 		// TODO: This should be moved to an outer loop
 		if( !( stateForCamera->renderFlags & RF_SHADOWMAPVIEW ) || !Shader_ReadDepth( shader ) ) [[likely]] {
@@ -748,7 +749,7 @@ auto Frontend::addEntryToSortList( StateForCamera *stateForCamera, const entity_
 	return std::nullopt;
 }
 
-void Frontend::processWorldPortalSurfaces( StateForCamera *stateForCamera, Scene *scene, bool isCameraAPortalCamera ) {
+void RendererFrontend::processWorldPortalSurfaces( StateForCamera *stateForCamera, Scene *scene, bool isCameraAPortalCamera ) {
 	const auto numWorldModelMergedSurfaces       = rsh.worldBrushModel->numModelMergedSurfaces;
 	const MergedSurfSpan *const mergedSurfSpans  = stateForCamera->drawSurfSurfSpansBuffer->get();
 	drawSurfaceBSP_t *const drawSurfaces         = stateForCamera->bspDrawSurfacesBuffer->get();
@@ -836,8 +837,8 @@ void Frontend::processWorldPortalSurfaces( StateForCamera *stateForCamera, Scene
 	}
 }
 
-bool Frontend::updatePortalSurfaceUsingMesh( StateForCamera *stateForCamera, portalSurface_t *portalSurface, const mesh_t *mesh,
-											 const float *mins, const float *maxs, const shader_t *shader ) {
+bool RendererFrontend::updatePortalSurfaceUsingMesh( StateForCamera *stateForCamera, portalSurface_t *portalSurface, const mesh_t *mesh,
+													 const float *mins, const float *maxs, const shader_t *shader ) {
 	vec3_t v[3];
 	for( unsigned i = 0; i < 3; i++ ) {
 		VectorCopy( mesh->xyzArray[mesh->elems[i]], v[i] );
@@ -914,7 +915,7 @@ bool Frontend::updatePortalSurfaceUsingMesh( StateForCamera *stateForCamera, por
 	return true;
 }
 
-auto Frontend::findNearestPortalEntity( const portalSurface_t *portalSurface, Scene *scene ) -> const entity_t * {
+auto RendererFrontend::findNearestPortalEntity( const portalSurface_t *portalSurface, Scene *scene ) -> const entity_t * {
 	vec3_t center;
 	VectorAvg( portalSurface->mins, portalSurface->maxs, center );
 
@@ -933,7 +934,7 @@ auto Frontend::findNearestPortalEntity( const portalSurface_t *portalSurface, Sc
 	return bestEnt;
 }
 
-void Frontend::prepareDrawingPortalSurface( StateForCamera *stateForPrimaryCamera, Scene *scene, portalSurface_t *portalSurface ) {
+void RendererFrontend::prepareDrawingPortalSurface( StateForCamera *stateForPrimaryCamera, Scene *scene, portalSurface_t *portalSurface ) {
 	const shader_s *surfaceMaterial = portalSurface->shader;
 
 	int startFromTextureIndex = -1;
@@ -1020,10 +1021,10 @@ void Frontend::prepareDrawingPortalSurface( StateForCamera *stateForPrimaryCamer
 	}
 }
 
-auto Frontend::prepareDrawingPortalSurfaceSide( StateForCamera *stateForPrimaryCamera,
-												portalSurface_t *portalSurface, Scene *scene,
-												const entity_t *portalEntity, unsigned drawPortalFlags )
--> std::optional<std::pair<StateForCamera *, Texture *>> {
+auto RendererFrontend::prepareDrawingPortalSurfaceSide( StateForCamera *stateForPrimaryCamera,
+														portalSurface_t *portalSurface, Scene *scene,
+														const entity_t *portalEntity, unsigned drawPortalFlags )
+	-> std::optional<std::pair<StateForCamera *, Texture *>> {
 	vec3_t origin;
 	mat3_t axis;
 
@@ -1160,7 +1161,7 @@ auto Frontend::prepareDrawingPortalSurfaceSide( StateForCamera *stateForPrimaryC
 	return std::make_pair( stateForPortalCamera, captureTexture );
 }
 
-void Frontend::prepareDrawingSkyPortal( StateForCamera *stateForPrimaryCamera, Scene *scene ) {
+void RendererFrontend::prepareDrawingSkyPortal( StateForCamera *stateForPrimaryCamera, Scene *scene ) {
 	refdef_t newRefdef = stateForPrimaryCamera->refdef;
 	const skyportal_t *skyportal = &newRefdef.skyportal;
 

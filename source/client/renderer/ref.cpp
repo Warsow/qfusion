@@ -309,12 +309,12 @@ auto suggestNumExtraWorkerThreads( const SuggestNumWorkerThreadsArgs &args ) -> 
 
 void RenderSystem::beginDrawingScenes() {
 	WSW_PROFILER_SCOPE();
-	wsw::ref::Frontend::instance()->beginDrawingScenes();
+	wsw::RendererFrontend::instance()->beginDrawingScenes();
 }
 
 void RenderSystem::endDrawingScenes() {
 	WSW_PROFILER_SCOPE();
-	wsw::ref::Frontend::instance()->endDrawingScenes();
+	wsw::RendererFrontend::instance()->endDrawingScenes();
 }
 
 static std::optional<TaskSystem::ExecutionHandle> g_taskSystemExecutionHandle;
@@ -322,7 +322,7 @@ static std::optional<TaskSystem::ExecutionHandle> g_taskSystemExecutionHandle;
 auto RenderSystem::beginProcessingOfTasks() -> TaskSystem * {
 	WSW_PROFILER_SCOPE();
 
-	auto *result = wsw::ref::Frontend::instance()->getTaskSystem();
+	auto *result = wsw::RendererFrontend::instance()->getTaskSystem();
 	assert( !g_taskSystemExecutionHandle );
 
 	unsigned numAllowedExtraThreads = 0;
@@ -356,7 +356,7 @@ auto RenderSystem::beginProcessingOfTasks() -> TaskSystem * {
 void RenderSystem::endProcessingOfTasks() {
 	WSW_PROFILER_SCOPE();
 
-	const bool awaitResult = wsw::ref::Frontend::instance()->getTaskSystem()->awaitCompletion( g_taskSystemExecutionHandle.value() );
+	const bool awaitResult = wsw::RendererFrontend::instance()->getTaskSystem()->awaitCompletion( g_taskSystemExecutionHandle.value() );
 	g_taskSystemExecutionHandle = std::nullopt;
 	if( !awaitResult ) {
 		wsw::failWithLogicError( "Failed to execute rendering tasks" );
@@ -364,42 +364,42 @@ void RenderSystem::endProcessingOfTasks() {
 }
 
 auto RenderSystem::getMiniviewRenderTarget() -> RenderTargetComponents * {
-	return wsw::ref::Frontend::instance()->getMiniviewRenderTarget();
+	return wsw::RendererFrontend::instance()->getMiniviewRenderTarget();
 }
 
 auto RenderSystem::getMiniviewRenderTargetTexture() -> unsigned {
 	static_assert( std::is_same_v<GLuint, unsigned> );
-	return wsw::ref::Frontend::instance()->getMiniviewRenderTarget()->texture->texnum;
+	return wsw::RendererFrontend::instance()->getMiniviewRenderTarget()->texture->texnum;
 }
 
 auto RenderSystem::createDrawSceneRequest( const refdef_t &refdef ) -> DrawSceneRequest * {
 	WSW_PROFILER_SCOPE();
-	return wsw::ref::Frontend::instance()->createDrawSceneRequest( refdef );
+	return wsw::RendererFrontend::instance()->createDrawSceneRequest( refdef );
 }
 
 auto RenderSystem::beginProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests ) -> TaskHandle {
-	return wsw::ref::Frontend::instance()->beginProcessingDrawSceneRequests( requests );
+	return wsw::RendererFrontend::instance()->beginProcessingDrawSceneRequests( requests );
 }
 
 auto RenderSystem::endProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests, std::span<const TaskHandle> dependencies ) -> TaskHandle {
-	return wsw::ref::Frontend::instance()->endProcessingDrawSceneRequests( requests, dependencies );
+	return wsw::RendererFrontend::instance()->endProcessingDrawSceneRequests( requests, dependencies );
 }
 
 void RenderSystem::commitProcessedDrawSceneRequest( DrawSceneRequest *request ) {
 	WSW_PROFILER_SCOPE();
-	wsw::ref::Frontend::instance()->commitProcessedDrawSceneRequest( request );
+	wsw::RendererFrontend::instance()->commitProcessedDrawSceneRequest( request );
 }
 
 auto RenderSystem::createDraw2DRequest() -> Draw2DRequest * {
-	return wsw::ref::Frontend::instance()->createDraw2DRequest();
+	return wsw::RendererFrontend::instance()->createDraw2DRequest();
 }
 
 void RenderSystem::commitDraw2DRequest( Draw2DRequest *request ) {
-	wsw::ref::Frontend::instance()->commitDraw2DRequest( request );
+	wsw::RendererFrontend::instance()->commitDraw2DRequest( request );
 }
 
 void RenderSystem::recycleDraw2DRequest( Draw2DRequest *request ) {
-	wsw::ref::Frontend::instance()->recycleDraw2DRequest( request );
+	wsw::RendererFrontend::instance()->recycleDraw2DRequest( request );
 }
 
 [[nodiscard]]
@@ -924,7 +924,7 @@ rserr_t R_Init( const char *applicationName, const char *screenshotPrefix, int s
 
 	R_InitModels();
 
-	wsw::ref::Frontend::init();
+	wsw::RendererFrontend::init();
 
 	R_ClearSkeletalCache();
 
@@ -1049,7 +1049,7 @@ static void R_InitVolatileAssets() {
 	R_InitSkeletalCache();
 	R_InitCustomColors();
 
-	wsw::ref::Frontend::instance()->initVolatileAssets();
+	wsw::RendererFrontend::instance()->initVolatileAssets();
 
 	auto *materialCache = MaterialCache::instance();
 	rsh.envShader = materialCache->loadDefaultMaterial( wsw::StringView( "$environment" ), SHADER_TYPE_OPAQUE_ENV );
@@ -1070,7 +1070,7 @@ static void R_InitVolatileAssets() {
 }
 
 static void R_DestroyVolatileAssets() {
-	wsw::ref::Frontend::instance()->destroyVolatileAssets();
+	wsw::RendererFrontend::instance()->destroyVolatileAssets();
 
 	// kill volatile data
 	R_ShutdownCustomColors();
@@ -1115,7 +1115,7 @@ void R_EndRegistration_( void ) {
 void R_Shutdown_( bool verbose ) {
 	R_DestroyVolatileAssets();
 
-	wsw::ref::Frontend::shutdown();
+	wsw::RendererFrontend::shutdown();
 
 	R_ShutdownModels();
 

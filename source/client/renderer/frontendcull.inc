@@ -31,12 +31,12 @@ extern vec3_t g_lockedViewAxis;
 extern int g_lockedOccluderNum;
 #endif
 
-namespace wsw::ref {
+namespace wsw {
 
 #ifdef IMPLEMENT_collectVisisbleWorldLeaves
 
 template <unsigned Arch>
-auto Frontend::collectVisibleWorldLeavesArch( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
+auto RendererFrontend::collectVisibleWorldLeavesArch( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
 	const auto *const pvs             = Mod_ClusterPVS( stateForCamera->viewCluster, rsh.worldModel );
 	const unsigned numWorldLeaves     = rsh.worldBrushModel->numvisleafs;
 	const auto leaves                 = rsh.worldBrushModel->visleafs;
@@ -65,7 +65,7 @@ auto Frontend::collectVisibleWorldLeavesArch( StateForCamera *stateForCamera ) -
 #ifdef IMPLEMENT_collectVisibleOccluders
 
 template <unsigned Arch>
-auto Frontend::collectVisibleOccludersArch( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
+auto RendererFrontend::collectVisibleOccludersArch( StateForCamera *stateForCamera ) -> std::span<const unsigned> {
 	const Frustum *__restrict frustum     = &stateForCamera->frustum;
 	const unsigned numWorldModelOccluders = rsh.worldBrushModel->numOccluders;
 	unsigned *const visibleOccluders      = stateForCamera->visibleOccludersBuffer->get();
@@ -149,7 +149,7 @@ auto Frontend::collectVisibleOccludersArch( StateForCamera *stateForCamera ) -> 
 static constexpr float kSelfOcclusionBias = 0.1f;
 
 template <unsigned Arch>
-auto Frontend::buildFrustaOfOccludersArch( StateForCamera *stateForCamera, std::span<const SortedOccluder> sortedOccluders )
+auto RendererFrontend::buildFrustaOfOccludersArch( StateForCamera *stateForCamera, std::span<const SortedOccluder> sortedOccluders )
 	-> std::span<const Frustum> {
 	Frustum *const occluderFrusta = stateForCamera->occluderFrusta;
 	const unsigned maxOccluders   = wsw::min<unsigned>( sortedOccluders.size(), std::size( stateForCamera->occluderFrusta ) );
@@ -296,7 +296,7 @@ auto Frontend::buildFrustaOfOccludersArch( StateForCamera *stateForCamera, std::
 #if defined( IMPLEMENT_collectVisibleOccluders ) || defined( IMPLEMENT_buildFrustaOfOccluders )
 #if defined( SHOW_OCCLUDERS_FRUSTA ) || defined( DEBUG_OCCLUDERS )
 template <unsigned Arch>
-void Frontend::showOccluderFrustum( StateForCamera *stateForCamera, float offsetInFrontOfView,
+void RendererFrontend::showOccluderFrustum( StateForCamera *stateForCamera, float offsetInFrontOfView,
 									const float *viewOrigin, const float *viewAxis,
 									const OccluderDataEntry *occluderData ) {
 	vec3_t pointInFrontOfView;
@@ -378,7 +378,7 @@ void Frontend::showOccluderFrustum( StateForCamera *stateForCamera, float offset
 #ifdef IMPLEMENT_cullSurfacesByOccluders
 
 template <unsigned Arch>
-void Frontend::cullSurfacesByOccludersArch( [[maybe_unused]] StateForCamera *stateForCamera,
+void RendererFrontend::cullSurfacesByOccludersArch( [[maybe_unused]] StateForCamera *stateForCamera,
 											std::span<const unsigned> surfNums, std::span<const Frustum> occluderFrusta,
 											MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable ) {
 	assert( !occluderFrusta.empty() );
@@ -456,7 +456,7 @@ void Frontend::cullSurfacesByOccludersArch( [[maybe_unused]] StateForCamera *sta
 #ifdef IMPLEMENT_cullEntriesWithBounds
 
 template <unsigned Arch>
-auto Frontend::cullEntriesWithBoundsArch( [[maybe_unused]] StateForCamera *stateForCamera,
+auto RendererFrontend::cullEntriesWithBoundsArch( [[maybe_unused]] StateForCamera *stateForCamera,
 										  const void *entries, unsigned numEntries,
 										  unsigned boundsFieldOffset, unsigned strideInBytes,
 										  const Frustum *__restrict primaryFrustum, std::span<const Frustum> occluderFrusta,
@@ -517,7 +517,7 @@ auto Frontend::cullEntriesWithBoundsArch( [[maybe_unused]] StateForCamera *state
 #ifdef IMPLEMENT_cullEntryPtrsWithBounds
 
 template <unsigned Arch>
-auto Frontend::cullEntryPtrsWithBoundsArch( [[maybe_unused]] StateForCamera *stateForCamera,
+auto RendererFrontend::cullEntryPtrsWithBoundsArch( [[maybe_unused]] StateForCamera *stateForCamera,
 											const void **entryPtrs, unsigned numEntries, unsigned boundsFieldOffset,
 											const Frustum *__restrict primaryFrustum, std::span<const Frustum> occluderFrusta,
 											uint16_t *tmpIndices ) -> std::span<const uint16_t> {

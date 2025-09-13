@@ -32,16 +32,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 * Note that this sets the viewport to size of the active framebuffer.
 */
 void R_Set2DMode( bool enable ) {
-	wsw::ref::Frontend::instance()->set2DMode( enable );
+	wsw::RendererFrontend::instance()->set2DMode( enable );
 }
 
 void R_TransformForWorld();
 void R_TranslateForEntity( const entity_t *e );
 void R_TransformForEntity( const entity_t *e );
 
-namespace wsw::ref {
+namespace wsw {
 
-auto Frontend::getDefaultFarClip( const refdef_s *fd ) const -> float {
+auto RendererFrontend::getDefaultFarClip( const refdef_s *fd ) const -> float {
 	float dist;
 
 	if( fd->rdflags & RDF_NOWORLDMODEL ) {
@@ -56,7 +56,7 @@ auto Frontend::getDefaultFarClip( const refdef_s *fd ) const -> float {
 	return wsw::max( Z_NEAR, dist ) + Z_BIAS;
 }
 
-auto Frontend::getFogForBounds( const StateForCamera *stateForCamera, const float *mins, const float *maxs ) -> mfog_t * {
+auto RendererFrontend::getFogForBounds( const StateForCamera *stateForCamera, const float *mins, const float *maxs ) -> mfog_t * {
 	if( stateForCamera->refdef.rdflags & RDF_NOWORLDMODEL ) {
 		return nullptr;
 	}
@@ -81,7 +81,7 @@ auto Frontend::getFogForBounds( const StateForCamera *stateForCamera, const floa
 	return nullptr;
 }
 
-auto Frontend::getFogForSphere( const StateForCamera *stateForCamera, const vec3_t centre, const float radius ) -> mfog_t * {
+auto RendererFrontend::getFogForSphere( const StateForCamera *stateForCamera, const vec3_t centre, const float radius ) -> mfog_t * {
 	vec3_t mins, maxs;
 	for( unsigned i = 0; i < 3; i++ ) {
 		mins[i] = centre[i] - radius;
@@ -90,7 +90,7 @@ auto Frontend::getFogForSphere( const StateForCamera *stateForCamera, const vec3
 	return getFogForBounds( stateForCamera, mins, maxs );
 }
 
-void Frontend::set2DMode( bool enable ) {
+void RendererFrontend::set2DMode( bool enable ) {
 	const int width  = rf.frameBufferWidth;
 	const int height = rf.frameBufferHeight;
 
@@ -131,12 +131,12 @@ void Frontend::set2DMode( bool enable ) {
 	}
 }
 
-void Frontend::set2DScissor( int x, int y, int w, int h ) {
+void RendererFrontend::set2DScissor( int x, int y, int w, int h ) {
 	assert( rf.in2D );
 	RB_Scissor( x, y, w, h );
 }
 
-void Frontend::bindRenderTargetAndViewport( RenderTargetComponents *components, const StateForCamera *stateForCamera ) {
+void RendererFrontend::bindRenderTargetAndViewport( RenderTargetComponents *components, const StateForCamera *stateForCamera ) {
 	// TODO: This is for the default render target
 	const int width  = components ? components->texture->width : glConfig.width;
 	const int height = components ? components->texture->height : glConfig.height;
@@ -155,7 +155,7 @@ void Frontend::bindRenderTargetAndViewport( RenderTargetComponents *components, 
 	}
 }
 
-void Frontend::beginDrawingScenes() {
+void RendererFrontend::beginDrawingScenes() {
 	m_mainThreadChecker.checkCallingThread();
 	R_ClearSkeletalCache();
 	recycleFrameCameraStates();
@@ -165,12 +165,12 @@ void Frontend::beginDrawingScenes() {
 	m_tmpPortalScenesAndStates.clear();
 }
 
-auto Frontend::createDrawSceneRequest( const refdef_t &refdef ) -> DrawSceneRequest * {
+auto RendererFrontend::createDrawSceneRequest( const refdef_t &refdef ) -> DrawSceneRequest * {
 	m_mainThreadChecker.checkCallingThread();
 	return new( m_drawSceneRequestsHolder.unsafe_grow_back() )DrawSceneRequest( refdef, m_sceneIndexCounter++ );
 }
 
-auto Frontend::coBeginProcessingDrawSceneRequests( CoroTask::StartInfo si, Frontend *self, std::span<DrawSceneRequest *> requests ) -> CoroTask {
+auto RendererFrontend::coBeginProcessingDrawSceneRequests( CoroTask::StartInfo si, RendererFrontend *self, std::span<DrawSceneRequest *> requests ) -> CoroTask {
 	std::pair<Scene *, StateForCamera *> scenesAndCameras[kMaxDrawSceneRequests];
 	unsigned numScenesAndCameras = 0;
 
@@ -188,7 +188,7 @@ auto Frontend::coBeginProcessingDrawSceneRequests( CoroTask::StartInfo si, Front
 	co_await si.taskSystem->awaiterOf( self->beginPreparingRenderingFromTheseCameras( spanOfScenesAndCameras, false ) );
 }
 
-auto Frontend::coEndProcessingDrawSceneRequests( CoroTask::StartInfo si, Frontend *self, std::span<DrawSceneRequest *> requests ) -> CoroTask {
+auto RendererFrontend::coEndProcessingDrawSceneRequests( CoroTask::StartInfo si, RendererFrontend *self, std::span<DrawSceneRequest *> requests ) -> CoroTask {
 	std::pair<Scene *, StateForCamera *> scenesAndCameras[kMaxDrawSceneRequests];
 	unsigned numScenesAndCameras = 0;
 
@@ -203,20 +203,20 @@ auto Frontend::coEndProcessingDrawSceneRequests( CoroTask::StartInfo si, Fronten
 		{ scenesAndCameras, scenesAndCameras + numScenesAndCameras }, {}, false ) );
 }
 
-auto Frontend::beginProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests ) -> TaskHandle {
+auto RendererFrontend::beginProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests ) -> TaskHandle {
 	// Don't pin it to the main thread as the CGame coroutine is already pinned to the main thread
 	CoroTask::StartInfo si { &m_taskSystem, {}, CoroTask::AnyThread };
 	// Note: passing the span should be safe as it resides in cgame code during task system execution
 	return m_taskSystem.addCoro( [=, this]() { return coBeginProcessingDrawSceneRequests( si, this, requests ); } );
 }
 
-auto Frontend::endProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests, std::span<const TaskHandle> dependencies ) -> TaskHandle {
+auto RendererFrontend::endProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests, std::span<const TaskHandle> dependencies ) -> TaskHandle {
 	CoroTask::StartInfo si { &m_taskSystem, dependencies, CoroTask::OnlyMainThread };
 	// Note: passing the span should be safe as it resides in cgame code during task system execution
 	return m_taskSystem.addCoro( [=, this]() { return coEndProcessingDrawSceneRequests( si, this, requests ); } );
 }
 
-void Frontend::commitProcessedDrawSceneRequest( DrawSceneRequest *request ) {
+void RendererFrontend::commitProcessedDrawSceneRequest( DrawSceneRequest *request ) {
 	set2DMode( false );
 
 	RB_SetTime( request->m_refdef.time );
@@ -228,14 +228,14 @@ void Frontend::commitProcessedDrawSceneRequest( DrawSceneRequest *request ) {
 	}
 }
 
-void Frontend::endDrawingScenes() {
+void RendererFrontend::endDrawingScenes() {
 	m_mainThreadChecker.checkCallingThread();
 	bindRenderTargetAndViewport( nullptr, nullptr );
 	recycleFrameCameraStates();
 	m_drawSceneRequestsHolder.clear();
 }
 
-auto Frontend::createDraw2DRequest() -> Draw2DRequest * {
+auto RendererFrontend::createDraw2DRequest() -> Draw2DRequest * {
 	m_mainThreadChecker.checkCallingThread();
 	assert( !m_isDraw2DRequestInUse );
 	assert( m_draw2DRequest.m_cmds.empty() );
@@ -243,7 +243,7 @@ auto Frontend::createDraw2DRequest() -> Draw2DRequest * {
 	return &m_draw2DRequest;
 }
 
-void Frontend::commitDraw2DRequest( Draw2DRequest *request ) {
+void RendererFrontend::commitDraw2DRequest( Draw2DRequest *request ) {
 	m_mainThreadChecker.checkCallingThread();
 	set2DMode( true );
 	set2DScissor( 0, 0, rf.width2D, rf.height2D );
@@ -262,7 +262,7 @@ void Frontend::commitDraw2DRequest( Draw2DRequest *request ) {
 	set2DMode( false );
 }
 
-void Frontend::recycleDraw2DRequest( Draw2DRequest *request ) {
+void RendererFrontend::recycleDraw2DRequest( Draw2DRequest *request ) {
 	m_mainThreadChecker.checkCallingThread();
 	assert( m_isDraw2DRequestInUse );
 	assert( request == &m_draw2DRequest );
@@ -270,64 +270,64 @@ void Frontend::recycleDraw2DRequest( Draw2DRequest *request ) {
 	m_isDraw2DRequestInUse = false;
 }
 
-Frontend::Frontend() : m_taskSystem( { .profilingGroup  = wsw::ProfilingSystem::ClientGroup,
+RendererFrontend::RendererFrontend() : m_taskSystem( { .profilingGroup  = wsw::ProfilingSystem::ClientGroup,
 									   .numExtraThreads = suggestNumExtraWorkerThreads( {} ) } ) {
 	m_mainThreadChecker.markCurrentThreadForFurtherAccessChecks();
 	const auto features = Sys_GetProcessorFeatures();
 	if( Q_CPU_FEATURE_SSE41 & features ) {
-		m_collectVisibleWorldLeavesArchMethod = &Frontend::collectVisibleWorldLeavesSse41;
-		m_collectVisibleOccludersArchMethod   = &Frontend::collectVisibleOccludersSse41;
-		m_buildFrustaOfOccludersArchMethod    = &Frontend::buildFrustaOfOccludersSse41;
+		m_collectVisibleWorldLeavesArchMethod = &RendererFrontend::collectVisibleWorldLeavesSse41;
+		m_collectVisibleOccludersArchMethod   = &RendererFrontend::collectVisibleOccludersSse41;
+		m_buildFrustaOfOccludersArchMethod    = &RendererFrontend::buildFrustaOfOccludersSse41;
 		if( Q_CPU_FEATURE_AVX & features ) {
-			m_cullSurfacesByOccludersArchMethod = &Frontend::cullSurfacesByOccludersAvx;
+			m_cullSurfacesByOccludersArchMethod = &RendererFrontend::cullSurfacesByOccludersAvx;
 		} else {
-			m_cullSurfacesByOccludersArchMethod = &Frontend::cullSurfacesByOccludersSse41;
+			m_cullSurfacesByOccludersArchMethod = &RendererFrontend::cullSurfacesByOccludersSse41;
 		}
-		m_cullEntriesWithBoundsArchMethod   = &Frontend::cullEntriesWithBoundsSse41;
-		m_cullEntryPtrsWithBoundsArchMethod = &Frontend::cullEntryPtrsWithBoundsSse41;
+		m_cullEntriesWithBoundsArchMethod   = &RendererFrontend::cullEntriesWithBoundsSse41;
+		m_cullEntryPtrsWithBoundsArchMethod = &RendererFrontend::cullEntryPtrsWithBoundsSse41;
 	} else {
-		m_collectVisibleWorldLeavesArchMethod = &Frontend::collectVisibleWorldLeavesSse2;
-		m_collectVisibleOccludersArchMethod   = &Frontend::collectVisibleOccludersSse2;
-		m_buildFrustaOfOccludersArchMethod    = &Frontend::buildFrustaOfOccludersSse2;
-		m_cullSurfacesByOccludersArchMethod   = &Frontend::cullSurfacesByOccludersSse2;
-		m_cullEntriesWithBoundsArchMethod     = &Frontend::cullEntriesWithBoundsSse2;
-		m_cullEntryPtrsWithBoundsArchMethod   = &Frontend::cullEntryPtrsWithBoundsSse2;
+		m_collectVisibleWorldLeavesArchMethod = &RendererFrontend::collectVisibleWorldLeavesSse2;
+		m_collectVisibleOccludersArchMethod   = &RendererFrontend::collectVisibleOccludersSse2;
+		m_buildFrustaOfOccludersArchMethod    = &RendererFrontend::buildFrustaOfOccludersSse2;
+		m_cullSurfacesByOccludersArchMethod   = &RendererFrontend::cullSurfacesByOccludersSse2;
+		m_cullEntriesWithBoundsArchMethod     = &RendererFrontend::cullEntriesWithBoundsSse2;
+		m_cullEntryPtrsWithBoundsArchMethod   = &RendererFrontend::cullEntryPtrsWithBoundsSse2;
 	}
 }
 
-Frontend::~Frontend() {
+RendererFrontend::~RendererFrontend() {
 	m_mainThreadChecker.checkCallingThread();
 	disposeCameraStates();
 }
 
-alignas( 32 ) static SingletonHolder<Frontend> sceneInstanceHolder;
+alignas( 32 ) static SingletonHolder<RendererFrontend> sceneInstanceHolder;
 
-void Frontend::init() {
+void RendererFrontend::init() {
 	sceneInstanceHolder.init();
 }
 
-void Frontend::shutdown() {
+void RendererFrontend::shutdown() {
 	sceneInstanceHolder.shutdown();
 }
 
-Frontend *Frontend::instance() {
+RendererFrontend *RendererFrontend::instance() {
 	return sceneInstanceHolder.instance();
 }
 
-auto Frontend::getMiniviewRenderTarget() -> RenderTargetComponents * {
+auto RendererFrontend::getMiniviewRenderTarget() -> RenderTargetComponents * {
 	return TextureCache::instance()->getMiniviewRenderTarget();
 }
 
-void Frontend::initVolatileAssets() {
+void RendererFrontend::initVolatileAssets() {
 	m_coronaShader = MaterialCache::instance()->loadDefaultMaterial( "$corona"_asView, SHADER_TYPE_CORONA );
 }
 
-void Frontend::destroyVolatileAssets() {
+void RendererFrontend::destroyVolatileAssets() {
 	m_coronaShader = nullptr;
 	disposeCameraStates();
 }
 
-auto Frontend::allocStateForCamera() -> StateForCamera * {
+auto RendererFrontend::allocStateForCamera() -> StateForCamera * {
 	StateForCameraStorage *resultStorage = nullptr;
 	do {
 		// Portal drawing code may perform concurrent allocation of states
@@ -397,7 +397,7 @@ auto Frontend::allocStateForCamera() -> StateForCamera * {
 	return stateForCamera;
 }
 
-void Frontend::recycleFrameCameraStates() {
+void RendererFrontend::recycleFrameCameraStates() {
 	for( StateForCameraStorage *used = m_usedStatesForCamera, *next; used; used = next ) { next = used->next;
 		wsw::unlink( used, &m_usedStatesForCamera );
 		( (StateForCamera *)used->theStateStorage )->~StateForCamera();
@@ -407,7 +407,7 @@ void Frontend::recycleFrameCameraStates() {
 	assert( m_usedStatesForCamera == nullptr );
 }
 
-void Frontend::disposeCameraStates() {
+void RendererFrontend::disposeCameraStates() {
 	recycleFrameCameraStates();
 	assert( m_usedStatesForCamera == nullptr );
 	for( StateForCameraStorage *storage = m_freeStatesForCamera, *next; storage; storage = next ) { next = storage->next;
@@ -417,7 +417,7 @@ void Frontend::disposeCameraStates() {
 	assert( m_freeStatesForCamera == nullptr );
 }
 
-auto Frontend::setupStateForCamera( const refdef_t *fd, unsigned sceneIndex,
+auto RendererFrontend::setupStateForCamera( const refdef_t *fd, unsigned sceneIndex,
 									std::optional<CameraOverrideParams> overrideParams ) -> StateForCamera * {
 	auto *const stateForCamera = allocStateForCamera();
 	if( !stateForCamera ) [[unlikely]] {
@@ -517,7 +517,7 @@ auto Frontend::setupStateForCamera( const refdef_t *fd, unsigned sceneIndex,
 	return stateForCamera;
 }
 
-auto Frontend::coExecPassUponInitialCullingOfLeaves( CoroTask::StartInfo si, Frontend *self, StateForCamera *stateForCamera ) -> CoroTask {
+auto RendererFrontend::coExecPassUponInitialCullingOfLeaves( CoroTask::StartInfo si, RendererFrontend *self, StateForCamera *stateForCamera ) -> CoroTask {
 	std::span<const unsigned> surfNumsSpan;
 	if( stateForCamera->useWorldBspOcclusionCulling ) {
 		std::span<const unsigned> leavesInFrustumAndPvs = stateForCamera->leavesInFrustumAndPvs;
@@ -568,7 +568,7 @@ auto Frontend::coExecPassUponInitialCullingOfLeaves( CoroTask::StartInfo si, Fro
 	stateForCamera->surfsInFrustumAndPvs = surfNumsSpan;
 }
 
-auto Frontend::coExecPassUponPreparingOccluders( CoroTask::StartInfo si, Frontend *self, StateForCamera *stateForCamera ) -> CoroTask {
+auto RendererFrontend::coExecPassUponPreparingOccluders( CoroTask::StartInfo si, RendererFrontend *self, StateForCamera *stateForCamera ) -> CoroTask {
 	const std::span<const Frustum> occluderFrusta { stateForCamera->occluderFrusta, stateForCamera->numOccluderFrusta };
 
 	// Otherwise, we have marked surfaces of leaves immediately upon initial frustum culling of leaves
@@ -598,7 +598,7 @@ auto Frontend::coExecPassUponPreparingOccluders( CoroTask::StartInfo si, Fronten
 	}
 }
 
-auto Frontend::coPrepareOccluders( CoroTask::StartInfo si, Frontend *self, StateForCamera *stateForCamera ) -> CoroTask {
+auto RendererFrontend::coPrepareOccluders( CoroTask::StartInfo si, RendererFrontend *self, StateForCamera *stateForCamera ) -> CoroTask {
 	std::span<const Frustum> occluderFrusta;
 	if( stateForCamera->useOcclusionCulling ) {
 		// Collect occluder surfaces of leaves that fall into the primary frustum and that are "good enough"
@@ -618,7 +618,7 @@ auto Frontend::coPrepareOccluders( CoroTask::StartInfo si, Frontend *self, State
 	stateForCamera->numOccluderFrusta = occluderFrusta.size();
 }
 
-auto Frontend::coBeginPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, Frontend *self,
+auto RendererFrontend::coBeginPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, RendererFrontend *self,
 														  std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
 														  bool areCamerasPortalCameras ) -> CoroTask {
 	assert( scenesAndCameras.size() <= MAX_REF_CAMERAS );
@@ -762,7 +762,7 @@ auto Frontend::coBeginPreparingRenderingFromTheseCameras( CoroTask::StartInfo si
 	}
 }
 
-auto Frontend::beginPreparingRenderingFromTheseCameras( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
+auto RendererFrontend::beginPreparingRenderingFromTheseCameras( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
 														bool areCamerasPortalCameras ) -> TaskHandle {
 	return m_taskSystem.addCoro( [=, this]() {
 		CoroTask::StartInfo startInfo { &m_taskSystem, {}, CoroTask::AnyThread };
@@ -770,7 +770,7 @@ auto Frontend::beginPreparingRenderingFromTheseCameras( std::span<std::pair<Scen
 	});
 }
 
-auto Frontend::endPreparingRenderingFromTheseCameras( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
+auto RendererFrontend::endPreparingRenderingFromTheseCameras( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
 													  std::span<const TaskHandle> dependencies,
 													  bool areCamerasPortalCameras ) -> TaskHandle {
 	return m_taskSystem.addCoro( [=, this]() {
@@ -779,7 +779,7 @@ auto Frontend::endPreparingRenderingFromTheseCameras( std::span<std::pair<Scene 
 	});
 }
 
-auto Frontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, Frontend *self,
+auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, RendererFrontend *self,
 														std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
 														bool areCamerasPortalCameras ) -> CoroTask {
 	DynamicStuffWorkloadStorage *workloadStorage;
@@ -935,7 +935,7 @@ auto Frontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, 
 	}
 }
 
-void Frontend::performPreparedRenderingFromThisCamera( Scene *scene, StateForCamera *stateForCamera ) {
+void RendererFrontend::performPreparedRenderingFromThisCamera( Scene *scene, StateForCamera *stateForCamera ) {
 	// TODO: Is rendering depth mask first worth it
 
 	if( stateForCamera->stateForSkyPortalCamera ) {
@@ -1043,7 +1043,7 @@ void Frontend::performPreparedRenderingFromThisCamera( Scene *scene, StateForCam
 }
 
 
-void Frontend::dynLightDirForOrigin( const vec_t *origin, float radius, vec3_t dir, vec3_t diffuseLocal, vec3_t ambientLocal ) {
+void RendererFrontend::dynLightDirForOrigin( const vec_t *origin, float radius, vec3_t dir, vec3_t diffuseLocal, vec3_t ambientLocal ) {
 }
 
 }

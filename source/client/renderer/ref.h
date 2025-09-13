@@ -344,13 +344,13 @@ struct VisualTrace {
 	float fraction;
 };
 
-namespace wsw::ref { class Frontend; }
+namespace wsw { class RendererFrontend; }
 
 struct QuadPoly;
 struct DynamicMesh;
 
 class Scene {
-	friend class wsw::ref::Frontend;
+	friend class wsw::RendererFrontend;
 public:
 	struct DynamicLight {
 		float origin[3];
@@ -425,7 +425,7 @@ protected:
 
 // TODO: Aggregate Scene as a member?
 class DrawSceneRequest : public Scene {
-	friend class wsw::ref::Frontend;
+	friend class wsw::RendererFrontend;
 
 	// TODO: Get rid of "refdef_t"
 	refdef_t m_refdef;
@@ -554,7 +554,7 @@ struct ImageOptions {
 };
 
 class Draw2DRequest {
-	friend class wsw::ref::Frontend;
+	friend class wsw::RendererFrontend;
 public:
 	void setScissor( int x, int y, int w, int h );
 	void drawStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2, const vec4_t color, const shader_s *shader );
