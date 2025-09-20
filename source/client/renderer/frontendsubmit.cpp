@@ -371,8 +371,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 				drawActionsList->append( [=]( FrontendToBackendShared *fsh ) {
 					assert( r_drawSurfCb[surfType] );
 
-					RB_BindShader( entity, overrideParams, paramsTable, shader, fog );
-					RB_SetPortalSurface( portalSurface );
+					RB_BindShader( entity, overrideParams, paramsTable, shader, fog, portalSurface );
 
 					r_drawSurfCb[surfType]( fsh, entity, shader, fog, portalSurface, sds->drawSurf );
 				});

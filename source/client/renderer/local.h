@@ -807,11 +807,10 @@ void RB_DrawShadedMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSp
 void RB_FlushTextureCache( void );
 
 // shader
-void RB_BindShader( const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable, const shader_s *shader, const mfog_s *fog );
+void RB_BindShader( const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable, const shader_s *shader, const mfog_s *fog, const struct portalSurface_s *portalSurface );
 void RB_SetLightstyle( const struct superLightStyle_s *lightStyle );
 void RB_SetDlightBits( unsigned int dlightBits );
 void RB_SetBonesData( int numBones, dualquat_t *dualQuats, int maxWeights );
-void RB_SetPortalSurface( const struct portalSurface_s *portalSurface );
 void RB_SetRenderFlags( int flags );
 void RB_SetLightParams( float minLight, bool noWorldLight, float hdrExposure = 1.0f );
 void RB_SetShaderStateMask( int ANDmask, int ORmask );

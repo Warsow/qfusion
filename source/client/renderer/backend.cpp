@@ -361,9 +361,10 @@ void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
 	}
 
 	vattribmask_t vattribs;
+	// This assumption simplifies assignment of attribs, so we don't have to fully bind the shader to get actual attribs
+	assert( !entity || ( !entity->model && !entity->outlineHeight ) );
 	if( streamId == RB_VBO_NONE ) {
-		RB_BindShader( entity, nullptr, nullptr, shader, fog );
-		vattribs = rb.currentVAttribs;
+		vattribs = shader->vattribs;
 		streamId = ( ( vattribs & ~COMPACT_STREAM_VATTRIBS ) ? RB_VBO_STREAM : RB_VBO_STREAM_COMPACT );
 	} else {
 		vattribs = prev->vattribs;
@@ -472,9 +473,8 @@ void RB_FlushDynamicMeshes() {
 	float offsetx = 0.0f, offsety = 0.0f;
 	for( int i = 0; i < numDraws; i++ ) {
 		rbDynamicDraw_t *draw = rb.dynamicDraws + i;
-		RB_BindShader( draw->entity, nullptr, nullptr, draw->shader, draw->fog );
+		RB_BindShader( draw->entity, nullptr, nullptr, draw->shader, draw->fog, nullptr );
 		RB_BindVBO( draw->streamId, draw->primitive );
-		RB_SetPortalSurface( draw->portalSurface );
 		RB_Scissor( draw->scissor[0], draw->scissor[1], draw->scissor[2], draw->scissor[3] );
 
 		// translate the mesh in 2D
@@ -658,7 +658,7 @@ void R_SubmitBatchedSurfsToBackend( const FrontendToBackendShared *fsh, const en
 									const portalSurface_t *portalSurface, unsigned vertElemSpanIndex ) {
 	const VertElemSpan &vertElemSpan = fsh->batchedVertElemSpans[vertElemSpanIndex];
 	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
-		RB_BindShader( e, overrideParams, paramsTable, shader, fog );
+		RB_BindShader( e, overrideParams, paramsTable, shader, fog, nullptr );
 		RB_BindVBO( RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH ), GL_TRIANGLES );
 		const DrawMeshVertSpan drawMeshVertSpan = vertElemSpan;
 		RB_DrawMesh( fsh, &drawMeshVertSpan );

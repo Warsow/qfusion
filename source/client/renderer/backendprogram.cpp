@@ -1799,7 +1799,7 @@ static void RB_UpdateVertexAttribs( void ) {
 * RB_BindShader
 */
 void RB_BindShader( const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable,
-					const shader_t *shader, const mfog_t *fog ) {
+					const shader_t *shader, const mfog_t *fog, const portalSurface_s *portalSurface ) {
 	rb.currentShader = shader;
 	rb.fog = fog;
 	rb.texFog = rb.colorFog = NULL;
@@ -1816,7 +1816,7 @@ void RB_BindShader( const entity_t *e, const ShaderParams *overrideParams, const
 	rb.bonesData.numBones = 0;
 	rb.bonesData.maxWeights = 0;
 
-	rb.currentPortalSurface = NULL;
+	rb.currentPortalSurface = portalSurface;
 
 	if( !e ) {
 		if( const ShaderParams::Material *materialParams = ShaderParams::getMaterialParams( overrideParams, paramsTable ) ) {
@@ -1889,15 +1889,6 @@ void RB_SetDlightBits( unsigned int dlightBits ) {
 }
 
 /*
-* RB_SetShadowBits
-*/
-void RB_SetShadowBits( unsigned int shadowBits ) {
-	assert( rb.currentShader != NULL );
-	rb.currentShadowBits = shadowBits;
-	rb.dirtyUniformState = true;
-}
-
-/*
 * RB_SetAnimData
 */
 void RB_SetBonesData( int numBones, dualquat_t *dualQuats, int maxWeights ) {
@@ -1917,15 +1908,6 @@ void RB_SetBonesData( int numBones, dualquat_t *dualQuats, int maxWeights ) {
 	rb.dirtyUniformState = true;
 
 	RB_UpdateVertexAttribs();
-}
-
-/*
-* RB_SetPortalSurface
-*/
-void RB_SetPortalSurface( const portalSurface_t *portalSurface ) {
-	assert( rb.currentShader != NULL );
-	rb.currentPortalSurface = portalSurface;
-	rb.dirtyUniformState = true;
 }
 
 /*
