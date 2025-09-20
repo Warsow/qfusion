@@ -73,7 +73,6 @@ typedef struct r_backend_s {
 
 	const entity_t *currentEntity;
 	modtype_t currentModelType;
-	const mesh_vbo_t *currentMeshVBO;
 	rbBonesData_t bonesData;
 	const portalSurface_t *currentPortalSurface;
 
@@ -99,10 +98,6 @@ typedef struct r_backend_s {
 	int numDynamicDraws;
 
 	vattribmask_t currentVAttribs;
-
-	int primitive;
-	int currentVBOId;
-	mesh_vbo_t *currentVBO;
 
 	unsigned int currentDlightBits;
 	unsigned int currentShadowBits;
@@ -141,7 +136,7 @@ typedef struct r_backend_s {
 
 extern rbackend_t rb;
 
-void RB_DoDrawMeshVerts( const DrawMeshVertSpan *vertSpan );
+void RB_DoDrawMeshVerts( const DrawMeshVertSpan *vertSpan, int primitive );
 
 #define RB_IsAlphaBlending( blendsrc,blenddst ) \
 	( ( blendsrc ) == GLSTATE_SRCBLEND_SRC_ALPHA || ( blenddst ) == GLSTATE_DSTBLEND_SRC_ALPHA ) || \

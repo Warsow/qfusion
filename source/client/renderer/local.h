@@ -768,7 +768,8 @@ void RB_SetZClip( float zNear, float zFar );
 
 void RB_BindFrameBufferObject( RenderTargetComponents *renderTargetComponents );
 
-void RB_BindVBO( int id, int primitive );
+[[maybe_unused]]
+struct mesh_vbo_s *RB_BindVBO( int id );
 
 void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
 						const struct mfog_s *fog, const struct portalSurface_s *portalSurface, unsigned int shadowBits,
@@ -798,11 +799,10 @@ struct VertElemSpan {
 
 using DrawMeshVertSpan = std::variant<VertElemSpan, MultiDrawElemSpan>;
 
-void RB_DrawMesh( const FrontendToBackendShared *fsh, int firstVert, int numVerts, int firstElem, int numElems );
-void RB_DrawMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan );
+void RB_DrawMesh( const FrontendToBackendShared *fsh, int vboId, const DrawMeshVertSpan *vertSpan, int primitive );
 
-void RB_DrawWireframeMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan );
-void RB_DrawShadedMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan );
+void RB_DrawWireframeMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, int primitive );
+void RB_DrawShadedMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, int primitive );
 
 void RB_FlushTextureCache( void );
 
