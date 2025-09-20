@@ -98,8 +98,6 @@ typedef struct r_backend_s {
 	rbDynamicDraw_t dynamicDraws[MAX_DYNAMIC_DRAWS];
 	int numDynamicDraws;
 
-	DrawMeshVertSpan drawMeshVertSpan;
-
 	vattribmask_t currentVAttribs;
 
 	int primitive;
@@ -143,7 +141,7 @@ typedef struct r_backend_s {
 
 extern rbackend_t rb;
 
-void RB_DoDrawMeshVerts( const DrawMeshVertSpan &vertSpan );
+void RB_DoDrawMeshVerts( const DrawMeshVertSpan *vertSpan );
 
 #define RB_IsAlphaBlending( blendsrc,blenddst ) \
 	( ( blendsrc ) == GLSTATE_SRCBLEND_SRC_ALPHA || ( blenddst ) == GLSTATE_DSTBLEND_SRC_ALPHA ) || \

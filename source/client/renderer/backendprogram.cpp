@@ -56,14 +56,14 @@ static shaderpass_t r_GLSLpasses[MAX_BUILTIN_GLSLPASSES];
 
 static void RB_SetShaderpassState( int state );
 
-static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, const shaderpass_t *pass, uint64_t programFeatures );
-static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, uint64_t programFeatures );
-static void RB_RenderMeshGLSL_Outline( const shaderpass_t *pass, uint64_t programFeatures );
-static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, const shaderpass_t *pass, uint64_t programFeatures );
-static void RB_RenderMeshGLSL_Celshade( const shaderpass_t *pass, uint64_t programFeatures );
-static void RB_RenderMeshGLSL_Fog( const shaderpass_t *pass, uint64_t programFeatures );
-static void RB_RenderMeshGLSL_FXAA( const shaderpass_t *pass, uint64_t programFeatures );
-static void RB_RenderMeshGLSL_YUV( const shaderpass_t *pass, uint64_t programFeatures );
+static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *, const DrawMeshVertSpan *, const shaderpass_t *, uint64_t programFeatures );
+static void RB_RenderMeshGLSL_Distortion( const FrontendToBackendShared *, const DrawMeshVertSpan *, const shaderpass_t *, uint64_t programFeatures );
+static void RB_RenderMeshGLSL_Outline( const FrontendToBackendShared *, const DrawMeshVertSpan *, const shaderpass_t *, uint64_t programFeatures );
+static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *, const DrawMeshVertSpan *, const shaderpass_t *, uint64_t programFeatures );
+static void RB_RenderMeshGLSL_Celshade( const FrontendToBackendShared *, const DrawMeshVertSpan *, const shaderpass_t *, uint64_t programFeatures );
+static void RB_RenderMeshGLSL_Fog( const FrontendToBackendShared *, const DrawMeshVertSpan *, const shaderpass_t *, uint64_t programFeatures );
+static void RB_RenderMeshGLSL_FXAA( const FrontendToBackendShared *, const DrawMeshVertSpan *, const shaderpass_t *, uint64_t programFeatures );
+static void RB_RenderMeshGLSL_YUV( const FrontendToBackendShared *, const DrawMeshVertSpan *, const shaderpass_t *, uint64_t programFeatures );
 
 int RP_GetProgramObject( int elem );
 
@@ -832,7 +832,7 @@ static void RB_UpdateFogUniforms( int program, const mfog_t *fog ) {
 						  fog->shader->fog_dist, &fogPlane, &vpnPlane, dist );
 }
 
-static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, const shaderpass_t *pass, uint64_t programFeatures ) {
+static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, const shaderpass_t *pass, uint64_t programFeatures ) {
 	int i;
 	int program;
 	vec3_t lightDir = { 0.0f, 0.0f, 0.0f };
@@ -860,7 +860,7 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 	if( ( rb.currentModelType == mod_brush && !mapConfig.deluxeMappingEnabled )
 	    /*|| ( normalmap == rsh.blankBumpTexture && !glossmap && !decalmap && !entdecalmap )*/ ) {
 		// render as plain Q3A shader, which is less computation-intensive
-		RB_RenderMeshGLSL_Q3AShader( fsh, pass, programFeatures );
+		RB_RenderMeshGLSL_Q3AShader( fsh, vertSpan, pass, programFeatures );
 		return;
 	}
 
@@ -1085,14 +1085,14 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 			}
 		}
 
-		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
+		RB_DoDrawMeshVerts( vertSpan );
 	}
 }
 
 /*
 * RB_RenderMeshGLSL_Distortion
 */
-static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, uint64_t programFeatures ) {
+static void RB_RenderMeshGLSL_Distortion( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan, const shaderpass_t *pass, uint64_t programFeatures ) {
 	int i;
 	int width = 1, height = 1;
 	int program;
@@ -1175,14 +1175,14 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, uint64_t pro
 
 		RP_UpdateTextureUniforms( program, width, height );
 
-		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
+		RB_DoDrawMeshVerts( vertSpan );
 	}
 }
 
 /*
 * RB_RenderMeshGLSL_Outline
 */
-static void RB_RenderMeshGLSL_Outline( const shaderpass_t *pass, uint64_t programFeatures ) {
+static void RB_RenderMeshGLSL_Outline( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan, const shaderpass_t *pass, uint64_t programFeatures ) {
 	int program;
 	mat4_t texMatrix;
 
@@ -1222,7 +1222,7 @@ static void RB_RenderMeshGLSL_Outline( const shaderpass_t *pass, uint64_t progra
 		RP_UpdateBonesUniforms( program, rb.bonesData.numBones, rb.bonesData.dualQuats );
 	}
 
-	RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
+	RB_DoDrawMeshVerts( vertSpan );
 
 	rb.glStateProxy->setCull( faceCull );
 }
@@ -1265,7 +1265,7 @@ uint64_t RB_TcGenToProgramFeatures( int tcgen, vec_t *tcgenVec, mat4_t texMatrix
 	return programFeatures;
 }
 
-static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, const shaderpass_t *pass, uint64_t programFeatures ) {
+static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, const shaderpass_t *pass, uint64_t programFeatures ) {
 	int state;
 	int program;
 	int rgbgen = pass->rgbgen.type;
@@ -1442,11 +1442,11 @@ static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, con
 			RP_UpdateTextureUniforms( program, rb.st.screenDepthTex->width, rb.st.screenDepthTex->height );
 		}*/
 
-		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
+		RB_DoDrawMeshVerts( vertSpan );
 	}
 }
 
-static void RB_RenderMeshGLSL_Celshade( const shaderpass_t *pass, uint64_t programFeatures ) {
+static void RB_RenderMeshGLSL_Celshade( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan, const shaderpass_t *pass, uint64_t programFeatures ) {
 	const mfog_t *fog = rb.fog;
 
 	Texture *const base = pass->images[0];
@@ -1533,14 +1533,14 @@ static void RB_RenderMeshGLSL_Celshade( const shaderpass_t *pass, uint64_t progr
 			RP_UpdateBonesUniforms( program, rb.bonesData.numBones, rb.bonesData.dualQuats );
 		}
 
-		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
+		RB_DoDrawMeshVerts( vertSpan );
 	}
 }
 
 /*
 * RB_RenderMeshGLSL_Fog
 */
-static void RB_RenderMeshGLSL_Fog( const shaderpass_t *pass, uint64_t programFeatures ) {
+static void RB_RenderMeshGLSL_Fog( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan, const shaderpass_t *pass, uint64_t programFeatures ) {
 	int program;
 	const mfog_t *fog = rb.fog;
 	mat4_t texMatrix = { 0 };
@@ -1563,14 +1563,14 @@ static void RB_RenderMeshGLSL_Fog( const shaderpass_t *pass, uint64_t programFea
 			RP_UpdateBonesUniforms( program, rb.bonesData.numBones, rb.bonesData.dualQuats );
 		}
 
-		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
+		RB_DoDrawMeshVerts( vertSpan );
 	}
 }
 
 /*
 * RB_RenderMeshGLSL_FXAA
 */
-static void RB_RenderMeshGLSL_FXAA( const shaderpass_t *pass, uint64_t programFeatures ) {
+static void RB_RenderMeshGLSL_FXAA( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan, const shaderpass_t *pass, uint64_t programFeatures ) {
 	bool fxaa3 = false;
 	int program;
 	const Texture *image = pass->images[0];
@@ -1599,14 +1599,14 @@ static void RB_RenderMeshGLSL_FXAA( const shaderpass_t *pass, uint64_t programFe
 
 		RP_UpdateTextureUniforms( program, image->width, image->height );
 
-		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
+		RB_DoDrawMeshVerts( vertSpan );
 	}
 }
 
 /*
 * RB_RenderMeshGLSL_YUV
 */
-static void RB_RenderMeshGLSL_YUV( const shaderpass_t *pass, uint64_t programFeatures ) {
+static void RB_RenderMeshGLSL_YUV( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan, const shaderpass_t *pass, uint64_t programFeatures ) {
 	int program;
 	mat4_t texMatrix = { 0 };
 
@@ -1623,14 +1623,14 @@ static void RB_RenderMeshGLSL_YUV( const shaderpass_t *pass, uint64_t programFea
 	if( RB_BindProgram( program ) ) {
 		RB_UpdateCommonUniforms( program, pass, texMatrix );
 
-		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
+		RB_DoDrawMeshVerts( vertSpan );
 	}
 }
 
 /*
 * RB_RenderMeshGLSL_ColorCorrection
 */
-static void RB_RenderMeshGLSL_ColorCorrection( const shaderpass_t *pass, uint64_t programFeatures ) {
+static void RB_RenderMeshGLSL_ColorCorrection( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan, const shaderpass_t *pass, uint64_t programFeatures ) {
 	int i;
 	int program;
 	mat4_t texMatrix;
@@ -1678,14 +1678,14 @@ static void RB_RenderMeshGLSL_ColorCorrection( const shaderpass_t *pass, uint64_
 
 		RP_UpdateColorCorrectionUniforms( program, v_hdrGamma.get(), rb.hdrExposure );
 
-		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
+		RB_DoDrawMeshVerts( vertSpan );
 	}
 }
 
 /*
 * RB_RenderMeshGLSL_KawaseBlur
 */
-static void RB_RenderMeshGLSL_KawaseBlur( const shaderpass_t *pass, uint64_t programFeatures ) {
+static void RB_RenderMeshGLSL_KawaseBlur( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, const shaderpass_t *pass, uint64_t programFeatures ) {
 	int program;
 	mat4_t texMatrix = { 0 };
 
@@ -1704,11 +1704,11 @@ static void RB_RenderMeshGLSL_KawaseBlur( const shaderpass_t *pass, uint64_t pro
 
 		RP_UpdateKawaseUniforms( program, pass->images[0]->width, pass->images[0]->height, pass->anim_numframes );
 
-		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
+		RB_DoDrawMeshVerts( vertSpan );
 	}
 }
 
-void RB_RenderMeshGLSLProgrammed( const FrontendToBackendShared *fsh, const shaderpass_t *pass, int programType ) {
+void RB_RenderMeshGLSLProgrammed( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, const shaderpass_t *pass, int programType ) {
 	uint64_t features = 0;
 
 	if( rb.greyscale || pass->flags & SHADERPASS_GREYSCALE ) {
@@ -1731,38 +1731,38 @@ void RB_RenderMeshGLSLProgrammed( const FrontendToBackendShared *fsh, const shad
 
 	switch( programType ) {
 		case GLSL_PROGRAM_TYPE_MATERIAL:
-			RB_RenderMeshGLSL_Material( fsh, pass, features );
+			RB_RenderMeshGLSL_Material( fsh, vertSpan, pass, features );
 			break;
 		case GLSL_PROGRAM_TYPE_DISTORTION:
-			RB_RenderMeshGLSL_Distortion( pass, features );
+			RB_RenderMeshGLSL_Distortion( fsh, vertSpan, pass, features );
 			break;
 		case GLSL_PROGRAM_TYPE_RGB_SHADOW:
 			break;
 		case GLSL_PROGRAM_TYPE_SHADOWMAP:
 			break;
 		case GLSL_PROGRAM_TYPE_OUTLINE:
-			RB_RenderMeshGLSL_Outline( pass, features );
+			RB_RenderMeshGLSL_Outline( fsh, vertSpan, pass, features );
 			break;
 		case GLSL_PROGRAM_TYPE_Q3A_SHADER:
-			RB_RenderMeshGLSL_Q3AShader( fsh, pass, features );
+			RB_RenderMeshGLSL_Q3AShader( fsh, vertSpan, pass, features );
 			break;
 		case GLSL_PROGRAM_TYPE_CELSHADE:
-			RB_RenderMeshGLSL_Celshade( pass, features );
+			RB_RenderMeshGLSL_Celshade( fsh, vertSpan, pass, features );
 			break;
 		case GLSL_PROGRAM_TYPE_FOG:
-			RB_RenderMeshGLSL_Fog( pass, features );
+			RB_RenderMeshGLSL_Fog( fsh, vertSpan, pass, features );
 			break;
 		case GLSL_PROGRAM_TYPE_FXAA:
-			RB_RenderMeshGLSL_FXAA( pass, features );
+			RB_RenderMeshGLSL_FXAA( fsh, vertSpan, pass, features );
 			break;
 		case GLSL_PROGRAM_TYPE_YUV:
-			RB_RenderMeshGLSL_YUV( pass, features );
+			RB_RenderMeshGLSL_YUV( fsh, vertSpan, pass, features );
 			break;
 		case GLSL_PROGRAM_TYPE_COLOR_CORRECTION:
-			RB_RenderMeshGLSL_ColorCorrection( pass, features );
+			RB_RenderMeshGLSL_ColorCorrection( fsh, vertSpan, pass, features );
 			break;
 		case GLSL_PROGRAM_TYPE_KAWASE_BLUR:
-			RB_RenderMeshGLSL_KawaseBlur( pass, features );
+			RB_RenderMeshGLSL_KawaseBlur( fsh, vertSpan, pass, features );
 			break;
 		default:
 			Com_DPrintf( S_COLOR_YELLOW "WARNING: Unknown GLSL program type %i\n", programType );
@@ -1993,16 +1993,16 @@ int RB_BindProgram( int program ) {
 	return object;
 }
 
-static void RB_RenderPass( const FrontendToBackendShared *fsh, const shaderpass_t *pass ) {
+static void RB_RenderPass( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, const shaderpass_t *pass ) {
 	// for depth texture we render light's view to, ignore passes that do not write into depth buffer
 	if( ( rb.renderFlags & RF_SHADOWMAPVIEW ) && !( pass->flags & GLSTATE_DEPTHWRITE ) ) {
 		return;
 	}
 
 	if( pass->program_type ) {
-		RB_RenderMeshGLSLProgrammed( fsh, pass, pass->program_type );
+		RB_RenderMeshGLSLProgrammed( fsh, vertSpan, pass, pass->program_type );
 	} else {
-		RB_RenderMeshGLSLProgrammed( fsh, pass, GLSL_PROGRAM_TYPE_Q3A_SHADER );
+		RB_RenderMeshGLSLProgrammed( fsh, vertSpan, pass, GLSL_PROGRAM_TYPE_Q3A_SHADER );
 	}
 
 	if( rb.dirtyUniformState ) {
@@ -2086,10 +2086,10 @@ static void RB_SetShaderpassState( int state ) {
 * is not set and there have been no uniform updates, we can simply
 * call glDrawElements with fresh vertex data
 */
-static bool RB_CleanSinglePass( void ) {
+static bool RB_CleanSinglePass( const DrawMeshVertSpan *vertSpan ) {
 	// reuse current GLSL state (same program bound, same uniform values)
 	if( !rb.dirtyUniformState && rb.donePassesTotal == 1 ) {
-		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
+		RB_DoDrawMeshVerts( vertSpan );
 		return true;
 	}
 	return false;
@@ -2115,12 +2115,12 @@ static inline const vec_t *RB_TriangleLinesColor( void ) {
 	return colorGreen;
 }
 
-void RB_DrawWireframeMesh( const FrontendToBackendShared *fsh ) {
+void RB_DrawWireframeMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan ) {
 	static shaderpass_t r_triLinesPass;
 	static vec4_t r_triLinesColor;
 	shaderpass_t *pass;
 
-	if( RB_CleanSinglePass() ) {
+	if( RB_CleanSinglePass( vertSpan ) ) {
 		return;
 	}
 
@@ -2153,18 +2153,18 @@ void RB_DrawWireframeMesh( const FrontendToBackendShared *fsh ) {
 
 	RB_SetShaderState();
 
-	RB_RenderPass( fsh, &r_triLinesPass );
+	RB_RenderPass( fsh, vertSpan, &r_triLinesPass );
 }
 
 // TODO: Show outlines in mirrors
 #define ENTITY_OUTLINE( ent ) ( ( ( ( ent )->renderfx & RF_VIEWERMODEL ) ) ? 0 : ( ent )->outlineHeight )
 
-void RB_DrawShadedMesh( const FrontendToBackendShared *fsh ) {
+void RB_DrawShadedMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan ) {
 	unsigned i;
 	bool addGLSLOutline = false;
 	shaderpass_t *pass;
 
-	if( RB_CleanSinglePass() ) {
+	if( RB_CleanSinglePass( vertSpan ) ) {
 		return;
 	}
 
@@ -2184,18 +2184,18 @@ void RB_DrawShadedMesh( const FrontendToBackendShared *fsh ) {
 			continue;
 		}
 		//Com_Printf( "Rendering shader %s\n", rb.currentShader->name.data() );
-		RB_RenderPass( fsh, pass );
+		RB_RenderPass( fsh, vertSpan, pass );
 	}
 
 	// shadow map
 	if( rb.currentShadowBits && ( rb.currentShader->sort >= SHADER_SORT_OPAQUE )
 		&& ( rb.currentShader->sort <= SHADER_SORT_ALPHATEST ) ) {
-		RB_RenderPass( fsh, &r_GLSLpasses[BUILTIN_GLSLPASS_SHADOWMAP] );
+		RB_RenderPass( fsh, vertSpan, &r_GLSLpasses[BUILTIN_GLSLPASS_SHADOWMAP] );
 	}
 
 	// outlines
 	if( addGLSLOutline ) {
-		RB_RenderPass( fsh, &r_GLSLpasses[BUILTIN_GLSLPASS_OUTLINE] );
+		RB_RenderPass( fsh, vertSpan, &r_GLSLpasses[BUILTIN_GLSLPASS_OUTLINE] );
 	}
 
 	// fog
@@ -2208,6 +2208,6 @@ void RB_DrawShadedMesh( const FrontendToBackendShared *fsh ) {
 		} else {
 			fogPass->flags |= GLSTATE_DEPTHFUNC_EQ;
 		}
-		RB_RenderPass( fsh, fogPass );
+		RB_RenderPass( fsh, vertSpan, fogPass );
 	}
 }
