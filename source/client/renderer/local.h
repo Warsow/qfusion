@@ -796,11 +796,13 @@ struct VertElemSpan {
 	unsigned numElems;
 };
 
-using DrawCallData = std::variant<VertElemSpan, MultiDrawElemSpan>;
+using DrawMeshVertSpan = std::variant<VertElemSpan, MultiDrawElemSpan>;
 
-void RB_DrawElements( const FrontendToBackendShared *fsh, int firstVert, int numVerts, int firstElem, int numElems );
+void RB_DrawMesh( const FrontendToBackendShared *fsh, int firstVert, int numVerts, int firstElem, int numElems );
+void RB_DrawMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan &vertSpan );
 
-void RB_DrawElements( const FrontendToBackendShared *fsh, const DrawCallData &drawCallData );
+void RB_DrawWireframeMesh( const FrontendToBackendShared *fsh );
+void RB_DrawShadedMesh( const FrontendToBackendShared *fsh );
 
 void RB_FlushTextureCache( void );
 

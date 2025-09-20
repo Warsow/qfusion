@@ -683,7 +683,7 @@ static uint64_t RB_InstancedArraysProgramFeatures( void ) {
 	uint64_t programFeatures = 0;
 	if( ( rb.currentVAttribs & VATTRIB_INSTANCES_BITS ) == VATTRIB_INSTANCES_BITS ) {
 		programFeatures |= GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS;
-	} else if( /*rb.drawCallData.numInstances*/ false ) {
+	} else if( /*rb.drawMeshVertSpan.numInstances*/ false ) {
 		programFeatures |= GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS;
 	}
 	return programFeatures;
@@ -1085,7 +1085,7 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 			}
 		}
 
-		RB_DrawElementsReal( rb.drawCallData );
+		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
 	}
 }
 
@@ -1175,7 +1175,7 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, uint64_t pro
 
 		RP_UpdateTextureUniforms( program, width, height );
 
-		RB_DrawElementsReal( rb.drawCallData );
+		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
 	}
 }
 
@@ -1222,7 +1222,7 @@ static void RB_RenderMeshGLSL_Outline( const shaderpass_t *pass, uint64_t progra
 		RP_UpdateBonesUniforms( program, rb.bonesData.numBones, rb.bonesData.dualQuats );
 	}
 
-	RB_DrawElementsReal( rb.drawCallData );
+	RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
 
 	rb.glStateProxy->setCull( faceCull );
 }
@@ -1442,7 +1442,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, con
 			RP_UpdateTextureUniforms( program, rb.st.screenDepthTex->width, rb.st.screenDepthTex->height );
 		}*/
 
-		RB_DrawElementsReal( rb.drawCallData );
+		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
 	}
 }
 
@@ -1533,7 +1533,7 @@ static void RB_RenderMeshGLSL_Celshade( const shaderpass_t *pass, uint64_t progr
 			RP_UpdateBonesUniforms( program, rb.bonesData.numBones, rb.bonesData.dualQuats );
 		}
 
-		RB_DrawElementsReal( rb.drawCallData );
+		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
 	}
 }
 
@@ -1563,7 +1563,7 @@ static void RB_RenderMeshGLSL_Fog( const shaderpass_t *pass, uint64_t programFea
 			RP_UpdateBonesUniforms( program, rb.bonesData.numBones, rb.bonesData.dualQuats );
 		}
 
-		RB_DrawElementsReal( rb.drawCallData );
+		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
 	}
 }
 
@@ -1599,7 +1599,7 @@ static void RB_RenderMeshGLSL_FXAA( const shaderpass_t *pass, uint64_t programFe
 
 		RP_UpdateTextureUniforms( program, image->width, image->height );
 
-		RB_DrawElementsReal( rb.drawCallData );
+		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
 	}
 }
 
@@ -1623,7 +1623,7 @@ static void RB_RenderMeshGLSL_YUV( const shaderpass_t *pass, uint64_t programFea
 	if( RB_BindProgram( program ) ) {
 		RB_UpdateCommonUniforms( program, pass, texMatrix );
 
-		RB_DrawElementsReal( rb.drawCallData );
+		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
 	}
 }
 
@@ -1678,7 +1678,7 @@ static void RB_RenderMeshGLSL_ColorCorrection( const shaderpass_t *pass, uint64_
 
 		RP_UpdateColorCorrectionUniforms( program, v_hdrGamma.get(), rb.hdrExposure );
 
-		RB_DrawElementsReal( rb.drawCallData );
+		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
 	}
 }
 
@@ -1704,7 +1704,7 @@ static void RB_RenderMeshGLSL_KawaseBlur( const shaderpass_t *pass, uint64_t pro
 
 		RP_UpdateKawaseUniforms( program, pass->images[0]->width, pass->images[0]->height, pass->anim_numframes );
 
-		RB_DrawElementsReal( rb.drawCallData );
+		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
 	}
 }
 
@@ -1929,19 +1929,6 @@ void RB_SetPortalSurface( const portalSurface_t *portalSurface ) {
 }
 
 /*
-* RB_SetInstanceData
-*
-* Internal backend function, only used by RB_DrawElementsReal to upload
-* instance data
-*/
-void RB_SetInstanceData( int numInstances, instancePoint_t *instances ) {
-	if( !rb.currentProgram ) {
-		return;
-	}
-	RP_UpdateInstancesUniforms( rb.currentProgram, numInstances, instances );
-}
-
-/*
 * RB_SetZClip
 */
 void RB_SetZClip( float zNear, float zFar ) {
@@ -2102,7 +2089,7 @@ static void RB_SetShaderpassState( int state ) {
 static bool RB_CleanSinglePass( void ) {
 	// reuse current GLSL state (same program bound, same uniform values)
 	if( !rb.dirtyUniformState && rb.donePassesTotal == 1 ) {
-		RB_DrawElementsReal( rb.drawCallData );
+		RB_DoDrawMeshVerts( rb.drawMeshVertSpan );
 		return true;
 	}
 	return false;
@@ -2128,7 +2115,7 @@ static inline const vec_t *RB_TriangleLinesColor( void ) {
 	return colorGreen;
 }
 
-void RB_DrawWireframeElements( const FrontendToBackendShared *fsh ) {
+void RB_DrawWireframeMesh( const FrontendToBackendShared *fsh ) {
 	static shaderpass_t r_triLinesPass;
 	static vec4_t r_triLinesColor;
 	shaderpass_t *pass;
@@ -2172,7 +2159,7 @@ void RB_DrawWireframeElements( const FrontendToBackendShared *fsh ) {
 // TODO: Show outlines in mirrors
 #define ENTITY_OUTLINE( ent ) ( ( ( ( ent )->renderfx & RF_VIEWERMODEL ) ) ? 0 : ( ent )->outlineHeight )
 
-void RB_DrawShadedElements( const FrontendToBackendShared *fsh ) {
+void RB_DrawShadedMesh( const FrontendToBackendShared *fsh ) {
 	unsigned i;
 	bool addGLSLOutline = false;
 	shaderpass_t *pass;

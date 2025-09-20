@@ -98,7 +98,7 @@ typedef struct r_backend_s {
 	rbDynamicDraw_t dynamicDraws[MAX_DYNAMIC_DRAWS];
 	int numDynamicDraws;
 
-	DrawCallData drawCallData;
+	DrawMeshVertSpan drawMeshVertSpan;
 
 	vattribmask_t currentVAttribs;
 
@@ -143,7 +143,7 @@ typedef struct r_backend_s {
 
 extern rbackend_t rb;
 
-void RB_DrawElementsReal( const DrawCallData &drawCallData );
+void RB_DoDrawMeshVerts( const DrawMeshVertSpan &vertSpan );
 
 #define RB_IsAlphaBlending( blendsrc,blenddst ) \
 	( ( blendsrc ) == GLSTATE_SRCBLEND_SRC_ALPHA || ( blenddst ) == GLSTATE_DSTBLEND_SRC_ALPHA ) || \
@@ -152,12 +152,8 @@ void RB_DrawElementsReal( const DrawCallData &drawCallData );
 // r_backend_program.c
 void RB_InitShading( void );
 
-void RB_DrawWireframeElements( const FrontendToBackendShared *fsh );
-void RB_DrawShadedElements( const FrontendToBackendShared *fsh );
-
 int RB_RegisterProgram( int type, const char *name, const DeformSig &deformSig,
 						const deformv_t *deforms, int numDeforms, uint64_t features );
 int RB_BindProgram( int program );
-void RB_SetInstanceData( int numInstances, instancePoint_t *instances );
 
 #endif // R_BACKEND_LOCAL_H

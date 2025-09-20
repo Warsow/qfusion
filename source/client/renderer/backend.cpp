@@ -487,7 +487,7 @@ void RB_FlushDynamicMeshes() {
 		}
 
 		const auto &drawElements = draw->drawElements;
-		RB_DrawElements( nullptr, drawElements.firstVert, drawElements.numVerts, drawElements.firstElem, drawElements.numElems );
+		RB_DrawMesh( nullptr, drawElements.firstVert, drawElements.numVerts, drawElements.firstElem, drawElements.numElems );
 	}
 
 	rb.numDynamicDraws = 0;
@@ -502,11 +502,7 @@ void RB_FlushDynamicMeshes() {
 	}
 }
 
-static void RB_EnableVertexAttribs( void ) {
-	rb.glStateProxy->enableVertexAttribs( rb.currentVAttribs, rb.currentVBO );
-}
-
-void RB_DrawElementsReal( const DrawCallData &drawCallData ) {
+void RB_DoDrawMeshVerts( const DrawMeshVertSpan &vertSpan ) {
 	// TODO: What's the purpose of v_drawElements
 	if( !( v_drawElements.get() || rb.currentEntity == &rb.nullEnt ) ) [[unlikely]] {
 		return;
@@ -514,9 +510,9 @@ void RB_DrawElementsReal( const DrawCallData &drawCallData ) {
 
 	rb.glStateProxy->applyScissor();
 
-	if( const auto *mdSpan = std::get_if<MultiDrawElemSpan>( &drawCallData ) ) {
+	if( const auto *mdSpan = std::get_if<MultiDrawElemSpan>( &vertSpan ) ) {
 		qglMultiDrawElements( rb.primitive, mdSpan->counts, GL_UNSIGNED_SHORT, mdSpan->indices, mdSpan->numDraws );
-	} else if( const auto *vertElemSpan = std::get_if<VertElemSpan>( &drawCallData ) ) {
+	} else if( const auto *vertElemSpan = std::get_if<VertElemSpan>( &vertSpan ) ) {
 		const unsigned numVerts  = vertElemSpan->numVerts;
 		const unsigned numElems  = vertElemSpan->numElems;
 		const unsigned firstVert = vertElemSpan->firstVert;
@@ -529,29 +525,25 @@ void RB_DrawElementsReal( const DrawCallData &drawCallData ) {
 	}
 }
 
-static void RB_DrawElements_( const FrontendToBackendShared *fsh ) {
-	assert( rb.currentShader );
-
-	RB_EnableVertexAttribs();
-
-	if( rb.wireframe ) {
-		RB_DrawWireframeElements( fsh );
-	} else {
-		RB_DrawShadedElements( fsh );
-	}
+void RB_DrawMesh( const FrontendToBackendShared *fsh, int firstVert, int numVerts, int firstElem, int numElems ) {
+	RB_DrawMesh( fsh, VertElemSpan { .firstVert = (unsigned)firstVert, .numVerts = (unsigned)numVerts,
+									 .firstElem = (unsigned)firstElem, .numElems = (unsigned)numElems } );
 }
 
-void RB_DrawElements( const FrontendToBackendShared *fsh, int firstVert, int numVerts, int firstElem, int numElems ) {
-	RB_DrawElements( fsh, VertElemSpan { .firstVert = (unsigned)firstVert, .numVerts = (unsigned)numVerts,
-										 .firstElem = (unsigned)firstElem, .numElems = (unsigned)numElems } );
-}
-
-void RB_DrawElements( const FrontendToBackendShared *fsh, const DrawCallData &drawCallData ) {
+void RB_DrawMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan &drawMeshVertSpan ) {
 	rb.currentVAttribs &= ~VATTRIB_INSTANCES_BITS;
 
-	rb.drawCallData = drawCallData;
+	rb.drawMeshVertSpan = drawMeshVertSpan;
 
-	RB_DrawElements_( fsh );
+	assert( rb.currentShader );
+
+	rb.glStateProxy->enableVertexAttribs( rb.currentVAttribs, rb.currentVBO );
+
+	if( rb.wireframe ) {
+		RB_DrawWireframeMesh( fsh );
+	} else {
+		RB_DrawShadedMesh( fsh );
+	}
 }
 
 void RB_SetCamera( const vec3_t cameraOrigin, const mat3_t cameraAxis ) {
@@ -585,7 +577,7 @@ void R_SubmitAliasSurfToBackend( const FrontendToBackendShared *fsh, const entit
 	const maliasmesh_t *aliasmesh = drawSurf->mesh;
 
 	RB_BindVBO( aliasmesh->vbo->index, GL_TRIANGLES );
-	RB_DrawElements( fsh, 0, aliasmesh->numverts, 0, aliasmesh->numtris * 3 );
+	RB_DrawMesh( fsh, 0, aliasmesh->numverts, 0, aliasmesh->numtris * 3 );
 }
 
 void R_SubmitSkeletalSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceSkeletal_t *drawSurf ) {
@@ -608,7 +600,7 @@ void R_SubmitSkeletalSurfToBackend( const FrontendToBackendShared *fsh, const en
 		// fastpath: render static frame 0 as is
 		if( skmesh->vbo ) {
 			RB_BindVBO( skmesh->vbo->index, GL_TRIANGLES );
-			RB_DrawElements( fsh, 0, skmesh->numverts, 0, skmesh->numtris * 3 );
+			RB_DrawMesh( fsh, 0, skmesh->numverts, 0, skmesh->numtris * 3 );
 			return;
 		}
 	}
@@ -617,7 +609,7 @@ void R_SubmitSkeletalSurfToBackend( const FrontendToBackendShared *fsh, const en
 		// another fastpath: transform the initial pose on the GPU
 		RB_BindVBO( skmesh->vbo->index, GL_TRIANGLES );
 		RB_SetBonesData( skmodel->numbones, bonePoseRelativeDQ, skmesh->maxWeights );
-		RB_DrawElements( fsh, 0, skmesh->numverts, 0, skmesh->numtris * 3 );
+		RB_DrawMesh( fsh, 0, skmesh->numverts, 0, skmesh->numtris * 3 );
 		return;
 	}
 }
@@ -631,14 +623,14 @@ void R_SubmitBSPSurfToBackend( const FrontendToBackendShared *fsh, const entity_
 	RB_SetDlightBits( drawSurf->dlightBits );
 	RB_SetLightstyle( mergedBspSurf->superLightStyle );
 
-	RB_DrawElements( fsh, drawSurf->mdSpan );
+	RB_DrawMesh( fsh, drawSurf->mdSpan );
 }
 
 void R_SubmitNullSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const void * ) {
 	assert( rsh.nullVBO != NULL );
 
 	RB_BindVBO( rsh.nullVBO->index, GL_LINES );
-	RB_DrawElements( fsh, 0, 6, 0, 6 );
+	RB_DrawMesh( fsh, 0, 6, 0, 6 );
 }
 
 void R_SubmitDynamicMeshToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader,
@@ -654,7 +646,7 @@ void R_SubmitDynamicMeshToBackend( const FrontendToBackendShared *fsh, const ent
 			.numElems  = drawSurface->actualNumIndices,
 		};
 
-		RB_DrawElements( fsh, vertElemSpan );
+		RB_DrawMesh( fsh, vertElemSpan );
 	}
 }
 
@@ -666,7 +658,7 @@ void R_SubmitBatchedSurfsToBackend( const FrontendToBackendShared *fsh, const en
 	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
 		RB_BindShader( e, overrideParams, paramsTable, shader, fog );
 		RB_BindVBO( RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH ), GL_TRIANGLES );
-		RB_DrawElements( fsh, vertElemSpan );
+		RB_DrawMesh( fsh, vertElemSpan );
 	}
 }
 
