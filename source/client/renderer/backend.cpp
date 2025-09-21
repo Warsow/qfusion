@@ -38,7 +38,7 @@ static void RB_RegisterStreamVBOs();
 void RB_Init() {
 	memset( &rb, 0, sizeof( rb ) );
 
-	rb.glStateProxy = new GLStateProxy( glConfig.width, glConfig.height, glConfig.stencilBits );
+	rb.glState = new GLStateProxy( glConfig.width, glConfig.height, glConfig.stencilBits );
 
 	// initialize shading
 	RB_InitShading();
@@ -58,8 +58,8 @@ void RB_Shutdown() {
 		Q_free( fru.iboData );
 		fru.iboData = nullptr;
 	}
-	delete rb.glStateProxy;
-	rb.glStateProxy = nullptr;
+	delete rb.glState;
+	rb.glState = nullptr;
 }
 
 void RB_BeginRegistration() {
@@ -67,7 +67,7 @@ void RB_BeginRegistration() {
 	RB_BindVBO( 0 );
 
 	// unbind all texture targets on all TMUs
-	rb.glStateProxy->unbindAllTextures();
+	rb.glState->unbindAllTextures();
 }
 
 void RB_EndRegistration() {
@@ -75,15 +75,15 @@ void RB_EndRegistration() {
 }
 
 void RB_SetTime( int64_t time ) {
-	rb.time = time;
-	rb.nullEnt.shaderTime = Sys_Milliseconds();
+	rb.globalState.time = time;
+	rb.globalState.nullEnt.shaderTime = Sys_Milliseconds();
 }
 
 void RB_BeginFrame() {
-	Vector4Set( rb.nullEnt.shaderRGBA, 1, 1, 1, 1 );
-	rb.nullEnt.scale = 1;
-	VectorClear( rb.nullEnt.origin );
-	Matrix3_Identity( rb.nullEnt.axis );
+	Vector4Set( rb.globalState.nullEnt.shaderRGBA, 1, 1, 1, 1 );
+	rb.globalState.nullEnt.scale = 1;
+	VectorClear( rb.globalState.nullEnt.origin );
+	Matrix3_Identity( rb.globalState.nullEnt.axis );
 
 	// start fresh each frame
 	RB_SetShaderStateMask( ~0, 0 );
@@ -95,60 +95,60 @@ void RB_EndFrame() {
 }
 
 void RB_FlushTextureCache( void ) {
-	if( rb.glStateProxy ) {
-		rb.glStateProxy->flushTextureCache();
+	if( rb.glState ) {
+		rb.glState->flushTextureCache();
 	}
 }
 
 void RB_DepthRange( float depthmin, float depthmax ) {
-	rb.glStateProxy->setDepthRange( depthmin, depthmax );
+	rb.glState->setDepthRange( depthmin, depthmax );
 }
 
 void RB_GetDepthRange( float* depthmin, float *depthmax ) {
-	rb.glStateProxy->getDepthRange( depthmin, depthmax );
+	rb.glState->getDepthRange( depthmin, depthmax );
 }
 
 void RB_SaveDepthRange() {
-	rb.glStateProxy->saveDepthRange();
+	rb.glState->saveDepthRange();
 }
 
 void RB_RestoreDepthRange() {
-	rb.glStateProxy->restoreDepthRange();
+	rb.glState->restoreDepthRange();
 }
 
 void RB_LoadCameraMatrix( const mat4_t m ) {
-	Matrix4_Copy( m, rb.cameraMatrix );
+	Matrix4_Copy( m, rb.globalState.cameraMatrix );
 }
 
 void RB_LoadObjectMatrix( const mat4_t m ) {
-	Matrix4_Copy( m, rb.objectMatrix );
-	Matrix4_MultiplyFast( rb.cameraMatrix, m, rb.modelviewMatrix );
-	Matrix4_Multiply( rb.projectionMatrix, rb.modelviewMatrix, rb.modelviewProjectionMatrix );
+	Matrix4_Copy( m, rb.globalState.objectMatrix );
+	Matrix4_MultiplyFast( rb.globalState.cameraMatrix, m, rb.globalState.modelviewMatrix );
+	Matrix4_Multiply( rb.globalState.projectionMatrix, rb.globalState.modelviewMatrix, rb.globalState.modelviewProjectionMatrix );
 }
 
 void RB_LoadProjectionMatrix( const mat4_t m ) {
-	Matrix4_Copy( m, rb.projectionMatrix );
-	Matrix4_Multiply( m, rb.modelviewMatrix, rb.modelviewProjectionMatrix );
+	Matrix4_Copy( m, rb.globalState.projectionMatrix );
+	Matrix4_Multiply( m, rb.globalState.modelviewMatrix, rb.globalState.modelviewProjectionMatrix );
 }
 
 void RB_FlipFrontFace( void ) {
-	rb.glStateProxy->flipFrontFace();
+	rb.glState->flipFrontFace();
 }
 
 void RB_Scissor( int x, int y, int w, int h ) {
-	rb.glStateProxy->setScissor( x, y, w, h );
+	rb.glState->setScissor( x, y, w, h );
 }
 
 void RB_GetScissor( int *x, int *y, int *w, int *h ) {
-	rb.glStateProxy->getScissor( x, y, w, h );
+	rb.glState->getScissor( x, y, w, h );
 }
 
 void RB_Viewport( int x, int y, int w, int h ) {
-	rb.glStateProxy->setViewport( x, y, w, h );
+	rb.glState->setViewport( x, y, w, h );
 }
 
 void RB_Clear( int bits, float r, float g, float b, float a ) {
-	unsigned state = rb.glStateProxy->getState();
+	unsigned state = rb.glState->getState();
 
 	if( bits & GL_DEPTH_BUFFER_BIT ) {
 		state |= GLSTATE_DEPTHWRITE;
@@ -163,18 +163,18 @@ void RB_Clear( int bits, float r, float g, float b, float a ) {
 		qglClearColor( r, g, b, a );
 	}
 
-	rb.glStateProxy->setState( state );
+	rb.glState->setState( state );
 
-	rb.glStateProxy->applyScissor();
+	rb.glState->applyScissor();
 
 	qglClear( bits );
 
-	rb.glStateProxy->setDepthRange( 0.0f, 1.0f );
+	rb.glState->setDepthRange( 0.0f, 1.0f );
 }
 
 void RB_BindFrameBufferObject( RenderTargetComponents *components ) {
 	// TODO: Resolve object lifetime problems/initialization order so we don't have to call it like this...
-	GLStateProxy::bindFramebufferObject( rb.glStateProxy, components );
+	GLStateProxy::bindFramebufferObject( rb.glState, components );
 }
 
 /*
@@ -231,11 +231,11 @@ mesh_vbo_s *RB_BindVBO( int id ) {
 	}
 
 	if( vbo ) {
-		rb.glStateProxy->bindVertexBuffer( vbo->vertexId );
-		rb.glStateProxy->bindIndexBuffer( vbo->elemId );
+		rb.glState->bindVertexBuffer( vbo->vertexId );
+		rb.glState->bindIndexBuffer( vbo->elemId );
 	} else {
-		rb.glStateProxy->bindVertexBuffer( 0 );
-		rb.glStateProxy->bindIndexBuffer( 0 );
+		rb.glState->bindVertexBuffer( 0 );
+		rb.glState->bindIndexBuffer( 0 );
 	}
 
 	return vbo;
@@ -464,7 +464,7 @@ void RB_FlushDynamicMeshes() {
 	RB_GetScissor( &sx, &sy, &sw, &sh );
 
 	mat4_t m;
-	Matrix4_Copy( rb.objectMatrix, m );
+	Matrix4_Copy( rb.globalState.objectMatrix, m );
 	const float transx = m[12];
 	const float transy = m[13];
 
@@ -501,11 +501,11 @@ void RB_FlushDynamicMeshes() {
 
 void RB_DoDrawMeshVerts( const DrawMeshVertSpan *vertSpan, int primitive ) {
 	// TODO: What's the purpose of v_drawElements
-	if( !( v_drawElements.get() || rb.currentEntity == &rb.nullEnt ) ) [[unlikely]] {
+	if( !( v_drawElements.get() || rb.materialState.currentEntity == &rb.globalState.nullEnt ) ) [[unlikely]] {
 		return;
 	}
 
-	rb.glStateProxy->applyScissor();
+	rb.glState->applyScissor();
 
 	if( const auto *mdSpan = std::get_if<MultiDrawElemSpan>( vertSpan ) ) {
 		qglMultiDrawElements( primitive, mdSpan->counts, GL_UNSIGNED_SHORT, mdSpan->indices, mdSpan->numDraws );
@@ -525,13 +525,13 @@ void RB_DoDrawMeshVerts( const DrawMeshVertSpan *vertSpan, int primitive ) {
 void RB_DrawMesh( const FrontendToBackendShared *fsh, int vboId, const DrawMeshVertSpan *drawMeshVertSpan, int primitive ) {
 	const mesh_vbo_s *vbo = RB_BindVBO( vboId );
 
-	rb.currentVAttribs &= ~VATTRIB_INSTANCES_BITS;
+	rb.drawState.currentVAttribs &= ~VATTRIB_INSTANCES_BITS;
 
-	assert( rb.currentShader );
+	assert( rb.materialState.currentShader );
 
-	rb.glStateProxy->enableVertexAttribs( rb.currentVAttribs, vbo );
+	rb.glState->enableVertexAttribs( rb.drawState.currentVAttribs, vbo );
 
-	if( rb.wireframe ) {
+	if( rb.globalState.wireframe ) {
 		RB_DrawWireframeMesh( fsh, drawMeshVertSpan, primitive );
 	} else {
 		RB_DrawShadedMesh( fsh, drawMeshVertSpan, primitive );
@@ -539,19 +539,19 @@ void RB_DrawMesh( const FrontendToBackendShared *fsh, int vboId, const DrawMeshV
 }
 
 void RB_SetCamera( const vec3_t cameraOrigin, const mat3_t cameraAxis ) {
-	VectorCopy( cameraOrigin, rb.cameraOrigin );
-	Matrix3_Copy( cameraAxis, rb.cameraAxis );
+	VectorCopy( cameraOrigin, rb.globalState.cameraOrigin );
+	Matrix3_Copy( cameraAxis, rb.globalState.cameraAxis );
 }
 
 void RB_SetRenderFlags( int flags ) {
-	rb.renderFlags = flags;
+	rb.globalState.renderFlags = flags;
 }
 
 bool RB_EnableWireframe( bool enable ) {
-	const bool oldVal = rb.wireframe;
+	const bool oldVal = rb.globalState.wireframe;
 
-	if( rb.wireframe != enable ) {
-		rb.wireframe = enable;
+	if( rb.globalState.wireframe != enable ) {
+		rb.globalState.wireframe = enable;
 
 		if( enable ) {
 			RB_SetShaderStateMask( 0, GLSTATE_NO_DEPTH_TEST );

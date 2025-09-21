@@ -55,35 +55,9 @@ typedef struct {
 class GLStateProxy;
 
 typedef struct r_backend_s {
-	GLStateProxy *glStateProxy;
-
-	int64_t time;
-
-	mat4_t cameraMatrix;
-	mat4_t objectMatrix;
-	mat4_t modelviewMatrix;
-	mat4_t projectionMatrix;
-	mat4_t modelviewProjectionMatrix;
-	float zNear, zFar;
-
-	int renderFlags;
-
-	vec3_t cameraOrigin;
-	mat3_t cameraAxis;
-
-	const entity_t *currentEntity;
-	modtype_t currentModelType;
-	rbBonesData_t bonesData;
-	const portalSurface_t *currentPortalSurface;
-
-	// glUseProgram cache
-	int currentProgram;
-	int currentProgramObject;
-
-	// RP_RegisterProgram cache
-	int currentRegProgram;
-	int currentRegProgramType;
-	uint64_t currentRegProgramFeatures;
+	rbDynamicStream_t dynamicStreams[RB_VBO_NUM_STREAMS];
+	rbDynamicDraw_t dynamicDraws[MAX_DYNAMIC_DRAWS];
+	int numDynamicDraws;
 
 	struct {
 		unsigned vertexDataSize;
@@ -93,45 +67,84 @@ typedef struct r_backend_s {
 		void *iboData;
 	} frameUploads[2];
 
-	rbDynamicStream_t dynamicStreams[RB_VBO_NUM_STREAMS];
-	rbDynamicDraw_t dynamicDraws[MAX_DYNAMIC_DRAWS];
-	int numDynamicDraws;
+	// Either persistent during the entire frame or changes much less often than RB_BindShader() calls
+	// TODO: Should it be split into truly-persistent and changing states?
+	struct {
+		entity_t nullEnt;
+		int64_t time;
 
-	vattribmask_t currentVAttribs;
+		mat4_t cameraMatrix;
+		mat4_t objectMatrix;
+		mat4_t modelviewMatrix;
+		mat4_t projectionMatrix;
+		mat4_t modelviewProjectionMatrix;
+		float zNear, zFar;
 
-	unsigned int currentDlightBits;
-	unsigned int currentShadowBits;
+		int renderFlags;
 
-	// shader state
-	const shader_t *currentShader;
-	double currentShaderTime;
-	float currentShaderFrac;
-	int currentShaderState;
-	int shaderStateORmask, shaderStateANDmask;
-	bool dirtyUniformState;
-	bool doneDepthPass;
-	int donePassesTotal;
+		vec3_t cameraOrigin;
+		mat3_t cameraAxis;
 
-	bool wireframe;
+		float minLight;
+		float hdrExposure;
+		bool noWorldLight;
 
-	const superLightStyle_t *superLightStyle;
+		// TODO: Should it be a tracked state? We don't really perform frequent switching to/from wireframe
+		bool wireframe;
 
-	uint8_t entityColor[4];
-	uint8_t entityOutlineColor[4];
-	entity_t nullEnt;
+		int shaderStateORmask;
+		int shaderStateANDmask;
+	} globalState;
 
-	const mfog_t *fog, *texFog, *colorFog;
+	// Gets modified only by RB_BindShader() call
+	struct {
+		const shader_t *currentShader;
+		double currentShaderTime;
+		float currentShaderFrac;
 
-	bool greyscale;
-	bool alphaHack;
-	bool noDepthTest;
-	bool noColorWrite;
-	bool depthEqual;
-	float hackedAlpha;
+		const entity_t *currentEntity;
+		modtype_t currentModelType;
+		const portalSurface_t *currentPortalSurface;
 
-	float minLight;
-	float hdrExposure;
-	bool noWorldLight;
+		uint8_t entityColor[4];
+		uint8_t entityOutlineColor[4];
+
+		const mfog_t *fog, *texFog, *colorFog;
+
+		bool greyscale;
+		bool alphaHack;
+		bool noDepthTest;
+		bool noColorWrite;
+		bool depthEqual;
+		float hackedAlpha;
+	} materialState;
+
+	// Gets modified by RB_BindShader() and some consequent calls, including drawing passes
+	struct {
+		vattribmask_t currentVAttribs;
+		unsigned currentDlightBits;
+		unsigned currentShadowBits;
+		rbBonesData_t bonesData;
+		const superLightStyle_t *superLightStyle;
+		int currentShaderState;
+		bool dirtyUniformState;
+		bool doneDepthPass;
+		int donePassesTotal;
+	} drawState;
+
+	struct {
+		// TODO: Move to GLStateProxy?
+		// glUseProgram cache
+		int currentProgram;
+		int currentProgramObject;
+
+		// RP_RegisterProgram cache
+		int currentRegProgram;
+		int currentRegProgramType;
+		uint64_t currentRegProgramFeatures;
+	} programState;
+
+	GLStateProxy *glState;
 } rbackend_t;
 
 extern rbackend_t rb;
