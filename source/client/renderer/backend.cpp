@@ -565,6 +565,189 @@ bool RB_EnableWireframe( bool enable ) {
 	return oldVal;
 }
 
+static void RB_UpdateVertexAttribs( void ) {
+	vattribmask_t vattribs = rb.materialState.currentShader->vattribs;
+	if( rb.drawState.superLightStyle ) {
+		vattribs |= rb.drawState.superLightStyle->vattribs;
+	}
+	if( rb.drawState.bonesData.numBones ) {
+		vattribs |= VATTRIB_BONES_BITS;
+	}
+	if( rb.materialState.currentEntity->outlineHeight != 0.0f ) {
+		vattribs |= VATTRIB_NORMAL_BIT;
+	}
+	if( DRAWFLAT() ) {
+		vattribs |= VATTRIB_NORMAL_BIT;
+	}
+	if( rb.drawState.currentShadowBits && ( rb.materialState.currentModelType == mod_brush ) ) {
+		vattribs |= VATTRIB_NORMAL_BIT;
+	}
+	rb.drawState.currentVAttribs = vattribs;
+}
+
+void RB_BindShader( const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable,
+					const shader_t *shader, const mfog_t *fog, const portalSurface_s *portalSurface ) {
+	rb.materialState.currentShader = shader;
+	rb.materialState.fog = fog;
+	rb.materialState.texFog = rb.materialState.colorFog = NULL;
+
+	rb.drawState.doneDepthPass = false;
+	rb.drawState.dirtyUniformState = true;
+
+	rb.materialState.currentEntity = e ? e : &rb.globalState.nullEnt;
+	rb.materialState.currentModelType = rb.materialState.currentEntity->rtype == RT_MODEL &&
+										rb.materialState.currentEntity->model ? rb.materialState.currentEntity->model->type : mod_bad;
+
+	rb.drawState.currentDlightBits = 0;
+	rb.drawState.currentShadowBits = 0;
+	rb.drawState.superLightStyle = nullptr;
+
+	rb.drawState.bonesData.numBones = 0;
+	rb.drawState.bonesData.maxWeights = 0;
+
+	rb.materialState.currentPortalSurface = portalSurface;
+
+	if( !e ) {
+		if( const ShaderParams::Material *materialParams = ShaderParams::getMaterialParams( overrideParams, paramsTable ) ) {
+			rb.materialState.currentShaderTime = 1e-3 * (double)materialParams->shaderTime;
+			rb.materialState.currentShaderFrac = materialParams->shaderFrac;
+		} else {
+			rb.materialState.currentShaderTime = 1e-3 * (double)rb.globalState.nullEnt.shaderTime;
+			rb.materialState.currentShaderFrac = 0.0f;
+		}
+		rb.materialState.alphaHack = false;
+		rb.materialState.greyscale = false;
+		rb.materialState.noDepthTest = false;
+		rb.materialState.noColorWrite =  false;
+		rb.materialState.depthEqual = false;
+	} else {
+		Vector4Copy( rb.materialState.currentEntity->shaderRGBA, rb.materialState.entityColor );
+		Vector4Copy( rb.materialState.currentEntity->outlineColor, rb.materialState.entityOutlineColor );
+		int64_t givenShaderTime;
+		if( const ShaderParams::Material *materialParams = ShaderParams::getMaterialParams( overrideParams, paramsTable ) ) {
+			givenShaderTime = materialParams->shaderTime;
+			rb.materialState.currentShaderFrac = materialParams->shaderFrac;
+		} else {
+			givenShaderTime = rb.materialState.currentEntity->shaderTime;
+			rb.materialState.currentShaderFrac = 0.0f;
+		}
+		if( givenShaderTime > rb.globalState.time ) {
+			rb.materialState.currentShaderTime = 0;
+		} else {
+			rb.materialState.currentShaderTime = 1e-3 * (double)( rb.globalState.time - givenShaderTime );
+		}
+		rb.materialState.alphaHack = e->renderfx & RF_ALPHAHACK ? true : false;
+		rb.materialState.hackedAlpha = (float)e->shaderRGBA[3] / 255.0f;
+		rb.materialState.greyscale = e->renderfx & RF_GREYSCALE ? true : false;
+		rb.materialState.noDepthTest = e->renderfx & RF_NODEPTHTEST && e->rtype == RT_SPRITE ? true : false;
+		rb.materialState.noColorWrite = e->renderfx & RF_NOCOLORWRITE ? true : false;
+		rb.materialState.depthEqual = rb.materialState.alphaHack && ( e->renderfx & RF_WEAPONMODEL );
+	}
+
+	if( fog && fog->shader && !rb.materialState.noColorWrite ) {
+		// should we fog the geometry with alpha texture or scale colors?
+		if( !rb.materialState.alphaHack && Shader_UseTextureFog( shader ) ) {
+			rb.materialState.texFog = fog;
+		} else {
+			// use scaling of colors
+			rb.materialState.colorFog = fog;
+		}
+	}
+
+	RB_UpdateVertexAttribs();
+}
+
+void RB_SetLightstyle( const superLightStyle_t *lightStyle ) {
+	assert( rb.materialState.currentShader != NULL );
+	rb.drawState.superLightStyle = lightStyle;
+	rb.drawState.dirtyUniformState = true;
+
+	RB_UpdateVertexAttribs();
+}
+
+void RB_SetDlightBits( unsigned int dlightBits ) {
+	assert( rb.materialState.currentShader != NULL );
+	rb.drawState.currentDlightBits = dlightBits;
+	rb.drawState.dirtyUniformState = true;
+}
+
+void RB_SetBonesData( int numBones, dualquat_t *dualQuats, int maxWeights ) {
+	assert( rb.materialState.currentShader != NULL );
+
+	if( numBones > MAX_GLSL_UNIFORM_BONES ) {
+		numBones = MAX_GLSL_UNIFORM_BONES;
+	}
+	if( maxWeights > 4 ) {
+		maxWeights = 4;
+	}
+
+	rb.drawState.bonesData.numBones = numBones;
+	memcpy( rb.drawState.bonesData.dualQuats, dualQuats, numBones * sizeof( *dualQuats ) );
+	rb.drawState.bonesData.maxWeights = maxWeights;
+
+	rb.drawState.dirtyUniformState = true;
+
+	RB_UpdateVertexAttribs();
+}
+
+void RB_SetZClip( float zNear, float zFar ) {
+	rb.globalState.zNear = zNear;
+	rb.globalState.zFar = zFar;
+}
+
+void RB_SetLightParams( float minLight, bool noWorldLight, float hdrExposure ) {
+	rb.globalState.minLight = minLight;
+	rb.globalState.noWorldLight = noWorldLight;
+	rb.globalState.hdrExposure = hdrExposure;
+}
+
+void RB_SetShaderStateMask( unsigned ANDmask, unsigned ORmask ) {
+	rb.globalState.shaderStateANDmask = ANDmask;
+	rb.globalState.shaderStateORmask  = ORmask;
+}
+
+int RB_RegisterProgram( int type, const shader_s *materialToGetDeforms, uint64_t features ) {
+	const DeformSig &deformSig = materialToGetDeforms->deformSig;
+	const deformv_t *deforms   = materialToGetDeforms->deforms;
+	const unsigned numDeforms  = materialToGetDeforms->numdeforms;
+	const bool noDeforms       = !numDeforms;
+
+	if( rb.programState.currentRegProgramType == type && noDeforms && rb.programState.currentRegProgramFeatures == features ) {
+		return rb.programState.currentRegProgram;
+	}
+
+	const int program = RP_RegisterProgram( type, nullptr, deformSig, deforms, numDeforms, features );
+	if( noDeforms ) {
+		rb.programState.currentRegProgram = program;
+		rb.programState.currentRegProgramType = type;
+		rb.programState.currentRegProgramFeatures = features;
+	}
+
+	return program;
+}
+
+int RB_BindProgram( int program ) {
+	if( program == rb.programState.currentProgram ) {
+		return rb.programState.currentProgramObject;
+	}
+
+	rb.programState.currentProgram = program;
+	if( !program ) {
+		rb.programState.currentProgramObject = 0;
+		qglUseProgram( 0 );
+		return 0;
+	}
+
+	const int object = RP_GetProgramObject( program );
+	if( object ) {
+		qglUseProgram( object );
+	}
+
+	rb.programState.currentProgramObject = object;
+	rb.drawState.dirtyUniformState = true;
+	return object;
+}
+
 void R_SubmitAliasSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceAlias_t *drawSurf ) {
 	const maliasmesh_t *aliasmesh = drawSurf->mesh;
 

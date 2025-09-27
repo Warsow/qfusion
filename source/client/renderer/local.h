@@ -813,7 +813,7 @@ void RB_SetDlightBits( unsigned int dlightBits );
 void RB_SetBonesData( int numBones, dualquat_t *dualQuats, int maxWeights );
 void RB_SetRenderFlags( int flags );
 void RB_SetLightParams( float minLight, bool noWorldLight, float hdrExposure = 1.0f );
-void RB_SetShaderStateMask( int ANDmask, int ORmask );
+void RB_SetShaderStateMask( unsigned ANDmask, unsigned ORmask );
 void RB_SetCamera( const vec3_t cameraOrigin, const mat3_t cameraAxis );
 bool RB_EnableWireframe( bool enable );
 

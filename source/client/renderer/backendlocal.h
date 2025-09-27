@@ -92,8 +92,8 @@ typedef struct r_backend_s {
 		// TODO: Should it be a tracked state? We don't really perform frequent switching to/from wireframe
 		bool wireframe;
 
-		int shaderStateORmask;
-		int shaderStateANDmask;
+		unsigned shaderStateORmask;
+		unsigned shaderStateANDmask;
 	} globalState;
 
 	// Gets modified only by RB_BindShader() call
@@ -126,7 +126,7 @@ typedef struct r_backend_s {
 		unsigned currentShadowBits;
 		rbBonesData_t bonesData;
 		const superLightStyle_t *superLightStyle;
-		int currentShaderState;
+		unsigned currentShaderState;
 		bool dirtyUniformState;
 		bool doneDepthPass;
 		int donePassesTotal;
@@ -151,15 +151,15 @@ extern rbackend_t rb;
 
 void RB_DoDrawMeshVerts( const DrawMeshVertSpan *vertSpan, int primitive );
 
-#define RB_IsAlphaBlending( blendsrc,blenddst ) \
-	( ( blendsrc ) == GLSTATE_SRCBLEND_SRC_ALPHA || ( blenddst ) == GLSTATE_DSTBLEND_SRC_ALPHA ) || \
-	( ( blendsrc ) == GLSTATE_SRCBLEND_ONE_MINUS_SRC_ALPHA || ( blenddst ) == GLSTATE_DSTBLEND_ONE_MINUS_SRC_ALPHA )
+#define DRAWFLAT() \
+	( ( rb.materialState.currentModelType == mod_brush ) && \
+	( rb.globalState.renderFlags & ( RF_DRAWFLAT | RF_DRAWBRIGHT ) ) && \
+	!( rb.materialState.currentShader->flags & SHADER_NODRAWFLAT ) )
 
 // r_backend_program.c
 void RB_InitShading( void );
 
-int RB_RegisterProgram( int type, const char *name, const DeformSig &deformSig,
-						const deformv_t *deforms, int numDeforms, uint64_t features );
+int RB_RegisterProgram( int type, const shader_s *materialToGetDeforms, uint64_t features );
 int RB_BindProgram( int program );
 
 #endif // R_BACKEND_LOCAL_H

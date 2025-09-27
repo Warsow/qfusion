@@ -297,4 +297,54 @@ void RP_Shutdown();
 int RP_RegisterProgram( int type, const char *name, const DeformSig &deformSig,
 						const deformv_t *deforms, int numDeforms, uint64_t features );
 
+int RP_GetProgramObject( int elem );
+
+void RP_UpdateShaderUniforms( int elem,
+							  float shaderTime,
+							  const vec3_t entOrigin, const vec3_t entDist, const uint8_t *entityColor,
+							  const uint8_t *constColor, const float *rgbGenFuncArgs, const float *alphaGenFuncArgs,
+							  const mat4_t texMatrix, float colorMod );
+
+void RP_UpdateViewUniforms( int elem,
+							const mat4_t modelviewMatrix, const mat4_t modelviewProjectionMatrix,
+							const vec3_t viewOrigin, const mat3_t viewAxis,
+							float mirrorSide,
+							const int *viewport,
+							float zNear, float zFar );
+
+void RP_UpdateBlendMixUniform( int elem, vec2_t blendMask );
+
+void RP_UpdateSoftParticlesUniforms( int elem, float scale );
+
+void RP_UpdateMaterialUniforms( int elem,
+								float offsetmappingScale, float glossIntensity, float glossExponent );
+
+void RP_UpdateDistortionUniforms( int elem, bool frontPlane );
+
+void RP_UpdateTextureUniforms( int elem, int TexWidth, int TexHeight );
+
+void RP_UpdateOutlineUniforms( int elem, float projDistance );
+
+void RP_UpdateDiffuseLightUniforms( int elem,
+									const vec3_t lightDir, const vec4_t lightAmbient, const vec4_t lightDiffuse );
+
+void RP_UpdateDynamicLightsUniforms( const FrontendToBackendShared *fsh,
+									 int elem, const superLightStyle_t *superLightStyle,
+									 const vec3_t entOrigin, const mat3_t entAxis, unsigned int dlightbits );
+
+void RP_UpdateFogUniforms( int elem, byte_vec4_t color, float clearDist, float opaqueDist,
+						   cplane_t *fogPlane, cplane_t *eyePlane, float eyeFogDist );
+
+void RP_UpdateTexGenUniforms( int elem, const mat4_t reflectionMatrix, const mat4_t vectorMatrix );
+
+void RP_UpdateBonesUniforms( int elem, unsigned int numBones, dualquat_t *animDualQuat );
+
+void RP_UpdateInstancesUniforms( int elem, unsigned int numInstances, instancePoint_t *instances );
+
+void RP_UpdateDrawFlatUniforms( int elem, const vec3_t wallColor, const vec3_t floorColor );
+
+void RP_UpdateColorCorrectionUniforms( int elem, float hdrGamme, float hdrExposure );
+
+void RP_UpdateKawaseUniforms( int elem, int TexWidth, int TexHeight, int iteration );
+
 #endif // R_PROGRAM_H
