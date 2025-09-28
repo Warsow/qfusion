@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "backendlocal.h"
 #include "glstateproxy.h"
 
+#include <common/helpers/noise.h>
+
 #define RB_IsAlphaBlending( blendsrc,blenddst ) \
 	( ( blendsrc ) == GLSTATE_SRCBLEND_SRC_ALPHA || ( blenddst ) == GLSTATE_DSTBLEND_SRC_ALPHA ) || \
 	( ( blendsrc ) == GLSTATE_SRCBLEND_ONE_MINUS_SRC_ALPHA || ( blenddst ) == GLSTATE_DSTBLEND_ONE_MINUS_SRC_ALPHA )
@@ -39,20 +41,6 @@ enum {
 	BUILTIN_GLSLPASS_SKYBOX,
 	MAX_BUILTIN_GLSLPASSES
 };
-
-static float rb_sintable[FTABLE_SIZE];
-static float rb_triangletable[FTABLE_SIZE];
-static float rb_squaretable[FTABLE_SIZE];
-static float rb_sawtoothtable[FTABLE_SIZE];
-static float rb_inversesawtoothtable[FTABLE_SIZE];
-
-#define NOISE_SIZE  256
-#define NOISE_VAL( a )    rb_noiseperm[( a ) & ( NOISE_SIZE - 1 )]
-#define NOISE_INDEX( x, y, z, t ) NOISE_VAL( x + NOISE_VAL( y + NOISE_VAL( z + NOISE_VAL( t ) ) ) )
-#define NOISE_LERP( a, b, w ) ( a * ( 1.0f - w ) + b * w )
-
-static float rb_noisetable[NOISE_SIZE];
-static int rb_noiseperm[NOISE_SIZE];
 
 static shaderpass_t r_GLSLpasses[MAX_BUILTIN_GLSLPASSES];
 static shaderpass_t r_triLinesPass;
@@ -100,95 +88,39 @@ static void RB_InitBuiltinPasses() {
 }
 
 void RB_InitShading() {
-	// build lookup tables
-	for( int i = 0; i < FTABLE_SIZE; i++ ) {
-		const float t = (float)i / (float)FTABLE_SIZE;
-
-		rb_sintable[i] = std::sin( t * M_TWOPI );
-
-		if( t < 0.25f ) {
-			rb_triangletable[i] = t * 4.0f;
-		} else if( t < 0.75f ) {
-			rb_triangletable[i] = 2 - 4.0f * t;
-		} else {
-			rb_triangletable[i] = ( t - 0.75f ) * 4.0f - 1.0f;
-		}
-
-		if( t < 0.5 ) {
-			rb_squaretable[i] = 1.0f;
-		} else {
-			rb_squaretable[i] = -1.0f;
-		}
-
-		rb_sawtoothtable[i] = t;
-		rb_inversesawtoothtable[i] = 1.0f - t;
-	}
-
-	// init the noise table
-	srand( 1001 );
-
-	for( int i = 0; i < NOISE_SIZE; i++ ) {
-		rb_noisetable[i] = (float)( ( ( rand() / (float)RAND_MAX ) * 2.0 - 1.0 ) );
-		rb_noiseperm[i] = (unsigned char)( rand() / (float)RAND_MAX * 255 );
-	}
-
 	RB_InitBuiltinPasses();
 }
 
 static inline float RB_FastSin( float t ) {
-	return FTABLE_EVALUATE( rb_sintable, t );
+	return std::sin( t * (float)M_TWOPI );
 }
 
-static float *RB_TableForFunc( unsigned int func ) {
+[[nodiscard]]
+static auto calcFuncValue( unsigned func, float arg ) -> float {
+	const float modArg  = std::fmod( arg, 1.0f );
+	const float argFrac = modArg + ( modArg >= 0.0f ? 0.0f : 1.0f );
+	assert( argFrac >= 0.0f && argFrac <= 1.0f );
 	switch( func ) {
 		case SHADER_FUNC_SIN:
-			return rb_sintable;
-		case SHADER_FUNC_TRIANGLE:
-			return rb_triangletable;
+			return RB_FastSin( argFrac );
+		case SHADER_FUNC_TRIANGLE: {
+			if( argFrac < 0.25f ) {
+				return argFrac * 4.0f;
+			} else if( argFrac < 0.75f ) {
+				return 2.0f - 4.0f * argFrac;
+			} else {
+				return ( argFrac - 0.75f ) * 4.0f - 1.0f;
+			}
+		}
 		case SHADER_FUNC_SQUARE:
-			return rb_squaretable;
+			return argFrac < 0.5f ? +1.0f : -1.0f;
 		case SHADER_FUNC_SAWTOOTH:
-			return rb_sawtoothtable;
+			return argFrac;
 		case SHADER_FUNC_INVERSESAWTOOTH:
-			return rb_inversesawtoothtable;
+			return 1.0f - argFrac;
 		default:
-			break;
+			return RB_FastSin( argFrac );
 	}
-
-	return rb_sintable;  // default to sintable
-}
-
-static float RB_BackendGetNoiseValue( float x, float y, float z, float t ) {
-	const auto ix = (int)std::floor( x );
-	const auto iy = (int)std::floor( y );
-	const auto iz = (int)std::floor( z );
-	const auto it = (int)std::floor( t );
-
-	const float fx = x - (float)ix;
-	const float fy = y - (float)iy;
-	const float fz = z - (float)iz;
-	const float ft = t - (float)it;
-
-	float value[2];
-	for( int i = 0; i < 2; i++ ) {
-		float front[4], back[4];
-
-		front[0] = rb_noisetable[NOISE_INDEX( ix, iy, iz, it + i )];
-		front[1] = rb_noisetable[NOISE_INDEX( ix + 1, iy, iz, it + i )];
-		front[2] = rb_noisetable[NOISE_INDEX( ix, iy + 1, iz, it + i )];
-		front[3] = rb_noisetable[NOISE_INDEX( ix + 1, iy + 1, iz, it + i )];
-
-		back[0] = rb_noisetable[NOISE_INDEX( ix, iy, iz + 1, it + i )];
-		back[1] = rb_noisetable[NOISE_INDEX( ix + 1, iy, iz + 1, it + i )];
-		back[2] = rb_noisetable[NOISE_INDEX( ix, iy + 1, iz + 1, it + i )];
-		back[3] = rb_noisetable[NOISE_INDEX( ix + 1, iy + 1, iz + 1, it + i )];
-
-		const float fvalue = NOISE_LERP( NOISE_LERP( front[0], front[1], fx ), NOISE_LERP( front[2], front[3], fx ), fy );
-		const float bvalue = NOISE_LERP( NOISE_LERP( back[0], back[1], fx ), NOISE_LERP( back[2], back[3], fx ), fy );
-		value[i] = NOISE_LERP( fvalue, bvalue, fz );
-	}
-
-	return NOISE_LERP( value[0], value[1], ft );
 }
 
 static float RB_TransformFogPlanes( const mfog_t *fog, vec3_t fogNormal,
@@ -277,9 +209,8 @@ static void RB_ApplyTCMods( const shaderpass_t *pass, mat4_t result ) {
 								 1 + ( tcmod->args[1] * RB_FastSin( t2 + 0.25 ) + tcmod->args[0] ) * t1 );
 			} break;
 			case TC_MOD_STRETCH: {
-				const float *table = RB_TableForFunc( tcmod->args[0] );
 				float t2 = tcmod->args[3] + materialTime * tcmod->args[4];
-				float t1 = FTABLE_EVALUATE( table, t2 ) * tcmod->args[2] + tcmod->args[1];
+				float t1 = calcFuncValue( (unsigned)tcmod->args[0], t2 ) * tcmod->args[2] + tcmod->args[1];
 				t1 = t1 ? 1.0f / t1 : 1.0f;
 				t2 = 0.5f - 0.5f * t1;
 				Matrix4_Stretch2D( result, t1, t2 );
@@ -310,12 +241,13 @@ static void RB_ApplyTCMods( const shaderpass_t *pass, mat4_t result ) {
 static auto evaluateFunc( const shaderfunc_t *func, double materialTime ) -> float {
 	float value;
 	if( func->type == SHADER_FUNC_NOISE ) {
-		// TODO: Simplify the noise function as 3 arguments are always zeroes
-		value = RB_BackendGetNoiseValue( 0, 0, 0, ( materialTime + func->args[2] ) * func->args[3] );
+		// TODO: Not sure if this is suitable. There's no sufficient data to test it.
+		// Vanilla material scripts do not use the noise function. Looks like we shouldn't care.
+		const auto arg = (float)( ( materialTime + func->args[2] ) * func->args[3] );
+		value = calcSimplexNoise2D( 0.0f, arg );
 	} else {
-		const float *table = RB_TableForFunc( func->type );
-		const float arg = func->args[2] + materialTime * func->args[3];
-		value = FTABLE_EVALUATE( table, arg );
+		const auto arg = (float)( func->args[2] + materialTime * func->args[3] );
+		value = calcFuncValue( func->type, arg );
 	}
 	return value * func->args[1] + func->args[0];
 }
