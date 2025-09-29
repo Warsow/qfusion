@@ -43,7 +43,7 @@ link_directories("${Qt5_HOMEDIR}\\qml\\QtQuick\\Layouts")
 link_directories("${Qt5_HOMEDIR}\\qml\\QtQuick\\Controls.2")
 link_directories("${Qt5_HOMEDIR}\\qml\\QtQuick\\Controls.2\\Material")
 
-if (USE_SDL2 OR (${CMAKE_SYSTEM_NAME} MATCHES "Linux"))
+if (USE_SDL2 OR (UNIX AND NOT APPLE))
     include_directories(${SDL2_INCLUDE_DIR})
 endif()
 
@@ -139,7 +139,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 	endif()
 endif()
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+if (UNIX AND NOT APPLE)
 	set(CLIENT_PLATFORM_HEADERS "")
 
 	file(GLOB CLIENT_PLATFORM_SOURCES
