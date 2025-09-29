@@ -536,7 +536,7 @@ char *Q_strupr( char *s ) {
 
 	if( s ) {
 		for( p = s; *s; s++ )
-			*s = toupper( *s );
+			*s = toupper( ( unsigned char )*s );
 		return p;
 	}
 
@@ -551,7 +551,7 @@ char *Q_strlwr( char *s ) {
 
 	if( s ) {
 		for( p = s; *s; s++ )
-			*s = tolower( *s );
+			*s = tolower( ( unsigned char )*s );
 		return p;
 	}
 
