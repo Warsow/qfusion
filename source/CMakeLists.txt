@@ -129,7 +129,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 endif()
 
 # Linux or mingw specific settings
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR MINGW)
+if ((UNIX AND NOT APPLE) OR MINGW)
     # If no build type was specified - use release build settings
     if (NOT CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE "Release")
@@ -154,7 +154,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR MINGW)
 endif()
 
 # Linux-only specific settings
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+if (UNIX AND NOT APPLE)
     if (CMAKE_CROSSCOMPILING)
         set(CMAKE_LIBRARY_ARCHITECTURE "${CMAKE_SYSTEM_PROCESSOR}-linux-gnu")
         link_directories("${CMAKE_FIND_ROOT_PATH}/usr/lib/${CMAKE_SYSTEM_PROCESSOR}-linux-gnu")
@@ -184,7 +184,7 @@ if (NOT GAME_MODULES_ONLY)
         find_package(Qt5 COMPONENTS Core Concurrent Quick Gui Svg Multimedia REQUIRED)
 
         # We need SDL only on non-Windows platforms or when with SDL2-backend
-        if (USE_SDL2 OR (${CMAKE_SYSTEM_NAME} MATCHES "Linux"))
+        if (USE_SDL2 OR (UNIX AND NOT APPLE))
             set(USE_SDL2 1)
             find_package(SDL2 REQUIRED)
         endif()
@@ -195,8 +195,8 @@ if (NOT GAME_MODULES_ONLY)
     endif()
 endif()
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR MINGW)
-    if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+if ((UNIX AND NOT APPLE) OR MINGW)
+    if (UNIX AND NOT APPLE)
         STRING(TOLOWER "win32_${QFUSION_WINDOWS_ARCH}.tar.gz" TAR_GZ_NAME)
     else()
         STRING(TOLOWER "${CMAKE_SYSTEM_NAME}_${CMAKE_SYSTEM_PROCESSOR}.tar.gz" TAR_GZ_NAME)
@@ -230,7 +230,7 @@ if (NOT GAME_MODULES_ONLY)
     endif()
 endif()
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Do not add 'OR MINGW' here - we need to use suffix-prefix settings from Windows
+if (UNIX AND NOT APPLE)
     set(CURL_LIBRARY "")
     add_definitions(-DLIBCURL_RUNTIME)
 
