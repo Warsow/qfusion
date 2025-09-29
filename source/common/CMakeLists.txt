@@ -46,7 +46,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     file(GLOB EXECOMMON_PLATFORM_HEADERS "platform/win32/*.h")
 endif()
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+if (UNIX AND NOT APPLE)
     file(GLOB EXECOMMON_PLATFORM_SOURCES
          "platform/linux/*.cpp"
          "platform/unix/*.cpp")
