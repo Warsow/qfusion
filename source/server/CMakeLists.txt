@@ -26,7 +26,7 @@ else()
     )
 
     # Link libuuid
-    set(SERVER_PLATFORM_LIBRARIES "pthread" "dl" "m" "uuid")
+    set(SERVER_PLATFORM_LIBRARIES "pthread" ${CMAKE_DL_LIBS} "m" "uuid")
     set(SERVER_BINARY_TYPE "")
 endif()
 
