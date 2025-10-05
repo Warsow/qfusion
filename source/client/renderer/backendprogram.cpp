@@ -29,67 +29,38 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	( ( blendsrc ) == GLSTATE_SRCBLEND_SRC_ALPHA || ( blenddst ) == GLSTATE_DSTBLEND_SRC_ALPHA ) || \
 	( ( blendsrc ) == GLSTATE_SRCBLEND_ONE_MINUS_SRC_ALPHA || ( blenddst ) == GLSTATE_DSTBLEND_ONE_MINUS_SRC_ALPHA )
 
-#define FTABLE_SIZE_POW 12
-#define FTABLE_SIZE ( 1 << FTABLE_SIZE_POW )
-#define FTABLE_CLAMP( x ) ( ( (int)( ( x ) * FTABLE_SIZE ) & ( FTABLE_SIZE - 1 ) ) )
-#define FTABLE_EVALUATE( table, x ) ( ( table )[FTABLE_CLAMP( fmod( x, 1.0 ) )] )
-
-enum {
-	BUILTIN_GLSLPASS_FOG,
-	BUILTIN_GLSLPASS_SHADOWMAP,
-	BUILTIN_GLSLPASS_OUTLINE,
-	BUILTIN_GLSLPASS_SKYBOX,
-	MAX_BUILTIN_GLSLPASSES
+static const shaderpass_t kBuiltinFogPass {
+	.flags        = GLSTATE_SRCBLEND_SRC_ALPHA | GLSTATE_DSTBLEND_ONE_MINUS_SRC_ALPHA,
+	.rgbgen       = { .type = RGB_GEN_FOG },
+	.alphagen     = { .type = ALPHA_GEN_IDENTITY },
+	.tcgen        = TC_GEN_FOG,
+	.program_type = GLSL_PROGRAM_TYPE_FOG,
 };
 
-static shaderpass_t r_GLSLpasses[MAX_BUILTIN_GLSLPASSES];
-static shaderpass_t r_triLinesPass;
-static vec4_t r_triLinesColor;
+static const shaderpass_t kBuiltinShadowmapPass {
+	.flags        = GLSTATE_DEPTHFUNC_EQ | GLSTATE_SRCBLEND_ZERO | GLSTATE_DSTBLEND_SRC_COLOR,
+	.rgbgen       = { .type = RGB_GEN_IDENTITY },
+	.alphagen     = { .type = ALPHA_GEN_IDENTITY },
+	.tcgen        = TC_GEN_NONE,
+	.program_type = GLSL_PROGRAM_TYPE_SHADOWMAP,
+};
+
+static const shaderpass_t kBuiltinOutlinePass {
+	.flags        = GLSTATE_DEPTHWRITE,
+	.rgbgen       = { .type = RGB_GEN_OUTLINE },
+	.alphagen     = { .type = ALPHA_GEN_OUTLINE },
+	.tcgen        = TC_GEN_NONE,
+	.program_type = GLSL_PROGRAM_TYPE_OUTLINE,
+};
+
+static const shaderpass_t kBuiltinSkyboxPass {
+	.rgbgen       = { .type = RGB_GEN_IDENTITY },
+	.alphagen     = { .type = ALPHA_GEN_IDENTITY },
+	.tcgen        = TC_GEN_BASE,
+	.program_type = GLSL_PROGRAM_TYPE_Q3A_SHADER,
+};
 
 static void RB_SetShaderpassState( unsigned state );
-
-static void RB_InitBuiltinPasses() {
-	shaderpass_t *pass;
-
-	// init optional GLSL program passes
-	memset( r_GLSLpasses, 0, sizeof( r_GLSLpasses ) );
-
-	// init fog pass
-	pass = &r_GLSLpasses[BUILTIN_GLSLPASS_FOG];
-	pass->program_type = GLSL_PROGRAM_TYPE_Q3A_SHADER;
-	pass->tcgen = TC_GEN_FOG;
-	pass->rgbgen.type = RGB_GEN_FOG;
-	pass->alphagen.type = ALPHA_GEN_IDENTITY;
-	pass->flags = GLSTATE_SRCBLEND_SRC_ALPHA | GLSTATE_DSTBLEND_ONE_MINUS_SRC_ALPHA;
-	pass->program_type = GLSL_PROGRAM_TYPE_FOG;
-
-	// shadowmap
-	pass = &r_GLSLpasses[BUILTIN_GLSLPASS_SHADOWMAP];
-	pass->flags = GLSTATE_DEPTHFUNC_EQ /*|GLSTATE_OFFSET_FILL*/ | GLSTATE_SRCBLEND_ZERO | GLSTATE_DSTBLEND_SRC_COLOR;
-	pass->tcgen = TC_GEN_NONE;
-	pass->rgbgen.type = RGB_GEN_IDENTITY;
-	pass->alphagen.type = ALPHA_GEN_IDENTITY;
-	pass->program_type = GLSL_PROGRAM_TYPE_SHADOWMAP;
-
-	// outlines
-	pass = &r_GLSLpasses[BUILTIN_GLSLPASS_OUTLINE];
-	pass->flags = GLSTATE_DEPTHWRITE;
-	pass->rgbgen.type = RGB_GEN_OUTLINE;
-	pass->alphagen.type = ALPHA_GEN_OUTLINE;
-	pass->tcgen = TC_GEN_NONE;
-	pass->program_type = GLSL_PROGRAM_TYPE_OUTLINE;
-
-	// skybox
-	pass = &r_GLSLpasses[BUILTIN_GLSLPASS_SKYBOX];
-	pass->program_type = GLSL_PROGRAM_TYPE_Q3A_SHADER;
-	pass->tcgen = TC_GEN_BASE;
-	pass->rgbgen.type = RGB_GEN_IDENTITY;
-	pass->alphagen.type = ALPHA_GEN_IDENTITY;
-}
-
-void RB_InitShading() {
-	RB_InitBuiltinPasses();
-}
 
 static inline float RB_FastSin( float t ) {
 	return std::sin( t * (float)M_TWOPI );
@@ -1596,39 +1567,39 @@ void RB_DrawWireframeMesh( const FrontendToBackendShared *fsh, const DrawMeshVer
 		return;
 	}
 
-	Vector4Copy( RB_TriangleLinesColor(), r_triLinesColor );
-
-	shaderpass_t *pass;
+	const shaderpass_t *referencePass;
 	if( !rb.materialState.currentShader->numpasses ) {
 		// happens on fog volumes
-		pass = &r_GLSLpasses[BUILTIN_GLSLPASS_FOG];
+		referencePass = &kBuiltinFogPass;
 	} else {
-		pass = &rb.materialState.currentShader->passes[0];
+		referencePass = &rb.materialState.currentShader->passes[0];
 	}
 
-	// set some flags
+	shaderpass_t wireframePass = *referencePass;
+
+	const float *const wireColor = RB_TriangleLinesColor();
+	wireframePass.rgbgen.type = RGB_GEN_CONST;
+	VectorCopy( wireColor, wireframePass.rgbgen.args );
+	wireframePass.alphagen.type = ALPHA_GEN_CONST;
+	VectorSet( wireframePass.alphagen.args, wireColor[3], wireColor[3], wireColor[3] );
+
+	wireframePass.flags = 0;
+	wireframePass.images[0] = TextureCache::instance()->whiteTexture();
+	wireframePass.anim_fps = 0;
+	wireframePass.anim_numframes = 0;
+	wireframePass.program_type = GLSL_PROGRAM_TYPE_Q3A_SHADER;
+
 	rb.drawState.currentShadowBits = 0;
 	rb.drawState.currentDlightBits = 0;
-	// TODO: Modifying the material state
-	rb.materialState.colorFog = nullptr;
-	rb.materialState.texFog = nullptr;
-	rb.drawState.superLightStyle = nullptr;
 
-	// copy and override
-	r_triLinesPass = *pass;
-	r_triLinesPass.rgbgen.type = RGB_GEN_CONST;
-	VectorCopy( r_triLinesColor + 0, r_triLinesPass.rgbgen.args );
-	r_triLinesPass.alphagen.type = ALPHA_GEN_CONST;
-	VectorSet( r_triLinesPass.alphagen.args, r_triLinesColor[3], r_triLinesColor[3], r_triLinesColor[3] );
-	r_triLinesPass.flags = 0;
-	r_triLinesPass.images[0] = TextureCache::instance()->whiteTexture();
-	r_triLinesPass.anim_fps = 0;
-	r_triLinesPass.anim_numframes = 0;
-	r_triLinesPass.program_type = GLSL_PROGRAM_TYPE_Q3A_SHADER;
+	// TODO: Modifying the material state
+	rb.materialState.colorFog    = nullptr;
+	rb.materialState.texFog      = nullptr;
+	rb.drawState.superLightStyle = nullptr;
 
 	RB_UpdateCurrentShaderState();
 
-	RB_RenderPass( fsh, vertSpan, primitive, &r_triLinesPass );
+	RB_RenderPass( fsh, vertSpan, primitive, &wireframePass );
 }
 
 // TODO: Show outlines in mirrors
@@ -1662,28 +1633,24 @@ void RB_DrawShadedMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSp
 		}
 	}
 
-	// shadow map
 	if( rb.drawState.currentShadowBits && sort >= SHADER_SORT_OPAQUE && sort <= SHADER_SORT_ALPHATEST ) {
-		RB_RenderPass( fsh, vertSpan, primitive, &r_GLSLpasses[BUILTIN_GLSLPASS_SHADOWMAP] );
+		RB_RenderPass( fsh, vertSpan, primitive, &kBuiltinShadowmapPass );
 	}
 
-	// outlines
 	if( addGLSLOutline ) {
-		RB_RenderPass( fsh, vertSpan, primitive, &r_GLSLpasses[BUILTIN_GLSLPASS_OUTLINE] );
+		RB_RenderPass( fsh, vertSpan, primitive, &kBuiltinOutlinePass );
 	}
 
-	// fog
 	if( rb.materialState.texFog && rb.materialState.texFog->shader ) {
-		// Caution: Modifying the global builtin pass definition
-		shaderpass_t *const fogPass = &r_GLSLpasses[BUILTIN_GLSLPASS_FOG];
+		shaderpass_t fogPass = kBuiltinFogPass;
 
-		fogPass->images[0] = TextureCache::instance()->whiteTexture();
+		fogPass.images[0] = TextureCache::instance()->whiteTexture();
 		if( !numPasses || rb.materialState.currentShader->fog_dist != 0.0f ) {
-			fogPass->flags &= ~GLSTATE_DEPTHFUNC_EQ;
+			fogPass.flags &= ~GLSTATE_DEPTHFUNC_EQ;
 		} else {
-			fogPass->flags |= GLSTATE_DEPTHFUNC_EQ;
+			fogPass.flags |= GLSTATE_DEPTHFUNC_EQ;
 		}
 
-		RB_RenderPass( fsh, vertSpan, primitive, fogPass );
+		RB_RenderPass( fsh, vertSpan, primitive, &fogPass );
 	}
 }

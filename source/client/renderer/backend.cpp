@@ -40,9 +40,6 @@ void RB_Init() {
 
 	rb.glState = new GLStateProxy( glConfig.width, glConfig.height, glConfig.stencilBits );
 
-	// initialize shading
-	RB_InitShading();
-
 	// create VBO's we're going to use for streamed data
 	RB_RegisterStreamVBOs();
 }

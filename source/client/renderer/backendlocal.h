@@ -156,9 +156,6 @@ void RB_DoDrawMeshVerts( const DrawMeshVertSpan *vertSpan, int primitive );
 	( rb.globalState.renderFlags & ( RF_DRAWFLAT | RF_DRAWBRIGHT ) ) && \
 	!( rb.materialState.currentShader->flags & SHADER_NODRAWFLAT ) )
 
-// r_backend_program.c
-void RB_InitShading( void );
-
 int RB_RegisterProgram( int type, const shader_s *materialToGetDeforms, uint64_t features );
 int RB_BindProgram( int program );
 
