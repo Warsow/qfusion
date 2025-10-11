@@ -355,26 +355,28 @@ void GLStateProxy::enableVertexAttrib( int index, bool enable ) {
 	}
 }
 
-void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const mesh_vbo_s *vbo ) {
+void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const mesh_vbo_s *vbo, const VboSpanLayout *layout ) {
 	assert( vattribs & VATTRIB_POSITION_BIT );
-	const vattribmask_t hfa = vbo->halfFloatAttribs;
-	if( vattribs == m_lastVAttribs && hfa == m_lastHalfFloatVAttribs ) {
+	const vattribmask_t hfa = layout->halfFloatAttribs;
+	if( vattribs == m_lastVAttribs && hfa == m_lastHalfFloatVAttribs && layout->baseOffset == m_lastVboSpanOffset ) {
 		return;
 	}
 
 	m_lastVAttribs = vattribs;
 	m_lastHalfFloatVAttribs = hfa;
+	m_lastVboSpanOffset = layout->baseOffset;
 
 	// xyz position
 	enableVertexAttrib( VATTRIB_POSITION, true );
 	qglVertexAttribPointer( VATTRIB_POSITION, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_POSITION_BIT, hfa ),
-							GL_FALSE, vbo->vertexSize, ( const GLvoid * )0 );
+							GL_FALSE, layout->vertexSize, ( const GLvoid * )( uintptr_t )layout->baseOffset );
 
 	// normal
 	if( vattribs & VATTRIB_NORMAL_BIT ) {
 		enableVertexAttrib( VATTRIB_NORMAL, true );
+		const auto *pointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->normalsOffset );
 		qglVertexAttribPointer( VATTRIB_NORMAL, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_NORMAL_BIT, hfa ),
-								GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->normalsOffset );
+								GL_FALSE, layout->vertexSize, pointer );
 	} else {
 		enableVertexAttrib( VATTRIB_NORMAL, false );
 	}
@@ -382,8 +384,9 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const mesh_vbo_s
 	// s-vector
 	if( vattribs & VATTRIB_SVECTOR_BIT ) {
 		enableVertexAttrib( VATTRIB_SVECTOR, true );
+		const auto *pointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->sVectorsOffset );
 		qglVertexAttribPointer( VATTRIB_SVECTOR, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_SVECTOR_BIT, hfa ),
-								GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->sVectorsOffset );
+								GL_FALSE, layout->vertexSize, pointer );
 	} else {
 		enableVertexAttrib( VATTRIB_SVECTOR, false );
 	}
@@ -391,8 +394,8 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const mesh_vbo_s
 	// color
 	if( vattribs & VATTRIB_COLOR0_BIT ) {
 		enableVertexAttrib( VATTRIB_COLOR0, true );
-		qglVertexAttribPointer( VATTRIB_COLOR0, 4, GL_UNSIGNED_BYTE,
-								GL_TRUE, vbo->vertexSize, (const GLvoid * )vbo->colorsOffset[0] );
+		const auto *pointer = (const GLvoid * )(uintptr_t)( layout->baseOffset + layout->colorsOffset[0] );
+		qglVertexAttribPointer( VATTRIB_COLOR0, 4, GL_UNSIGNED_BYTE, GL_TRUE, layout->vertexSize, pointer );
 	} else {
 		enableVertexAttrib( VATTRIB_COLOR0, false );
 	}
@@ -400,8 +403,9 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const mesh_vbo_s
 	// texture coordinates
 	if( vattribs & VATTRIB_TEXCOORDS_BIT ) {
 		enableVertexAttrib( VATTRIB_TEXCOORDS, true );
+		const auto *pointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->stOffset );
 		qglVertexAttribPointer( VATTRIB_TEXCOORDS, 2, FLOAT_VATTRIB_GL_TYPE( VATTRIB_TEXCOORDS_BIT, hfa ),
-								GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->stOffset );
+								GL_FALSE, layout->vertexSize, pointer );
 	} else {
 		enableVertexAttrib( VATTRIB_TEXCOORDS, false );
 	}
@@ -409,8 +413,9 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const mesh_vbo_s
 	if( ( vattribs & VATTRIB_AUTOSPRITE_BIT ) == VATTRIB_AUTOSPRITE_BIT ) {
 		// submit sprite point
 		enableVertexAttrib( VATTRIB_SPRITEPOINT, true );
+		const auto *pointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->spritePointsOffset );
 		qglVertexAttribPointer( VATTRIB_SPRITEPOINT, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_AUTOSPRITE_BIT, hfa ),
-								GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->spritePointsOffset );
+								GL_FALSE, layout->vertexSize, pointer );
 	} else {
 		enableVertexAttrib( VATTRIB_SPRITEPOINT, false );
 	}
@@ -419,13 +424,13 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const mesh_vbo_s
 	if( ( vattribs & VATTRIB_BONES_BITS ) == VATTRIB_BONES_BITS ) {
 		// submit indices
 		enableVertexAttrib( VATTRIB_BONESINDICES, true );
-		qglVertexAttribPointer( VATTRIB_BONESINDICES, 4, GL_UNSIGNED_BYTE,
-								GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->bonesIndicesOffset );
+		const auto *indicesPointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->bonesIndicesOffset );
+		qglVertexAttribPointer( VATTRIB_BONESINDICES, 4, GL_UNSIGNED_BYTE, GL_FALSE, layout->vertexSize, indicesPointer );
 
 		// submit weights
 		enableVertexAttrib( VATTRIB_BONESWEIGHTS, true );
-		qglVertexAttribPointer( VATTRIB_BONESWEIGHTS, 4, GL_UNSIGNED_BYTE,
-								GL_TRUE, vbo->vertexSize, ( const GLvoid * )vbo->bonesWeightsOffset );
+		const auto *weightsPointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->bonesWeightsOffset );
+		qglVertexAttribPointer( VATTRIB_BONESWEIGHTS, 4, GL_UNSIGNED_BYTE, GL_TRUE, layout->vertexSize, weightsPointer );
 	} else {
 		// lightmap texture coordinates - aliasing bones, so not disabling bones
 		int lmattr = VATTRIB_LMCOORDS01;
@@ -434,9 +439,10 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const mesh_vbo_s
 		for( int i = 0; i < ( MAX_LIGHTMAPS + 1 ) / 2; i++ ) {
 			if( vattribs & lmattrbit ) {
 				enableVertexAttrib( lmattr, true );
-				qglVertexAttribPointer( lmattr, vbo->lmstSize[i],
+				const auto *pointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->lmstOffset[i] );
+				qglVertexAttribPointer( lmattr, layout->lmstSize[i],
 										FLOAT_VATTRIB_GL_TYPE( VATTRIB_LMCOORDS0_BIT, hfa ),
-										GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->lmstOffset[i] );
+										GL_FALSE, layout->vertexSize, pointer );
 			} else {
 				enableVertexAttrib( lmattr, false );
 			}
@@ -451,8 +457,8 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const mesh_vbo_s
 		for( int i = 0; i < ( MAX_LIGHTMAPS + 3 ) / 4; i++ ) {
 			if( vattribs & ( VATTRIB_LMLAYERS0123_BIT << i ) ) {
 				enableVertexAttrib( lmattr, true );
-				qglVertexAttribPointer( lmattr, 4, GL_UNSIGNED_BYTE,
-										GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->lmlayersOffset[i] );
+				const auto *pointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->lmlayersOffset[i] );
+				qglVertexAttribPointer( lmattr, 4, GL_UNSIGNED_BYTE, GL_FALSE, layout->vertexSize, pointer );
 			} else {
 				enableVertexAttrib( lmattr, false );
 			}
@@ -464,12 +470,12 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const mesh_vbo_s
 	if( ( vattribs & VATTRIB_INSTANCES_BITS ) == VATTRIB_INSTANCES_BITS ) {
 		enableVertexAttrib( VATTRIB_INSTANCE_QUAT, true );
 		qglVertexAttribPointer( VATTRIB_INSTANCE_QUAT, 4, GL_FLOAT, GL_FALSE, 8 * sizeof( vec_t ),
-								( const GLvoid * )vbo->instancesOffset );
+								( const GLvoid * )(uintptr_t)layout->instancesOffset );
 		qglVertexAttribDivisor( VATTRIB_INSTANCE_QUAT, 1 );
 
 		enableVertexAttrib( VATTRIB_INSTANCE_XYZS, true );
 		qglVertexAttribPointer( VATTRIB_INSTANCE_XYZS, 4, GL_FLOAT, GL_FALSE, 8 * sizeof( vec_t ),
-								( const GLvoid * )( vbo->instancesOffset + sizeof( vec_t ) * 4 ) );
+								( const GLvoid * )(uintptr_t)( layout->instancesOffset + sizeof( vec_t ) * 4 ) );
 		qglVertexAttribDivisor( VATTRIB_INSTANCE_XYZS, 1 );
 	} else {
 		enableVertexAttrib( VATTRIB_INSTANCE_QUAT, false );

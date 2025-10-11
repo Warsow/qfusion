@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "glimp.h"
 
 struct mesh_vbo_s;
+struct VboSpanLayout;
 class RenderTargetComponents;
 class Texture;
 
@@ -65,7 +66,7 @@ public:
 	void bindVertexBuffer( GLuint buffer );
 	void bindIndexBuffer( GLuint buffer );
 
-	void enableVertexAttribs( vattribmask_t attribs, const mesh_vbo_s *vbo );
+	void enableVertexAttribs( vattribmask_t attribs, const mesh_vbo_s *vbo, const VboSpanLayout *layout );
 
 	// TODO: There are problems with initialization order
 	static void bindFramebufferObject( GLStateProxy *holder, RenderTargetComponents *components );
@@ -90,6 +91,7 @@ private:
 	unsigned m_vertexAttribEnabled { 0 };
 	vattribmask_t m_lastVAttribs { 0 };
 	vattribmask_t m_lastHalfFloatVAttribs { 0 };
+	unsigned m_lastVboSpanOffset { 0 };
 
 	int m_fbWidth { 0 };
 	int m_fbHeight { 0 };

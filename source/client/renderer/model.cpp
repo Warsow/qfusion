@@ -919,7 +919,8 @@ merge:
 		mesh_vbo_t *vbo = &tempVBOs[numTempVBOs++];
 		vbo->numVerts = numVerts;
 		vbo->numElems = numElems;
-		vbo->vertexAttribs = vattribs;
+		assert( vbo->layout.baseOffset == 0 );
+		vbo->layout.vertexAttribs = vattribs;
 		if( numFaces == 1 ) {
 			// non-mergable
 			vbo->index = numTempVBOs;
@@ -984,7 +985,7 @@ merge:
 				mesh_vbo_t *const vbo2 = &tempVBOs[j];
 				// If unmerged
 				if( vbo2->index == 0 ) {
-					if( vbo2->vertexAttribs == vbo->vertexAttribs ) {
+					if( vbo2->layout.vertexAttribs == vbo->layout.vertexAttribs ) {
 						if( vbo->numVerts + vbo2->numVerts < USHRT_MAX ) {
 							MergedBspSurface *const mergedSurf = &loadbmodel->mergedSurfaces[startDrawSurface + j];
 							mergedSurf->firstVboVert = vbo->numVerts;
@@ -1032,7 +1033,7 @@ merge:
 
 		// don't use half-floats for XYZ due to precision issues
 		vbo->owner = R_CreateMeshVBO( mergedSurf, vbo->numVerts, vbo->numElems, mergedSurf->numInstances,
-									  vbo->vertexAttribs, VBO_TAG_WORLD, vbo->vertexAttribs & ~floatVattribs );
+									  vbo->layout.vertexAttribs, VBO_TAG_WORLD, vbo->layout.vertexAttribs & ~floatVattribs );
 		mergedSurf->vbo = (mesh_vbo_s *)vbo->owner;
 
 		if( mergedSurf->numInstances == 0 ) {
@@ -1064,7 +1065,7 @@ merge:
 			const int vertsOffset = drawSurf->firstVboVert + surf->firstDrawSurfVert;
 			const int elemsOffset = drawSurf->firstVboElem + surf->firstDrawSurfElem;
 
-			R_UploadVBOVertexData( vbo, vertsOffset, vbo->vertexAttribs, mesh );
+			R_UploadVBOVertexData( vbo, vertsOffset, vbo->layout.vertexAttribs, mesh );
 			R_UploadVBOElemData( vbo, vertsOffset, elemsOffset, mesh );
 			R_UploadVBOInstancesData( vbo, 0, surf->numInstances, surf->instances );
 		}

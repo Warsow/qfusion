@@ -91,6 +91,106 @@ void R_InitVBO( void ) {
 	qglBindVertexArray( r_vao );
 }
 
+[[nodiscard]]
+static auto buildVertexLayoutForVattribs( VboSpanLayout *layout, vattribmask_t vattribs, vattribmask_t halfFloatVattribs,
+										  int numVerts, int numInstances ) -> size_t {
+	memset( layout, 0, sizeof( VboSpanLayout ) );
+
+	// vertex data
+	unsigned vertexSize = 0;
+
+	vertexSize += FLOAT_VATTRIB_SIZE( VATTRIB_POSITION_BIT, halfFloatVattribs ) * 4;
+
+	// normals data
+	if( vattribs & VATTRIB_NORMAL_BIT ) {
+		assert( !( vertexSize & 3 ) );
+		layout->normalsOffset = vertexSize;
+		vertexSize += FLOAT_VATTRIB_SIZE( VATTRIB_NORMAL_BIT, halfFloatVattribs ) * 4;
+	}
+
+	// s-vectors (tangent vectors)
+	if( vattribs & VATTRIB_SVECTOR_BIT ) {
+		assert( !( vertexSize & 3 ) );
+		layout->sVectorsOffset = vertexSize;
+		vertexSize += FLOAT_VATTRIB_SIZE( VATTRIB_SVECTOR_BIT, halfFloatVattribs ) * 4;
+	}
+
+	// texture coordinates
+	if( vattribs & VATTRIB_TEXCOORDS_BIT ) {
+		assert( !( vertexSize & 3 ) );
+		layout->stOffset = vertexSize;
+		vertexSize += FLOAT_VATTRIB_SIZE( VATTRIB_TEXCOORDS_BIT, halfFloatVattribs ) * 2;
+	}
+
+	// lightmap texture coordinates
+	vattribbit_t lmattrbit = VATTRIB_LMCOORDS0_BIT;
+	for( int i = 0; i < ( MAX_LIGHTMAPS + 1 ) / 2; i++ ) {
+		if( !( vattribs & lmattrbit ) ) {
+			break;
+		}
+		assert( !( vertexSize & 3 ) );
+		layout->lmstOffset[i] = vertexSize;
+		layout->lmstSize[i] = ( vattribs & ( lmattrbit << 1 ) ) ? 4 : 2;
+		vertexSize += FLOAT_VATTRIB_SIZE( VATTRIB_LMCOORDS0_BIT, halfFloatVattribs ) * layout->lmstSize[i];
+		lmattrbit = ( vattribbit_t )( ( vattribmask_t )lmattrbit << 2 );
+	}
+
+	// lightmap array texture layers
+	for( int i = 0; i < ( MAX_LIGHTMAPS + 3 ) / 4; i++ ) {
+		if( !( vattribs & ( VATTRIB_LMLAYERS0123_BIT << i ) ) ) {
+			break;
+		}
+		assert( !( vertexSize & 3 ) );
+		layout->lmlayersOffset[i] = vertexSize;
+		vertexSize += sizeof( int );
+	}
+
+	// vertex colors
+	if( vattribs & VATTRIB_COLOR0_BIT ) {
+		assert( !( vertexSize & 3 ) );
+		layout->colorsOffset[0] = vertexSize;
+		vertexSize += sizeof( int );
+	}
+
+	// bones data for skeletal animation
+	if( ( vattribs & VATTRIB_BONES_BITS ) == VATTRIB_BONES_BITS ) {
+		assert( SKM_MAX_WEIGHTS == 4 );
+
+		assert( !( vertexSize & 3 ) );
+		layout->bonesIndicesOffset = vertexSize;
+		vertexSize += sizeof( int );
+
+		assert( !( vertexSize & 3 ) );
+		layout->bonesWeightsOffset = vertexSize;
+		vertexSize += sizeof( int );
+	}
+
+	// autosprites
+	// FIXME: autosprite2 requires waaaay too much data for such a trivial
+	// transformation..
+	if( ( vattribs & VATTRIB_AUTOSPRITE_BIT ) == VATTRIB_AUTOSPRITE_BIT ) {
+		assert( !( vertexSize & 3 ) );
+		layout->spritePointsOffset = vertexSize;
+		vertexSize += FLOAT_VATTRIB_SIZE( VATTRIB_AUTOSPRITE_BIT, halfFloatVattribs ) * 4;
+	}
+
+	size_t dataSize = vertexSize * numVerts;
+
+	// instances data
+	if( ( ( vattribs & VATTRIB_INSTANCES_BITS ) == VATTRIB_INSTANCES_BITS ) && numInstances ) {
+		assert( !( vertexSize & 3 ) );
+		layout->instancesOffset = dataSize;
+		dataSize += numInstances * sizeof( GLfloat ) * 8;
+	}
+
+	assert( vertexSize < std::numeric_limits<uint8_t>::max() );
+	layout->vertexSize       = vertexSize;
+	layout->vertexAttribs    = vattribs;
+	layout->halfFloatAttribs = halfFloatVattribs;
+
+	return dataSize;
+}
+
 /*
 * R_CreateMeshVBO
 *
@@ -101,14 +201,10 @@ void R_InitVBO( void ) {
 */
 mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numInstances,
 							 vattribmask_t vattribs, vbo_tag_t tag, vattribmask_t halfFloatVattribs ) {
-	int i;
-	size_t size;
 	GLuint vbo_id;
 	vbohandle_t *vboh = NULL;
 	mesh_vbo_t *vbo = NULL;
 	GLenum usage = VBO_USAGE_FOR_TAG( tag );
-	size_t vertexSize;
-	vattribbit_t lmattrbit;
 
 	if( !r_free_vbohandles ) {
 		return NULL;
@@ -129,93 +225,9 @@ mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numIns
 	vbo = &r_mesh_vbo[vboh->index];
 	memset( vbo, 0, sizeof( *vbo ) );
 
-	// vertex data
-	vertexSize = 0;
-
-	vertexSize += FLOAT_VATTRIB_SIZE( VATTRIB_POSITION_BIT, halfFloatVattribs ) * 4;
-
-	// normals data
-	if( vattribs & VATTRIB_NORMAL_BIT ) {
-		assert( !( vertexSize & 3 ) );
-		vbo->normalsOffset = vertexSize;
-		vertexSize += FLOAT_VATTRIB_SIZE( VATTRIB_NORMAL_BIT, halfFloatVattribs ) * 4;
-	}
-
-	// s-vectors (tangent vectors)
-	if( vattribs & VATTRIB_SVECTOR_BIT ) {
-		assert( !( vertexSize & 3 ) );
-		vbo->sVectorsOffset = vertexSize;
-		vertexSize += FLOAT_VATTRIB_SIZE( VATTRIB_SVECTOR_BIT, halfFloatVattribs ) * 4;
-	}
-
-	// texture coordinates
-	if( vattribs & VATTRIB_TEXCOORDS_BIT ) {
-		assert( !( vertexSize & 3 ) );
-		vbo->stOffset = vertexSize;
-		vertexSize += FLOAT_VATTRIB_SIZE( VATTRIB_TEXCOORDS_BIT, halfFloatVattribs ) * 2;
-	}
-
-	// lightmap texture coordinates
-	lmattrbit = VATTRIB_LMCOORDS0_BIT;
-	for( i = 0; i < ( MAX_LIGHTMAPS + 1 ) / 2; i++ ) {
-		if( !( vattribs & lmattrbit ) ) {
-			break;
-		}
-		assert( !( vertexSize & 3 ) );
-		vbo->lmstOffset[i] = vertexSize;
-		vbo->lmstSize[i] = ( vattribs & ( lmattrbit << 1 ) ) ? 4 : 2;
-		vertexSize += FLOAT_VATTRIB_SIZE( VATTRIB_LMCOORDS0_BIT, halfFloatVattribs ) * vbo->lmstSize[i];
-		lmattrbit = ( vattribbit_t )( ( vattribmask_t )lmattrbit << 2 );
-	}
-
-	// lightmap array texture layers
-	for( i = 0; i < ( MAX_LIGHTMAPS + 3 ) / 4; i++ ) {
-		if( !( vattribs & ( VATTRIB_LMLAYERS0123_BIT << i ) ) ) {
-			break;
-		}
-		assert( !( vertexSize & 3 ) );
-		vbo->lmlayersOffset[i] = vertexSize;
-		vertexSize += sizeof( int );
-	}
-
-	// vertex colors
-	if( vattribs & VATTRIB_COLOR0_BIT ) {
-		assert( !( vertexSize & 3 ) );
-		vbo->colorsOffset[0] = vertexSize;
-		vertexSize += sizeof( int );
-	}
-
-	// bones data for skeletal animation
-	if( ( vattribs & VATTRIB_BONES_BITS ) == VATTRIB_BONES_BITS ) {
-		assert( SKM_MAX_WEIGHTS == 4 );
-
-		assert( !( vertexSize & 3 ) );
-		vbo->bonesIndicesOffset = vertexSize;
-		vertexSize += sizeof( int );
-
-		assert( !( vertexSize & 3 ) );
-		vbo->bonesWeightsOffset = vertexSize;
-		vertexSize += sizeof( int );
-	}
-
-	// autosprites
-	// FIXME: autosprite2 requires waaaay too much data for such a trivial
-	// transformation..
-	if( ( vattribs & VATTRIB_AUTOSPRITE_BIT ) == VATTRIB_AUTOSPRITE_BIT ) {
-		assert( !( vertexSize & 3 ) );
-		vbo->spritePointsOffset = vertexSize;
-		vertexSize += FLOAT_VATTRIB_SIZE( VATTRIB_AUTOSPRITE_BIT, halfFloatVattribs ) * 4;
-	}
-
-	size = vertexSize * numVerts;
-
-
-	// instances data
-	if( ( ( vattribs & VATTRIB_INSTANCES_BITS ) == VATTRIB_INSTANCES_BITS ) && numInstances ) {
-		assert( !( vertexSize & 3 ) );
-		vbo->instancesOffset = size;
-		size += numInstances * sizeof( GLfloat ) * 8;
-	}
+	const auto indexDataSize  = (GLsizeiptr)numElems * sizeof( elem_t );
+	const auto vertexDataSize = (GLsizeiptr)buildVertexLayoutForVattribs( &vbo->layout, vattribs, halfFloatVattribs,
+																		  numVerts, numInstances );
 
 	// pre-allocate vertex buffer
 	vbo_id = 0;
@@ -226,12 +238,10 @@ mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numIns
 	vbo->vertexId = vbo_id;
 
 	qglBindBuffer( GL_ARRAY_BUFFER, vbo_id );
-	qglBufferData( GL_ARRAY_BUFFER, size, nullptr, usage );
+	qglBufferData( GL_ARRAY_BUFFER, vertexDataSize, nullptr, usage );
 	if( qglGetError() == GL_OUT_OF_MEMORY ) {
 		goto error;
 	}
-
-	vbo->arrayBufferSize = size;
 
 	// pre-allocate elements buffer
 	vbo_id = 0;
@@ -241,14 +251,11 @@ mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numIns
 	}
 	vbo->elemId = vbo_id;
 
-	size = numElems * sizeof( elem_t );
 	qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, vbo_id );
-	qglBufferData( GL_ELEMENT_ARRAY_BUFFER, size, nullptr, usage );
+	qglBufferData( GL_ELEMENT_ARRAY_BUFFER, indexDataSize, nullptr, usage );
 	if( qglGetError() == GL_OUT_OF_MEMORY ) {
 		goto error;
 	}
-
-	vbo->elemBufferSize = size;
 
 	r_free_vbohandles = vboh->next;
 
@@ -261,14 +268,11 @@ mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numIns
 	r_num_active_vbos++;
 
 	vbo->registrationSequence = rsh.registrationSequence;
-	vbo->vertexSize = vertexSize;
 	vbo->numVerts = numVerts;
 	vbo->numElems = numElems;
 	vbo->owner = owner;
 	vbo->index = vboh->index + 1;
 	vbo->tag = tag;
-	vbo->vertexAttribs = vattribs;
-	vbo->halfFloatAttribs = halfFloatVattribs;
 
 	return vbo;
 
@@ -391,7 +395,6 @@ vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs
 	size_t vertSize;
 	vattribmask_t errMask;
 	vattribmask_t hfa;
-	uint8_t *data = (uint8_t *)outData;
 
 	assert( vbo != NULL );
 	assert( mesh != NULL );
@@ -400,11 +403,14 @@ vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs
 		return 0;
 	}
 
+	const VboSpanLayout *const layout = &vbo->layout;
+	uint8_t *data = (uint8_t *)outData + layout->baseOffset;
+
 	errMask = 0;
 	numVerts = mesh->numVerts;
-	vertSize = vbo->vertexSize;
+	vertSize = layout->vertexSize;
 
-	hfa = vbo->halfFloatAttribs;
+	hfa = layout->halfFloatAttribs;
 
 	// upload vertex xyz data
 	if( vattribs & VATTRIB_POSITION_BIT ) {
@@ -418,40 +424,40 @@ vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs
 	}
 
 	// upload normals data
-	if( vbo->normalsOffset && ( vattribs & VATTRIB_NORMAL_BIT ) ) {
+	if( layout->normalsOffset && ( vattribs & VATTRIB_NORMAL_BIT ) ) {
 		if( !mesh->normalsArray ) {
 			errMask |= VATTRIB_NORMAL_BIT;
 		} else {
 			R_FillVertexBuffer_float_or_half( FLOAT_VATTRIB_GL_TYPE( VATTRIB_NORMAL_BIT, hfa ),
 											  mesh->normalsArray[0],
-											  4, vertSize, numVerts, data + vbo->normalsOffset );
+											  4, vertSize, numVerts, data + layout->normalsOffset );
 		}
 	}
 
 	// upload tangent vectors
-	if( vbo->sVectorsOffset && ( ( vattribs & ( VATTRIB_SVECTOR_BIT | VATTRIB_AUTOSPRITE2_BIT ) ) == VATTRIB_SVECTOR_BIT ) ) {
+	if( layout->sVectorsOffset && ( ( vattribs & ( VATTRIB_SVECTOR_BIT | VATTRIB_AUTOSPRITE2_BIT ) ) == VATTRIB_SVECTOR_BIT ) ) {
 		if( !mesh->sVectorsArray ) {
 			errMask |= VATTRIB_SVECTOR_BIT;
 		} else {
 			R_FillVertexBuffer_float_or_half( FLOAT_VATTRIB_GL_TYPE( VATTRIB_SVECTOR_BIT, hfa ),
 											  mesh->sVectorsArray[0],
-											  4, vertSize, numVerts, data + vbo->sVectorsOffset );
+											  4, vertSize, numVerts, data + layout->sVectorsOffset );
 		}
 	}
 
 	// upload texture coordinates
-	if( vbo->stOffset && ( vattribs & VATTRIB_TEXCOORDS_BIT ) ) {
+	if( layout->stOffset && ( vattribs & VATTRIB_TEXCOORDS_BIT ) ) {
 		if( !mesh->stArray ) {
 			errMask |= VATTRIB_TEXCOORDS_BIT;
 		} else {
 			R_FillVertexBuffer_float_or_half( FLOAT_VATTRIB_GL_TYPE( VATTRIB_TEXCOORDS_BIT, hfa ),
 											  mesh->stArray[0],
-											  2, vertSize, numVerts, data + vbo->stOffset );
+											  2, vertSize, numVerts, data + layout->stOffset );
 		}
 	}
 
 	// upload lightmap texture coordinates
-	if( vbo->lmstOffset[0] && ( vattribs & VATTRIB_LMCOORDS0_BIT ) ) {
+	if( vbo->layout.lmstOffset[0] && ( vattribs & VATTRIB_LMCOORDS0_BIT ) ) {
 		vattribbit_t lmattrbit;
 		int type = FLOAT_VATTRIB_GL_TYPE( VATTRIB_LMCOORDS0_BIT, hfa );
 		int lmstSize = ( ( type == GL_HALF_FLOAT ) ? 2 * sizeof( GLhalf ) : 2 * sizeof( float ) );
@@ -469,7 +475,7 @@ vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs
 
 			R_FillVertexBuffer_float_or_half( type,
 											  mesh->lmstArray[i * 2 + 0][0],
-											  2, vertSize, numVerts, data + vbo->lmstOffset[i] );
+											  2, vertSize, numVerts, data + vbo->layout.lmstOffset[i] );
 
 			if( vattribs & ( lmattrbit << 1 ) ) {
 				if( !mesh->lmstArray[i * 2 + 1] ) {
@@ -478,7 +484,7 @@ vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs
 				}
 				R_FillVertexBuffer_float_or_half( type,
 												  mesh->lmstArray[i * 2 + 1][0],
-												  2, vertSize, numVerts, data + vbo->lmstOffset[i] + lmstSize );
+												  2, vertSize, numVerts, data + vbo->layout.lmstOffset[i] + lmstSize );
 			}
 
 			lmattrbit = ( decltype( lmattrbit ) )( lmattrbit << 2 );
@@ -486,7 +492,7 @@ vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs
 	}
 
 	// upload lightmap array texture layers
-	if( vbo->lmlayersOffset[0] && ( vattribs & VATTRIB_LMLAYERS0123_BIT ) ) {
+	if( vbo->layout.lmlayersOffset[0] && ( vattribs & VATTRIB_LMLAYERS0123_BIT ) ) {
 		vattribbit_t lmattrbit;
 
 		lmattrbit = VATTRIB_LMLAYERS0123_BIT;
@@ -502,26 +508,26 @@ vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs
 
 			R_FillVertexBuffer( int, int,
 								( int * )&mesh->lmlayersArray[i][0],
-								1, vertSize, numVerts, data + vbo->lmlayersOffset[i] );
+								1, vertSize, numVerts, data + vbo->layout.lmlayersOffset[i] );
 
 			lmattrbit = ( decltype( lmattrbit ) )( lmattrbit << 1 );
 		}
 	}
 
 	// upload vertex colors (although indices > 0 are never used)
-	if( vbo->colorsOffset[0] && ( vattribs & VATTRIB_COLOR0_BIT ) ) {
+	if( vbo->layout.colorsOffset[0] && ( vattribs & VATTRIB_COLOR0_BIT ) ) {
 		if( !mesh->colorsArray[0] ) {
 			errMask |= VATTRIB_COLOR0_BIT;
 		} else {
 			R_FillVertexBuffer( int, int,
 								(int *)&mesh->colorsArray[0][0],
-								1, vertSize, numVerts, data + vbo->colorsOffset[0] );
+								1, vertSize, numVerts, data + vbo->layout.colorsOffset[0] );
 		}
 	}
 
 	// upload centre and radius for autosprites
 	// this code assumes that the mesh has been properly pretransformed
-	if( vbo->spritePointsOffset && ( ( vattribs & VATTRIB_AUTOSPRITE2_BIT ) == VATTRIB_AUTOSPRITE2_BIT ) ) {
+	if( vbo->layout.spritePointsOffset && ( ( vattribs & VATTRIB_AUTOSPRITE2_BIT ) == VATTRIB_AUTOSPRITE2_BIT ) ) {
 		// for autosprite2 also upload vertices that form the longest axis
 		// the remaining vertex can be trivially computed in vertex shader
 		vec3_t vd[3];
@@ -534,8 +540,8 @@ vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs
 		vec4_t *verts = mesh->xyzArray;
 		const elem_t *elems = mesh->elems, trifanElems[6] = { 0, 1, 2, 0, 2, 3 };
 		int numQuads;
-		size_t bufferOffset0 = vbo->spritePointsOffset;
-		size_t bufferOffset1 = vbo->sVectorsOffset;
+		size_t bufferOffset0 = vbo->layout.spritePointsOffset;
+		size_t bufferOffset1 = vbo->layout.sVectorsOffset;
 
 		assert( ( mesh->elems && mesh->numElems ) || ( numVerts == 4 ) );
 		if( mesh->elems && mesh->numElems ) {
@@ -611,11 +617,11 @@ vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs
 			bufferOffset0 += 4 * vertSize;
 			bufferOffset1 += 4 * vertSize;
 		}
-	} else if( vbo->spritePointsOffset && ( ( vattribs & VATTRIB_AUTOSPRITE_BIT ) == VATTRIB_AUTOSPRITE_BIT ) ) {
+	} else if( vbo->layout.spritePointsOffset && ( ( vattribs & VATTRIB_AUTOSPRITE_BIT ) == VATTRIB_AUTOSPRITE_BIT ) ) {
 		vec4_t *verts;
 		vec4_t centre[4];
 		int numQuads;
-		size_t bufferOffset = vbo->spritePointsOffset;
+		size_t bufferOffset = vbo->layout.spritePointsOffset;
 
 		if( mesh->xyzArray ) {
 			verts = mesh->xyzArray;
@@ -647,22 +653,22 @@ vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs
 	}
 
 	if( vattribs & VATTRIB_BONES_BITS ) {
-		if( vbo->bonesIndicesOffset ) {
+		if( layout->bonesIndicesOffset ) {
 			if( !mesh->blendIndices ) {
 				errMask |= VATTRIB_BONESINDICES_BIT;
 			} else {
 				R_FillVertexBuffer( int, int,
 									(int *)&mesh->blendIndices[0],
-									1, vertSize, numVerts, data + vbo->bonesIndicesOffset );
+									1, vertSize, numVerts, data + layout->bonesIndicesOffset );
 			}
 		}
-		if( vbo->bonesWeightsOffset ) {
+		if( layout->bonesWeightsOffset ) {
 			if( !mesh->blendWeights ) {
 				errMask |= VATTRIB_BONESWEIGHTS_BIT;
 			} else {
 				R_FillVertexBuffer( int, int,
 									(int *)&mesh->blendWeights[0],
-									1, vertSize, numVerts, data + vbo->bonesWeightsOffset );
+									1, vertSize, numVerts, data + layout->bonesWeightsOffset );
 			}
 		}
 	}
@@ -684,7 +690,7 @@ void R_UploadVBOVertexRawData( mesh_vbo_t *vbo, int vertsOffset, int numVerts, c
 	}
 
 	qglBindBuffer( GL_ARRAY_BUFFER, vbo->vertexId );
-	qglBufferSubData( GL_ARRAY_BUFFER, vertsOffset * vbo->vertexSize, numVerts * vbo->vertexSize, data );
+	qglBufferSubData( GL_ARRAY_BUFFER, vertsOffset * vbo->layout.vertexSize, numVerts * vbo->layout.vertexSize, data );
 }
 
 /*
@@ -704,7 +710,7 @@ vattribmask_t R_UploadVBOVertexData( mesh_vbo_t *vbo, int vertsOffset, vattribma
 		R_DeferDataSync();
 	}
 
-	data = R_VBOVertBuffer( mesh->numVerts, vbo->vertexSize );
+	data = R_VBOVertBuffer( mesh->numVerts, vbo->layout.vertexSize );
 	errMask = R_FillVBOVertexDataBuffer( vbo, vattribs, mesh, data );
 	R_UploadVBOVertexRawData( vbo, vertsOffset, mesh->numVerts, data );
 	return errMask;
@@ -795,10 +801,10 @@ vattribmask_t R_UploadVBOInstancesData( mesh_vbo_t *vbo, int instOffset, int num
 		R_DeferDataSync();
 	}
 
-	if( vbo->instancesOffset ) {
+	if( vbo->layout.instancesOffset ) {
 		qglBindBuffer( GL_ARRAY_BUFFER, vbo->vertexId );
 		qglBufferSubData( GL_ARRAY_BUFFER,
-							 vbo->instancesOffset + instOffset * sizeof( instancePoint_t ),
+							 vbo->layout.instancesOffset + instOffset * sizeof( instancePoint_t ),
 							 numInstances * sizeof( instancePoint_t ), instances );
 	}
 

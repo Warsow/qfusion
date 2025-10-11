@@ -195,7 +195,7 @@ void RB_RegisterStreamVBOs() {
 			stream->vbo = R_CreateMeshVBO( &rb,
 										   MAX_STREAM_VBO_VERTS, MAX_STREAM_VBO_ELEMENTS, 0,
 										   vattribs[i], VBO_TAG_STREAM, 0 );
-			stream->vertexData = (uint8_t *)Q_malloc( MAX_STREAM_VBO_VERTS * stream->vbo->vertexSize );
+			stream->vertexData = (uint8_t *)Q_malloc( MAX_STREAM_VBO_VERTS * stream->vbo->layout.vertexSize );
 		}
 	}
 
@@ -205,7 +205,7 @@ void RB_RegisterStreamVBOs() {
 		} else {
 			constexpr vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_COLOR0_BIT | VATTRIB_TEXCOORDS_BIT;
 			fru.vbo = R_CreateMeshVBO( &rb, MAX_UPLOAD_VBO_VERTICES, MAX_UPLOAD_VBO_INDICES, 0, vattribs, VBO_TAG_STREAM, 0 );
-			fru.vboData = Q_malloc( MAX_UPLOAD_VBO_VERTICES * fru.vbo->vertexSize );
+			fru.vboData = Q_malloc( MAX_UPLOAD_VBO_VERTICES * fru.vbo->layout.vertexSize );
 			fru.iboData = Q_malloc( MAX_UPLOAD_VBO_INDICES * sizeof( uint16_t ) );
 		}
 	}
@@ -254,10 +254,10 @@ void R_SetFrameUploadMeshSubdata( unsigned group, unsigned verticesOffset, unsig
 	if( mesh->numVerts && mesh->numElems ) {
 		auto &fru = rb.frameUploads[group];
 
-		void *const destVertexData    = (uint8_t *)fru.vboData + verticesOffset * fru.vbo->vertexSize;
+		void *const destVertexData    = (uint8_t *)fru.vboData + verticesOffset * fru.vbo->layout.vertexSize;
 		uint16_t *const destIndexData = (uint16_t *)fru.iboData + indicesOffset;
 
-		R_FillVBOVertexDataBuffer( fru.vbo, fru.vbo->vertexAttribs, mesh, destVertexData );
+		R_FillVBOVertexDataBuffer( fru.vbo, fru.vbo->layout.vertexAttribs, mesh, destVertexData );
 		for( unsigned i = 0; i < mesh->numElems; ++i ) {
 			// TODO: Current frontend-enforced limitations are the sole protection from overflow
 			// TODO: Use draw elements base vertex
@@ -274,7 +274,7 @@ void R_EndFrameUploads( unsigned group ) {
 	if( auto &fru = rb.frameUploads[group]; fru.vertexDataSize && fru.indexDataSize ) {
 		RB_BindVBO( RB_VBOIdForFrameUploads( group ) );
 
-		qglBufferSubData( GL_ARRAY_BUFFER, 0, (GLsizeiptr)( fru.vbo->vertexSize * fru.vertexDataSize ), fru.vboData );
+		qglBufferSubData( GL_ARRAY_BUFFER, 0, ( fru.vbo->layout.vertexSize * fru.vertexDataSize ), fru.vboData );
 		qglBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)( sizeof( uint16_t ) * fru.indexDataSize ), fru.iboData );
 
 		fru.vertexDataSize = ~0u;
@@ -408,7 +408,7 @@ void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
 
 	const int destVertOffset = stream->drawElements.firstVert + stream->drawElements.numVerts;
 	R_FillVBOVertexDataBuffer( stream->vbo, vattribs, mesh,
-							   stream->vertexData + destVertOffset * stream->vbo->vertexSize );
+							   stream->vertexData + destVertOffset * stream->vbo->layout.vertexSize );
 
 	elem_t *destElems = dynamicStreamElems[-streamId - 1] + stream->drawElements.firstElem + stream->drawElements.numElems;
 	if( trifan ) {
@@ -451,7 +451,7 @@ void RB_FlushDynamicMeshes() {
 
 		if( stream->drawElements.numVerts ) {
 			R_UploadVBOVertexRawData( stream->vbo, stream->drawElements.firstVert, stream->drawElements.numVerts,
-									  stream->vertexData + stream->drawElements.firstVert * stream->vbo->vertexSize );
+									  stream->vertexData + stream->drawElements.firstVert * stream->vbo->layout.vertexSize );
 			stream->drawElements.firstVert += stream->drawElements.numVerts;
 			stream->drawElements.numVerts = 0;
 		}
@@ -526,7 +526,7 @@ void RB_DrawMesh( const FrontendToBackendShared *fsh, int vboId, const DrawMeshV
 
 	assert( rb.materialState.currentShader );
 
-	rb.glState->enableVertexAttribs( rb.drawState.currentVAttribs, vbo );
+	rb.glState->enableVertexAttribs( rb.drawState.currentVAttribs, vbo, &vbo->layout );
 
 	if( rb.globalState.wireframe ) {
 		RB_DrawWireframeMesh( fsh, drawMeshVertSpan, primitive );

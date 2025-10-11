@@ -1550,37 +1550,45 @@ typedef enum {
 	VBO_TAG_STREAM
 } vbo_tag_t;
 
-typedef struct mesh_vbo_s {
-	unsigned int index;
-	int registrationSequence;
-	vbo_tag_t tag;
-
-	unsigned int vertexId;
-	unsigned int elemId;
-	void                *owner;
-	unsigned int visframe;
-
-	unsigned int numVerts;
-	unsigned int numElems;
-
-	size_t vertexSize;
-	size_t arrayBufferSize;
-	size_t elemBufferSize;
-
+struct VboSpanLayout {
 	vattribmask_t vertexAttribs;
 	vattribmask_t halfFloatAttribs;
 
-	size_t normalsOffset;
-	size_t sVectorsOffset;
-	size_t stOffset;
-	size_t lmstOffset[( MAX_LIGHTMAPS + 1 ) / 2];
-	size_t lmstSize[( MAX_LIGHTMAPS + 1 ) / 2];
-	size_t lmlayersOffset[( MAX_LIGHTMAPS + 3 ) / 4];
-	size_t colorsOffset[MAX_LIGHTMAPS];
-	size_t bonesIndicesOffset;
-	size_t bonesWeightsOffset;
-	size_t spritePointsOffset;              // autosprite or autosprite2 centre + radius
-	size_t instancesOffset;
+	unsigned baseOffset;
+	unsigned instancesOffset;
+
+	uint8_t vertexSize;
+
+	uint8_t normalsOffset;
+	uint8_t sVectorsOffset;
+	uint8_t stOffset;
+	uint8_t lmstOffset[( MAX_LIGHTMAPS + 1 ) / 2];
+	uint8_t lmstSize[( MAX_LIGHTMAPS + 1 ) / 2];
+	uint8_t lmlayersOffset[( MAX_LIGHTMAPS + 3 ) / 4];
+	uint8_t colorsOffset[MAX_LIGHTMAPS];
+	uint8_t bonesIndicesOffset;
+	uint8_t bonesWeightsOffset;
+	uint8_t spritePointsOffset;              // autosprite or autosprite2 centre + radius
+};
+
+typedef struct mesh_vbo_s {
+	void   *owner;
+
+	// TODO: This is practically unused except for merging bsp surfaces.
+	// Also it's meaninggless for heterogenous buffers.
+	unsigned numVerts;
+	unsigned numElems;
+
+	unsigned index;
+	int registrationSequence;
+
+	vbo_tag_t tag;
+
+	unsigned vertexId;
+	unsigned elemId;
+
+	// TODO: Don't store it inline in this aggregate
+	VboSpanLayout layout;
 } mesh_vbo_t;
 
 void        R_InitVBO( void );
