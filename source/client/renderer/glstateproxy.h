@@ -66,7 +66,7 @@ public:
 	void bindVertexBuffer( GLuint buffer );
 	void bindIndexBuffer( GLuint buffer );
 
-	void enableVertexAttribs( vattribmask_t attribs, const mesh_vbo_s *vbo, const VboSpanLayout *layout );
+	void enableVertexAttribs( vattribmask_t attribs, const VboSpanLayout *layout );
 
 	// TODO: There are problems with initialization order
 	static void bindFramebufferObject( GLStateProxy *holder, RenderTargetComponents *components );

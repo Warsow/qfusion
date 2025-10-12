@@ -364,8 +364,9 @@ auto RendererFrontend::allocStateForCamera() -> StateForCamera * {
 	stateForCamera->prepareCoronasWorkload   = &resultStorage->prepareCoronasWorkloadBuffer;
 	stateForCamera->prepareParticlesWorkload = &resultStorage->prepareParticlesWorkloadBuffer;
 	stateForCamera->batchedSurfVertSpans     = &resultStorage->batchedSurfVertSpansBuffer;
-	stateForCamera->prepareSpritesWorkload   = &resultStorage->prepareSpritesWorkloadBuffer;
-	stateForCamera->preparedSpriteMeshes     = &resultStorage->preparedSpriteMeshesBuffer;
+
+	stateForCamera->prepareSpritesWorkload            = &resultStorage->prepareSpritesWorkloadBuffer;
+	stateForCamera->preparedSpriteVertElemAndVboSpans = &resultStorage->spriteVertElemAndVboSpansBuffer;
 
 	stateForCamera->visibleLeavesBuffer            = &resultStorage->visibleLeavesBuffer;
 	stateForCamera->visibleOccludersBuffer         = &resultStorage->visibleOccludersBuffer;
@@ -790,11 +791,15 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 		// by primary and portal camera groups. The primary call starts uploads.
 		// Make sure the following portal stage does not reset values.
 
-		self->m_dynamicMeshOffsetsOfVerticesAndIndices     = { 0, 0 };
-		self->m_variousDynamicsOffsetsOfVerticesAndIndices = { 0, 0 };
+		self->m_dynamicMeshCountersOfVerticesAndIndices = { 0, 0 };
+		self->m_batchedSurfCountersOfVerticesAndIndices = { 0, 0 };
+
+		self->m_spriteSurfOffsetOfVertices = 0;
+		self->m_spriteSurfCounterOfIndices = 0;
 
 		R_BeginFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
 		R_BeginFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
+		R_BeginFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT );
 
 		workloadStorage = &self->m_dynamicStuffWorkloadStorage[0];
 	}
@@ -803,7 +808,7 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 	if( v_drawEntities.get() ) {
 		for( auto [scene, stateForCamera] : scenesAndCameras ) {
 			const std::span<const Frustum> occluderFrusta { stateForCamera->occluderFrusta, stateForCamera->numOccluderFrusta };
-			self->collectVisibleDynamicMeshes( stateForCamera, scene, occluderFrusta, &self->m_dynamicMeshOffsetsOfVerticesAndIndices );
+			self->collectVisibleDynamicMeshes( stateForCamera, scene, occluderFrusta, &self->m_dynamicMeshCountersOfVerticesAndIndices );
 
 			for( unsigned i = 0; i < stateForCamera->numDynamicMeshDrawSurfaces; ++i ) {
 				DynamicMeshDrawSurface *drawSurface = &stateForCamera->dynamicMeshDrawSurfaces[i];
@@ -904,7 +909,7 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 		self->processSortList( stateForCamera, scene );
 	}
 
-	self->markBuffersOfBatchedDynamicsForUpload( scenesAndCameras, workloadStorage );
+	self->markBuffersOfVariousDynamicsForUpload( scenesAndCameras, workloadStorage );
 
 	for( PrepareBatchedSurfWorkload *workload: workloadStorage->selectedPolysWorkload ) {
 		self->prepareBatchedQuadPolys( workload );
@@ -916,7 +921,7 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 		self->prepareBatchedParticles( workload );
 	}
 	for( PrepareSpriteSurfWorkload *workload: workloadStorage->selectedSpriteWorkload ) {
-		self->prepareLegacySprite( workload );
+		self->prepareLegacySprites( workload );
 	}
 
 	// If there's processing of portals, finish it prior to awaiting uploads
@@ -930,8 +935,19 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 
 	// The primary group of cameras ends uploads
 	if( !areCamerasPortalCameras ) {
-		R_EndFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
-		R_EndFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
+		const VboSpanLayout *dynamicMeshLayout = RB_VBOSpanLayoutForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
+		const unsigned dynamicMeshVertexDataSize = dynamicMeshLayout->vertexSize * self->m_dynamicMeshCountersOfVerticesAndIndices.first;
+		const unsigned dynamicMeshIndexDataSize = sizeof( elem_t ) * self->m_dynamicMeshCountersOfVerticesAndIndices.second;
+		R_EndFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH, dynamicMeshVertexDataSize, dynamicMeshIndexDataSize );
+
+		const VboSpanLayout *batchedMeshLayout = RB_VBOSpanLayoutForFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
+		const unsigned batchedMeshVertexDataSize = batchedMeshLayout->vertexSize * self->m_batchedSurfCountersOfVerticesAndIndices.first;
+		const unsigned batchedMeshIndexDataSize = sizeof( elem_t ) * self->m_batchedSurfCountersOfVerticesAndIndices.second;
+		R_EndFrameUploads( UPLOAD_GROUP_BATCHED_MESH, batchedMeshVertexDataSize, batchedMeshIndexDataSize );
+
+		const unsigned spriteVertexDataSize = self->m_spriteSurfOffsetOfVertices;
+		const unsigned spriteIndexDataSize  = sizeof( elem_t ) * self->m_spriteSurfCounterOfIndices;
+		R_EndFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT, spriteVertexDataSize, spriteIndexDataSize );
 	}
 }
 

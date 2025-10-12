@@ -91,9 +91,8 @@ void R_InitVBO( void ) {
 	qglBindVertexArray( r_vao );
 }
 
-[[nodiscard]]
-static auto buildVertexLayoutForVattribs( VboSpanLayout *layout, vattribmask_t vattribs, vattribmask_t halfFloatVattribs,
-										  int numVerts, int numInstances ) -> size_t {
+auto buildVertexLayoutForVattribs( VboSpanLayout *layout, vattribmask_t vattribs, vattribmask_t halfFloatVattribs,
+								   int numVerts, int numInstances ) -> size_t {
 	memset( layout, 0, sizeof( VboSpanLayout ) );
 
 	// vertex data
@@ -389,7 +388,7 @@ R_FillVertexBuffer_f( int, int, );
 * VATTRIB_POSITION_BIT is not set, it will also reset bits for other positional
 * attributes such as autosprite pos and instance pos.
 */
-vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs, const mesh_t *mesh, void *outData ) {
+vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, const VboSpanLayout *layout, vattribmask_t vattribs, const mesh_t *mesh, void *outData ) {
 	int i, j;
 	unsigned numVerts;
 	size_t vertSize;
@@ -403,7 +402,9 @@ vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs
 		return 0;
 	}
 
-	const VboSpanLayout *const layout = &vbo->layout;
+	if( !layout ) {
+		layout = &vbo->layout;
+	}
 	uint8_t *data = (uint8_t *)outData + layout->baseOffset;
 
 	errMask = 0;
@@ -711,7 +712,7 @@ vattribmask_t R_UploadVBOVertexData( mesh_vbo_t *vbo, int vertsOffset, vattribma
 	}
 
 	data = R_VBOVertBuffer( mesh->numVerts, vbo->layout.vertexSize );
-	errMask = R_FillVBOVertexDataBuffer( vbo, vattribs, mesh, data );
+	errMask = R_FillVBOVertexDataBuffer( vbo, nullptr, vattribs, mesh, data );
 	R_UploadVBOVertexRawData( vbo, vertsOffset, mesh->numVerts, data );
 	return errMask;
 }

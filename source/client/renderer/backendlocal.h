@@ -60,12 +60,13 @@ typedef struct r_backend_s {
 	int numDynamicDraws;
 
 	struct {
-		unsigned vertexDataSize;
-		unsigned indexDataSize;
 		mesh_vbo_t *vbo;
 		void *vboData;
 		void *iboData;
-	} frameUploads[2];
+		unsigned vboCapacityInVerts;
+		unsigned vboCapacityInBytes;
+		unsigned iboCapacityInElems;
+	} frameUploads[3];
 
 	// Either persistent during the entire frame or changes much less often than RB_BindShader() calls
 	// TODO: Should it be split into truly-persistent and changing states?

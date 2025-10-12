@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "frontend.h"
 #include "backendlocal.h"
 #include "glstateproxy.h"
+#include "common/facilities/cvar.h"
 #include <common/helpers/memspecbuilder.h>
 #include <common/facilities/sysclock.h>
 
@@ -204,9 +205,23 @@ void RB_RegisterStreamVBOs() {
 			R_TouchMeshVBO( fru.vbo );
 		} else {
 			constexpr vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_COLOR0_BIT | VATTRIB_TEXCOORDS_BIT;
-			fru.vbo = R_CreateMeshVBO( &rb, MAX_UPLOAD_VBO_VERTICES, MAX_UPLOAD_VBO_INDICES, 0, vattribs, VBO_TAG_STREAM, 0 );
-			fru.vboData = Q_malloc( MAX_UPLOAD_VBO_VERTICES * fru.vbo->layout.vertexSize );
-			fru.iboData = Q_malloc( MAX_UPLOAD_VBO_INDICES * sizeof( uint16_t ) );
+			unsigned capacityInVerts = 0;
+			const auto group = std::addressof( fru ) - rb.frameUploads;
+			if( group == UPLOAD_GROUP_DYNAMIC_MESH || group == UPLOAD_GROUP_BATCHED_MESH ) {
+				capacityInVerts = ( 1 << 16 ) - 1;
+			} else {
+				// We don't need that much for sprites
+				assert( group == UPLOAD_GROUP_BATCHED_MESH_EXT );
+				capacityInVerts = 4096;
+			}
+			unsigned capacityInElems = 6 * capacityInVerts;
+			// TODO: Allow to supplying capacity in bytes for heterogenous buffers
+			fru.vbo = R_CreateMeshVBO( &rb, capacityInVerts, capacityInElems, 0, vattribs, VBO_TAG_STREAM, 0 );
+			fru.vboData = Q_malloc( capacityInVerts * fru.vbo->layout.vertexSize );
+			fru.iboData = Q_malloc( capacityInElems * sizeof( uint16_t ) );
+			fru.vboCapacityInVerts = capacityInVerts;
+			fru.vboCapacityInBytes = capacityInVerts * fru.vbo->layout.vertexSize;
+			fru.iboCapacityInElems = capacityInElems;
 		}
 	}
 }
@@ -218,6 +233,8 @@ mesh_vbo_s *RB_BindVBO( int id ) {
 			vbo = rb.frameUploads[UPLOAD_GROUP_DYNAMIC_MESH].vbo;
 		} else if( id == RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH ) ) {
 			vbo = rb.frameUploads[UPLOAD_GROUP_BATCHED_MESH].vbo;
+		} else if( id == RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT ) ) {
+			vbo = rb.frameUploads[UPLOAD_GROUP_BATCHED_MESH_EXT].vbo;
 		} else {
 			vbo = rb.dynamicStreams[-id - 1].vbo;
 		}
@@ -243,42 +260,73 @@ int RB_VBOIdForFrameUploads( unsigned group ) {
 	return std::numeric_limits<int>::min() + (int)group;
 }
 
-void R_BeginFrameUploads( unsigned group ) {
+const VboSpanLayout *RB_VBOSpanLayoutForFrameUploads( unsigned group ) {
 	assert( group < std::size( rb.frameUploads ) );
-	rb.frameUploads[group].vertexDataSize = 0;
-	rb.frameUploads[group].indexDataSize  = 0;
+	return &rb.frameUploads[group].vbo->layout;
 }
 
-void R_SetFrameUploadMeshSubdata( unsigned group, unsigned verticesOffset, unsigned indicesOffset, const mesh_t *mesh ) {
+unsigned RB_VboCapacityInVertexBytesForFrameUploads( unsigned group ) {
+	assert( group < std::size( rb.frameUploads ) );
+	return rb.frameUploads[group].vboCapacityInBytes;
+}
+
+unsigned RB_VboCapacityInVerticesForFrameUploads( unsigned group ) {
+	assert( group < std::size( rb.frameUploads ) && group != UPLOAD_GROUP_BATCHED_MESH_EXT );
+	return rb.frameUploads[group].vboCapacityInVerts;
+}
+
+unsigned RB_VboCapacityInIndexElemsForFrameUploads( unsigned group ) {
+	assert( group < std::size( rb.frameUploads ) );
+	return rb.frameUploads[group].iboCapacityInElems;
+}
+
+void R_BeginFrameUploads( unsigned group ) {
+	assert( group < std::size( rb.frameUploads ) );
+}
+
+void R_SetFrameUploadMeshSubdataUsingOffsets( unsigned group, unsigned baseVertex, unsigned verticesOffsetInBytes,
+											  unsigned indicesOffsetInBytes, const mesh_t *mesh ) {
 	assert( group < std::size( rb.frameUploads ) );
 	if( mesh->numVerts && mesh->numElems ) {
 		auto &fru = rb.frameUploads[group];
 
-		void *const destVertexData    = (uint8_t *)fru.vboData + verticesOffset * fru.vbo->layout.vertexSize;
-		uint16_t *const destIndexData = (uint16_t *)fru.iboData + indicesOffset;
+		auto *const destVertexData = (uint8_t *)fru.vboData + verticesOffsetInBytes;
+		auto *const destIndexData  = (uint16_t *)( (uint8_t *)fru.iboData + indicesOffsetInBytes );
 
-		R_FillVBOVertexDataBuffer( fru.vbo, fru.vbo->layout.vertexAttribs, mesh, destVertexData );
+		R_FillVBOVertexDataBuffer( fru.vbo, &fru.vbo->layout, fru.vbo->layout.vertexAttribs, mesh, destVertexData );
 		for( unsigned i = 0; i < mesh->numElems; ++i ) {
 			// TODO: Current frontend-enforced limitations are the sole protection from overflow
 			// TODO: Use draw elements base vertex
-			destIndexData[i] = mesh->elems[i] + verticesOffset;
+			destIndexData[i] = mesh->elems[i] + baseVertex;
 		}
-
-		fru.vertexDataSize = wsw::max( fru.vertexDataSize, verticesOffset + mesh->numVerts );
-		fru.indexDataSize  = wsw::max( fru.indexDataSize, indicesOffset + mesh->numElems );
 	}
 }
 
-void R_EndFrameUploads( unsigned group ) {
+void R_SetFrameUploadMeshSubdataUsingLayout( unsigned group, unsigned baseVertex, const VboSpanLayout *layout,
+											 unsigned indexOfFirstIndex, const mesh_t *mesh ) {
 	assert( group < std::size( rb.frameUploads ) );
-	if( auto &fru = rb.frameUploads[group]; fru.vertexDataSize && fru.indexDataSize ) {
+	if( mesh->numVerts && mesh->numElems ) {
+		auto &fru = rb.frameUploads[group];
+
+		R_FillVBOVertexDataBuffer( fru.vbo, layout, layout->vertexAttribs, mesh, fru.vboData );
+
+		auto *const destIndexData  = ( (uint16_t *)fru.iboData ) + indexOfFirstIndex;
+		for( unsigned i = 0; i < mesh->numElems; ++i ) {
+			// TODO: Current frontend-enforced limitations are the sole protection from overflow
+			// TODO: Use draw elements base vertex
+			destIndexData[i] = mesh->elems[i] + baseVertex;
+		}
+	}
+}
+
+void R_EndFrameUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes ) {
+	assert( group < std::size( rb.frameUploads ) );
+	if( vertexDataSizeInBytes && indexDataSizeInBytes ) {
 		RB_BindVBO( RB_VBOIdForFrameUploads( group ) );
+		const auto &fru = rb.frameUploads[group];
 
-		qglBufferSubData( GL_ARRAY_BUFFER, 0, ( fru.vbo->layout.vertexSize * fru.vertexDataSize ), fru.vboData );
-		qglBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)( sizeof( uint16_t ) * fru.indexDataSize ), fru.iboData );
-
-		fru.vertexDataSize = ~0u;
-		fru.indexDataSize  = ~0u;
+		qglBufferSubData( GL_ARRAY_BUFFER, 0, vertexDataSizeInBytes, fru.vboData );
+		qglBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, indexDataSizeInBytes, fru.iboData );
 	}
 }
 
@@ -407,7 +455,7 @@ void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
 	}
 
 	const int destVertOffset = stream->drawElements.firstVert + stream->drawElements.numVerts;
-	R_FillVBOVertexDataBuffer( stream->vbo, vattribs, mesh,
+	R_FillVBOVertexDataBuffer( stream->vbo, nullptr, vattribs, mesh,
 							   stream->vertexData + destVertOffset * stream->vbo->layout.vertexSize );
 
 	elem_t *destElems = dynamicStreamElems[-streamId - 1] + stream->drawElements.firstElem + stream->drawElements.numElems;
@@ -481,7 +529,7 @@ void RB_FlushDynamicMeshes() {
 		}
 
 		const DrawMeshVertSpan drawMeshVertSpan = draw->drawElements;
-		RB_DrawMesh( nullptr, draw->streamId, &drawMeshVertSpan, GL_TRIANGLES );
+		RB_DrawMesh( nullptr, draw->streamId, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 	}
 
 	rb.numDynamicDraws = 0;
@@ -519,14 +567,18 @@ void RB_DoDrawMeshVerts( const DrawMeshVertSpan *vertSpan, int primitive ) {
 	}
 }
 
-void RB_DrawMesh( const FrontendToBackendShared *fsh, int vboId, const DrawMeshVertSpan *drawMeshVertSpan, int primitive ) {
+void RB_DrawMesh( const FrontendToBackendShared *fsh, int vboId, const VboSpanLayout *layout, const DrawMeshVertSpan *drawMeshVertSpan, int primitive ) {
 	const mesh_vbo_s *vbo = RB_BindVBO( vboId );
+
+	if( !layout ) [[likely]] {
+		layout = &vbo->layout;
+	}
 
 	rb.drawState.currentVAttribs &= ~VATTRIB_INSTANCES_BITS;
 
 	assert( rb.materialState.currentShader );
 
-	rb.glState->enableVertexAttribs( rb.drawState.currentVAttribs, vbo, &vbo->layout );
+	rb.glState->enableVertexAttribs( rb.drawState.currentVAttribs, layout );
 
 	if( rb.globalState.wireframe ) {
 		RB_DrawWireframeMesh( fsh, drawMeshVertSpan, primitive );
@@ -753,7 +805,7 @@ void R_SubmitAliasSurfToBackend( const FrontendToBackendShared *fsh, const entit
 		.firstElem = 0, .numElems = 3u * aliasmesh->numtris,
 	};
 
-	RB_DrawMesh( fsh, aliasmesh->vbo->index, &drawMeshVertSpan, GL_TRIANGLES );
+	RB_DrawMesh( fsh, aliasmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 }
 
 void R_SubmitSkeletalSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceSkeletal_t *drawSurf ) {
@@ -780,7 +832,7 @@ void R_SubmitSkeletalSurfToBackend( const FrontendToBackendShared *fsh, const en
 	if( !cache || R_SkeletalRenderAsFrame0( cache ) ) {
 		// fastpath: render static frame 0 as is
 		if( skmesh->vbo ) {
-			RB_DrawMesh( fsh, skmesh->vbo->index, &drawMeshVertSpan, GL_TRIANGLES );
+			RB_DrawMesh( fsh, skmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 			return;
 		}
 	}
@@ -788,7 +840,7 @@ void R_SubmitSkeletalSurfToBackend( const FrontendToBackendShared *fsh, const en
 	if( bonePoseRelativeDQ && skmesh->vbo ) {
 		// another fastpath: transform the initial pose on the GPU
 		RB_SetBonesData( skmodel->numbones, bonePoseRelativeDQ, skmesh->maxWeights );
-		RB_DrawMesh( fsh, skmesh->vbo->index, &drawMeshVertSpan, GL_TRIANGLES );
+		RB_DrawMesh( fsh, skmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 		return;
 	}
 }
@@ -803,7 +855,7 @@ void R_SubmitBSPSurfToBackend( const FrontendToBackendShared *fsh, const entity_
 
 	const DrawMeshVertSpan &drawMeshVertSpan = drawSurf->mdSpan;
 
-	RB_DrawMesh( fsh, mergedBspSurf->vbo->index, &drawMeshVertSpan, GL_TRIANGLES );
+	RB_DrawMesh( fsh, mergedBspSurf->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 }
 
 void R_SubmitNullSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const void * ) {
@@ -813,7 +865,7 @@ void R_SubmitNullSurfToBackend( const FrontendToBackendShared *fsh, const entity
 		.firstVert = 0, .numVerts = 6, .firstElem = 0, .numElems = 6,
 	};
 
-	RB_DrawMesh( fsh, rsh.nullVBO->index, &drawMeshVertSpan, GL_LINES );
+	RB_DrawMesh( fsh, rsh.nullVBO->index, nullptr, &drawMeshVertSpan, GL_LINES );
 }
 
 void R_SubmitDynamicMeshToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader,
@@ -827,7 +879,7 @@ void R_SubmitDynamicMeshToBackend( const FrontendToBackendShared *fsh, const ent
 			.numElems  = drawSurface->actualNumIndices,
 		};
 
-		RB_DrawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH ), &drawMeshVertSpan, GL_TRIANGLES );
+		RB_DrawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH ), nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 	}
 }
 
@@ -839,14 +891,18 @@ void R_SubmitBatchedSurfsToBackend( const FrontendToBackendShared *fsh, const en
 	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
 		RB_BindShader( e, overrideParams, paramsTable, shader, fog, nullptr );
 		const DrawMeshVertSpan drawMeshVertSpan = vertElemSpan;
-		RB_DrawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH ), &drawMeshVertSpan, GL_TRIANGLES );
+		RB_DrawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH ), nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 	}
 }
 
-void R_SubmitSpriteSurfsToBackend( const FrontendToBackendShared *fsh, const entity_t *e,
-								   const ShaderParams *, const ShaderParamsTable *paramsTable,
-								   const shader_s *shader, const mfog_t *fog,
-								   const portalSurface_t *portalSurface, unsigned meshIndex ) {
-	auto *mesh = (mesh_t *)( (uint8_t *)fsh->preparedSpriteMeshes + meshIndex * fsh->preparedSpriteMeshStride );
-	RB_AddDynamicMesh( e, shader, fog, portalSurface, 0, mesh, GL_TRIANGLES, 0.0f, 0.0f );
+void R_SubmitBatchedSurfsToBackendExt( const FrontendToBackendShared *fsh, const entity_t *e,
+									   const ShaderParams *, const ShaderParamsTable *paramsTable,
+									   const shader_s *shader, const mfog_t *fog,
+									   const portalSurface_t *portalSurface, unsigned vertElemSpanAndVboSpanIndex ) {
+	const auto &[vertElemSpan, vboSpanLayout] = fsh->batchedVertElemAndVboSpans[vertElemSpanAndVboSpanIndex];
+	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
+		RB_BindShader( e, nullptr, paramsTable, shader, fog, nullptr );
+		const DrawMeshVertSpan drawMeshVertSpan = vertElemSpan;
+		RB_DrawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT ), &vboSpanLayout, &drawMeshVertSpan, GL_TRIANGLES );
+	}
 }
