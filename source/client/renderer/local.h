@@ -777,18 +777,26 @@ void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
 void RB_FlushDynamicMeshes( void );
 
 enum : unsigned {
-	UPLOAD_GROUP_DYNAMIC_MESH = 0,
-	UPLOAD_GROUP_BATCHED_MESH = 1,
+	UPLOAD_GROUP_DYNAMIC_MESH     = 0,
+	UPLOAD_GROUP_BATCHED_MESH     = 1,
+	// TODO: Redesign the interface of dynamic uploads, use better naming
+	UPLOAD_GROUP_BATCHED_MESH_EXT = 2,
 };
 
-constexpr auto MAX_UPLOAD_VBO_VERTICES = (1 << 16) - 1;
-constexpr auto MAX_UPLOAD_VBO_INDICES  = 6 * MAX_UPLOAD_VBO_VERTICES;
+struct VboSpanLayout;
 
 int RB_VBOIdForFrameUploads( unsigned group );
+const VboSpanLayout *RB_VBOSpanLayoutForFrameUploads( unsigned group );
+unsigned RB_VboCapacityInVertexBytesForFrameUploads( unsigned group );
+unsigned RB_VboCapacityInVerticesForFrameUploads( unsigned group );
+unsigned RB_VboCapacityInIndexElemsForFrameUploads( unsigned group );
 
 void R_BeginFrameUploads( unsigned group );
-void R_SetFrameUploadMeshSubdata( unsigned group, unsigned verticesOffset, unsigned indicesOffset, const mesh_t *mesh );
-void R_EndFrameUploads( unsigned group );
+void R_SetFrameUploadMeshSubdataUsingOffsets( unsigned group, unsigned baseVertex, unsigned verticesOffsetInBytes,
+											  unsigned indicesOffsetInBytes, const mesh_t *mesh );
+void R_SetFrameUploadMeshSubdataUsingLayout( unsigned group, unsigned baseVertex, const VboSpanLayout *layout,
+											 unsigned indexOfFirstIndex, const mesh_t *mesh );
+void R_EndFrameUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes );
 
 struct VertElemSpan {
 	unsigned firstVert;
@@ -799,7 +807,7 @@ struct VertElemSpan {
 
 using DrawMeshVertSpan = std::variant<VertElemSpan, MultiDrawElemSpan>;
 
-void RB_DrawMesh( const FrontendToBackendShared *fsh, int vboId, const DrawMeshVertSpan *vertSpan, int primitive );
+void RB_DrawMesh( const FrontendToBackendShared *fsh, int vboId, const VboSpanLayout *vboSpanLayout, const DrawMeshVertSpan *vertSpan, int primitive );
 
 void RB_DrawWireframeMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, int primitive );
 void RB_DrawShadedMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, int primitive );
@@ -1445,14 +1453,34 @@ void R_BuildTangentVectors( int numVertexes, vec4_t *xyzArray, vec4_t *normalsAr
 
 struct ParticleDrawSurface { uint16_t aggregateIndex; uint16_t particleIndex; };
 
+struct VboSpanLayout {
+	vattribmask_t vertexAttribs;
+	vattribmask_t halfFloatAttribs;
+
+	unsigned baseOffset;
+	unsigned instancesOffset;
+
+	uint8_t vertexSize;
+
+	uint8_t normalsOffset;
+	uint8_t sVectorsOffset;
+	uint8_t stOffset;
+	uint8_t lmstOffset[( MAX_LIGHTMAPS + 1 ) / 2];
+	uint8_t lmstSize[( MAX_LIGHTMAPS + 1 ) / 2];
+	uint8_t lmlayersOffset[( MAX_LIGHTMAPS + 3 ) / 4];
+	uint8_t colorsOffset[MAX_LIGHTMAPS];
+	uint8_t bonesIndicesOffset;
+	uint8_t bonesWeightsOffset;
+	uint8_t spritePointsOffset;              // autosprite or autosprite2 centre + radius
+};
+
 struct FrontendToBackendShared {
 	const Scene::DynamicLight *dynamicLights;
 	const Scene::ParticlesAggregate *particleAggregates;
 	std::span<const uint16_t> visibleProgramLightIndices;
 	std::span<const uint16_t> allVisibleLightIndices;
 	const VertElemSpan *batchedVertElemSpans;
-	const void *preparedSpriteMeshes;
-	unsigned preparedSpriteMeshStride;
+	const std::pair<VertElemSpan, VboSpanLayout> *batchedVertElemAndVboSpans;
 	// TODO: How do i supply mesh
 	vec3_t viewOrigin;
 	mat3_t viewAxis;
@@ -1467,8 +1495,8 @@ void R_SubmitDynamicMeshToBackend( const FrontendToBackendShared *fsh, const ent
 void R_SubmitBSPSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceBSP_t *drawSurf );
 void R_SubmitNullSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const void * );
 
-void R_SubmitSpriteSurfsToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, unsigned meshOffset );
 void R_SubmitBatchedSurfsToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, unsigned vertElemSpanOffset );
+void R_SubmitBatchedSurfsToBackendExt( const FrontendToBackendShared *fsh, const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, unsigned vertAndVboSpanOffset );
 
 //
 // r_poly.c
@@ -1550,27 +1578,6 @@ typedef enum {
 	VBO_TAG_STREAM
 } vbo_tag_t;
 
-struct VboSpanLayout {
-	vattribmask_t vertexAttribs;
-	vattribmask_t halfFloatAttribs;
-
-	unsigned baseOffset;
-	unsigned instancesOffset;
-
-	uint8_t vertexSize;
-
-	uint8_t normalsOffset;
-	uint8_t sVectorsOffset;
-	uint8_t stOffset;
-	uint8_t lmstOffset[( MAX_LIGHTMAPS + 1 ) / 2];
-	uint8_t lmstSize[( MAX_LIGHTMAPS + 1 ) / 2];
-	uint8_t lmlayersOffset[( MAX_LIGHTMAPS + 3 ) / 4];
-	uint8_t colorsOffset[MAX_LIGHTMAPS];
-	uint8_t bonesIndicesOffset;
-	uint8_t bonesWeightsOffset;
-	uint8_t spritePointsOffset;              // autosprite or autosprite2 centre + radius
-};
-
 typedef struct mesh_vbo_s {
 	void   *owner;
 
@@ -1598,7 +1605,7 @@ void        R_ReleaseMeshVBO( mesh_vbo_t *vbo );
 void        R_TouchMeshVBO( mesh_vbo_t *vbo );
 mesh_vbo_t *R_GetVBOByIndex( int index );
 int         R_GetNumberOfActiveVBOs( void );
-vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, vattribmask_t vattribs, const mesh_t *mesh, void *outData );
+vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, const VboSpanLayout *layout, vattribmask_t vattribs, const mesh_t *mesh, void *outData );
 void        R_UploadVBOVertexRawData( mesh_vbo_t *vbo, int vertsOffset, int numVerts, const void *data );
 vattribmask_t R_UploadVBOVertexData( mesh_vbo_t *vbo, int vertsOffset, vattribmask_t vattribs, const mesh_t *mesh );
 void        R_UploadVBOElemData( mesh_vbo_t *vbo, int vertsOffset, int elemsOffset, const mesh_t *mesh );
@@ -1606,6 +1613,10 @@ vattribmask_t R_UploadVBOInstancesData( mesh_vbo_t *vbo, int instOffset, int num
 void        R_FreeVBOsByTag( vbo_tag_t tag );
 void        R_FreeUnusedVBOs( void );
 void        R_ShutdownVBO( void );
+
+[[nodiscard]]
+auto buildVertexLayoutForVattribs( VboSpanLayout *layout, vattribmask_t vattribs, vattribmask_t halfFloatVattribs,
+								   int numVerts, int numInstances ) -> size_t;
 
 typedef struct {
 	int overbrightBits;                     // map specific overbright bits

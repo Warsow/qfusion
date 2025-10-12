@@ -178,20 +178,20 @@ void RendererFrontend::collectVisibleParticles( StateForCamera *stateForCamera, 
 
 void RendererFrontend::collectVisibleDynamicMeshes( StateForCamera *stateForCamera,  Scene *scene,
 													std::span<const Frustum> occluderFrusta,
-													std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
+													std::pair<unsigned, unsigned> *countersOfVerticesAndIndices ) {
 	uint16_t tmpIndices[wsw::max( Scene::kMaxDynamicMeshes, Scene::kMaxCompoundDynamicMeshes )];
 
 	const std::span<const DynamicMesh *> meshes = scene->m_dynamicMeshes;
 	const auto visibleDynamicMeshIndices = cullDynamicMeshes( stateForCamera, meshes.data(),
 															  meshes.size(), occluderFrusta, tmpIndices );
 	addDynamicMeshesToSortList( stateForCamera, scene->m_polyent, scene->m_dynamicMeshes.data(),
-								visibleDynamicMeshIndices, offsetsOfVerticesAndIndices );
+								visibleDynamicMeshIndices, countersOfVerticesAndIndices );
 
 	const std::span<const Scene::CompoundDynamicMesh> compoundMeshes = scene->m_compoundDynamicMeshes;
 	const auto visibleCompoundMeshesIndices = cullCompoundDynamicMeshes( stateForCamera, compoundMeshes,
 																		 occluderFrusta, tmpIndices );
 	addCompoundDynamicMeshesToSortList( stateForCamera, scene->m_polyent, scene->m_compoundDynamicMeshes.data(),
-										visibleCompoundMeshesIndices, offsetsOfVerticesAndIndices );
+										visibleCompoundMeshesIndices, countersOfVerticesAndIndices );
 }
 
 auto RendererFrontend::collectVisibleLights( StateForCamera *stateForCamera, Scene *scene, std::span<const Frustum> occluderFrusta )

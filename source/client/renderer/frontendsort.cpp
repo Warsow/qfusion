@@ -551,7 +551,7 @@ void RendererFrontend::addParticlesToSortList( StateForCamera *stateForCamera, c
 
 void RendererFrontend::addDynamicMeshesToSortList( StateForCamera *stateForCamera, const entity_t *meshEntity,
 												   const DynamicMesh **meshes, std::span<const uint16_t> indicesOfMeshes,
-												   std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
+												   std::pair<unsigned, unsigned> *countersOfVerticesAndIndices ) {
 	const float *const __restrict viewOrigin = stateForCamera->viewOrigin;
 
 	for( const unsigned meshIndex: indicesOfMeshes ) {
@@ -561,14 +561,14 @@ void RendererFrontend::addDynamicMeshesToSortList( StateForCamera *stateForCamer
 		VectorAvg( mesh->cullMins, mesh->cullMaxs, meshCenter );
 		const float distance = DistanceFast( meshCenter, viewOrigin );
 
-		addDynamicMeshToSortList( stateForCamera, meshEntity, mesh, distance, offsetsOfVerticesAndIndices );
+		addDynamicMeshToSortList( stateForCamera, meshEntity, mesh, distance, countersOfVerticesAndIndices );
 	}
 }
 
 void RendererFrontend::addCompoundDynamicMeshesToSortList( StateForCamera *stateForCamera, const entity_t *meshEntity,
 														   const Scene::CompoundDynamicMesh *meshes,
 														   std::span<const uint16_t> indicesOfMeshes,
-														   std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
+														   std::pair<unsigned, unsigned> *countersOfVerticesAndIndices ) {
 	const float *const __restrict viewOrigin = stateForCamera->viewOrigin;
 
 	float distances[Scene::kMaxCompoundDynamicMeshes];
@@ -614,7 +614,7 @@ void RendererFrontend::addCompoundDynamicMeshesToSortList( StateForCamera *state
 		}
 
 		const auto addMesh = [&]( const DynamicMesh *mesh, float distance ) -> void {
-			addDynamicMeshToSortList( stateForCamera, meshEntity, mesh, distance, offsetsOfVerticesAndIndices );
+			addDynamicMeshToSortList( stateForCamera, meshEntity, mesh, distance, countersOfVerticesAndIndices );
 		};
 
 		for( unsigned partNum = 0; partNum < numDrawnBehindParts; ++partNum ) {
@@ -637,7 +637,7 @@ void RendererFrontend::addCompoundDynamicMeshesToSortList( StateForCamera *state
 
 void RendererFrontend::addDynamicMeshToSortList( StateForCamera *stateForCamera, const entity_t *meshEntity,
 												 const DynamicMesh *mesh, float distance,
-												 std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices ) {
+												 std::pair<unsigned, unsigned> *countersOfVerticesAndIndices ) {
 	DynamicMeshDrawSurface *const drawSurface = stateForCamera->dynamicMeshDrawSurfaces +
 												stateForCamera->numDynamicMeshDrawSurfaces;
 	// Dynamic mesh lod code is special
@@ -651,13 +651,15 @@ void RendererFrontend::addDynamicMeshToSortList( StateForCamera *stateForCamera,
 	if( maybeStorageRequirements ) [[likely]] {
 		const auto [numVertices, numIndices] = *maybeStorageRequirements;
 		assert( numVertices && numIndices );
+		const unsigned maxVertices = RB_VboCapacityInVerticesForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
+		const unsigned maxIndices  = RB_VboCapacityInIndexElemsForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
 		// TODO: Allow more if we draw using base vertex
-		if( offsetsOfVerticesAndIndices->first + numVertices <= MAX_UPLOAD_VBO_VERTICES &&
-			offsetsOfVerticesAndIndices->second + numIndices <= MAX_UPLOAD_VBO_INDICES ) {
+		if( countersOfVerticesAndIndices->first + numVertices <= maxVertices &&
+			countersOfVerticesAndIndices->second + numIndices <= maxIndices ) {
 			drawSurface->requestedNumVertices = numVertices;
 			drawSurface->requestedNumIndices  = numIndices;
-			drawSurface->verticesOffset       = offsetsOfVerticesAndIndices->first;
-			drawSurface->indicesOffset        = offsetsOfVerticesAndIndices->second;
+			drawSurface->verticesOffset       = countersOfVerticesAndIndices->first;
+			drawSurface->indicesOffset        = countersOfVerticesAndIndices->second;
 			drawSurface->dynamicMesh          = mesh;
 
 			const mfog_t *fog        = nullptr;
@@ -665,8 +667,8 @@ void RendererFrontend::addDynamicMeshToSortList( StateForCamera *stateForCamera,
 			addEntryToSortList( stateForCamera, meshEntity, fog, material, distance, 0, nullptr, drawSurface, ST_DYNAMIC_MESH );
 
 			stateForCamera->numDynamicMeshDrawSurfaces++;
-			offsetsOfVerticesAndIndices->first += numVertices;
-			offsetsOfVerticesAndIndices->second += numIndices;
+			countersOfVerticesAndIndices->first += numVertices;
+			countersOfVerticesAndIndices->second += numIndices;
 		}
 	}
 }

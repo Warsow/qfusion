@@ -3815,6 +3815,16 @@ void CG_AddFlagModelOnTag( centity_t *cent, byte_vec4_t teamcolor, const char *t
 		flag.outlineHeight = 0;
 
 		CG_AddEntityToScene( &flag, drawSceneRequest );
+
+		flag.origin[2] -= 32.0f;
+		flag.origin2[2] -= 32.0f;
+
+		CG_AddEntityToScene( &flag, drawSceneRequest );
+
+		flag.origin[2] += 64.0f;
+		flag.origin2[2] += 64.0f;
+
+		CG_AddEntityToScene( &flag, drawSceneRequest );
 	}
 
 	drawSceneRequest->addLight( flag.origin, 128.0f, 0.0f, teamcolor[0] / 255, teamcolor[1] / 255, teamcolor[2] / 255 );

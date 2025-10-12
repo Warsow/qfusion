@@ -355,7 +355,7 @@ void GLStateProxy::enableVertexAttrib( int index, bool enable ) {
 	}
 }
 
-void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const mesh_vbo_s *vbo, const VboSpanLayout *layout ) {
+void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLayout *layout ) {
 	assert( vattribs & VATTRIB_POSITION_BIT );
 	const vattribmask_t hfa = layout->halfFloatAttribs;
 	if( vattribs == m_lastVAttribs && hfa == m_lastHalfFloatVAttribs && layout->baseOffset == m_lastVboSpanOffset ) {

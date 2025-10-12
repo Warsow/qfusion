@@ -145,21 +145,13 @@ private:
 		unsigned vertSpanOffset;
 	};
 
-	// ST_SPRITE surfaces need special handling as they go through the legacy dynamic mesh path
 	struct PrepareSpriteSurfWorkload {
 		std::span<const sortedDrawSurf_t> batchSpan;
+		const shader_t *material;
+		Scene *scene;
 		StateForCamera *stateForCamera;
-		unsigned firstMeshOffset;
-	};
-
-	// A "mesh" and the respective data storage
-	struct PreparedSpriteMesh {
-		mesh_t mesh;
-		vec4_t positions[4];
-		vec4_t normals[4];
-		vec2_t texCoords[4];
-		byte_vec4_t colors[4];
-		elem_t indices[6];
+		unsigned vertAndVboSpanOffset;
+		unsigned indexOfFirstIndex;
 	};
 
 	struct DebugLine {
@@ -230,7 +222,7 @@ private:
 		wsw::PodVector<VertElemSpan> *batchedSurfVertSpans;
 
 		wsw::PodVector<PrepareSpriteSurfWorkload> *prepareSpritesWorkload;
-		wsw::PodVector<PreparedSpriteMesh> *preparedSpriteMeshes;
+		wsw::PodVector<std::pair<VertElemSpan, VboSpanLayout>> *preparedSpriteVertElemAndVboSpans;
 
 		PodBuffer<unsigned> *visibleLeavesBuffer;
 		PodBuffer<unsigned> *visibleOccludersBuffer;
@@ -383,7 +375,7 @@ private:
 								 std::span<const Frustum> occluderFrusta, uint16_t *tmpIndices ) -> std::span<const uint16_t>;
 
 	void collectVisibleDynamicMeshes( StateForCamera *stateForCamera, Scene *scene, std::span<const Frustum> frusta,
-									  std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices );
+									  std::pair<unsigned, unsigned> *countersOfVerticesAndIndices );
 
 	[[nodiscard]]
 	auto cullCompoundDynamicMeshes( StateForCamera *stateForCamera, std::span<const Scene::CompoundDynamicMesh> meshes,
@@ -419,14 +411,14 @@ private:
 								 const Scene::ParticlesAggregate *particles, std::span<const uint16_t> aggregateIndices );
 
 	void addDynamicMeshesToSortList( StateForCamera *stateForCamera, const entity_t *meshEntity, const DynamicMesh **meshes,
-									 std::span<const uint16_t> indicesOfMeshes, std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices );
+									 std::span<const uint16_t> indicesOfMeshes, std::pair<unsigned, unsigned> *countersOfVerticesAndIndices );
 
 	void addCompoundDynamicMeshesToSortList( StateForCamera *stateForCamera, const entity_t *meshEntity,
 											 const Scene::CompoundDynamicMesh *meshes, std::span<const uint16_t> indicesOfMeshes,
-											 std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices );
+											 std::pair<unsigned, unsigned> *countersOfVerticesAndIndices );
 
 	void addDynamicMeshToSortList( StateForCamera *stateForCamera, const entity_t *meshEntity, const DynamicMesh *mesh,
-								   float distance, std::pair<unsigned, unsigned> *offsetsOfVerticesAndIndices );
+								   float distance, std::pair<unsigned, unsigned> *countersOfVerticesAndIndices );
 
 	void addCoronaLightsToSortList( StateForCamera *stateForCamera, const entity_t *polyEntity, const Scene::DynamicLight *lights,
 									std::span<const uint16_t> indices );
@@ -635,12 +627,14 @@ private:
 		const ShaderParams *, const ShaderParamsTable *,
 		const shader_t *, const mfog_t *, const portalSurface_t *, unsigned );
 
+	// TODO: Rename, as it's no longer just "batched"
 	[[nodiscard]]
-	auto registerBuildingBatchedSurf( StateForCamera *stateForCamera, Scene *scene, unsigned surfType, std::span<const sortedDrawSurf_t> batchSpan )
+	auto registerBuildingBatchedSurf( StateForCamera *stateForCamera, Scene *scene, const shader_s *material,
+									  unsigned surfType, std::span<const sortedDrawSurf_t> batchSpan )
 		-> std::pair<SubmitBatchedSurfFn, unsigned>;
 
 	struct DynamicStuffWorkloadStorage;
-	void markBuffersOfBatchedDynamicsForUpload( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
+	void markBuffersOfVariousDynamicsForUpload( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
 												DynamicStuffWorkloadStorage *workloadStorage );
 
 	struct DynamicMeshFillDataWorkload;
@@ -650,7 +644,7 @@ private:
 	void prepareBatchedCoronas( PrepareBatchedSurfWorkload *workload );
 	void prepareBatchedParticles( PrepareBatchedSurfWorkload *workload );
 
-	void prepareLegacySprite( PrepareSpriteSurfWorkload *workload );
+	void prepareLegacySprites( PrepareSpriteSurfWorkload *workload );
 
 	// TODO: Should we care of preparing the data in async fashion?
 	void submitRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2,
@@ -698,7 +692,7 @@ private:
 		wsw::PodVector<VertElemSpan> batchedSurfVertSpansBuffer;
 
 		wsw::PodVector<PrepareSpriteSurfWorkload> prepareSpritesWorkloadBuffer;
-		wsw::PodVector<PreparedSpriteMesh> preparedSpriteMeshesBuffer;
+		wsw::PodVector<std::pair<VertElemSpan, VboSpanLayout>> spriteVertElemAndVboSpansBuffer;
 
 		PodBuffer<unsigned> visibleLeavesBuffer;
 		PodBuffer<unsigned> visibleOccludersBuffer;
@@ -756,8 +750,14 @@ private:
 	};
 
 	// Note: Both regular and portal stages access these values from the single thread.
-	std::pair<unsigned, unsigned> m_dynamicMeshOffsetsOfVerticesAndIndices { 0, 0 };
-	std::pair<unsigned, unsigned> m_variousDynamicsOffsetsOfVerticesAndIndices { 0, 0 };
+
+	// Counters of elements of the same size
+	std::pair<unsigned, unsigned> m_dynamicMeshCountersOfVerticesAndIndices { 0, 0 };
+	std::pair<unsigned, unsigned> m_batchedSurfCountersOfVerticesAndIndices { 0, 0 };
+
+	// Offsets in bytes (elements have variable size)
+	unsigned m_spriteSurfOffsetOfVertices { 0 };
+	unsigned m_spriteSurfCounterOfIndices { 0 };
 
 	struct DynamicStuffWorkloadStorage {
 		wsw::PodVector<DynamicMeshFillDataWorkload> dynamicMeshFillDataWorkload;

@@ -111,7 +111,8 @@ static const drawSurf_cb r_drawSurfCb[ST_MAX_TYPES] = {
 	( drawSurf_cb ) & R_SubmitNullSurfToBackend,
 };
 
-auto RendererFrontend::registerBuildingBatchedSurf( StateForCamera *stateForCamera, Scene *scene, unsigned surfType,
+auto RendererFrontend::registerBuildingBatchedSurf( StateForCamera *stateForCamera, Scene *scene,
+													const shader_s *material, unsigned surfType,
 													std::span<const sortedDrawSurf_t> batchSpan )
 	-> std::pair<SubmitBatchedSurfFn, unsigned> {
 	assert( !r_drawSurfCb[surfType] );
@@ -143,17 +144,18 @@ auto RendererFrontend::registerBuildingBatchedSurf( StateForCamera *stateForCame
 
 		resultFn = R_SubmitBatchedSurfsToBackend;
 	} else {
-		resultOffset = stateForCamera->preparedSpriteMeshes->size();
-		// We need an element for each mesh in span
-		stateForCamera->preparedSpriteMeshes->resize( stateForCamera->preparedSpriteMeshes->size() + batchSpan.size() );
+		resultOffset = stateForCamera->preparedSpriteVertElemAndVboSpans->size();
+		stateForCamera->preparedSpriteVertElemAndVboSpans->append( {} );
 
 		stateForCamera->prepareSpritesWorkload->append( PrepareSpriteSurfWorkload {
-			.batchSpan       = batchSpan,
-			.stateForCamera  = stateForCamera,
-			.firstMeshOffset = resultOffset,
+			.batchSpan            = batchSpan,
+			.material             = material,
+			.scene                = scene,
+			.stateForCamera       = stateForCamera,
+			.vertAndVboSpanOffset = resultOffset,
 		});
 
-		resultFn = R_SubmitSpriteSurfsToBackend;
+		resultFn = R_SubmitBatchedSurfsToBackendExt;
 	}
 
 	return { resultFn, resultOffset };
@@ -166,8 +168,9 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 	stateForCamera->prepareCoronasWorkload->clear();
 	stateForCamera->prepareParticlesWorkload->clear();
 	stateForCamera->batchedSurfVertSpans->clear();
+
 	stateForCamera->prepareSpritesWorkload->clear();
-	stateForCamera->preparedSpriteMeshes->clear();
+	stateForCamera->preparedSpriteVertElemAndVboSpans->clear();
 
 	const auto *sortList = stateForCamera->sortList;
 	if( sortList->empty() ) [[unlikely]] {
@@ -274,13 +277,14 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 				const sortedDrawSurf_t *batchSpanEnd = sds;
 
 				assert( batchSpanEnd > batchSpanBegin );
-				const auto [submitFn, offset] = registerBuildingBatchedSurf( stateForCamera, scene, prevSurfType,
+				const auto [submitFn, offset] = registerBuildingBatchedSurf( stateForCamera, scene,
+																			 prevShader, prevSurfType,
 																			 { batchSpanBegin, batchSpanEnd } );
 
 				drawActionsList->append( [=]( FrontendToBackendShared *fsh ) {
-					RB_FlushDynamicMeshes();
+					//RB_FlushDynamicMeshes();
 					submitFn( fsh, prevEntity, prevOverrideParams, paramsTable, prevShader, prevFog, prevPortalSurface, offset );
-					RB_FlushDynamicMeshes();
+					//RB_FlushDynamicMeshes();
 				});
 			}
 
@@ -295,7 +299,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 				if( !depthHack ) {
 					depthHack = true;
 					drawActionsList->append([=]( FrontendToBackendShared *fsh ) {
-						RB_FlushDynamicMeshes();
+						//RB_FlushDynamicMeshes();
 						float depthmin = 0.0f, depthmax = 0.0f;
 						RB_GetDepthRange( &depthmin, &depthmax );
 						RB_SaveDepthRange();
@@ -306,7 +310,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 				if( depthHack ) {
 					depthHack = false;
 					drawActionsList->append([=]( FrontendToBackendShared * ) {
-						RB_FlushDynamicMeshes();
+						//RB_FlushDynamicMeshes();
 						RB_RestoreDepthRange();
 					});
 				}
@@ -318,7 +322,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 				cullHack = ( ( entity->flags & RF_CULLHACK ) ? true : false );
 				if( cullHack != oldCullHack ) {
 					drawActionsList->append( [=]( FrontendToBackendShared * ) {
-						RB_FlushDynamicMeshes();
+						//RB_FlushDynamicMeshes();
 						RB_FlipFrontFace();
 					});
 				}
@@ -330,7 +334,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			if( infiniteProj != prevInfiniteProj ) {
 				if( infiniteProj ) {
 					drawActionsList->append( [=]( FrontendToBackendShared * ) {
-						RB_FlushDynamicMeshes();
+						//RB_FlushDynamicMeshes();
 						mat4_t projectionMatrix;
 						Matrix4_Copy( stateForCamera->projectionMatrix, projectionMatrix );
 						Matrix4_PerspectiveProjectionToInfinity( Z_NEAR, projectionMatrix, glConfig.depthEpsilon );
@@ -338,7 +342,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 					});
 				} else {
 					drawActionsList->append( [=]( FrontendToBackendShared * ) {
-						RB_FlushDynamicMeshes();
+						//RB_FlushDynamicMeshes();
 						RB_LoadProjectionMatrix( stateForCamera->projectionMatrix );
 					});
 				}
@@ -399,13 +403,14 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 		const sortedDrawSurf_t *batchSpanEnd = drawSurfs + numDrawSurfs;
 
 		assert( batchSpanEnd > batchSpanBegin );
-		const auto [submitFn, offset] = registerBuildingBatchedSurf( stateForCamera, scene, prevSurfType,
+		const auto [submitFn, offset] = registerBuildingBatchedSurf( stateForCamera, scene,
+																	 prevShader, prevSurfType,
 																	 { batchSpanBegin, batchSpanEnd } );
 
 		drawActionsList->append( [=]( FrontendToBackendShared *fsh ) {
-			RB_FlushDynamicMeshes();
+			//RB_FlushDynamicMeshes();
 			submitFn( fsh, prevEntity, prevOverrideParams, paramsTable, prevShader, prevFog, prevPortalSurface, offset );
-			RB_FlushDynamicMeshes();
+			//RB_FlushDynamicMeshes();
 		});
 	}
 
@@ -483,20 +488,23 @@ auto getQuadPolySpanStorageRequirements( std::span<const sortedDrawSurf_t> batch
 	return std::make_optional( std::make_pair( numVertices, numIndices ) );
 }
 
-void RendererFrontend::markBuffersOfBatchedDynamicsForUpload( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
+void RendererFrontend::markBuffersOfVariousDynamicsForUpload( std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
 															  DynamicStuffWorkloadStorage *workloadStorage ) {
 	workloadStorage->selectedPolysWorkload.clear();
 	workloadStorage->selectedCoronasWorkload.clear();
 	workloadStorage->selectedParticlesWorkload.clear();
 	workloadStorage->selectedSpriteWorkload.clear();
 
-	const auto markAndAdvanceBatchedOffsets = [this]( const std::pair<unsigned, unsigned> &storageRequirements,
-													  StateForCamera *stateForCamera,
-													  const PrepareBatchedSurfWorkload &workload ) -> bool {
-		unsigned *const offsetOfVertices = &m_variousDynamicsOffsetsOfVerticesAndIndices.first;
-		unsigned *const offsetOfIndices  = &m_variousDynamicsOffsetsOfVerticesAndIndices.second;
-		if( *offsetOfVertices + storageRequirements.first <= MAX_UPLOAD_VBO_VERTICES &&
-			*offsetOfIndices + storageRequirements.second <= MAX_UPLOAD_VBO_INDICES ) {
+	const unsigned maxBatchedBufferVertices = RB_VboCapacityInVerticesForFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
+	const unsigned maxBatchedBufferIndices  = RB_VboCapacityInIndexElemsForFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
+
+	const auto markAndAdvanceBatchedOffsets = [&, this]( const std::pair<unsigned, unsigned> &storageRequirements,
+														 StateForCamera *stateForCamera,
+														 const PrepareBatchedSurfWorkload &workload ) -> bool {
+		unsigned *const offsetOfVertices = &m_batchedSurfCountersOfVerticesAndIndices.first;
+		unsigned *const offsetOfIndices  = &m_batchedSurfCountersOfVerticesAndIndices.second;
+		if( *offsetOfVertices + storageRequirements.first <= maxBatchedBufferVertices &&
+			*offsetOfIndices + storageRequirements.second <= maxBatchedBufferIndices ) {
 			stateForCamera->batchedSurfVertSpans->data()[workload.vertSpanOffset] = VertElemSpan {
 				.firstVert = *offsetOfVertices,
 				.numVerts  = storageRequirements.first,
@@ -552,9 +560,44 @@ void RendererFrontend::markBuffersOfBatchedDynamicsForUpload( std::span<std::pai
 		}
 	}
 
+	const unsigned maxSpriteBufferVertexBytes = RB_VboCapacityInVertexBytesForFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT );
+	const unsigned maxSpriteBufferIndices     = RB_VboCapacityInIndexElemsForFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT );
+
 	for( auto [scene, stateForCamera] : scenesAndCameras ) {
 		for( PrepareSpriteSurfWorkload &workload: *stateForCamera->prepareSpritesWorkload ) {
-			workloadStorage->selectedSpriteWorkload.push_back( std::addressof( workload ) );
+			std::pair<VertElemSpan, VboSpanLayout> *vertSpanAndLayout =
+				stateForCamera->preparedSpriteVertElemAndVboSpans->data() + workload.vertAndVboSpanOffset;
+
+			const vattribmask_t vattribs          = workload.material->vattribs & ~VATTRIB_INSTANCES_BITS;
+			const vattribmask_t halfFloatVattribs = 0;
+			const size_t quadDataSize = buildVertexLayoutForVattribs( &vertSpanAndLayout->second, vattribs, halfFloatVattribs, 4, 0 );
+			const unsigned numQuads   = workload.batchSpan.size();
+			unsigned vertexDataSize = numQuads * quadDataSize;
+
+			// TODO: Truncate the range in case of overflow, don't reject the full range!
+			// TODO: Take alignment into account? How should we align vertices?
+
+			if( m_spriteSurfOffsetOfVertices + vertexDataSize <= maxSpriteBufferVertexBytes &&
+			    m_spriteSurfCounterOfIndices + 6 * numQuads <= maxSpriteBufferIndices ) {
+				workload.indexOfFirstIndex           = m_spriteSurfCounterOfIndices;
+				vertSpanAndLayout->second.baseOffset = m_spriteSurfOffsetOfVertices;
+
+				// Note: The base vertex is always zero as we rebind buffer pointers in heterogenous buffers for every span
+				vertSpanAndLayout->first = VertElemSpan {
+					.firstVert = 0,
+					.numVerts  = 4 * numQuads,
+					.firstElem = m_spriteSurfCounterOfIndices,
+					.numElems  = 6 * numQuads,
+				};
+
+				workloadStorage->selectedSpriteWorkload.push_back( std::addressof( workload ) );
+
+				m_spriteSurfOffsetOfVertices += vertexDataSize;
+				m_spriteSurfCounterOfIndices += 6 * numQuads;
+			} else {
+				vertSpanAndLayout->first  = VertElemSpan { .numVerts = 0, .numElems = 0 };
+				vertSpanAndLayout->second = VboSpanLayout { .vertexSize = 0 };
+			}
 		}
 	}
 }
@@ -564,8 +607,7 @@ void RendererFrontend::submitDrawActionsList( StateForCamera *stateForCamera, Sc
 	fsh.dynamicLights               = scene->m_dynamicLights.data();
 	fsh.particleAggregates          = scene->m_particles.data();
 	fsh.batchedVertElemSpans        = stateForCamera->batchedSurfVertSpans->data();
-	fsh.preparedSpriteMeshes        = stateForCamera->preparedSpriteMeshes->data();
-	fsh.preparedSpriteMeshStride    = sizeof( PreparedSpriteMesh );
+	fsh.batchedVertElemAndVboSpans  = stateForCamera->preparedSpriteVertElemAndVboSpans->data();
 	fsh.allVisibleLightIndices      = { stateForCamera->allVisibleLightIndices, stateForCamera->numAllVisibleLights };
 	fsh.visibleProgramLightIndices  = { stateForCamera->visibleProgramLightIndices, stateForCamera->numVisibleProgramLights };
 	fsh.renderFlags                 = stateForCamera->renderFlags;
@@ -706,8 +748,11 @@ void RendererFrontend::prepareDynamicMesh( DynamicMeshFillDataWorkload *workload
 		mesh.colorsArray[0] = meshBuilder->meshColors.get();
 		mesh.elems          = meshBuilder->meshIndices.get();
 
-		R_SetFrameUploadMeshSubdata( UPLOAD_GROUP_DYNAMIC_MESH, workload->drawSurface->verticesOffset,
-									 workload->drawSurface->indicesOffset, &mesh );
+		const unsigned uploadGroup             = UPLOAD_GROUP_DYNAMIC_MESH;
+		const unsigned baseVertex              = workload->drawSurface->verticesOffset;
+		const unsigned vertexDataOffsetInBytes = RB_VBOSpanLayoutForFrameUploads( uploadGroup )->vertexSize * baseVertex;
+		const unsigned indexDataOffsetInBytes  = sizeof( elem_t ) * workload->drawSurface->indicesOffset;
+		R_SetFrameUploadMeshSubdataUsingOffsets( uploadGroup, baseVertex, vertexDataOffsetInBytes, indexDataOffsetInBytes, &mesh );
 	}
 }
 
@@ -741,10 +786,11 @@ static void uploadBatchedMesh( MeshBuilder *builder, VertElemSpan *inOutSpan ) {
 		mesh.colorsArray[0] = builder->meshColors.get();
 		mesh.elems          = builder->meshIndices.get();
 
-		const unsigned verticesOffset = inOutSpan->firstVert;
-		const unsigned indicesOffset  = inOutSpan->firstElem;
-
-		R_SetFrameUploadMeshSubdata( UPLOAD_GROUP_BATCHED_MESH, verticesOffset, indicesOffset, &mesh );
+		const unsigned uploadGroup             = UPLOAD_GROUP_BATCHED_MESH;
+		const unsigned baseVertex              = inOutSpan->firstVert;
+		const unsigned vertexDataOffsetInBytes = RB_VBOSpanLayoutForFrameUploads( uploadGroup )->vertexSize * baseVertex;
+		const unsigned indexDataOffsetInBytes  = sizeof( elem_t ) * inOutSpan->firstElem;
+		R_SetFrameUploadMeshSubdataUsingOffsets( uploadGroup, baseVertex, vertexDataOffsetInBytes, indexDataOffsetInBytes, &mesh );
 
 		// Correct original estimations by final values
 		assert( builder->numVerticesSoFar <= inOutSpan->numVerts );
@@ -1288,11 +1334,65 @@ void RendererFrontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *work
 	uploadBatchedMesh( meshBuilder, workload->stateForCamera->batchedSurfVertSpans->data() + workload->vertSpanOffset );
 }
 
-void RendererFrontend::prepareLegacySprite( PrepareSpriteSurfWorkload *workload ) {
-	StateForCamera *const stateForCamera     = workload->stateForCamera;
-	PreparedSpriteMesh *const preparedMeshes = stateForCamera->preparedSpriteMeshes->data() + workload->firstMeshOffset;
-	const float *const viewAxis              = stateForCamera->viewAxis;
-	const bool shouldMirrorView              = ( stateForCamera->renderFlags & RF_MIRRORVIEW ) != 0;
+struct SpriteBuilder {
+	PodBuffer<vec4_t> meshPositions;
+	PodBuffer<vec4_t> meshNormals;
+	PodBuffer<vec2_t> meshTexCoords;
+	PodBuffer<byte_vec4_t> meshColors;
+	PodBuffer<elem_t> meshIndices;
+
+	unsigned numVerticesSoFar { 0 };
+	unsigned numIndicesSoFar { 0 };
+
+	void reserveForNumSpirtes( unsigned numSprites ) {
+		const unsigned numVertices = 4 * numSprites;
+		meshPositions.reserve( numVertices );
+		meshNormals.reserve( numVertices );
+		meshTexCoords.reserve( numVertices );
+		meshColors.reserve( numVertices );
+		meshIndices.reserve( 6 * numSprites );
+
+		this->numVerticesSoFar = 0;
+		this->numIndicesSoFar  = 0;
+	}
+
+	void appendQuad( const vec4_t positions[4], const vec4_t normals[4], const vec2_t texCoords[4], const byte_vec4_t colors[4], const uint16_t indices[6] ) {
+		std::memcpy( meshPositions.get() + numVerticesSoFar, positions, 4 * sizeof( vec4_t ) );
+		std::memcpy( meshNormals.get() + numVerticesSoFar, normals, 4 * sizeof( vec4_t ) );
+		std::memcpy( meshTexCoords.get() + numVerticesSoFar, texCoords, 4 * sizeof( vec2_t ) );
+		std::memcpy( meshColors.get() + numVerticesSoFar, colors, 4 * sizeof( byte_vec4_t ) );
+
+		for( unsigned i = 0; i < 6; ++i ) {
+			meshIndices.get()[numIndicesSoFar + i] = numVerticesSoFar + indices[i];
+		}
+
+		numVerticesSoFar += 4;
+		numIndicesSoFar += 6;
+	}
+
+	void fillMesh( mesh_t *mesh ) {
+		std::memset( mesh, 0, sizeof( mesh_t ) );
+
+		mesh->xyzArray       = meshPositions.get();
+		mesh->normalsArray   = meshNormals.get();
+		mesh->stArray        = meshTexCoords.get();
+		mesh->colorsArray[0] = meshColors.get();
+		mesh->elems          = meshIndices.get();
+
+		mesh->numVerts = numVerticesSoFar;
+		mesh->numElems = numIndicesSoFar;
+	}
+};
+
+static thread_local SpriteBuilder tl_spriteBuilder;
+
+void RendererFrontend::prepareLegacySprites( PrepareSpriteSurfWorkload *workload ) {
+	SpriteBuilder *const spriteBuilder   = &tl_spriteBuilder;
+	StateForCamera *const stateForCamera = workload->stateForCamera;
+	const float *const viewAxis          = stateForCamera->viewAxis;
+	const bool shouldMirrorView          = ( stateForCamera->renderFlags & RF_MIRRORVIEW ) != 0;
+
+	spriteBuilder->reserveForNumSpirtes( workload->batchSpan.size() );
 
 	for( size_t surfInSpan = 0; surfInSpan < workload->batchSpan.size(); ++surfInSpan ) {
 		const sortedDrawSurf_t &sds = workload->batchSpan.data()[surfInSpan];
@@ -1333,25 +1433,18 @@ void RendererFrontend::prepareLegacySprite( PrepareSpriteSurfWorkload *workload 
 		elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
 		vec2_t texcoords[4] = { {0, 1}, {0, 0}, {1,0}, {1,1} };
 
-		PreparedSpriteMesh *const preparedMesh = preparedMeshes + surfInSpan;
-		std::memset( &preparedMesh->mesh, 0, sizeof( mesh_t ) );
-
 		// TODO: Reduce copying
-		std::memcpy( &preparedMesh->positions, xyz, 4 * sizeof( vec4_t ) );
-		std::memcpy( &preparedMesh->normals, normals, 4 * sizeof( vec4_t ) );
-		std::memcpy( &preparedMesh->texCoords, texcoords, 4 * sizeof( vec2_t ) );
-		std::memcpy( &preparedMesh->colors, colors, 4 * sizeof( byte_vec4_t ) );
-		std::memcpy( &preparedMesh->indices, elems, 6 * sizeof( elem_t ) );
-
-		preparedMesh->mesh.xyzArray       = preparedMesh->positions;
-		preparedMesh->mesh.normalsArray   = preparedMesh->normals;
-		preparedMesh->mesh.stArray        = preparedMesh->texCoords;
-		preparedMesh->mesh.colorsArray[0] = preparedMesh->colors;
-		preparedMesh->mesh.elems          = preparedMesh->indices;
-
-		preparedMesh->mesh.numVerts = 4;
-		preparedMesh->mesh.numElems = 6;
+		spriteBuilder->appendQuad( xyz, normals, texcoords, colors, elems );
 	}
+
+	mesh_t mesh;
+	spriteBuilder->fillMesh( &mesh );
+
+	std::pair<VertElemSpan, VboSpanLayout> *const vertSpanAndLayout =
+		stateForCamera->preparedSpriteVertElemAndVboSpans->data() + workload->vertAndVboSpanOffset;
+
+	R_SetFrameUploadMeshSubdataUsingLayout( UPLOAD_GROUP_BATCHED_MESH_EXT, 0, &vertSpanAndLayout->second,
+											workload->indexOfFirstIndex, &mesh );
 }
 
 void RendererFrontend::submitRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2, float angle,
