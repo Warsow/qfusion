@@ -650,6 +650,19 @@ private:
 	void submitRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2,
 								  float angle, const float *color, const shader_s *material );
 
+	struct AuxiliaryDynamicStream;
+
+	[[nodiscard]]
+	auto getStreamForUploadGroup( unsigned uploadGroup ) -> AuxiliaryDynamicStream *;
+
+	void beginAddingAuxiliaryDynamicMeshes( unsigned uploadGroup );
+
+	void addAuxiliaryDynamicMesh( unsigned uploadGroup, const entity_t *entity, const shader_t *shader,
+								  const struct mfog_s *fog, const struct portalSurface_s *portalSurface, unsigned shadowBits,
+								  const struct mesh_s *mesh, int primitive, float x_offset, float y_offset );
+
+	void flushAuxiliaryDynamicMeshes( unsigned uploadGroup );
+
 	auto ( RendererFrontend::*m_collectVisibleWorldLeavesArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
 	auto ( RendererFrontend::*m_collectVisibleOccludersArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
 	auto ( RendererFrontend::*m_buildFrustaOfOccludersArchMethod )( StateForCamera *, std::span<const SortedOccluder> ) -> std::span<const Frustum>;
@@ -771,6 +784,27 @@ private:
 	// (Note that we may start executing tasks of the regular stage while the portal stuff still gets added,
 	// hence we split these workload temporaries by stage).
 	DynamicStuffWorkloadStorage m_dynamicStuffWorkloadStorage[2];
+
+	struct AuxiliaryDynamicDraw {
+		const entity_t *entity;
+		const shader_t *shader;
+		const mfog_t *fog;
+		const portalSurface_t *portalSurface;
+		unsigned shadowBits;
+		int primitive;
+		vec2_t offset;
+		int scissor[4];
+		VertElemSpan drawElements;
+	};
+
+	struct AuxiliaryDynamicStream {
+		wsw::PodVector<AuxiliaryDynamicDraw> draws;
+		unsigned numVertsSoFar { 0 };
+		unsigned numElemsSoFar { 0 };
+	};
+
+	AuxiliaryDynamicStream m_2DMeshStream;
+	AuxiliaryDynamicStream m_debugMeshStream;
 
 	// This is not an appropriate place to keep the client-global instance of task system.
 	// However, moving it to the client code is complicated due to lifetime issues related to client global vars.

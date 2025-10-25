@@ -32,33 +32,9 @@ typedef struct {
 	unsigned int maxWeights;
 } rbBonesData_t;
 
-typedef struct {
-	mesh_vbo_t *vbo;
-	uint8_t *vertexData;
-	VertElemSpan drawElements;
-} rbDynamicStream_t;
-
-typedef struct {
-	const entity_t *entity;
-	const shader_t *shader;
-	const mfog_t *fog;
-	const portalSurface_t *portalSurface;
-	unsigned int shadowBits;
-	vattribmask_t vattribs; // based on the fields above - cached to avoid rebinding
-	int streamId;
-	int primitive;
-	vec2_t offset;
-	int scissor[4];
-	VertElemSpan drawElements;
-} rbDynamicDraw_t;
-
 class GLStateProxy;
 
 typedef struct r_backend_s {
-	rbDynamicStream_t dynamicStreams[RB_VBO_NUM_STREAMS];
-	rbDynamicDraw_t dynamicDraws[MAX_DYNAMIC_DRAWS];
-	int numDynamicDraws;
-
 	struct {
 		mesh_vbo_t *vbo;
 		void *vboData;
@@ -66,7 +42,7 @@ typedef struct r_backend_s {
 		unsigned vboCapacityInVerts;
 		unsigned vboCapacityInBytes;
 		unsigned iboCapacityInElems;
-	} frameUploads[3];
+	} frameUploads[5];
 
 	// Either persistent during the entire frame or changes much less often than RB_BindShader() calls
 	// TODO: Should it be split into truly-persistent and changing states?

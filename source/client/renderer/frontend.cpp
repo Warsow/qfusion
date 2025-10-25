@@ -123,9 +123,11 @@ void RendererFrontend::set2DMode( bool enable ) {
 		RB_SetShaderStateMask( ~0, GLSTATE_NO_DEPTH_TEST );
 
 		RB_SetRenderFlags( 0 );
+
+		beginAddingAuxiliaryDynamicMeshes( UPLOAD_GROUP_2D_MESH );
 	} else {
 		// render previously batched 2D geometry, if any
-		RB_FlushDynamicMeshes();
+		flushAuxiliaryDynamicMeshes( UPLOAD_GROUP_2D_MESH );
 
 		RB_SetShaderStateMask( ~0, 0 );
 	}
@@ -797,9 +799,9 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 		self->m_spriteSurfOffsetOfVertices = 0;
 		self->m_spriteSurfCounterOfIndices = 0;
 
-		R_BeginFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
-		R_BeginFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
-		R_BeginFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT );
+		R_BeginUploads( UPLOAD_GROUP_DYNAMIC_MESH );
+		R_BeginUploads( UPLOAD_GROUP_BATCHED_MESH );
+		R_BeginUploads( UPLOAD_GROUP_BATCHED_MESH_EXT );
 
 		workloadStorage = &self->m_dynamicStuffWorkloadStorage[0];
 	}
@@ -938,16 +940,16 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 		const VboSpanLayout *dynamicMeshLayout = RB_VBOSpanLayoutForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
 		const unsigned dynamicMeshVertexDataSize = dynamicMeshLayout->vertexSize * self->m_dynamicMeshCountersOfVerticesAndIndices.first;
 		const unsigned dynamicMeshIndexDataSize = sizeof( elem_t ) * self->m_dynamicMeshCountersOfVerticesAndIndices.second;
-		R_EndFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH, dynamicMeshVertexDataSize, dynamicMeshIndexDataSize );
+		R_EndUploads( UPLOAD_GROUP_DYNAMIC_MESH, dynamicMeshVertexDataSize, dynamicMeshIndexDataSize );
 
 		const VboSpanLayout *batchedMeshLayout = RB_VBOSpanLayoutForFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
 		const unsigned batchedMeshVertexDataSize = batchedMeshLayout->vertexSize * self->m_batchedSurfCountersOfVerticesAndIndices.first;
 		const unsigned batchedMeshIndexDataSize = sizeof( elem_t ) * self->m_batchedSurfCountersOfVerticesAndIndices.second;
-		R_EndFrameUploads( UPLOAD_GROUP_BATCHED_MESH, batchedMeshVertexDataSize, batchedMeshIndexDataSize );
+		R_EndUploads( UPLOAD_GROUP_BATCHED_MESH, batchedMeshVertexDataSize, batchedMeshIndexDataSize );
 
 		const unsigned spriteVertexDataSize = self->m_spriteSurfOffsetOfVertices;
 		const unsigned spriteIndexDataSize  = sizeof( elem_t ) * self->m_spriteSurfCounterOfIndices;
-		R_EndFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT, spriteVertexDataSize, spriteIndexDataSize );
+		R_EndUploads( UPLOAD_GROUP_BATCHED_MESH_EXT, spriteVertexDataSize, spriteIndexDataSize );
 	}
 }
 
