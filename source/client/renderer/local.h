@@ -726,10 +726,7 @@ struct FrontendToBackendShared;
 #include "shader.h"
 
 enum {
-	RB_VBO_STREAM_COMPACT       = -2, // bind RB_VBO_STREAM instead
-	RB_VBO_STREAM               = -1,
-	RB_VBO_NONE                 = 0,
-	RB_VBO_NUM_STREAMS          = -RB_VBO_STREAM_COMPACT
+	RB_VBO_NONE = 0,
 };
 
 //===================================================================
@@ -750,6 +747,8 @@ void RB_BeginRegistration();
 void RB_EndRegistration();
 
 void RB_LoadCameraMatrix( const mat4_t m );
+// TODO....
+void RB_GetObjectMatrix( float *m );
 void RB_LoadObjectMatrix( const mat4_t m );
 void RB_LoadProjectionMatrix( const mat4_t m );
 
@@ -771,16 +770,15 @@ void RB_BindFrameBufferObject( RenderTargetComponents *renderTargetComponents );
 [[maybe_unused]]
 struct mesh_vbo_s *RB_BindVBO( int id );
 
-void RB_AddDynamicMesh( const entity_t *entity, const shader_t *shader,
-						const struct mfog_s *fog, const struct portalSurface_s *portalSurface, unsigned int shadowBits,
-						const struct mesh_s *mesh, int primitive, float x_offset, float y_offset );
-void RB_FlushDynamicMeshes( void );
-
 enum : unsigned {
 	UPLOAD_GROUP_DYNAMIC_MESH     = 0,
 	UPLOAD_GROUP_BATCHED_MESH     = 1,
 	// TODO: Redesign the interface of dynamic uploads, use better naming
 	UPLOAD_GROUP_BATCHED_MESH_EXT = 2,
+	// TODO: Use one text group per camera
+	UPLOAD_GROUP_2D_MESH,
+	// TODO: Use one debug group per camera - if we care of debug mesh submission performance
+	UPLOAD_GROUP_DEBUG_MESH,
 };
 
 struct VboSpanLayout;
@@ -791,12 +789,12 @@ unsigned RB_VboCapacityInVertexBytesForFrameUploads( unsigned group );
 unsigned RB_VboCapacityInVerticesForFrameUploads( unsigned group );
 unsigned RB_VboCapacityInIndexElemsForFrameUploads( unsigned group );
 
-void R_BeginFrameUploads( unsigned group );
-void R_SetFrameUploadMeshSubdataUsingOffsets( unsigned group, unsigned baseVertex, unsigned verticesOffsetInBytes,
-											  unsigned indicesOffsetInBytes, const mesh_t *mesh );
-void R_SetFrameUploadMeshSubdataUsingLayout( unsigned group, unsigned baseVertex, const VboSpanLayout *layout,
-											 unsigned indexOfFirstIndex, const mesh_t *mesh );
-void R_EndFrameUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes );
+void R_BeginUploads( unsigned group );
+void R_SetUploadedSubdataFromMeshUsingOffsets( unsigned group, unsigned baseVertex, unsigned verticesOffsetInBytes,
+											   unsigned indicesOffsetInBytes, const mesh_t *mesh );
+void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVertex, const VboSpanLayout *layout,
+											  unsigned indexOfFirstIndex, const mesh_t *mesh );
+void R_EndUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes );
 
 struct VertElemSpan {
 	unsigned firstVert;

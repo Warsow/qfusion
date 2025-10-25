@@ -586,9 +586,6 @@ void R_BeginFrame( bool forceClear, int swapInterval ) {
 void R_EndFrame( void ) {
 	WSW_PROFILER_SCOPE();
 
-	// render previously batched 2D geometry, if any
-	RB_FlushDynamicMeshes();
-
 	// reset the 2D state so that the mode will be
 	// properly set back again in R_BeginFrame
 	R_Set2DMode( false );

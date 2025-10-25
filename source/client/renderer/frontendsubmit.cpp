@@ -622,29 +622,35 @@ void RendererFrontend::submitDrawActionsList( StateForCamera *stateForCamera, Sc
 }
 
 void RendererFrontend::submitDebugStuffToBackend( StateForCamera *stateForCamera, Scene *scene ) {
-	// TODO: Reduce this copying
-	vec4_t verts[2];
-	byte_vec4_t colors[2] { { 0, 0, 0, 1 }, { 0, 0, 0, 1 } };
-	elem_t elems[2] { 0, 1 };
+	if( !stateForCamera->debugLines->empty() ) {
+		// TODO: Reduce this copying
+		vec4_t verts[2];
+		byte_vec4_t colors[2] { { 0, 0, 0, 1 }, { 0, 0, 0, 1 } };
+		elem_t elems[2] { 0, 1 };
 
-	mesh_t mesh {};
-	mesh.colorsArray[0] = colors;
-	mesh.xyzArray = verts;
-	mesh.numVerts = 2;
-	mesh.numElems = 2;
-	mesh.elems = elems;
-	verts[0][3] = verts[1][3] = 1.0f;
-	for( const DebugLine &line: *stateForCamera->debugLines ) {
-		VectorCopy( line.p1, verts[0] );
-		VectorCopy( line.p2, verts[1] );
-		std::memcpy( colors[0], &line.color, 4 );
-		std::memcpy( colors[1], &line.color, 4 );
-		RB_AddDynamicMesh( scene->m_worldent, rsh.whiteShader, nullptr, nullptr, 0, &mesh, GL_LINES, 0.0f, 0.0f );
+		mesh_t mesh {};
+		mesh.colorsArray[0] = colors;
+		mesh.xyzArray = verts;
+		mesh.numVerts = 2;
+		mesh.numElems = 2;
+		mesh.elems = elems;
+		verts[0][3] = verts[1][3] = 1.0f;
+
+		beginAddingAuxiliaryDynamicMeshes( UPLOAD_GROUP_DEBUG_MESH );
+
+		for( const DebugLine &line: *stateForCamera->debugLines ) {
+			VectorCopy( line.p1, verts[0] );
+			VectorCopy( line.p2, verts[1] );
+			std::memcpy( colors[0], &line.color, 4 );
+			std::memcpy( colors[1], &line.color, 4 );
+			addAuxiliaryDynamicMesh( UPLOAD_GROUP_DEBUG_MESH, scene->m_worldent, rsh.whiteShader,
+									 nullptr, nullptr, 0, &mesh, GL_LINES, 0.0f, 0.0f );
+		}
+
+		flushAuxiliaryDynamicMeshes( UPLOAD_GROUP_DEBUG_MESH );
+
+		stateForCamera->debugLines->clear();
 	}
-
-	RB_FlushDynamicMeshes();
-
-	stateForCamera->debugLines->clear();
 }
 
 void RendererFrontend::addDebugLine( StateForCamera *stateForCamera, const float *p1, const float *p2, int color ) {
@@ -655,6 +661,157 @@ void RendererFrontend::addDebugLine( StateForCamera *stateForCamera, const float
 	stateForCamera->debugLines->emplace_back( DebugLine {
 		{ p1[0], p1[1], p1[2] }, { p2[0], p2[1], p2[2] }, rgbaColor
 	});
+}
+
+auto RendererFrontend::getStreamForUploadGroup( unsigned uploadGroup ) -> AuxiliaryDynamicStream * {
+	assert( uploadGroup == UPLOAD_GROUP_2D_MESH || uploadGroup == UPLOAD_GROUP_DEBUG_MESH );
+	return uploadGroup == UPLOAD_GROUP_2D_MESH ? &m_2DMeshStream : &m_debugMeshStream;
+}
+
+void RendererFrontend::beginAddingAuxiliaryDynamicMeshes( unsigned uploadGroup ) {
+	assert( getStreamForUploadGroup( uploadGroup )->numVertsSoFar == 0 );
+	assert( getStreamForUploadGroup( uploadGroup )->numElemsSoFar == 0 );
+	R_BeginUploads( uploadGroup );
+}
+
+void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, const entity_t *entity, const shader_t *shader,
+												const struct mfog_s *fog, const struct portalSurface_s *portalSurface,
+												unsigned shadowBits, const struct mesh_s *mesh, int primitive,
+												float xOffset, float yOffset ) {
+	assert( primitive == GL_TRIANGLES || primitive == GL_LINES );
+
+	AuxiliaryDynamicStream *const stream = getStreamForUploadGroup( uploadGroup );
+
+	const unsigned numMeshVerts = mesh->numVerts;
+	const unsigned capacityInVerts = RB_VboCapacityInVerticesForFrameUploads( uploadGroup );
+	if( !numMeshVerts || numMeshVerts + stream->numVertsSoFar > capacityInVerts ) [[unlikely]] {
+		return;
+	}
+
+	const unsigned numMeshElems = mesh->numElems;
+	const unsigned capacityInElems = RB_VboCapacityInIndexElemsForFrameUploads( uploadGroup );
+	if( !numMeshElems || numMeshElems + stream->numElemsSoFar > capacityInElems ) [[unlikely]] {
+		return;
+	}
+
+	AuxiliaryDynamicDraw *prev = nullptr;
+	if( !stream->draws.empty() ) [[likely]] {
+		prev = std::addressof( stream->draws.back() );
+	}
+
+	int scissor[4];
+	RB_GetScissor( &scissor[0], &scissor[1], &scissor[2], &scissor[3] );
+
+	bool merge = false;
+	if( prev ) [[likely]] {
+		// TODO: Should we really care of all these conditions now?
+		if( ( shader->flags & SHADER_ENTITY_MERGABLE ) || ( prev->entity == entity ) ) {
+			const int renderFX     = entity ? entity->renderfx : 0;
+			const int prevRenderFX = prev->entity ? prev->entity->renderfx : 0;
+			if( prevRenderFX == renderFX && prev->shader == shader ) {
+				if( prev->fog == fog && prev->portalSurface == portalSurface ) {
+					if( prev->shadowBits == shadowBits && prev->primitive == primitive ) {
+						if( prev->offset[0] == xOffset && prev->offset[1] == yOffset ) {
+							if( !memcmp( scissor, prev->scissor, std::size( scissor ) * sizeof( *scissor ) ) ) {
+								merge = true;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	AuxiliaryDynamicDraw *draw;
+	if( merge ) [[likely]] {
+		draw = prev;
+		// Just add to counters
+		draw->drawElements.numVerts += numMeshVerts;
+		draw->drawElements.numElems += numMeshElems;
+	} else {
+		stream->draws.emplace_back( AuxiliaryDynamicDraw {
+			.entity = entity,
+			.shader = shader,
+			.fog    = fog,
+			.portalSurface = portalSurface,
+			.shadowBits    = shadowBits,
+			.primitive     = primitive,
+			.offset        = { xOffset, yOffset },
+			.scissor       = { scissor[0], scissor[1], scissor[2], scissor[3] },
+			.drawElements  = VertElemSpan {
+				.firstVert = stream->numVertsSoFar,
+				.numVerts  = numMeshVerts,
+				.firstElem = stream->numElemsSoFar,
+				.numElems  = numMeshElems,
+			}
+		});
+	}
+
+	const unsigned baseVertex = stream->numVertsSoFar;
+	// TODO: Do we really need to specify offsets in bytes for non-variable vertex streams?
+	// Otherwise, using the base vertex is sufficient
+	const unsigned verticesOffsetInBytes = RB_VBOSpanLayoutForFrameUploads( uploadGroup )->vertexSize * stream->numVertsSoFar;
+	const unsigned indicesOffsetInBytes  = sizeof( elem_t ) * stream->numElemsSoFar;
+	R_SetUploadedSubdataFromMeshUsingOffsets( uploadGroup, baseVertex, verticesOffsetInBytes, indicesOffsetInBytes, mesh );
+
+	stream->numVertsSoFar += numMeshVerts;
+	stream->numElemsSoFar += numMeshElems;
+}
+
+void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup ) {
+	if( AuxiliaryDynamicStream *const stream = getStreamForUploadGroup( uploadGroup ); !stream->draws.empty() ) {
+		const unsigned vertexSize     = RB_VBOSpanLayoutForFrameUploads( uploadGroup )->vertexSize;
+		const unsigned vertexDataSize = vertexSize * stream->numVertsSoFar;
+		const unsigned indexDataSize  = sizeof( elem_t ) * stream->numElemsSoFar;
+		assert( vertexDataSize > 0 && indexDataSize > 0 );
+		R_EndUploads( uploadGroup, vertexDataSize, indexDataSize );
+
+		int sx, sy, sw, sh;
+		RB_GetScissor( &sx, &sy, &sw, &sh );
+
+		mat4_t m;
+		RB_GetObjectMatrix( m );
+
+		const float transx = m[12];
+		const float transy = m[13];
+
+		float xOffset = 0.0f, yOffset = 0.0f;
+
+		const auto vboId = RB_VBOIdForFrameUploads( uploadGroup );
+
+		for( const AuxiliaryDynamicDraw &draw: stream->draws ) {
+			assert( draw.shader );
+			RB_BindShader( draw.entity, nullptr, nullptr, draw.shader, draw.fog, nullptr );
+			RB_Scissor( draw.scissor[0], draw.scissor[1], draw.scissor[2], draw.scissor[3] );
+
+			// translate the mesh in 2D
+			if(( xOffset != draw.offset[0] ) || ( yOffset != draw.offset[1] ) ) {
+				xOffset = draw.offset[0];
+				yOffset = draw.offset[1];
+				m[12] = transx + xOffset;
+				m[13] = transy + yOffset;
+				RB_LoadObjectMatrix( m );
+			}
+
+			assert( draw.drawElements.numVerts > 0 && draw.drawElements.numElems > 0 );
+			const DrawMeshVertSpan drawMeshVertSpan = draw.drawElements;
+			assert( draw.primitive == GL_TRIANGLES || draw.primitive == GL_LINES );
+			RB_DrawMesh( nullptr, vboId, nullptr, &drawMeshVertSpan, draw.primitive );
+		}
+
+		RB_Scissor( sx, sy, sw, sh );
+
+		// restore the original translation in the object matrix if it has been changed
+		if( xOffset != 0.0f || yOffset != 0.0f ) {
+			m[12] = transx;
+			m[13] = transy;
+			RB_LoadObjectMatrix( m );
+		}
+
+		stream->draws.clear();
+		stream->numVertsSoFar = 0;
+		stream->numElemsSoFar = 0;
+	}
 }
 
 // TODO: Write to mapped buffers directly
@@ -752,7 +909,7 @@ void RendererFrontend::prepareDynamicMesh( DynamicMeshFillDataWorkload *workload
 		const unsigned baseVertex              = workload->drawSurface->verticesOffset;
 		const unsigned vertexDataOffsetInBytes = RB_VBOSpanLayoutForFrameUploads( uploadGroup )->vertexSize * baseVertex;
 		const unsigned indexDataOffsetInBytes  = sizeof( elem_t ) * workload->drawSurface->indicesOffset;
-		R_SetFrameUploadMeshSubdataUsingOffsets( uploadGroup, baseVertex, vertexDataOffsetInBytes, indexDataOffsetInBytes, &mesh );
+		R_SetUploadedSubdataFromMeshUsingOffsets( uploadGroup, baseVertex, vertexDataOffsetInBytes, indexDataOffsetInBytes, &mesh );
 	}
 }
 
@@ -790,7 +947,7 @@ static void uploadBatchedMesh( MeshBuilder *builder, VertElemSpan *inOutSpan ) {
 		const unsigned baseVertex              = inOutSpan->firstVert;
 		const unsigned vertexDataOffsetInBytes = RB_VBOSpanLayoutForFrameUploads( uploadGroup )->vertexSize * baseVertex;
 		const unsigned indexDataOffsetInBytes  = sizeof( elem_t ) * inOutSpan->firstElem;
-		R_SetFrameUploadMeshSubdataUsingOffsets( uploadGroup, baseVertex, vertexDataOffsetInBytes, indexDataOffsetInBytes, &mesh );
+		R_SetUploadedSubdataFromMeshUsingOffsets( uploadGroup, baseVertex, vertexDataOffsetInBytes, indexDataOffsetInBytes, &mesh );
 
 		// Correct original estimations by final values
 		assert( builder->numVerticesSoFar <= inOutSpan->numVerts );
@@ -1443,8 +1600,8 @@ void RendererFrontend::prepareLegacySprites( PrepareSpriteSurfWorkload *workload
 	std::pair<VertElemSpan, VboSpanLayout> *const vertSpanAndLayout =
 		stateForCamera->preparedSpriteVertElemAndVboSpans->data() + workload->vertAndVboSpanOffset;
 
-	R_SetFrameUploadMeshSubdataUsingLayout( UPLOAD_GROUP_BATCHED_MESH_EXT, 0, &vertSpanAndLayout->second,
-											workload->indexOfFirstIndex, &mesh );
+	R_SetUploadedSubdataFromMeshUsingLayout( UPLOAD_GROUP_BATCHED_MESH_EXT, 0, &vertSpanAndLayout->second,
+											 workload->indexOfFirstIndex, &mesh );
 }
 
 void RendererFrontend::submitRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2, float angle,
@@ -1495,7 +1652,7 @@ void RendererFrontend::submitRotatedStretchPic( int x, int y, int w, int h, floa
 		}
 	}
 
-	RB_AddDynamicMesh( nullptr, material, nullptr, nullptr, 0, &pic_mesh, GL_TRIANGLES, 0.0f, 0.0f );
+	addAuxiliaryDynamicMesh( UPLOAD_GROUP_2D_MESH, nullptr, material, nullptr, nullptr, 0, &pic_mesh, GL_TRIANGLES, 0.0f, 0.0f );
 }
 
 }
