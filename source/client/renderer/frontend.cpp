@@ -359,8 +359,8 @@ auto RendererFrontend::allocStateForCamera() -> StateForCamera * {
 	stateForCamera->shaderParamsStorage->clear();
 	stateForCamera->materialParamsStorage->clear();
 
-	stateForCamera->sortList         = &resultStorage->meshSortList;
-	stateForCamera->drawActionsList  = &resultStorage->drawActionsList;
+	stateForCamera->sortList       = &resultStorage->meshSortList;
+	stateForCamera->drawActionTape = &resultStorage->drawActionTape;
 
 	stateForCamera->preparePolysWorkload     = &resultStorage->preparePolysWorkloadBuffer;
 	stateForCamera->prepareCoronasWorkload   = &resultStorage->prepareCoronasWorkloadBuffer;

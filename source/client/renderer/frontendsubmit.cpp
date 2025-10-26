@@ -162,7 +162,7 @@ auto RendererFrontend::registerBuildingBatchedSurf( StateForCamera *stateForCame
 }
 
 void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *scene ) {
-	stateForCamera->drawActionsList->clear();
+	stateForCamera->drawActionTape->clear();
 
 	stateForCamera->preparePolysWorkload->clear();
 	stateForCamera->prepareCoronasWorkload->clear();
@@ -189,10 +189,9 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 	};
 
 	std::sort( stateForCamera->sortList->begin(), stateForCamera->sortList->end(), cmp );
-	stateForCamera->drawActionsList->reserve( stateForCamera->sortList->size() );
 
-	auto *const materialCache   = MaterialCache::instance();
-	auto *const drawActionsList = stateForCamera->drawActionsList;
+	auto *const materialCache  = MaterialCache::instance();
+	auto *const drawActionTape = stateForCamera->drawActionTape;
 
 	// For capturing it in lambdas
 	ShaderParamsTable *const paramsTable = &stateForCamera->shaderParamsTable;
@@ -281,7 +280,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 																			 prevShader, prevSurfType,
 																			 { batchSpanBegin, batchSpanEnd } );
 
-				drawActionsList->append( [=]( FrontendToBackendShared *fsh ) {
+				drawActionTape->append( [=]( FrontendToBackendShared *fsh ) {
 					//RB_FlushDynamicMeshes();
 					submitFn( fsh, prevEntity, prevOverrideParams, paramsTable, prevShader, prevFog, prevPortalSurface, offset );
 					//RB_FlushDynamicMeshes();
@@ -298,7 +297,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			if( entity->flags & RF_WEAPONMODEL ) {
 				if( !depthHack ) {
 					depthHack = true;
-					drawActionsList->append([=]( FrontendToBackendShared *fsh ) {
+					drawActionTape->append( [=]( FrontendToBackendShared *fsh ) {
 						//RB_FlushDynamicMeshes();
 						float depthmin = 0.0f, depthmax = 0.0f;
 						RB_GetDepthRange( &depthmin, &depthmax );
@@ -309,7 +308,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			} else {
 				if( depthHack ) {
 					depthHack = false;
-					drawActionsList->append([=]( FrontendToBackendShared * ) {
+					drawActionTape->append( [=]( FrontendToBackendShared * ) {
 						//RB_FlushDynamicMeshes();
 						RB_RestoreDepthRange();
 					});
@@ -321,7 +320,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 				bool oldCullHack = cullHack;
 				cullHack = ( ( entity->flags & RF_CULLHACK ) ? true : false );
 				if( cullHack != oldCullHack ) {
-					drawActionsList->append( [=]( FrontendToBackendShared * ) {
+					drawActionTape->append( [=]( FrontendToBackendShared * ) {
 						//RB_FlushDynamicMeshes();
 						RB_FlipFrontFace();
 					});
@@ -333,7 +332,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			const bool infiniteProj = entity->renderfx & RF_NODEPTHTEST ? true : false;
 			if( infiniteProj != prevInfiniteProj ) {
 				if( infiniteProj ) {
-					drawActionsList->append( [=]( FrontendToBackendShared * ) {
+					drawActionTape->append( [=]( FrontendToBackendShared * ) {
 						//RB_FlushDynamicMeshes();
 						mat4_t projectionMatrix;
 						Matrix4_Copy( stateForCamera->projectionMatrix, projectionMatrix );
@@ -341,7 +340,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 						RB_LoadProjectionMatrix( projectionMatrix );
 					});
 				} else {
-					drawActionsList->append( [=]( FrontendToBackendShared * ) {
+					drawActionTape->append( [=]( FrontendToBackendShared * ) {
 						//RB_FlushDynamicMeshes();
 						RB_LoadProjectionMatrix( stateForCamera->projectionMatrix );
 					});
@@ -351,13 +350,13 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			if( isDrawSurfBatched ) {
 				// don't transform batched surfaces
 				if( !prevIsDrawSurfBatched ) {
-					drawActionsList->append( [=]( FrontendToBackendShared * ) {
+					drawActionTape->append( [=]( FrontendToBackendShared * ) {
 						RB_LoadObjectMatrix( mat4x4_identity );
 					});
 				}
 			} else {
 				if( ( entNum != prevEntNum ) || prevIsDrawSurfBatched ) {
-					drawActionsList->append( [=]( FrontendToBackendShared * ) {
+					drawActionTape->append( [=]( FrontendToBackendShared * ) {
 						if( entity->number == kWorldEntNumber ) [[likely]] {
 							R_TransformForWorld();
 						} else if( entity->rtype == RT_MODEL ) {
@@ -372,7 +371,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			}
 
 			if( !isDrawSurfBatched ) {
-				drawActionsList->append( [=]( FrontendToBackendShared *fsh ) {
+				drawActionTape->append( [=]( FrontendToBackendShared *fsh ) {
 					assert( r_drawSurfCb[surfType] );
 
 					RB_BindShader( entity, overrideParams, paramsTable, shader, fog, portalSurface );
@@ -407,7 +406,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 																	 prevShader, prevSurfType,
 																	 { batchSpanBegin, batchSpanEnd } );
 
-		drawActionsList->append( [=]( FrontendToBackendShared *fsh ) {
+		drawActionTape->append( [=]( FrontendToBackendShared *fsh ) {
 			//RB_FlushDynamicMeshes();
 			submitFn( fsh, prevEntity, prevOverrideParams, paramsTable, prevShader, prevFog, prevPortalSurface, offset );
 			//RB_FlushDynamicMeshes();
@@ -415,12 +414,12 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 	}
 
 	if( depthHack ) {
-		drawActionsList->append( [=]( FrontendToBackendShared * ) {
+		drawActionTape->append( [=]( FrontendToBackendShared * ) {
 			RB_RestoreDepthRange();
 		});
 	}
 	if( cullHack ) {
-		drawActionsList->append( [=]( FrontendToBackendShared * ) {
+		drawActionTape->append( [=]( FrontendToBackendShared * ) {
 			RB_FlipFrontFace();
 		});
 	}
@@ -616,9 +615,7 @@ void RendererFrontend::submitDrawActionsList( StateForCamera *stateForCamera, Sc
 	std::memcpy( fsh.viewAxis, stateForCamera->viewAxis, sizeof( mat3_t ) );
 	VectorCopy( stateForCamera->viewOrigin, fsh.viewOrigin );
 
-	for( wsw::Function<void( FrontendToBackendShared * )> &drawAction: *stateForCamera->drawActionsList ) {
-		drawAction( &fsh );
-	}
+	stateForCamera->drawActionTape->exec( &fsh );
 }
 
 void RendererFrontend::submitDebugStuffToBackend( StateForCamera *stateForCamera, Scene *scene ) {

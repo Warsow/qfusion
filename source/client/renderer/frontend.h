@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <span>
 
 #include <common/types/podbuffer.h>
-#include <common/types/function.h>
+#include <common/helpers/actiontape.h>
 #include <common/helpers/qthreads.h>
 #include <common/facilities/tasksystem.h>
 
@@ -210,9 +210,8 @@ private:
 
 		// TODO: We don't really need a growable vector, preallocate at it start
 		wsw::PodVector<sortedDrawSurf_t> *sortList;
-		// Same here, we can't use PodBuffer yet for wsw::Function<>
-		// TODO: Use something less wasteful wrt storage than wsw::Function<>
-		wsw::PodVector<wsw::Function<void( FrontendToBackendShared *)>> *drawActionsList;
+
+		wsw::ActionTape<FrontendToBackendShared *> *drawActionTape;
 
 		wsw::PodVector<PrepareBatchedSurfWorkload> *preparePolysWorkload;
 		wsw::PodVector<PrepareBatchedSurfWorkload> *prepareCoronasWorkload;
@@ -697,7 +696,7 @@ private:
 		wsw::PodVector<ShaderParams::Material> materialParamsStorage;
 
 		wsw::PodVector<sortedDrawSurf_t> meshSortList;
-		wsw::PodVector<wsw::Function<void( FrontendToBackendShared * )>> drawActionsList;
+		wsw::ActionTape<FrontendToBackendShared *> drawActionTape;
 
 		wsw::PodVector<PrepareBatchedSurfWorkload> preparePolysWorkloadBuffer;
 		wsw::PodVector<PrepareBatchedSurfWorkload> prepareCoronasWorkloadBuffer;
