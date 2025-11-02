@@ -8,8 +8,6 @@
 qf_varying vec2 v_FogCoord;
 #endif
 
-uniform float u_OutlineHeight;
-
 void main(void)
 {
 	vec4 Position = a_Position;

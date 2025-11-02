@@ -1,6 +1,8 @@
 #ifdef FRAGMENT_SHADER
 
-uniform myhalf u_SoftParticlesScale;
+layout (std140) uniform SoftParticlesBlock {
+	myhalf u_SoftParticlesScale;
+};
 
 myhalf FragmentSoftness(float Depth, sampler2D DepthTexture, in vec2 ScreenCoord, in vec2 ZRange)
 {

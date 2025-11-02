@@ -31,6 +31,8 @@ rbackend_t rb;
 
 static void RB_RegisterStreamVBOs();
 
+#define MAX_UNIFORM_BLOCK_SIZE 2048
+
 void RB_Init() {
 	memset( &rb, 0, sizeof( rb ) );
 
@@ -38,14 +40,48 @@ void RB_Init() {
 
 	// create VBO's we're going to use for streamed data
 	RB_RegisterStreamVBOs();
+
+	assert( qglGetError() == GL_NO_ERROR );
+
+	for( unsigned i = 0; i < MAX_UNIFORM_BINDINGS; ++i ) {
+		GLuint uboId = 0;
+		qglGenBuffers( 1, &uboId );
+
+		qglBindBuffer( GL_UNIFORM_BUFFER, uboId );
+
+		// Zeroed by default
+		auto *data = (uint8_t *)Q_malloc( 2 * MAX_UNIFORM_BLOCK_SIZE );
+
+		assert( uboId != 0 );
+		rb.uniformUploads[i].id               = uboId;
+		rb.uniformUploads[i].lastSize         = 0;
+		rb.uniformUploads[i].lastUploadedData = data;
+		rb.uniformUploads[i].scratchpadData   = data + MAX_UNIFORM_BLOCK_SIZE;
+
+		qglBufferData( GL_UNIFORM_BUFFER, MAX_UNIFORM_BLOCK_SIZE, rb.uniformUploads[i].lastUploadedData, GL_DYNAMIC_DRAW );
+
+		qglBindBuffer( GL_UNIFORM_BUFFER, 0 );
+
+		qglBindBufferBase( GL_UNIFORM_BUFFER, i, uboId );
+
+		if( qglGetError() != GL_NO_ERROR ) {
+			Com_Error( ERR_FATAL, "Failed to setup a uniform buffer" );
+		}
+	}
 }
 
 void RB_Shutdown() {
-	for( auto &fru: rb.frameUploads ) {
-		Q_free( fru.vboData );
-		fru.vboData = nullptr;
-		Q_free( fru.iboData );
-		fru.iboData = nullptr;
+	for( auto &vu: rb.vertexUploads ) {
+		Q_free( vu.vboData );
+		vu.vboData = nullptr;
+		Q_free( vu.iboData );
+		vu.iboData = nullptr;
+	}
+	for( auto &uu: rb.uniformUploads ) {
+		qglDeleteBuffers( 1, &uu.id );
+		Q_free( uu.lastUploadedData );
+		uu.lastUploadedData = nullptr;
+		uu.scratchpadData = nullptr;
 	}
 	delete rb.glState;
 	rb.glState = nullptr;
@@ -171,11 +207,12 @@ void RB_BindFrameBufferObject( RenderTargetComponents *components ) {
 }
 
 void RB_RegisterStreamVBOs() {
-	for( auto &fru: rb.frameUploads ) {
-		if( fru.vbo ) {
-			R_TouchMeshVBO( fru.vbo );
+	for( auto &vu: rb.vertexUploads ) {
+		// TODO: Allow to create explictly managed vertex buffers, so we don't have to touch auxiliary buffers
+		if( vu.vbo ) {
+			R_TouchMeshVBO( vu.vbo );
 		} else {
-			const auto group = std::addressof( fru ) - rb.frameUploads;
+			const auto group = std::addressof( vu ) - rb.vertexUploads;
 			vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_COLOR0_BIT | VATTRIB_TEXCOORDS_BIT;
 			if( group != UPLOAD_GROUP_2D_MESH && group != UPLOAD_GROUP_DEBUG_MESH ) {
 				vattribs |= VATTRIB_NORMAL_BIT;
@@ -189,12 +226,12 @@ void RB_RegisterStreamVBOs() {
 			}
 			unsigned capacityInElems = 6 * capacityInVerts;
 			// TODO: Allow to supplying capacity in bytes for heterogenous buffers
-			fru.vbo = R_CreateMeshVBO( &rb, capacityInVerts, capacityInElems, 0, vattribs, VBO_TAG_STREAM, 0 );
-			fru.vboData = Q_malloc( capacityInVerts * fru.vbo->layout.vertexSize );
-			fru.iboData = Q_malloc( capacityInElems * sizeof( uint16_t ) );
-			fru.vboCapacityInVerts = capacityInVerts;
-			fru.vboCapacityInBytes = capacityInVerts * fru.vbo->layout.vertexSize;
-			fru.iboCapacityInElems = capacityInElems;
+			vu.vbo = R_CreateMeshVBO( &rb, capacityInVerts, capacityInElems, 0, vattribs, VBO_TAG_STREAM, 0 );
+			vu.vboData = Q_malloc( capacityInVerts * vu.vbo->layout.vertexSize );
+			vu.iboData = Q_malloc( capacityInElems * sizeof( uint16_t ) );
+			vu.vboCapacityInVerts = capacityInVerts;
+			vu.vboCapacityInBytes = capacityInVerts * vu.vbo->layout.vertexSize;
+			vu.iboCapacityInElems = capacityInElems;
 		}
 	}
 }
@@ -205,8 +242,8 @@ mesh_vbo_s *RB_BindVBO( int id ) {
 		vbo = R_GetVBOByIndex( id );
 	} else if( id < 0 ) {
 		const auto group = (unsigned)( -1 - id );
-		assert( group < std::size( rb.frameUploads ) );
-		vbo = rb.frameUploads[group].vbo;
+		assert( group < std::size( rb.vertexUploads ) );
+		vbo = rb.vertexUploads[group].vbo;
 	} else {
 		vbo = nullptr;
 	}
@@ -223,44 +260,44 @@ mesh_vbo_s *RB_BindVBO( int id ) {
 }
 
 int RB_VBOIdForFrameUploads( unsigned group ) {
-	assert( group < std::size( rb.frameUploads ) );
+	assert( group < std::size( rb.vertexUploads ) );
 	return -1 - (signed)group;
 }
 
 const VboSpanLayout *RB_VBOSpanLayoutForFrameUploads( unsigned group ) {
-	assert( group < std::size( rb.frameUploads ) );
-	return &rb.frameUploads[group].vbo->layout;
+	assert( group < std::size( rb.vertexUploads ) );
+	return &rb.vertexUploads[group].vbo->layout;
 }
 
 unsigned RB_VboCapacityInVertexBytesForFrameUploads( unsigned group ) {
-	assert( group < std::size( rb.frameUploads ) );
-	return rb.frameUploads[group].vboCapacityInBytes;
+	assert( group < std::size( rb.vertexUploads ) );
+	return rb.vertexUploads[group].vboCapacityInBytes;
 }
 
 unsigned RB_VboCapacityInVerticesForFrameUploads( unsigned group ) {
-	assert( group < std::size( rb.frameUploads ) && group != UPLOAD_GROUP_BATCHED_MESH_EXT );
-	return rb.frameUploads[group].vboCapacityInVerts;
+	assert( group < std::size( rb.vertexUploads ) && group != UPLOAD_GROUP_BATCHED_MESH_EXT );
+	return rb.vertexUploads[group].vboCapacityInVerts;
 }
 
 unsigned RB_VboCapacityInIndexElemsForFrameUploads( unsigned group ) {
-	assert( group < std::size( rb.frameUploads ) );
-	return rb.frameUploads[group].iboCapacityInElems;
+	assert( group < std::size( rb.vertexUploads ) );
+	return rb.vertexUploads[group].iboCapacityInElems;
 }
 
 void R_BeginUploads( unsigned group ) {
-	assert( group < std::size( rb.frameUploads ) );
+	assert( group < std::size( rb.vertexUploads ) );
 }
 
 void R_SetUploadedSubdataFromMeshUsingOffsets( unsigned group, unsigned baseVertex, unsigned verticesOffsetInBytes,
 											   unsigned indicesOffsetInBytes, const mesh_t *mesh ) {
-	assert( group < std::size( rb.frameUploads ) );
+	assert( group < std::size( rb.vertexUploads ) );
 	if( mesh->numVerts && mesh->numElems ) {
-		auto &fru = rb.frameUploads[group];
+		auto &vu = rb.vertexUploads[group];
 
-		auto *const destVertexData = (uint8_t *)fru.vboData + verticesOffsetInBytes;
-		auto *const destIndexData  = (uint16_t *)( (uint8_t *)fru.iboData + indicesOffsetInBytes );
+		auto *const destVertexData = (uint8_t *)vu.vboData + verticesOffsetInBytes;
+		auto *const destIndexData  = (uint16_t *)((uint8_t *)vu.iboData + indicesOffsetInBytes );
 
-		R_FillVBOVertexDataBuffer( fru.vbo, &fru.vbo->layout, fru.vbo->layout.vertexAttribs, mesh, destVertexData );
+		R_FillVBOVertexDataBuffer( vu.vbo, &vu.vbo->layout, vu.vbo->layout.vertexAttribs, mesh, destVertexData );
 		for( unsigned i = 0; i < mesh->numElems; ++i ) {
 			// TODO: Current frontend-enforced limitations are the sole protection from overflow
 			// TODO: Use draw elements base vertex
@@ -271,13 +308,13 @@ void R_SetUploadedSubdataFromMeshUsingOffsets( unsigned group, unsigned baseVert
 
 void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVertex, const VboSpanLayout *layout,
 											  unsigned indexOfFirstIndex, const mesh_t *mesh ) {
-	assert( group < std::size( rb.frameUploads ) );
+	assert( group < std::size( rb.vertexUploads ) );
 	if( mesh->numVerts && mesh->numElems ) {
-		auto &fru = rb.frameUploads[group];
+		auto &vu = rb.vertexUploads[group];
 
-		R_FillVBOVertexDataBuffer( fru.vbo, layout, layout->vertexAttribs, mesh, fru.vboData );
+		R_FillVBOVertexDataBuffer( vu.vbo, layout, layout->vertexAttribs, mesh, vu.vboData );
 
-		auto *const destIndexData  = ( (uint16_t *)fru.iboData ) + indexOfFirstIndex;
+		auto *const destIndexData  = ( (uint16_t *)vu.iboData ) + indexOfFirstIndex;
 		for( unsigned i = 0; i < mesh->numElems; ++i ) {
 			// TODO: Current frontend-enforced limitations are the sole protection from overflow
 			// TODO: Use draw elements base vertex
@@ -287,13 +324,38 @@ void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVerte
 }
 
 void R_EndUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes ) {
-	assert( group < std::size( rb.frameUploads ) );
+	assert( group < std::size( rb.vertexUploads ) );
 	if( vertexDataSizeInBytes && indexDataSizeInBytes ) {
 		RB_BindVBO( RB_VBOIdForFrameUploads( group ) );
-		const auto &fru = rb.frameUploads[group];
+		const auto &vu = rb.vertexUploads[group];
 
-		qglBufferSubData( GL_ARRAY_BUFFER, 0, vertexDataSizeInBytes, fru.vboData );
-		qglBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, indexDataSizeInBytes, fru.iboData );
+		qglBufferSubData( GL_ARRAY_BUFFER, 0, vertexDataSizeInBytes, vu.vboData );
+		qglBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, indexDataSizeInBytes, vu.iboData );
+	}
+}
+
+void *RB_GetTmpUniformBlock( unsigned binding, size_t blockSize ) {
+	assert( binding < std::size( rb.uniformUploads ) );
+	assert( blockSize <= MAX_UNIFORM_BLOCK_SIZE );
+	auto &uu = rb.uniformUploads[binding];
+	assert( uu.lastSize == 0 || uu.lastSize == blockSize );
+	uu.lastSize = blockSize;
+	std::memset( uu.scratchpadData, 0, blockSize );
+	return uu.scratchpadData;
+}
+
+void RB_CommitUniformBlock( unsigned binding, void *blockData, size_t blockSize ) {
+	assert( binding < std::size( rb.uniformUploads ) );
+	auto uu = rb.uniformUploads[binding];
+	assert( uu.lastSize == blockSize );
+	assert( blockData == uu.scratchpadData );
+	if( std::memcmp( uu.lastUploadedData, blockData, blockSize ) != 0 ) {
+		qglBindBuffer( GL_UNIFORM_BUFFER, uu.id );
+		//qglBufferSubData( GL_UNIFORM_BUFFER, 0, (GLsizeiptr)blockSize, blockData );
+		// This is much faster on Mesa
+		qglBufferData( GL_UNIFORM_BUFFER, (GLsizeiptr)blockSize, blockData, GL_DYNAMIC_DRAW );
+		std::memcpy( uu.lastUploadedData, blockData, blockSize );
+		qglBindBuffer( GL_UNIFORM_BUFFER, 0 );
 	}
 }
 

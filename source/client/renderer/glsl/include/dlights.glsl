@@ -1,10 +1,11 @@
 #if defined(NUM_DLIGHTS)
 
-uniform vec3 u_DlightPosition[NUM_DLIGHTS];
-uniform myhalf4 u_DlightDiffuseAndInvRadius[NUM_DLIGHTS];
-#if !defined(GL_ES) && (QF_GLSL_VERSION >= 330)
-uniform int u_NumDynamicLights;
-#endif
+// TODO: Pass MAX_DLIGHTS properly
+layout (std140) uniform DynamicLightBlock {
+    myhalf3 u_DlightPosition[32];
+    myhalf4 u_DlightDiffuseAndInvRadius[32];
+    int u_NumDynamicLights;
+};
 
 #include "dlights_overload.glsl"
 

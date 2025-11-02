@@ -520,6 +520,23 @@ const char              *qglGetGLWExtensionsString();
 
 #define GL_MAX_LABEL_LENGTH               0x82E8
 
+#define GL_UNIFORM_BUFFER                 0x8A11
+#define GL_UNIFORM_BUFFER_BINDING         0x8A28
+#define GL_UNIFORM_BUFFER_START           0x8A29
+#define GL_UNIFORM_BUFFER_SIZE            0x8A2A
+#define GL_MAX_VERTEX_UNIFORM_BLOCKS      0x8A2B
+#define GL_MAX_FRAGMENT_UNIFORM_BLOCKS    0x8A2D
+#define GL_MAX_COMBINED_UNIFORM_BLOCKS    0x8A2E
+#define GL_MAX_UNIFORM_BUFFER_BINDINGS    0x8A2F
+#define GL_MAX_UNIFORM_BLOCK_SIZE         0x8A30
+#define GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS 0x8A31
+#define GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS 0x8A33
+#define GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT 0x8A34
+#define GL_ACTIVE_UNIFORM_BLOCK_MAX_NAME_LENGTH 0x8A35
+#define GL_ACTIVE_UNIFORM_BLOCKS          0x8A36
+
+#define GL_INVALID_INDEX                  0xFFFFFFFFu
+
 #endif // QGL_H
 
 #ifndef APIENTRY
@@ -720,3 +737,8 @@ QGL_FUNC( void, glDrawBuffers, ( GLsizei n, const GLenum * bufs ) );
 QGL_FUNC( void, glSampleCoverage, ( GLfloat value, GLboolean invert ) );
 
 QGL_EXT( void, glObjectLabel, ( GLenum identifier, GLuint name, GLsizei length, const char *label ) );
+
+QGL_FUNC( GLuint, glGetUniformBlockIndex, ( GLuint program, const GLchar *uniformBlockName ) );
+QGL_FUNC( void, glUniformBlockBinding, ( GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding ) );
+QGL_FUNC( void, glBindBufferRange, ( GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size ) );
+QGL_FUNC( void, glBindBufferBase, ( GLenum target, GLuint index, GLuint buffer ) );

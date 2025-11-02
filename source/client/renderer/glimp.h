@@ -83,7 +83,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define MAX_TEXTURE_UNITS               8
 
-#define MAX_GLSL_UNIFORM_BONES          100
+// Current limits for the actual data
+#define MAX_GLSL_UNIFORM_BONES          48
 #define MAX_GLSL_UNIFORM_INSTANCES      40
 
 #define GAMMARAMP_STRIDE                4096
@@ -185,7 +186,6 @@ typedef struct {
 	,maxFragmentUniformComponents
 	,maxFramebufferSamples
 	;
-	unsigned int maxGLSLBones;      // the maximum amount of bones we can handle in a vertex shader
 	unsigned maxObjectLabelLen;
 
 	bool sSRGB;

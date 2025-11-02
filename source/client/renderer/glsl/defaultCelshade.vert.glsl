@@ -11,8 +11,6 @@ qf_varying vec3 v_TexCoordCube;
 qf_varying vec2 v_FogCoord;
 #endif
 
-uniform mat3 u_ReflectionTexMatrix;
-
 void main(void)
 {
 	vec4 Position = a_Position;

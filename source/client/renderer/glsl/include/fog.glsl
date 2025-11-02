@@ -1,6 +1,8 @@
-uniform vec2 u_FogScaleAndEyeDist;
-uniform vec4 u_FogEyePlane, u_FogPlane;
-uniform myhalf3 u_FogColor;
+layout (std140) uniform FogBlock {
+    vec4 u_FogEyePlane, u_FogPlane;
+    myhalf3 u_FogColor;
+    vec2 u_FogScaleAndEyeDist;
+};
 
 #define FOG_TEXCOORD_STEP 1.0/256.0
 
