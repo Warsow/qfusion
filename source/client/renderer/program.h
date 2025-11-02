@@ -209,86 +209,6 @@ struct ShaderProgram {
 	void *nameDataToFree { nullptr };
 	// Optional, points to the default heap if set.
 	void *deformSigDataToFree { nullptr };
-
-	struct loc_s {
-		int ModelViewMatrix,
-			ModelViewProjectionMatrix,
-
-			ZRange,
-
-			ViewOrigin,
-			ViewAxis,
-
-			MirrorSide,
-
-			Viewport,
-
-			LightDir,
-			LightAmbient,
-			LightDiffuse,
-			LightingIntensity,
-
-			TextureMatrix,
-
-			GlossFactors,
-
-			OffsetMappingScale,
-			OutlineHeight,
-			OutlineCutOff,
-
-			FrontPlane,
-			TextureParams,
-
-			EntityDist,
-			EntityOrigin,
-			EntityColor,
-			ConstColor,
-			RGBGenFuncArgs,
-			AlphaGenFuncArgs;
-
-		struct {
-			int Plane,
-				Color,
-				ScaleAndEyeDist,
-				EyePlane;
-		} Fog;
-
-		int ShaderTime,
-
-			ReflectionTexMatrix,
-			VectorTexMatrix,
-
-			DeluxemapOffset,
-			LightstyleColor[MAX_LIGHTMAPS],
-
-			DynamicLightsPosition[MAX_DLIGHTS],
-			DynamicLightsDiffuseAndInvRadius[MAX_DLIGHTS >> 2],
-			NumDynamicLights,
-
-			DualQuats,
-
-			InstancePoints,
-
-			WallColor,
-			FloorColor,
-
-			BlendMix,
-			ColorMod,
-
-			SoftParticlesScale;
-
-		int hdrGamma,
-			hdrExposure;
-
-		// builtin uniforms
-		struct {
-			int ShaderTime,
-				ViewOrigin,
-				ViewAxis,
-				MirrorSide,
-				EntityOrigin;
-		} builtin;
-	} loc;
 };
 
 void RP_Init();
@@ -299,52 +219,48 @@ int RP_RegisterProgram( int type, const char *name, const DeformSig &deformSig,
 
 int RP_GetProgramObject( int elem );
 
-void RP_UpdateShaderUniforms( int elem,
-							  float shaderTime,
+void RP_UpdateShaderUniforms( float shaderTime,
 							  const vec3_t entOrigin, const vec3_t entDist, const uint8_t *entityColor,
 							  const uint8_t *constColor, const float *rgbGenFuncArgs, const float *alphaGenFuncArgs,
 							  const mat4_t texMatrix, float colorMod );
 
-void RP_UpdateViewUniforms( int elem,
-							const mat4_t modelviewMatrix, const mat4_t modelviewProjectionMatrix,
+void RP_UpdateViewUniforms( const mat4_t modelviewMatrix, const mat4_t modelviewProjectionMatrix,
 							const vec3_t viewOrigin, const mat3_t viewAxis,
 							float mirrorSide,
 							const int *viewport,
 							float zNear, float zFar );
 
-void RP_UpdateBlendMixUniform( int elem, vec2_t blendMask );
+void RP_UpdateDeformBuiltinUniforms( float shaderTime, const vec3_t viewOrigin, const mat3_t viewAxis, const vec3_t entOrigin, float mirrorSide );
 
-void RP_UpdateSoftParticlesUniforms( int elem, float scale );
+void RP_UpdateBlendMixUniform( vec2_t blendMask );
 
-void RP_UpdateMaterialUniforms( int elem,
-								float offsetmappingScale, float glossIntensity, float glossExponent );
+void RP_UpdateSoftParticlesUniforms( float scale );
 
-void RP_UpdateDistortionUniforms( int elem, bool frontPlane );
+void RP_UpdateMaterialUniforms( float offsetmappingScale, float glossIntensity, float glossExponent );
 
-void RP_UpdateTextureUniforms( int elem, int TexWidth, int TexHeight );
+void RP_UpdateDistortionUniforms( bool frontPlane );
 
-void RP_UpdateOutlineUniforms( int elem, float projDistance );
+void RP_UpdateTextureUniforms( int TexWidth, int TexHeight );
 
-void RP_UpdateDiffuseLightUniforms( int elem,
-									const vec3_t lightDir, const vec4_t lightAmbient, const vec4_t lightDiffuse );
+void RP_UpdateOutlineUniforms( float projDistance );
+
+void RP_UpdateDiffuseLightUniforms( const vec3_t lightDir, const vec4_t lightAmbient, const vec4_t lightDiffuse );
 
 void RP_UpdateDynamicLightsUniforms( const FrontendToBackendShared *fsh,
-									 int elem, const superLightStyle_t *superLightStyle,
+									 const superLightStyle_t *superLightStyle,
 									 const vec3_t entOrigin, const mat3_t entAxis, unsigned int dlightbits );
 
-void RP_UpdateFogUniforms( int elem, byte_vec4_t color, float clearDist, float opaqueDist,
+void RP_UpdateFogUniforms( byte_vec4_t color, float clearDist, float opaqueDist,
 						   cplane_t *fogPlane, cplane_t *eyePlane, float eyeFogDist );
 
-void RP_UpdateTexGenUniforms( int elem, const mat4_t reflectionMatrix, const mat4_t vectorMatrix );
+void RP_UpdateTexGenUniforms( const mat4_t reflectionMatrix, const mat4_t vectorMatrix );
 
-void RP_UpdateBonesUniforms( int elem, unsigned int numBones, dualquat_t *animDualQuat );
+void RP_UpdateBonesUniforms( unsigned int numBones, dualquat_t *animDualQuat );
 
-void RP_UpdateInstancesUniforms( int elem, unsigned int numInstances, instancePoint_t *instances );
+void RP_UpdateDrawFlatUniforms( const vec3_t wallColor, const vec3_t floorColor );
 
-void RP_UpdateDrawFlatUniforms( int elem, const vec3_t wallColor, const vec3_t floorColor );
+void RP_UpdateColorCorrectionUniforms( float hdrGamme, float hdrExposure );
 
-void RP_UpdateColorCorrectionUniforms( int elem, float hdrGamme, float hdrExposure );
-
-void RP_UpdateKawaseUniforms( int elem, int TexWidth, int TexHeight, int iteration );
+void RP_UpdateKawaseUniforms( int TexWidth, int TexHeight, int iteration );
 
 #endif // R_PROGRAM_H

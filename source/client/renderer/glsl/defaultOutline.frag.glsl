@@ -6,8 +6,6 @@
 qf_varying vec2 v_FogCoord;
 #endif
 
-uniform float u_OutlineCutOff;
-
 void main(void)
 {
 	vec4 color;

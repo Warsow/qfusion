@@ -13,11 +13,6 @@ uniform samplerCube u_BaseTexture;
 uniform sampler2D u_BaseTexture;
 #endif
 
-#ifdef APPLY_DRAWFLAT
-uniform myhalf3 u_WallColor;
-uniform myhalf3 u_FloorColor;
-#endif
-
 #ifdef NUM_LIGHTMAPS
 uniform LightmapSampler u_LightmapTexture0;
 #if NUM_LIGHTMAPS >= 2

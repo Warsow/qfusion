@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define MAX_DYNAMIC_DRAWS           2048
 
+#define MAX_UNIFORM_BINDINGS        17
+
 typedef struct {
 	unsigned int numBones;
 	dualquat_t dualQuats[MAX_GLSL_UNIFORM_BONES];
@@ -33,6 +35,9 @@ typedef struct {
 } rbBonesData_t;
 
 class GLStateProxy;
+
+void *RB_GetTmpUniformBlock( unsigned binding, size_t blockSize );
+void RB_CommitUniformBlock( unsigned binding, void *blockData, size_t blockSize );
 
 typedef struct r_backend_s {
 	struct {
@@ -42,7 +47,14 @@ typedef struct r_backend_s {
 		unsigned vboCapacityInVerts;
 		unsigned vboCapacityInBytes;
 		unsigned iboCapacityInElems;
-	} frameUploads[5];
+	} vertexUploads[5];
+
+	struct {
+		GLuint id;
+		void *lastUploadedData;
+		void *scratchpadData;
+		unsigned lastSize;
+	} uniformUploads[MAX_UNIFORM_BINDINGS];
 
 	// Either persistent during the entire frame or changes much less often than RB_BindShader() calls
 	// TODO: Should it be split into truly-persistent and changing states?

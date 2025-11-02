@@ -53,7 +53,7 @@ static void Mod_SkeletalBuildStaticVBOForMesh( mskmesh_t *mesh ) {
 	vattribmask_t vattribs;
 
 	vattribs = VATTRIB_POSITION_BIT | VATTRIB_TEXCOORDS_BIT | VATTRIB_NORMAL_BIT | VATTRIB_SVECTOR_BIT;
-	if( glConfig.maxGLSLBones > 0 ) {
+	if( true ) {
 		vattribs |= VATTRIB_BONES_BITS;
 	}
 	if( mesh->skin.shader ) {
@@ -235,6 +235,10 @@ void Mod_LoadSkeletalModel( model_t *mod, model_t *parent, void *buffer, bspForm
 	if( header->num_joints != header->num_poses ) {
 		rError() << wsw::StringView( mod->name ) << "has an invalid number of poses"
 			<< wsw::named( "num joints", header->num_joints ) << wsw::named( "num poses", header->num_poses );
+		goto error;
+	}
+	if( header->num_joints > MAX_GLSL_UNIFORM_BONES ) {
+		rError() << wsw::StringView( mod->name ) << "has too much bones";
 		goto error;
 	}
 
@@ -722,14 +726,11 @@ void Mod_LoadSkeletalModel( model_t *mod, model_t *parent, void *buffer, bspForm
 		}
 	}
 
-	// creating a VBO only makes sense if GLSL is present and the number of bones
-	// we can handle on the GPU is sufficient
-	// (created after the skins because skin loading may wait for GL commands to finish)
-	if( poutmodel->numbones <= glConfig.maxGLSLBones ) {
-		for( i = 0; i < header->num_meshes; i++ ) {
-			// build a static vertex buffer object for this mesh
-			Mod_SkeletalBuildStaticVBOForMesh( &poutmodel->meshes[i] );
-		}
+	assert( poutmodel->numbones <= MAX_GLSL_UNIFORM_BONES );
+
+	for( i = 0; i < header->num_meshes; i++ ) {
+		// build a static vertex buffer object for this mesh
+		Mod_SkeletalBuildStaticVBOForMesh( &poutmodel->meshes[i] );
 	}
 
 	poutmodel->drawSurfs = ( drawSurfaceSkeletal_t * )pmem; pmem += sizeof( *poutmodel->drawSurfs ) * header->num_meshes;

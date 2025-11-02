@@ -6,12 +6,6 @@
 
 #include "include/varying_q3a.glsl"
 
-#if defined(APPLY_TC_GEN_CELSHADE)
-uniform mat3 u_ReflectionTexMatrix;
-#elif defined(APPLY_TC_GEN_VECTOR)
-uniform mat4 u_VectorTexMatrix;
-#endif
-
 void main(void)
 {
 	vec4 Position = a_Position;

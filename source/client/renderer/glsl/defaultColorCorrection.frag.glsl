@@ -21,8 +21,10 @@ const float B = 0.80; // the bright point for bloom
 
 #ifdef APPLY_HDR
 
-uniform myhalf u_HDRGamma;
-uniform myhalf u_HDRExposure;
+layout (std140) uniform ColorCorrectionBlock {
+	myhalf u_HDRGamma;
+	myhalf u_HDRExposure;
+};
 
 vec3 ACESFilm(vec3 x)
 {

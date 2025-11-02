@@ -542,7 +542,7 @@ static uint64_t RB_sRGBProgramFeatures( const shaderpass_t *pass ) {
 	return programFeatures;
 }
 
-static void RB_UpdateCommonUniforms( int program, const shaderpass_t *pass, mat4_t texMatrix ) {
+static void RB_UpdateCommonUniforms( const shaderpass_t *pass, mat4_t texMatrix ) {
 	const entity_t *e = rb.materialState.currentEntity;
 
 	// the logic here should match R_TransformForEntity
@@ -566,13 +566,10 @@ static void RB_UpdateCommonUniforms( int program, const shaderpass_t *pass, mat4
 		RB_ApplyTCMods( pass, texMatrix );
 	}
 
-	RP_UpdateViewUniforms( program,
-						   rb.globalState.modelviewMatrix, rb.globalState.modelviewProjectionMatrix,
-						   rb.globalState.cameraOrigin, rb.globalState.cameraAxis,
-						   rb.globalState.renderFlags & RF_MIRRORVIEW ? -1 : 1,
-						   rb.glState->getViewport(),
-						   rb.globalState.zNear, rb.globalState.zFar
-						   );
+	const float mirrorSide = ( rb.globalState.renderFlags & RF_MIRRORVIEW ) ? -1 : +1;
+	RP_UpdateViewUniforms( rb.globalState.modelviewMatrix, rb.globalState.modelviewProjectionMatrix,
+						   rb.globalState.cameraOrigin, rb.globalState.cameraAxis, mirrorSide,
+						   rb.glState->getViewport(), rb.globalState.zNear, rb.globalState.zFar );
 
 	const auto glState = rb.glState->getState();
 	vec2_t blendMix = { 0, 0 };
@@ -588,26 +585,28 @@ static void RB_UpdateCommonUniforms( int program, const shaderpass_t *pass, mat4
 		}
 	}
 
-	RP_UpdateShaderUniforms( program,
-							 rb.materialState.currentShaderTime,
+	RP_UpdateShaderUniforms( rb.materialState.currentShaderTime,
 							 entOrigin, entDist, rb.materialState.entityColor,
 							 constColor,
 							 pass->rgbgen.func.type != SHADER_FUNC_NONE ? pass->rgbgen.func.args : pass->rgbgen.args,
 							 pass->alphagen.func.type != SHADER_FUNC_NONE ? pass->alphagen.func.args : pass->alphagen.args,
 							 texMatrix, colorMod );
 
-	RP_UpdateBlendMixUniform( program, blendMix );
+	RP_UpdateDeformBuiltinUniforms( rb.materialState.currentShaderTime, rb.globalState.cameraOrigin,
+									rb.globalState.cameraAxis, entOrigin, mirrorSide );
 
-	RP_UpdateSoftParticlesUniforms( program, v_softParticles_scale.get() );
+	RP_UpdateBlendMixUniform( blendMix );
+
+	RP_UpdateSoftParticlesUniforms( v_softParticles_scale.get() );
 }
 
-static void RB_UpdateFogUniforms( int program, const mfog_t *fog ) {
+static void RB_UpdateFogUniforms( const mfog_t *fog ) {
 	assert( fog );
 
 	cplane_t fogPlane, vpnPlane;
 	const float dist = RB_TransformFogPlanes( fog, fogPlane.normal, &fogPlane.dist, vpnPlane.normal, &vpnPlane.dist );
 
-	RP_UpdateFogUniforms( program, fog->shader->fog_color, fog->shader->fog_clearDist,
+	RP_UpdateFogUniforms( fog->shader->fog_color, fog->shader->fog_clearDist,
 						  fog->shader->fog_dist, &fogPlane, &vpnPlane, dist );
 }
 
@@ -787,34 +786,34 @@ static void RB_RenderMeshGLSL_Q3AShader( const FrontendToBackendShared *fsh, con
 	// update uniforms
 	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_Q3A_SHADER, rb.materialState.currentShader, programFeatures );
 	if( RB_BindProgram( program ) ) {
-		RB_UpdateCommonUniforms( program, pass, texMatrix );
+		RB_UpdateCommonUniforms( pass, texMatrix );
 
-		RP_UpdateTexGenUniforms( program, texMatrix, genVectors );
+		RP_UpdateTexGenUniforms( texMatrix, genVectors );
 
 		if( isWorldSurface || rgbgen == RGB_GEN_LIGHTING_DIFFUSE ) {
-			RP_UpdateDiffuseLightUniforms( program, lightDir, lightAmbient, lightDiffuse );
+			RP_UpdateDiffuseLightUniforms( lightDir, lightAmbient, lightDiffuse );
 		}
 
 		if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
-			RB_UpdateFogUniforms( program, fog );
+			RB_UpdateFogUniforms( fog );
 		}
 
 		// submit animation data
 		if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
-			RP_UpdateBonesUniforms( program, rb.drawState.bonesData.numBones, rb.drawState.bonesData.dualQuats );
+			RP_UpdateBonesUniforms( rb.drawState.bonesData.numBones, rb.drawState.bonesData.dualQuats );
 		}
 
 		// dynamic lights
 		if( isLightmapped || isWorldVertexLight ) {
-			RP_UpdateDynamicLightsUniforms( fsh, program, lightStyle, e->origin, e->axis, rb.drawState.currentDlightBits );
+			RP_UpdateDynamicLightsUniforms( fsh, lightStyle, e->origin, e->axis, rb.drawState.currentDlightBits );
 		}
 
 		// r_drawflat
 		if( programFeatures & GLSL_SHADER_COMMON_DRAWFLAT ) {
 			if( rb.globalState.renderFlags & RF_DRAWBRIGHT ) [[unlikely]] {
-				RP_UpdateDrawFlatUniforms( program, colorWhite, colorWhite );
+				RP_UpdateDrawFlatUniforms( colorWhite, colorWhite );
 			} else {
-				RP_UpdateDrawFlatUniforms( program, rsh.wallColor, rsh.floorColor );
+				RP_UpdateDrawFlatUniforms( rsh.wallColor, rsh.floorColor );
 			}
 		}
 
@@ -1051,29 +1050,29 @@ static void RB_RenderMeshGLSL_Material( const FrontendToBackendShared *fsh, cons
 
 	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_MATERIAL, rb.materialState.currentShader, programFeatures );
 	if( RB_BindProgram( program ) ) {
-		RB_UpdateCommonUniforms( program, pass, texMatrix );
-		RP_UpdateMaterialUniforms( program, offsetmappingScale, glossIntensity, glossExponent );
-		RP_UpdateDiffuseLightUniforms( program, lightDir, ambient, diffuse );
+		RB_UpdateCommonUniforms( pass, texMatrix );
+		RP_UpdateMaterialUniforms( offsetmappingScale, glossIntensity, glossExponent );
+		RP_UpdateDiffuseLightUniforms( lightDir, ambient, diffuse );
 
 		if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
-			RB_UpdateFogUniforms( program, fog );
+			RB_UpdateFogUniforms( fog );
 		}
 
 		// submit animation data
 		if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
-			RP_UpdateBonesUniforms( program, rb.drawState.bonesData.numBones, rb.drawState.bonesData.dualQuats );
+			RP_UpdateBonesUniforms( rb.drawState.bonesData.numBones, rb.drawState.bonesData.dualQuats );
 		}
 
 		// dynamic lights
-		RP_UpdateDynamicLightsUniforms( fsh, program, lightStyle, rb.materialState.currentEntity->origin,
+		RP_UpdateDynamicLightsUniforms( fsh, lightStyle, rb.materialState.currentEntity->origin,
 										rb.materialState.currentEntity->axis, rb.drawState.currentDlightBits );
 
 		// r_drawflat
 		if( programFeatures & GLSL_SHADER_COMMON_DRAWFLAT ) {
 			if( rb.globalState.renderFlags & RF_DRAWBRIGHT ) [[unlikely]] {
-				RP_UpdateDrawFlatUniforms( program, colorWhite, colorWhite );
+				RP_UpdateDrawFlatUniforms( colorWhite, colorWhite );
 			} else {
-				RP_UpdateDrawFlatUniforms( program, rsh.wallColor, rsh.floorColor );
+				RP_UpdateDrawFlatUniforms( rsh.wallColor, rsh.floorColor );
 			}
 		}
 
@@ -1152,9 +1151,9 @@ static void RB_RenderMeshGLSL_Distortion( const FrontendToBackendShared *, const
 	// update uniforms
 	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_DISTORTION, rb.materialState.currentShader, programFeatures );
 	if( RB_BindProgram( program ) ) {
-		RB_UpdateCommonUniforms( program, pass, texMatrix );
-		RP_UpdateDistortionUniforms( program, frontPlane );
-		RP_UpdateTextureUniforms( program, width, height );
+		RB_UpdateCommonUniforms( pass, texMatrix );
+		RP_UpdateDistortionUniforms( frontPlane );
+		RP_UpdateTextureUniforms( width, height );
 
 		RB_DoDrawMeshVerts( vertSpan, primitive );
 	}
@@ -1178,16 +1177,16 @@ static void RB_RenderMeshGLSL_Outline( const FrontendToBackendShared *, const Dr
 
 		RB_SetShaderpassState( pass->flags );
 
-		RB_UpdateCommonUniforms( program, pass, texMatrix );
-		RP_UpdateOutlineUniforms( program, rb.materialState.currentEntity->outlineHeight * v_outlinesScale.get() );
+		RB_UpdateCommonUniforms( pass, texMatrix );
+		RP_UpdateOutlineUniforms( rb.materialState.currentEntity->outlineHeight * v_outlinesScale.get() );
 
 		if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
-			RB_UpdateFogUniforms( program, rb.materialState.fog );
+			RB_UpdateFogUniforms( rb.materialState.fog );
 		}
 
 		// submit animation data
 		if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
-			RP_UpdateBonesUniforms( program, rb.drawState.bonesData.numBones, rb.drawState.bonesData.dualQuats );
+			RP_UpdateBonesUniforms( rb.drawState.bonesData.numBones, rb.drawState.bonesData.dualQuats );
 		}
 
 		RB_DoDrawMeshVerts( vertSpan, primitive );
@@ -1274,16 +1273,16 @@ static void RB_RenderMeshGLSL_Celshade( const FrontendToBackendShared *, const D
 		mat4_t reflectionMatrix;
 		RB_VertexTCCelshadeMatrix( reflectionMatrix );
 
-		RB_UpdateCommonUniforms( program, pass, texMatrix );
-		RP_UpdateTexGenUniforms( program, reflectionMatrix, texMatrix );
+		RB_UpdateCommonUniforms( pass, texMatrix );
+		RP_UpdateTexGenUniforms( reflectionMatrix, texMatrix );
 
 		if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
-			RB_UpdateFogUniforms( program, fog );
+			RB_UpdateFogUniforms( fog );
 		}
 
 		// submit animation data
 		if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
-			RP_UpdateBonesUniforms( program, rb.drawState.bonesData.numBones, rb.drawState.bonesData.dualQuats );
+			RP_UpdateBonesUniforms( rb.drawState.bonesData.numBones, rb.drawState.bonesData.dualQuats );
 		}
 
 		RB_DoDrawMeshVerts( vertSpan, primitive );
@@ -1301,12 +1300,12 @@ static void RB_RenderMeshGLSL_Fog( const FrontendToBackendShared *, const DrawMe
 	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_FOG, rb.materialState.currentShader, programFeatures );
 	if( RB_BindProgram( program ) ) {
 		mat4_t texMatrix = { 0 };
-		RB_UpdateCommonUniforms( program, pass, texMatrix );
-		RB_UpdateFogUniforms( program, fog );
+		RB_UpdateCommonUniforms( pass, texMatrix );
+		RB_UpdateFogUniforms( fog );
 
 		// submit animation data
 		if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
-			RP_UpdateBonesUniforms( program, rb.drawState.bonesData.numBones, rb.drawState.bonesData.dualQuats );
+			RP_UpdateBonesUniforms( rb.drawState.bonesData.numBones, rb.drawState.bonesData.dualQuats );
 		}
 
 		RB_DoDrawMeshVerts( vertSpan, primitive );
@@ -1328,8 +1327,8 @@ static void RB_RenderMeshGLSL_FXAA( const FrontendToBackendShared *, const DrawM
 		mat4_t texMatrix;
 		Matrix4_Identity( texMatrix );
 
-		RB_UpdateCommonUniforms( program, pass, texMatrix );
-		RP_UpdateTextureUniforms( program, image->width, image->height );
+		RB_UpdateCommonUniforms( pass, texMatrix );
+		RP_UpdateTextureUniforms( image->width, image->height );
 
 		RB_DoDrawMeshVerts( vertSpan, primitive );
 	}
@@ -1347,7 +1346,7 @@ static void RB_RenderMeshGLSL_YUV( const FrontendToBackendShared *, const DrawMe
 	if( RB_BindProgram( program ) ) {
 		// TODO: Should we set it to identity?
 		mat4_t texMatrix = { 0 };
-		RB_UpdateCommonUniforms( program, pass, texMatrix );
+		RB_UpdateCommonUniforms( pass, texMatrix );
 
 		RB_DoDrawMeshVerts( vertSpan, primitive );
 	}
@@ -1392,8 +1391,8 @@ static void RB_RenderMeshGLSL_ColorCorrection( const FrontendToBackendShared *, 
 		mat4_t texMatrix;
 		Matrix4_Identity( texMatrix );
 
-		RB_UpdateCommonUniforms( program, pass, texMatrix );
-		RP_UpdateColorCorrectionUniforms( program, v_hdrGamma.get(), rb.globalState.hdrExposure );
+		RB_UpdateCommonUniforms( pass, texMatrix );
+		RP_UpdateColorCorrectionUniforms( v_hdrGamma.get(), rb.globalState.hdrExposure );
 
 		RB_DoDrawMeshVerts( vertSpan, primitive );
 	}
@@ -1410,8 +1409,8 @@ static void RB_RenderMeshGLSL_KawaseBlur( const FrontendToBackendShared *fsh, co
 		mat4_t texMatrix = { 0 };
 		Matrix4_Identity( texMatrix );
 
-		RB_UpdateCommonUniforms( program, pass, texMatrix );
-		RP_UpdateKawaseUniforms( program, pass->images[0]->width, pass->images[0]->height, pass->anim_numframes );
+		RB_UpdateCommonUniforms( pass, texMatrix );
+		RP_UpdateKawaseUniforms( pass->images[0]->width, pass->images[0]->height, pass->anim_numframes );
 
 		RB_DoDrawMeshVerts( vertSpan, primitive );
 	}

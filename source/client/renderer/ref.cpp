@@ -745,17 +745,10 @@ static bool R_RegisterGLExtensions( void ) {
 	qglGetIntegerv( GL_MAX_FRAGMENT_UNIFORM_COMPONENTS, &glConfig.maxFragmentUniformComponents );
 
 	// keep the maximum number of bones we can do in GLSL sane
+	// TODO: Check this
 	//if( r_maxglslbones->integer > MAX_GLSL_UNIFORM_BONES ) {
 	//	Cvar_ForceSet( r_maxglslbones->name, r_maxglslbones->dvalue );
 	//}
-
-	// require GLSL 1.20+ for GPU skinning
-	if( glConfig.shadingLanguageVersion >= 120 ) {
-		// the maximum amount of bones we can handle in a vertex shader (2 vec4 uniforms per vertex)
-		glConfig.maxGLSLBones = wsw::max( 0, glConfig.maxVertexUniformComponents / 8 - 19 );
-	} else {
-		glConfig.maxGLSLBones = 0;
-	}
 
 	glConfig.depthEpsilon = 1.0 / ( 1 << 22 );
 

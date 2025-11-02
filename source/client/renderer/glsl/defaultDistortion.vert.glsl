@@ -10,7 +10,9 @@ qf_varying vec3 v_EyeVector;
 #endif
 
 #ifdef APPLY_EYEDOT
-uniform float u_FrontPlane;
+layout (std140) uniform DistortionBlock {
+	float u_FrontPlane;
+};
 #endif
 
 void main(void)

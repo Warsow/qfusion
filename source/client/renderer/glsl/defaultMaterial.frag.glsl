@@ -21,17 +21,11 @@ uniform sampler2D u_DecalTexture;
 uniform sampler2D u_EntityDecalTexture;
 #endif
 
-#if defined(APPLY_OFFSETMAPPING) || defined(APPLY_RELIEFMAPPING)
-uniform float u_OffsetMappingScale;
-#endif
 
-#ifdef APPLY_DRAWFLAT
-uniform myhalf3 u_WallColor;
-uniform myhalf3 u_FloorColor;
-#endif
-
-uniform myhalf2 u_GlossFactors; // gloss scaling and exponent factors
-
+layout (std140) uniform MaterialBlock {
+	uniform myhalf2 u_GlossFactors; // gloss scaling and exponent factors
+	uniform float u_OffsetMappingScale;
+};
 
 void main()
 {

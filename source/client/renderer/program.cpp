@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "local.h"
 #include "program.h"
+#include "backendlocal.h"
 #include <common/helpers/links.h>
 #include <common/helpers/memspecbuilder.h>
 #include <common/helpers/singletonholder.h>
@@ -644,12 +645,14 @@ private:
 	bool loadVertexShaderSource( GLuint id, const wsw::StringView &name, int type, uint64_t features,
 								 std::span<const deformv_t> deforms,
 								 const SpanOfSourceStrings &featureStrings,
-								 const wsw::StringView &version, const wsw::StringView &maxBones );
+								 const wsw::StringView &version,
+								 const std::span<const wsw::StringView> &additionalConstants );
 
 	[[nodiscard]]
 	bool loadFragmentShaderSource( GLuint id, const wsw::StringView &name, int type, uint64_t features,
 								   const SpanOfSourceStrings &featureStrings,
-								   const wsw::StringView &version, const wsw::StringView &maxBones );
+								   const wsw::StringView &version,
+								   const std::span<const wsw::StringView> &additionalConstants );
 
 	[[nodiscard]]
 	bool compileShader( GLuint id, const char *kind, std::span<const char *> strings, std::span<int> lengths );
@@ -660,7 +663,7 @@ private:
 	[[nodiscard]]
 	bool linkProgram( GLuint programId, GLuint vertexShaderId, GLuint fragmentShaderId );
 	
-	static void setupUniformsAndLocations( ShaderProgram *program );
+	static void setupUniformsAndLocations( GLuint programId );
 
 	wsw::HeapBasedFreelistAllocator m_programsAllocator;
 	wsw::HeapBasedFreelistAllocator m_namesAllocator;
@@ -1165,6 +1168,12 @@ public:
 		sourceCache.addBuiltinSourceLines( key, this );
 	}
 
+	void addAll( std::span<const wsw::StringView> strings ) {
+		for( const wsw::StringView &string: strings ) {
+			add( string.data(), string.size() );
+		}
+	}
+
 private:
 	static_assert( std::is_same_v<GLchar, char> );
 	wsw::PodVector<const char *> *const m_strings;
@@ -1391,7 +1400,7 @@ auto ShaderProgramCache::getProgramForParams( int type, const wsw::StringView &m
 	m_programForIndex[programIndex] = program;
 
 	qglUseProgram( program->programId );
-	setupUniformsAndLocations( program );
+	setupUniformsAndLocations( program->programId );
 	assert( qglGetError() == GL_NO_ERROR );
 
 	return (int)( programIndex + 1 );
@@ -1473,7 +1482,12 @@ bool ShaderProgramCache::loadShaderSources( const wsw::StringView &name, int typ
 	shaderVersion << "#define QF_GLSL_VERSION "_asView << glConfig.shadingLanguageVersion << "\n"_asView;
 
 	wsw::StaticString<64> maxBones;
-	maxBones << "#define MAX_UNIFORM_BONES "_asView << glConfig.maxGLSLBones << "\n"_asView;
+	maxBones << "#define MAX_UNIFORM_BONES "_asView << MAX_GLSL_UNIFORM_BONES << "\n"_asView;
+
+	wsw::StaticString<64> maxDlights;
+	maxDlights << "#define MAX_DLIGHTS "_asView << MAX_DLIGHTS << "\n"_asView;
+
+	std::initializer_list<wsw::StringView> additionalConstants { maxBones.asView(), maxDlights.asView() };
 
 	m_tmpCommonStrings.clear();
 	m_tmpCommonOffsets.clear();
@@ -1492,12 +1506,12 @@ bool ShaderProgramCache::loadShaderSources( const wsw::StringView &name, int typ
 	Com_DPrintf( "Registering GLSL program %s for features 0x%" PRIu64 "\n", name.data(), features );
 
 	if( !loadVertexShaderSource( vertexShaderId, name, type, features, deforms,
-								 spanOfFeatureStrings, shaderVersion.asView(), maxBones.asView() ) ) {
+								 spanOfFeatureStrings, shaderVersion.asView(), additionalConstants ) ) {
 		return false;
 	}
 
 	if( !loadFragmentShaderSource( fragmentShaderId, name, type, features,
-								   spanOfFeatureStrings, shaderVersion.asView(), maxBones.asView() ) ) {
+								   spanOfFeatureStrings, shaderVersion.asView(), additionalConstants ) ) {
 		return false;
 	}
 
@@ -1529,7 +1543,8 @@ void ShaderProgramCache::loadSourceOfFeatures( int type, uint64_t features, Prog
 bool ShaderProgramCache::loadVertexShaderSource( GLuint id, const wsw::StringView &name, int type, uint64_t features,
 												 std::span<const deformv_t> deforms,
 												 const SpanOfSourceStrings &featureStrings,
-												 const wsw::StringView &shaderVersion, const wsw::StringView &maxBones ) {
+												 const wsw::StringView &shaderVersion,
+												 const std::span<const wsw::StringView> &additionalConstants ) {
 	assert( !name.empty() && name.isZeroTerminated() );
 
 	m_tmpShaderStrings.clear();
@@ -1564,7 +1579,7 @@ bool ShaderProgramCache::loadVertexShaderSource( GLuint id, const wsw::StringVie
 	}
 
 	sourceBuilder.addAll( g_programSourceFileCache.constants, g_programSourceFileCache );
-	sourceBuilder.add( maxBones.data() );
+	sourceBuilder.addAll( additionalConstants );
 	sourceBuilder.addAll( g_programSourceFileCache.uniforms, g_programSourceFileCache );
 
 	sourceBuilder.addAll( g_programSourceFileCache.waveFuncs, g_programSourceFileCache );
@@ -1579,7 +1594,7 @@ bool ShaderProgramCache::loadVertexShaderSource( GLuint id, const wsw::StringVie
 
 	if( features & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
 		sourceBuilder.add( "qf_attribute vec4 a_BonesIndices, a_BonesWeights;\n" );
-		sourceBuilder.add( "uniform vec4 u_DualQuats[MAX_UNIFORM_BONES*2];\n" );
+		sourceBuilder.add( "layout (std140) uniform BonesBlock { vec4 u_DualQuats[MAX_UNIFORM_BONES*2]; };\n" );
 
 		sourceBuilder.addAll( g_programSourceFileCache.quatTransform, g_programSourceFileCache );
 		sourceBuilder.add( "#define QF_DUAL_QUAT_TRANSFORM_TANGENT\n");
@@ -1612,7 +1627,8 @@ bool ShaderProgramCache::loadVertexShaderSource( GLuint id, const wsw::StringVie
 
 bool ShaderProgramCache::loadFragmentShaderSource( GLuint id, const wsw::StringView &name, int type, uint64_t features,
 												   const SpanOfSourceStrings &featureStrings,
-												   const wsw::StringView &shaderVersion, const wsw::StringView &maxBones ) {
+												   const wsw::StringView &shaderVersion,
+												   const std::span<const wsw::StringView> &additionalConstants ) {
 	assert( !name.empty() && name.isZeroTerminated() );
 
 	m_tmpShaderStrings.clear();
@@ -1642,7 +1658,7 @@ bool ShaderProgramCache::loadFragmentShaderSource( GLuint id, const wsw::StringV
 	}
 
 	sourceBuilder.addAll( g_programSourceFileCache.constants, g_programSourceFileCache );
-	sourceBuilder.add( maxBones.data() );
+	sourceBuilder.addAll( additionalConstants );
 	sourceBuilder.addAll( g_programSourceFileCache.uniforms, g_programSourceFileCache );
 
 	sourceBuilder.addAll( g_programSourceFileCache.math, g_programSourceFileCache );
@@ -1654,12 +1670,12 @@ bool ShaderProgramCache::loadFragmentShaderSource( GLuint id, const wsw::StringV
 
 	ProgramSourceLoader fragmentShaderLoader( &g_programSourceFileCache, &m_tmpShaderStrings, &m_tmpShaderLengths );
 	if( !fragmentShaderLoader.load( wsw::StringView( fileName ), features, type ) ) {
-		rError() << "Failed to load source of", wsw::StringView( fileName );
+		rError() << "Failed to load source of" << wsw::StringView( fileName );
 		return false;
 	}
 
 	if( !compileShader( id, "fragment", m_tmpShaderStrings, m_tmpShaderLengths ) ) {
-		rError() << "Failed to compile %s\n", wsw::StringView( fileName );
+		rError() << "Failed to compile" << wsw::StringView( fileName );
 		return false;
 	}
 
@@ -1719,117 +1735,282 @@ int RP_GetProgramObject( int elem ) {
 	return 0;
 }
 
-/*
-* RP_UpdateShaderUniforms
-*/
-void RP_UpdateShaderUniforms( int elem,
-							  float shaderTime,
-							  const vec3_t entOrigin, const vec3_t entDist, const uint8_t *entityColor,
-							  const uint8_t *constColor, const float *rgbGenFuncArgs, const float *alphaGenFuncArgs,
-							  const mat4_t texMatrix, float colorMod ) {
-	GLfloat m[9];
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+struct UniformBlock {
+	enum class Binding : unsigned {
+		DeformBuiltin,
+		View,
+		Shader,
+		DiffuseLight,
+		DeluxeMap,
+		Material,
+		DynamicLight,
+		Outline,
+		Bones,
+		Fog,
+		TextureParams,
+		ColorCorrection,
+		DrawFlat,
+		SoftParticles,
+		BlendMix,
+		TexGen,
+		Distortion,
+	};
 
-	if( entOrigin ) {
-		if( program->loc.EntityOrigin >= 0 ) {
-			qglUniform3fv( program->loc.EntityOrigin, 1, entOrigin );
-		}
-		if( program->loc.builtin.EntityOrigin >= 0 ) {
-			qglUniform3fv( program->loc.builtin.EntityOrigin, 1, entOrigin );
-		}
-	}
+	// Ensure that we can address the array of streams by a binding value
+	static_assert( (unsigned)Binding::Distortion + 1 == MAX_UNIFORM_BINDINGS );
 
-	if( program->loc.EntityDist >= 0 && entDist ) {
-		qglUniform3fv( program->loc.EntityDist, 1, entDist );
-	}
-	if( program->loc.EntityColor >= 0 && entityColor ) {
-		qglUniform4f( program->loc.EntityColor, entityColor[0] * 1.0 / 255.0, entityColor[1] * 1.0 / 255.0, entityColor[2] * 1.0 / 255.0, entityColor[3] * 1.0 / 255.0 );
-	}
+	struct alignas( 16 ) DeformBuiltin {
+		static constexpr unsigned kBinding = (unsigned)Binding::DeformBuiltin;
 
-	if( program->loc.ShaderTime >= 0 ) {
-		qglUniform1f( program->loc.ShaderTime, shaderTime );
-	}
-	if( program->loc.builtin.ShaderTime >= 0 ) {
-		qglUniform1f( program->loc.builtin.ShaderTime, shaderTime );
-	}
+		alignas( 16 ) float viewOrigin[3];
+		// mat3x3
+		alignas( 16 ) float viewAxis[12];
+		alignas( 16 ) float entityOrigin[3];
 
-	if( program->loc.ConstColor >= 0 && constColor ) {
-		qglUniform4f( program->loc.ConstColor, constColor[0] * 1.0 / 255.0, constColor[1] * 1.0 / 255.0, constColor[2] * 1.0 / 255.0, constColor[3] * 1.0 / 255.0 );
-	}
-	if( program->loc.RGBGenFuncArgs >= 0 && rgbGenFuncArgs ) {
-		qglUniform4fv( program->loc.RGBGenFuncArgs, 1, rgbGenFuncArgs );
-	}
-	if( program->loc.AlphaGenFuncArgs >= 0 && alphaGenFuncArgs ) {
-		qglUniform4fv( program->loc.AlphaGenFuncArgs, 1, alphaGenFuncArgs );
-	}
+		// Follows a vec3, no alignment is required
+		float shaderTime;
+		float mirrorSide;
+	};
 
-	// FIXME: this looks shit...
-	if( program->loc.TextureMatrix >= 0 ) {
-		m[0] = texMatrix[0], m[1] = texMatrix[4];
-		m[2] = texMatrix[1], m[3] = texMatrix[5];
-		m[4] = texMatrix[12], m[5] = texMatrix[13];
+	struct alignas( 16 ) View {
+		static constexpr unsigned kBinding = (unsigned)Binding::View;
 
-		qglUniform4fv( program->loc.TextureMatrix, 2, m );
-	}
+		alignas( 16 ) float modelViewMatrix[16];
+		alignas( 16 ) float modelViewProjectionMatrix[16];
+		alignas( 16 ) float viewOrigin[3];
+		// mat3x3
+		alignas( 16 ) float viewAxis[12];
+		alignas( 16 ) int32_t viewport[4];
 
-	if( program->loc.LightingIntensity >= 0 ) {
-		qglUniform1f( program->loc.LightingIntensity, 1.0 );
-	}
-	if( program->loc.ColorMod >= 0 ) {
-		qglUniform1f( program->loc.ColorMod, colorMod );
-	}
+		alignas( 8 ) float zRange[2];
+		// Follows a vec2, so no alignment is required
+		float mirrorSide;
+	};
+
+	struct alignas( 16 ) Shader {
+		static constexpr unsigned kBinding = (unsigned)Binding::Shader;
+
+		alignas( 16 ) float entityOrigin[3];
+		alignas( 16 ) float entityDist[3];
+		alignas( 16 ) float entityColor[4];
+		alignas( 16 ) float constColor[4];
+		alignas( 16 ) float rgbGenFuncArgs[4];
+		alignas( 16 ) float alphaGenFuncArgs[4];
+		alignas( 16 ) float textureMatrix[8];
+
+		float colorMod;
+		float shaderTime;
+	};
+
+	struct alignas( 16 ) DiffuseLight {
+		static constexpr unsigned kBinding = (unsigned)Binding::DiffuseLight;
+
+		alignas( 16 ) float lightDir[3];
+		alignas( 16 ) float lightAmbient[3];
+		alignas( 16 ) float lightDiffuse[3];
+	};
+
+	struct alignas( 16 ) Material {
+		static constexpr unsigned kBinding = (unsigned)Binding::Material;
+
+		alignas( 8 ) float glossFactors[2];
+		float offsetMappingScale;
+	};
+
+	struct alignas( 16 ) DeluxeMap {
+		static constexpr unsigned kBinding = (unsigned)Binding::DeluxeMap;
+
+		alignas( 16 ) float deluxeMapOffset[4];
+		alignas( 16 ) float lightstyleColor[16];
+	};
+
+	struct alignas( 16 ) DynamicLight {
+		static constexpr unsigned kBinding = (unsigned)Binding::DynamicLight;
+
+		alignas( 16 ) float dynamicLightsPosition[4 * MAX_DLIGHTS];
+		// One 4-component vector per light, grouped by 4 and transposed
+		alignas( 16 ) float dynamicLightsDiffuseAndInvRadius[4 * MAX_DLIGHTS];
+
+		// TODO: Should we use dynamic branching at all?
+		alignas( 16 ) int32_t numDynamicLights;
+	};
+
+	struct alignas( 16 ) Outline {
+		static constexpr unsigned kBinding = (unsigned)Binding::Outline;
+
+		alignas( 16 ) float outlineHeight;
+		float outlineCutoff;
+	};
+
+	struct alignas( 16 ) Bones {
+		static constexpr unsigned kBinding = (unsigned)Binding::Bones;
+
+		alignas( 16 ) float dualQuats[8 * MAX_GLSL_UNIFORM_BONES];
+	};
+
+	struct alignas( 16 ) Fog {
+		static constexpr unsigned kBinding = (unsigned)Binding::Fog;
+
+		alignas( 16 ) float eyePlane[4];
+		alignas( 16 ) float plane[4];
+		alignas( 16 ) float color[3];
+		alignas( 16 ) float scaleAndEyeDist[2];
+	};
+
+	struct alignas( 16 ) TextureParams {
+		static constexpr unsigned kBinding = (unsigned)Binding::TextureParams;
+
+		// width, height, rcpWidth, rcpHeight
+		// TODO: Do we need this in modern GL versions?
+		alignas( 16 ) float textureParams[4];
+	};
+
+	struct alignas( 16 ) ColorCorrection {
+		static constexpr unsigned kBinding = (unsigned)Binding::ColorCorrection;
+
+		alignas( 16 ) float hdrGamma;
+		float hdrExposure;
+	};
+
+	struct alignas( 16 ) DrawFlat {
+		static constexpr unsigned kBinding = (unsigned)Binding::DrawFlat;
+
+		alignas( 16 ) float wallColor[3];
+		alignas( 16 ) float floorColor[3];
+	};
+
+	struct alignas( 16 ) SoftParticles {
+		static constexpr unsigned kBinding = (unsigned)Binding::SoftParticles;
+
+		alignas( 16 ) float softParticlesScale;
+	};
+
+	struct alignas( 16 ) BlendMix {
+		static constexpr unsigned kBinding = (unsigned)Binding::BlendMix;
+
+		alignas( 16 ) float blendMix[2];
+	};
+
+	struct alignas( 16 ) TexGen {
+		static constexpr unsigned kBinding = (unsigned)Binding::TexGen;
+
+		// mat3x3
+		alignas( 16 ) float reflectionTexMatrix[12];
+		alignas( 16 ) float vectorTexMatrix[16];
+	};
+
+	struct alignas( 16 ) Distortion {
+		static constexpr unsigned kBinding = (unsigned)Binding::Distortion;
+
+		alignas( 16 ) float frontPlane;
+	};
+};
+
+template <typename Block>
+auto allocUniformBlock() -> Block * {
+	return (Block *)RB_GetTmpUniformBlock( Block::kBinding, sizeof( Block ) );
+}
+
+template <typename Block>
+void commitUniformBlock( Block *block ) {
+	RB_CommitUniformBlock( Block::kBinding, block, sizeof( Block ) );
+}
+
+static inline void copyMat3ToStd140Layout( const mat3_t from, float *to ) {
+	VectorCopy( from + 0, to + 0 );
+	VectorCopy( from + 3, to + 4 );
+	VectorCopy( from + 6, to + 8 );
+}
+
+static inline void copyMat4ToStd140Layout( const mat4_t from, float *to ) {
+	Matrix4_Copy( from, to );
 }
 
 /*
-* RP_UpdateViewUniforms
+* RP_UpdateShaderUniforms
 */
-void RP_UpdateViewUniforms( int elem,
-							const mat4_t modelviewMatrix, const mat4_t modelviewProjectionMatrix,
+void RP_UpdateShaderUniforms( float shaderTime,
+							  const vec3_t entOrigin, const vec3_t entDist, const uint8_t *entityColor,
+							  const uint8_t *constColor, const float *rgbGenFuncArgs, const float *alphaGenFuncArgs,
+							  const mat4_t texMatrix, float colorMod ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::Shader>();
+
+	if( entOrigin ) {
+		VectorCopy( entOrigin, block->entityOrigin );
+	}
+
+	if( entDist ) {
+		VectorCopy( entDist, block->entityDist );
+	}
+	if( entityColor ) {
+		Vector4Set( block->entityColor, entityColor[0] * 1.0 / 255.0, entityColor[1] * 1.0 / 255.0, entityColor[2] * 1.0 / 255.0, entityColor[3] * 1.0 / 255.0 );
+	}
+
+	block->shaderTime = shaderTime;
+
+	if( constColor ) {
+		Vector4Set( block->constColor, constColor[0] * 1.0 / 255.0, constColor[1] * 1.0 / 255.0, constColor[2] * 1.0 / 255.0, constColor[3] * 1.0 / 255.0 );
+	}
+	if( rgbGenFuncArgs ) {
+		Vector4Copy( rgbGenFuncArgs, block->rgbGenFuncArgs );
+	}
+	if( alphaGenFuncArgs ) {
+		Vector4Copy( alphaGenFuncArgs, block->alphaGenFuncArgs );
+	}
+
+	block->textureMatrix[0] = texMatrix[0], block->textureMatrix[1] = texMatrix[4];
+	block->textureMatrix[2] = texMatrix[1], block->textureMatrix[3] = texMatrix[5];
+	block->textureMatrix[4] = texMatrix[12], block->textureMatrix[5] = texMatrix[13];
+
+	block->colorMod = colorMod;
+
+	commitUniformBlock( block );
+}
+
+void RP_UpdateViewUniforms( const mat4_t modelviewMatrix, const mat4_t modelviewProjectionMatrix,
 							const vec3_t viewOrigin, const mat3_t viewAxis,
 							float mirrorSide,
 							const int *viewport,
 							float zNear, float zFar ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+	auto *const __restrict block = allocUniformBlock<UniformBlock::View>();
 
-	if( program->loc.ModelViewMatrix >= 0 ) {
-		qglUniformMatrix4fv( program->loc.ModelViewMatrix, 1, GL_FALSE, modelviewMatrix );
-	}
-	if( program->loc.ModelViewProjectionMatrix >= 0 ) {
-		qglUniformMatrix4fv( program->loc.ModelViewProjectionMatrix, 1, GL_FALSE, modelviewProjectionMatrix );
-	}
+	copyMat4ToStd140Layout( modelviewMatrix, block->modelViewMatrix );
+	copyMat4ToStd140Layout( modelviewProjectionMatrix, block->modelViewProjectionMatrix );
 
-	if( program->loc.ZRange >= 0 ) {
-		qglUniform2f( program->loc.ZRange, zNear, zFar );
-	}
+	block->zRange[0] = zNear, block->zRange[1] = zFar;
 
 	if( viewOrigin ) {
-		if( program->loc.ViewOrigin >= 0 ) {
-			qglUniform3fv( program->loc.ViewOrigin, 1, viewOrigin );
-		}
-		if( program->loc.builtin.ViewOrigin >= 0 ) {
-			qglUniform3fv( program->loc.builtin.ViewOrigin, 1, viewOrigin );
-		}
+		VectorCopy( viewOrigin, block->viewOrigin );
 	}
 
 	if( viewAxis ) {
-		if( program->loc.ViewAxis >= 0 ) {
-			qglUniformMatrix3fv( program->loc.ViewAxis, 1, GL_FALSE, viewAxis );
-		}
-		if( program->loc.builtin.ViewAxis >= 0 ) {
-			qglUniformMatrix3fv( program->loc.builtin.ViewAxis, 1, GL_FALSE, viewAxis );
-		}
+		copyMat3ToStd140Layout( viewAxis, block->viewAxis );
 	}
 
-	if( program->loc.Viewport >= 0 ) {
-		qglUniform4iv( program->loc.Viewport, 1, viewport );
+	Vector4Copy( viewport, block->viewport );
+
+	block->mirrorSide = mirrorSide;
+
+	commitUniformBlock( block );
+}
+
+void RP_UpdateDeformBuiltinUniforms( float shaderTime, const vec3_t viewOrigin, const mat3_t viewAxis, const vec3_t entOrigin, float mirrorSide ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::DeformBuiltin>();
+
+	if( viewOrigin ) {
+		VectorCopy( viewOrigin, block->viewOrigin );
+	}
+	if( viewAxis ) {
+		copyMat3ToStd140Layout( viewAxis, block->viewAxis );
+	}
+	if( entOrigin ) {
+		VectorCopy( entOrigin, block->entityOrigin );
 	}
 
-	if( program->loc.MirrorSide >= 0 ) {
-		qglUniform1f( program->loc.MirrorSide, mirrorSide );
-	}
-	if( program->loc.builtin.MirrorSide >= 0 ) {
-		qglUniform1f( program->loc.builtin.MirrorSide, mirrorSide );
-	}
+	block->shaderTime = shaderTime;
+	block->mirrorSide = mirrorSide;
+
+	commitUniformBlock( block );
 }
 
 /*
@@ -1840,156 +2021,139 @@ void RP_UpdateViewUniforms( int elem,
 * to be used in the following manner:
 * color *= mix(myhalf4(1.0), myhalf4(scale), u_BlendMix.xxxy);
 */
-void RP_UpdateBlendMixUniform( int elem, vec2_t blendMix ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateBlendMixUniform( vec2_t blendMix ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::BlendMix>();
 
-	if( program->loc.BlendMix >= 0 ) {
-		qglUniform2fv( program->loc.BlendMix, 1, blendMix );
-	}
+	Vector2Copy( blendMix, block->blendMix );
+
+	commitUniformBlock( block );
 }
 
 /*
 * RP_UpdateSoftParticlesUniforms
 */
-void RP_UpdateSoftParticlesUniforms( int elem, float scale ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateSoftParticlesUniforms( float scale ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::SoftParticles>();
 
-	if( program->loc.SoftParticlesScale >= 0 ) {
-		qglUniform1f( program->loc.SoftParticlesScale, scale );
-	}
+	block->softParticlesScale = scale;
+
+	commitUniformBlock( block );
 }
 
 /*
 * RP_UpdateDiffuseLightUniforms
 */
-void RP_UpdateDiffuseLightUniforms( int elem,
-									const vec3_t lightDir, const vec4_t lightAmbient, const vec4_t lightDiffuse ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateDiffuseLightUniforms( const vec3_t lightDir, const vec4_t lightAmbient, const vec4_t lightDiffuse ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::DiffuseLight>();
 
-	if( program->loc.LightDir >= 0 && lightDir ) {
-		qglUniform3fv( program->loc.LightDir, 1, lightDir );
+	if( lightDir ) {
+		VectorCopy( lightDir, block->lightDir );
 	}
-	if( program->loc.LightAmbient >= 0 && lightAmbient ) {
-		qglUniform3f( program->loc.LightAmbient, lightAmbient[0], lightAmbient[1], lightAmbient[2] );
+	if( lightAmbient ) {
+		// TODO: Is alpha unused
+		VectorCopy( lightAmbient, block->lightAmbient );
 	}
-	if( program->loc.LightDiffuse >= 0 && lightDiffuse ) {
-		qglUniform3f( program->loc.LightDiffuse, lightDiffuse[0], lightDiffuse[1], lightDiffuse[2] );
+	if( lightDiffuse ) {
+		// TODO: Is alpha unused
+		VectorCopy( lightDiffuse, block->lightDiffuse );
 	}
-	if( program->loc.LightingIntensity >= 0 ) {
-		qglUniform1f( program->loc.LightingIntensity, v_lighting_intensity.get() );
-	}
+
+	commitUniformBlock( block );
 }
 
 /*
 * RP_UpdateMaterialUniforms
 */
-void RP_UpdateMaterialUniforms( int elem,
-								float offsetmappingScale, float glossIntensity, float glossExponent ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateMaterialUniforms( float offsetmappingScale, float glossIntensity, float glossExponent ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::Material>();
 
-	if( program->loc.GlossFactors >= 0 ) {
-		qglUniform2f( program->loc.GlossFactors, glossIntensity, glossExponent );
-	}
-	if( program->loc.OffsetMappingScale >= 0 ) {
-		qglUniform1f( program->loc.OffsetMappingScale, offsetmappingScale );
-	}
+	block->glossFactors[0] = glossIntensity;
+	block->glossFactors[1] = glossExponent;
+	block->offsetMappingScale = offsetmappingScale;
+
+	commitUniformBlock( block );
 }
 
-/*
-* RP_UpdateDistortionUniforms
-*/
-void RP_UpdateDistortionUniforms( int elem, bool frontPlane ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateDistortionUniforms( bool frontPlane ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::Distortion>();
 
-	if( program->loc.FrontPlane >= 0 ) {
-		qglUniform1f( program->loc.FrontPlane, frontPlane ? 1 : -1 );
-	}
+	block->frontPlane = frontPlane ? +1.0f : -1.0f;
+
+	commitUniformBlock( block );
 }
 
-/*
-* RP_UpdateTextureUniforms
-*/
-void RP_UpdateTextureUniforms( int elem, int TexWidth, int TexHeight ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateTextureUniforms( int TexWidth, int TexHeight ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::TextureParams>();
 
-	if( program->loc.TextureParams >= 0 ) {
-		qglUniform4f( program->loc.TextureParams, TexWidth, TexHeight,
-						 TexWidth ? 1.0 / TexWidth : 1.0, TexHeight ? 1.0 / TexHeight : 1.0 );
-	}
+	Vector4Set( block->textureParams, TexWidth, TexHeight, TexWidth ? 1.0 / TexWidth : 1.0, TexHeight ? 1.0 / TexHeight : 1.0 );
+
+	commitUniformBlock( block );
 }
 
 /*
 * RP_UpdateOutlineUniforms
 */
-void RP_UpdateOutlineUniforms( int elem, float projDistance ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateOutlineUniforms( float projDistance ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::Outline>();
 
-	if( program->loc.OutlineHeight >= 0 ) {
-		qglUniform1f( program->loc.OutlineHeight, projDistance );
-	}
-	if( program->loc.OutlineCutOff >= 0 ) {
-		qglUniform1f( program->loc.OutlineCutOff, wsw::max( 0.0f, v_outlinesCutoff.get() ) );
-	}
+	block->outlineHeight = projDistance;
+	block->outlineCutoff = wsw::max( 0.0f, v_outlinesCutoff.get() );
+
+	commitUniformBlock( block );
 }
 
 /*
 * RP_UpdateFogUniforms
 */
-void RP_UpdateFogUniforms( int elem, byte_vec4_t color, float clearDist, float opaqueDist, cplane_t *fogPlane, cplane_t *eyePlane, float eyeDist ) {
-	GLfloat fog_color[3] = { 0, 0, 0 };
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateFogUniforms( byte_vec4_t color, float clearDist, float opaqueDist, cplane_t *fogPlane, cplane_t *eyePlane, float eyeDist ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::Fog>();
 
-	VectorScale( color, ( 1.0 / 255.0 ), fog_color );
+	VectorScale( color, ( 1.0 / 255.0 ), block->color );
+	Vector2Set( block->scaleAndEyeDist, 1.0 / ( opaqueDist - clearDist ), eyeDist );
+	Vector4Set( block->plane, fogPlane->normal[0], fogPlane->normal[1], fogPlane->normal[2], fogPlane->dist );
+	Vector4Set( block->eyePlane, eyePlane->normal[0], eyePlane->normal[1], eyePlane->normal[2], eyePlane->dist );
 
-	if( program->loc.Fog.Color >= 0 ) {
-		qglUniform3fv( program->loc.Fog.Color, 1, fog_color );
-	}
-	if( program->loc.Fog.ScaleAndEyeDist >= 0 ) {
-		qglUniform2f( program->loc.Fog.ScaleAndEyeDist, 1.0 / ( opaqueDist - clearDist ), eyeDist );
-	}
-	if( program->loc.Fog.Plane >= 0 ) {
-		qglUniform4f( program->loc.Fog.Plane, fogPlane->normal[0], fogPlane->normal[1], fogPlane->normal[2], fogPlane->dist );
-	}
-	if( program->loc.Fog.EyePlane >= 0 ) {
-		qglUniform4f( program->loc.Fog.EyePlane, eyePlane->normal[0], eyePlane->normal[1], eyePlane->normal[2], eyePlane->dist );
-	}
+	commitUniformBlock( block );
 }
 
 void RP_UpdateDynamicLightsUniforms( const FrontendToBackendShared *fsh,
-									 int elem, const superLightStyle_t *superLightStyle,
+									 const superLightStyle_t *superLightStyle,
 									 const vec3_t entOrigin, const mat3_t entAxis, unsigned int dlightbits ) {
-	int i, n, c;
-	vec3_t dlorigin, tvec;
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
-	bool identityAxis = Matrix3_Compare( entAxis, axis_identity );
-	vec4_t shaderColor[4];
 
 	if( superLightStyle ) {
-		GLfloat rgb[3];
-		static float deluxemapOffset[( MAX_LIGHTMAPS + 3 ) & ( ~3 )];
+		float deluxemapOffset[( MAX_LIGHTMAPS + 3 ) & ( ~3 )];
+		static_assert( MAX_LIGHTMAPS <= 4 );
 
-		for( i = 0; i < MAX_LIGHTMAPS && superLightStyle->lightmapStyles[i] != 255; i++ ) {
-			VectorCopy( lightStyles[superLightStyle->lightmapStyles[i]].rgb, rgb );
+		auto *const __restrict block = allocUniformBlock<UniformBlock::DeluxeMap>();
 
-			if( program->loc.LightstyleColor[i] >= 0 ) {
-				qglUniform3fv( program->loc.LightstyleColor[i], 1, rgb );
-			}
-			if( program->loc.DeluxemapOffset >= 0 ) {
-				deluxemapOffset[i] = superLightStyle->stOffset[i][0];
-			}
+		int i = 0;
+		for( ; i < MAX_LIGHTMAPS && superLightStyle->lightmapStyles[i] != 255; i++ ) {
+			VectorCopy( lightStyles[superLightStyle->lightmapStyles[i]].rgb, &block->lightstyleColor[4 * i] );
+
+			deluxemapOffset[i] = superLightStyle->stOffset[i][0];
 		}
 
-		if( i && ( program->loc.DeluxemapOffset >= 0 ) ) {
-			qglUniform4fv( program->loc.DeluxemapOffset, ( i + 3 ) / 4, deluxemapOffset );
+		if( i ) {
+			assert( ( ( i + 3 ) / 4 ) == 1 );
+			//qglUniform4fv( program->loc.DeluxemapOffset, ( i + 3 ) / 4, deluxemapOffset );
+			Vector4Copy( deluxemapOffset, block->deluxeMapOffset );
 		}
+
+		commitUniformBlock( block );
 	}
 
 	if( dlightbits ) {
+		const bool identityAxis = Matrix3_Compare( entAxis, axis_identity );
+
+		auto *const __restrict block = allocUniformBlock<UniformBlock::DynamicLight>();
+
+		vec4_t shaderColor[4];
 		memset( shaderColor, 0, sizeof( vec4_t ) * 3 );
 		Vector4Set( shaderColor[3], 1.0f, 1.0f, 1.0f, 1.0f );
-		n = 0;
+		int numAddedLights = 0;
+		unsigned offsetInFloadElems = 0;
 
-		for( i = 0; i < (int)fsh->visibleProgramLightIndices.size(); ++i ) {
+		for( unsigned i = 0; i < fsh->visibleProgramLightIndices.size(); ++i ) {
 			const unsigned lightBit = 1 << i;
 			if( !( dlightbits & lightBit ) ) {
 				continue;
@@ -1997,35 +2161,38 @@ void RP_UpdateDynamicLightsUniforms( const FrontendToBackendShared *fsh,
 
 			dlightbits &= ~lightBit;
 
-			if( program->loc.DynamicLightsPosition[n] < 0 ) {
-				break;
-			}
-
 			const auto *const light = fsh->dynamicLights + fsh->visibleProgramLightIndices[i];
 			assert( light->hasProgramLight && light->programRadius >= 1.0f );
 
+			vec3_t dlorigin;
 			VectorSubtract( light->origin, entOrigin, dlorigin );
 			if( !identityAxis ) {
+				vec3_t tvec;
 				VectorCopy( dlorigin, tvec );
 				Matrix3_TransformVector( entAxis, tvec, dlorigin );
 			}
 
-			qglUniform3fv( program->loc.DynamicLightsPosition[n], 1, dlorigin );
+			// Each origin element is laid out as vec4
+			VectorCopy( dlorigin, &block->dynamicLightsPosition[4 * i] );
+			//qglUniform3fv( program->loc.DynamicLightsPosition[n], 1, dlorigin );
 
-			c = n & 3;
-			shaderColor[0][c] = light->color[0];
-			shaderColor[1][c] = light->color[1];
-			shaderColor[2][c] = light->color[2];
-			shaderColor[3][c] = Q_Rcp( light->programRadius );
+			const int component       = numAddedLights & 3;
+			shaderColor[0][component] = light->color[0];
+			shaderColor[1][component] = light->color[1];
+			shaderColor[2][component] = light->color[2];
+			shaderColor[3][component] = Q_Rcp( light->programRadius );
 
 			// DynamicLightsDiffuseAndInvRadius is transposed for SIMD, but it's still 4x4
-			if( c == 3 ) {
-				qglUniform4fv( program->loc.DynamicLightsDiffuseAndInvRadius[n >> 2], 4, shaderColor[0] );
+			if( component == 3 ) {
+				memcpy( block->dynamicLightsDiffuseAndInvRadius + offsetInFloadElems, shaderColor, 4 * sizeof( vec4_t ) );
+				//qglUniform4fv( program->loc.DynamicLightsDiffuseAndInvRadius[n >> 2], 4, shaderColor[0] );
 				memset( shaderColor, 0, sizeof( vec4_t ) * 3 );
 				Vector4Set( shaderColor[3], 1.0f, 1.0f, 1.0f, 1.0f );
+				// We've copied 16 float values
+				offsetInFloadElems += 16;
 			}
 
-			n++;
+			numAddedLights++;
 
 			dlightbits &= ~lightBit;
 			if( !dlightbits ) {
@@ -2033,42 +2200,41 @@ void RP_UpdateDynamicLightsUniforms( const FrontendToBackendShared *fsh,
 			}
 		}
 
-		if( n & 3 ) {
-			qglUniform4fv( program->loc.DynamicLightsDiffuseAndInvRadius[n >> 2], 4, shaderColor[0] );
+		if( numAddedLights & 3 ) {
+			memcpy( block->dynamicLightsDiffuseAndInvRadius + offsetInFloadElems, shaderColor, 4 * sizeof( vec4_t ) );
+			//qglUniform4fv( program->loc.DynamicLightsDiffuseAndInvRadius[n >> 2], 4, shaderColor[0] );
 			memset( shaderColor, 0, sizeof( vec4_t ) * 3 ); // to set to zero for the remaining lights
 			Vector4Set( shaderColor[3], 1.0f, 1.0f, 1.0f, 1.0f );
-			n = ALIGN( n, 4 );
+			numAddedLights = ALIGN( numAddedLights, 4 );
+			// We've copied 16 float values
+			offsetInFloadElems += 16;
 		}
 
-		if( program->loc.NumDynamicLights >= 0 ) {
-			qglUniform1i( program->loc.NumDynamicLights, n );
+		for( ; numAddedLights < MAX_DLIGHTS; numAddedLights += 4 ) {
+			memcpy( block->dynamicLightsDiffuseAndInvRadius + offsetInFloadElems, shaderColor, 4 * sizeof( vec4_t ) );
+			offsetInFloadElems += 16;
 		}
 
-		for( ; n < MAX_DLIGHTS; n += 4 ) {
-			if( program->loc.DynamicLightsPosition[n] < 0 ) {
-				break;
-			}
-			qglUniform4fv( program->loc.DynamicLightsDiffuseAndInvRadius[n >> 2], 4, shaderColor[0] );
-		}
+		block->numDynamicLights = numAddedLights;
+
+		commitUniformBlock( block );
 	}
 }
 
 /*
 * RP_UpdateTexGenUniforms
 */
-void RP_UpdateTexGenUniforms( int elem, const mat4_t reflectionMatrix, const mat4_t vectorMatrix ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateTexGenUniforms( const mat4_t reflectionMatrix, const mat4_t vectorMatrix ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::TexGen>();
 
-	if( program->loc.ReflectionTexMatrix >= 0 ) {
-		mat3_t m;
-		memcpy( &m[0], &reflectionMatrix[0], 3 * sizeof( vec_t ) );
-		memcpy( &m[3], &reflectionMatrix[4], 3 * sizeof( vec_t ) );
-		memcpy( &m[6], &reflectionMatrix[8], 3 * sizeof( vec_t ) );
-		qglUniformMatrix3fv( program->loc.ReflectionTexMatrix, 1, GL_FALSE, m );
-	}
-	if( program->loc.VectorTexMatrix >= 0 ) {
-		qglUniformMatrix4fv( program->loc.VectorTexMatrix, 1, GL_FALSE, vectorMatrix );
-	}
+	mat3_t m;
+	VectorCopy( reflectionMatrix + 0, m + 0 );
+	VectorCopy( reflectionMatrix + 4, m + 3 );
+	VectorCopy( reflectionMatrix + 8, m + 6 );
+	copyMat3ToStd140Layout( m, block->reflectionTexMatrix );
+	copyMat4ToStd140Layout( vectorMatrix, block->vectorTexMatrix );
+
+	commitUniformBlock( block );
 }
 
 /*
@@ -2076,279 +2242,121 @@ void RP_UpdateTexGenUniforms( int elem, const mat4_t reflectionMatrix, const mat
 *
 * Set uniform values for animation dual quaternions
 */
-void RP_UpdateBonesUniforms( int elem, unsigned int numBones, dualquat_t *animDualQuat ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateBonesUniforms( unsigned int numBones, dualquat_t *animDualQuat ) {
+	assert( numBones <= MAX_GLSL_UNIFORM_BONES );
 
-	if( numBones > glConfig.maxGLSLBones ) {
-		return;
-	}
-	if( program->loc.DualQuats < 0 ) {
-		return;
-	}
-	qglUniform4fv( program->loc.DualQuats, numBones * 2, &animDualQuat[0][0] );
-}
+	auto *const __restrict block = allocUniformBlock<UniformBlock::Bones>();
 
-/*
-* RP_UpdateInstancesUniforms
-*
-* Set uniform values for instance points (quaternion + xyz + scale)
-*/
-void RP_UpdateInstancesUniforms( int elem, unsigned int numInstances, instancePoint_t *instances ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+	// TODO: We don't need delta-comparison for anim data as it's unique for all models, do we need?
 
-	if( numInstances > MAX_GLSL_UNIFORM_INSTANCES ) {
-		numInstances = MAX_GLSL_UNIFORM_INSTANCES;
-	}
-	if( program->loc.InstancePoints < 0 ) {
-		return;
-	}
-	qglUniform4fv( program->loc.InstancePoints, numInstances * 2, &instances[0][0] );
+	memcpy( block->dualQuats, animDualQuat, 8 * sizeof( float ) * numBones );
+
+	commitUniformBlock( block );
 }
 
 /*
 * RP_UpdateColorCorrectionUniforms
 */
-void RP_UpdateColorCorrectionUniforms( int elem, float hdrGamma, float hdrExposure ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateColorCorrectionUniforms( float hdrGamma, float hdrExposure ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::ColorCorrection>();
 
-	if( program->loc.hdrGamma >= 0 ) {
-		qglUniform1f( program->loc.hdrGamma, hdrGamma );
-	}
-	if( program->loc.hdrExposure >= 0 ) {
-		qglUniform1f( program->loc.hdrExposure, hdrExposure );
-	}
+	block->hdrGamma = hdrGamma;
+	block->hdrExposure = hdrExposure;
+
+	commitUniformBlock( block );
 }
 
 /*
 * RP_UpdateDrawFlatUniforms
 */
-void RP_UpdateDrawFlatUniforms( int elem, const vec3_t wallColor, const vec3_t floorColor ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateDrawFlatUniforms( const vec3_t wallColor, const vec3_t floorColor ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::DrawFlat>();
 
-	if( program->loc.WallColor >= 0 ) {
-		qglUniform3f( program->loc.WallColor, wallColor[0], wallColor[1], wallColor[2] );
-	}
-	if( program->loc.FloorColor >= 0 ) {
-		qglUniform3f( program->loc.FloorColor, floorColor[0], floorColor[1], floorColor[2] );
-	}
+	VectorCopy( wallColor, block->wallColor );
+	VectorCopy( floorColor, block->floorColor );
+
+	commitUniformBlock( block );
 }
 
 /*
 * RP_UpdateKawaseUniforms
 */
-void RP_UpdateKawaseUniforms( int elem, int TexWidth, int TexHeight, int iteration ) {
-	ShaderProgram *const program = g_programCacheInstanceHolder.instance()->getProgramById( elem );
+void RP_UpdateKawaseUniforms( int TexWidth, int TexHeight, int iteration ) {
+	auto *const block = allocUniformBlock<UniformBlock::TextureParams>();
 
-	if( program->loc.TextureParams >= 0 ) {
-		qglUniform4f( program->loc.TextureParams,
-						 TexWidth ? 1.0 / TexWidth : 1.0, TexHeight ? 1.0 / TexHeight : 1.0, (float)iteration, 1.0 );
-	}
+	Vector4Set( block->textureParams, TexWidth ? 1.0 / TexWidth : 1.0, TexHeight ? 1.0 / TexHeight : 1.0, (float)iteration, 1.0 );
+
+	commitUniformBlock( block );
 }
 
-void ShaderProgramCache::setupUniformsAndLocations( ShaderProgram *program ) {
-	char tmp[1024];
-	unsigned int i;
-	int locBaseTexture,
-		locNormalmapTexture,
-		locGlossTexture,
-		locDecalTexture,
-		locEntityDecalTexture,
-		locLightmapTexture[MAX_LIGHTMAPS],
-		locDuDvMapTexture,
-		locReflectionTexture,
-		locRefractionTexture,
-		locCelShadeTexture,
-		locCelLightTexture,
-		locDiffuseTexture,
-		locStripesTexture,
-		locDepthTexture,
-		locYUVTextureY,
-		locYUVTextureU,
-		locYUVTextureV,
-		locColorLUT
-	;
+void ShaderProgramCache::setupUniformsAndLocations( GLuint programId ) {
+	const auto bindSamplerUniform = []( GLuint programId, const char *name, int value ) {
+		if( const int location = qglGetUniformLocation( programId, name ); location >= 0 ) {
+			qglUniform1i( location, value );
+		}
+	};
 
-	memset( &program->loc, -1, sizeof( program->loc ) );
+	bindSamplerUniform( programId, "u_BaseTexture", 0 );
+	bindSamplerUniform( programId, "u_NormalmapTexture", 1 );
+	bindSamplerUniform( programId, "u_GlossTexture", 2 );
+	bindSamplerUniform( programId, "u_DecalTexture", 3 );
+	bindSamplerUniform( programId, "u_EntityDecalTexture", 4 );
 
-	program->loc.ModelViewMatrix = qglGetUniformLocation( program->programId, "u_ModelViewMatrix" );
-	program->loc.ModelViewProjectionMatrix = qglGetUniformLocation( program->programId, "u_ModelViewProjectionMatrix" );
+	bindSamplerUniform( programId, "u_DuDvMapTexture", 0 );
+	bindSamplerUniform( programId, "u_ReflectionTexture", 2 );
+	bindSamplerUniform( programId, "u_RefractionTexture", 3 );
 
-	program->loc.ZRange = qglGetUniformLocation( program->programId, "u_ZRange" );
+	bindSamplerUniform( programId, "u_CelShadeTexture", 1 );
+	bindSamplerUniform( programId, "u_CelLightTexture", 6 );
+	bindSamplerUniform( programId, "u_DiffuseTexture", 2 );
+	bindSamplerUniform( programId, "u_StripesTexture", 5 );
 
-	program->loc.ViewOrigin = qglGetUniformLocation( program->programId, "u_ViewOrigin" );
-	program->loc.ViewAxis = qglGetUniformLocation( program->programId, "u_ViewAxis" );
+	bindSamplerUniform( programId, "u_DepthTexture", 3 );
 
-	program->loc.MirrorSide = qglGetUniformLocation( program->programId, "u_MirrorSide" );
+	bindSamplerUniform( programId, "u_YUVTextureY", 0 );
+	bindSamplerUniform( programId, "u_YUVTextureU", 1 );
+	bindSamplerUniform( programId, "u_YUVTextureV", 2 );
 
-	program->loc.Viewport = qglGetUniformLocation( program->programId, "u_Viewport" );
+	bindSamplerUniform( programId, "u_ColorLUT", 1 );
 
-	program->loc.LightDir = qglGetUniformLocation( program->programId, "u_LightDir" );
-	program->loc.LightAmbient = qglGetUniformLocation( program->programId, "u_LightAmbient" );
-	program->loc.LightDiffuse = qglGetUniformLocation( program->programId, "u_LightDiffuse" );
-	program->loc.LightingIntensity = qglGetUniformLocation( program->programId, "u_LightingIntensity" );
+	if( const int location = qglGetUniformLocation( programId, "u_LightingIntensity" ); location >= 0 ) {
+		qglUniform1f( location, 1.0f );
+	}
 
-	program->loc.TextureMatrix = qglGetUniformLocation( program->programId, "u_TextureMatrix" );
-
-	locBaseTexture = qglGetUniformLocation( program->programId, "u_BaseTexture" );
-	locNormalmapTexture = qglGetUniformLocation( program->programId, "u_NormalmapTexture" );
-	locGlossTexture = qglGetUniformLocation( program->programId, "u_GlossTexture" );
-	locDecalTexture = qglGetUniformLocation( program->programId, "u_DecalTexture" );
-	locEntityDecalTexture = qglGetUniformLocation( program->programId, "u_EntityDecalTexture" );
-
-	locDuDvMapTexture = qglGetUniformLocation( program->programId, "u_DuDvMapTexture" );
-	locReflectionTexture = qglGetUniformLocation( program->programId, "u_ReflectionTexture" );
-	locRefractionTexture = qglGetUniformLocation( program->programId, "u_RefractionTexture" );
-
-	locCelShadeTexture = qglGetUniformLocation( program->programId, "u_CelShadeTexture" );
-	locCelLightTexture = qglGetUniformLocation( program->programId, "u_CelLightTexture" );
-	locDiffuseTexture = qglGetUniformLocation( program->programId, "u_DiffuseTexture" );
-	locStripesTexture = qglGetUniformLocation( program->programId, "u_StripesTexture" );
-
-	locDepthTexture = qglGetUniformLocation( program->programId, "u_DepthTexture" );
-
-	locYUVTextureY = qglGetUniformLocation( program->programId, "u_YUVTextureY" );
-	locYUVTextureU = qglGetUniformLocation( program->programId, "u_YUVTextureU" );
-	locYUVTextureV = qglGetUniformLocation( program->programId, "u_YUVTextureV" );
-
-	locColorLUT = qglGetUniformLocation( program->programId, "u_ColorLUT" );
-
-	program->loc.DeluxemapOffset = qglGetUniformLocation( program->programId, "u_DeluxemapOffset" );
-
-	for( i = 0; i < MAX_LIGHTMAPS; i++ ) {
+	for( int i = 0; i < MAX_LIGHTMAPS; i++ ) {
+		char tmp[1024];
 		// arrays of samplers are broken on ARM Mali so get u_LightmapTexture%i instead of u_LightmapTexture[%i]
-		locLightmapTexture[i] = qglGetUniformLocation( program->programId,
-														  va_r( tmp, sizeof( tmp ), "u_LightmapTexture%i", i ) );
-
-		if( locLightmapTexture[i] < 0 ) {
+		const char *name = va_r( tmp, sizeof( tmp ), "u_LightmapTexture%i", i );
+		if( const int location = qglGetUniformLocation( programId, name ); location >= 0 ) {
+			qglUniform1i( location, i + 4 );
+		} else {
 			break;
 		}
-
-		program->loc.LightstyleColor[i] = qglGetUniformLocation( program->programId,
-																	va_r( tmp, sizeof( tmp ), "u_LightstyleColor[%i]", i ) );
 	}
 
-	program->loc.GlossFactors = qglGetUniformLocation( program->programId, "u_GlossFactors" );
-
-	program->loc.OffsetMappingScale = qglGetUniformLocation( program->programId, "u_OffsetMappingScale" );
-
-	program->loc.OutlineHeight = qglGetUniformLocation( program->programId, "u_OutlineHeight" );
-	program->loc.OutlineCutOff = qglGetUniformLocation( program->programId, "u_OutlineCutOff" );
-
-	program->loc.FrontPlane = qglGetUniformLocation( program->programId, "u_FrontPlane" );
-
-	program->loc.TextureParams = qglGetUniformLocation( program->programId, "u_TextureParams" );
-
-	program->loc.EntityDist = qglGetUniformLocation( program->programId, "u_EntityDist" );
-	program->loc.EntityOrigin = qglGetUniformLocation( program->programId, "u_EntityOrigin" );
-	program->loc.EntityColor = qglGetUniformLocation( program->programId, "u_EntityColor" );
-	program->loc.ConstColor = qglGetUniformLocation( program->programId, "u_ConstColor" );
-	program->loc.RGBGenFuncArgs = qglGetUniformLocation( program->programId, "u_RGBGenFuncArgs" );
-	program->loc.AlphaGenFuncArgs = qglGetUniformLocation( program->programId, "u_AlphaGenFuncArgs" );
-
-	program->loc.Fog.Plane = qglGetUniformLocation( program->programId, "u_FogPlane" );
-	program->loc.Fog.Color = qglGetUniformLocation( program->programId, "u_FogColor" );
-	program->loc.Fog.ScaleAndEyeDist = qglGetUniformLocation( program->programId, "u_FogScaleAndEyeDist" );
-	program->loc.Fog.EyePlane = qglGetUniformLocation( program->programId, "u_FogEyePlane" );
-
-	program->loc.ShaderTime = qglGetUniformLocation( program->programId, "u_ShaderTime" );
-
-	program->loc.ReflectionTexMatrix = qglGetUniformLocation( program->programId, "u_ReflectionTexMatrix" );
-	program->loc.VectorTexMatrix = qglGetUniformLocation( program->programId, "u_VectorTexMatrix" );
-
-	program->loc.builtin.ViewOrigin = qglGetUniformLocation( program->programId, "u_QF_ViewOrigin" );
-	program->loc.builtin.ViewAxis = qglGetUniformLocation( program->programId, "u_QF_ViewAxis" );
-	program->loc.builtin.MirrorSide = qglGetUniformLocation( program->programId, "u_QF_MirrorSide" );
-	program->loc.builtin.EntityOrigin = qglGetUniformLocation( program->programId, "u_QF_EntityOrigin" );
-	program->loc.builtin.ShaderTime = qglGetUniformLocation( program->programId, "u_QF_ShaderTime" );
-
-	// dynamic lights
-	for( i = 0; i < MAX_DLIGHTS; i++ ) {
-		program->loc.DynamicLightsPosition[i] = qglGetUniformLocation( program->programId,
-																		  va_r( tmp, sizeof( tmp ), "u_DlightPosition[%i]", i ) );
-
-		if( !( i & 3 ) ) {
-			// 4x4 transposed, so we can index it with `i`
-			program->loc.DynamicLightsDiffuseAndInvRadius[i >> 2] =
-				qglGetUniformLocation( program->programId, va_r( tmp, sizeof( tmp ), "u_DlightDiffuseAndInvRadius[%i]", i ) );
+	const auto bindBlock = []( GLuint programId, const char *name, unsigned binding ) {
+		if( const GLuint index = qglGetUniformBlockIndex( programId, name ); index != GL_INVALID_INDEX ) {
+			qglUniformBlockBinding( programId, index, binding );
 		}
-	}
-	program->loc.NumDynamicLights = qglGetUniformLocation( program->programId, "u_NumDynamicLights" );
+	};
 
-	program->loc.BlendMix = qglGetUniformLocation( program->programId, "u_BlendMix" );
-	program->loc.ColorMod = qglGetUniformLocation( program->programId, "u_ColorMod" );
-
-	program->loc.SoftParticlesScale = qglGetUniformLocation( program->programId, "u_SoftParticlesScale" );
-
-	program->loc.DualQuats = qglGetUniformLocation( program->programId, "u_DualQuats" );
-
-	program->loc.InstancePoints = qglGetUniformLocation( program->programId, "u_InstancePoints" );
-
-	program->loc.WallColor = qglGetUniformLocation( program->programId, "u_WallColor" );
-	program->loc.FloorColor = qglGetUniformLocation( program->programId, "u_FloorColor" );
-
-	program->loc.hdrGamma = qglGetUniformLocation( program->programId, "u_HDRGamma" );
-	program->loc.hdrExposure = qglGetUniformLocation( program->programId, "u_HDRExposure" );
-
-	if( locBaseTexture >= 0 ) {
-		qglUniform1i( locBaseTexture, 0 );
-	}
-	if( locDuDvMapTexture >= 0 ) {
-		qglUniform1i( locDuDvMapTexture, 0 );
-	}
-
-	if( locNormalmapTexture >= 0 ) {
-		qglUniform1i( locNormalmapTexture, 1 );
-	}
-	if( locGlossTexture >= 0 ) {
-		qglUniform1i( locGlossTexture, 2 );
-	}
-	if( locDecalTexture >= 0 ) {
-		qglUniform1i( locDecalTexture, 3 );
-	}
-	if( locEntityDecalTexture >= 0 ) {
-		qglUniform1i( locEntityDecalTexture, 4 );
-	}
-
-	if( locReflectionTexture >= 0 ) {
-		qglUniform1i( locReflectionTexture, 2 );
-	}
-	if( locRefractionTexture >= 0 ) {
-		qglUniform1i( locRefractionTexture, 3 );
-	}
-
-	if( locCelShadeTexture >= 0 ) {
-		qglUniform1i( locCelShadeTexture, 1 );
-	}
-	if( locDiffuseTexture >= 0 ) {
-		qglUniform1i( locDiffuseTexture, 2 );
-	}
-	if( locStripesTexture >= 0 ) {
-		qglUniform1i( locStripesTexture, 5 );
-	}
-	if( locCelLightTexture >= 0 ) {
-		qglUniform1i( locCelLightTexture, 6 );
-	}
-
-	if( locDepthTexture >= 0 ) {
-		qglUniform1i( locDepthTexture, 3 );
-	}
-
-	for( i = 0; i < MAX_LIGHTMAPS && locLightmapTexture[i] >= 0; i++ )
-		qglUniform1i( locLightmapTexture[i], i + 4 );
-
-	if( locYUVTextureY >= 0 ) {
-		qglUniform1i( locYUVTextureY, 0 );
-	}
-	if( locYUVTextureU >= 0 ) {
-		qglUniform1i( locYUVTextureU, 1 );
-	}
-	if( locYUVTextureV >= 0 ) {
-		qglUniform1i( locYUVTextureV, 2 );
-	}
-
-	if( locColorLUT >= 0 ) {
-		qglUniform1i( locColorLUT, 1 );
-	}
+	bindBlock( programId, "DeformBuiltinBlock", UniformBlock::DeformBuiltin::kBinding );
+	bindBlock( programId, "ViewBlock", UniformBlock::View::kBinding );
+	bindBlock( programId, "ShaderBlock", UniformBlock::Shader::kBinding );
+	bindBlock( programId, "DiffuseLightBlock", UniformBlock::DiffuseLight::kBinding );
+	bindBlock( programId, "DeluxeMapBlock", UniformBlock::DeluxeMap::kBinding );
+	bindBlock( programId, "DynamicLightBlock", UniformBlock::DynamicLight::kBinding );
+	bindBlock( programId, "MaterialBlock", UniformBlock::Material::kBinding );
+	bindBlock( programId, "OutlineBlock", UniformBlock::Outline::kBinding );
+	bindBlock( programId, "FogBlock", UniformBlock::Fog::kBinding );
+	bindBlock( programId, "TextureParamsBlock", UniformBlock::TextureParams::kBinding );
+	bindBlock( programId, "ColorCorrectionBlock", UniformBlock::ColorCorrection::kBinding );
+	bindBlock( programId, "DrawFlatBlock", UniformBlock::DrawFlat::kBinding );
+	bindBlock( programId, "SoftParticlesBlock", UniformBlock::SoftParticles::kBinding );
+	bindBlock( programId, "BlendMixBlock", UniformBlock::BlendMix::kBinding );
+	bindBlock( programId, "TexGenBlock", UniformBlock::TexGen::kBinding );
+	bindBlock( programId, "DistortionBlock", UniformBlock::Distortion::kBinding );
+	bindBlock( programId, "BonesBlock", UniformBlock::Bones::kBinding );
 
 	// TODO: Flush GL errors, if any?
 	(void)qglGetError();

@@ -520,6 +520,9 @@ const char              *qglGetGLWExtensionsString();
 
 #define GL_MAX_LABEL_LENGTH               0x82E8
 
+#define GL_UNIFORM_BUFFER                 0x8A11
+#define GL_INVALID_INDEX                  0xFFFFFFFFu
+
 #endif // QGL_H
 
 #ifndef APIENTRY
@@ -720,3 +723,8 @@ QGL_FUNC( void, glDrawBuffers, ( GLsizei n, const GLenum * bufs ) );
 QGL_FUNC( void, glSampleCoverage, ( GLfloat value, GLboolean invert ) );
 
 QGL_EXT( void, glObjectLabel, ( GLenum identifier, GLuint name, GLsizei length, const char *label ) );
+
+QGL_FUNC( GLuint, glGetUniformBlockIndex, ( GLuint program, const GLchar *uniformBlockName ) );
+QGL_FUNC( void, glUniformBlockBinding, ( GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding ) );
+QGL_FUNC( void, glBindBufferRange, ( GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size ) );
+QGL_FUNC( void, glBindBufferBase, ( GLenum target, GLuint index, GLuint buffer ) );
