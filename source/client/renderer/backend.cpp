@@ -33,10 +33,14 @@ static void RB_RegisterStreamVBOs();
 
 #define MAX_UNIFORM_BLOCK_SIZE 2048
 
+BackendState::BackendState( int width, int height ) : gl( width, height ) {
+	std::memset( &global, 0, sizeof( global ) );
+	std::memset( &draw, 0, sizeof( draw ) );
+	std::memset( &material, 0, sizeof( material ) );
+}
+
 void RB_Init() {
 	memset( &rb, 0, sizeof( rb ) );
-
-	rb.glState = new GLStateProxy( glConfig.width, glConfig.height, glConfig.stencilBits );
 
 	// create VBO's we're going to use for streamed data
 	RB_RegisterStreamVBOs();
@@ -83,105 +87,136 @@ void RB_Shutdown() {
 		uu.lastUploadedData = nullptr;
 		uu.scratchpadData = nullptr;
 	}
-	delete rb.glState;
-	rb.glState = nullptr;
+}
+
+void RB_SetDefaultGLState( int stencilBits ) {
+	if( stencilBits ) {
+		assert( stencilBits == 8 );
+		qglStencilMask( ( GLuint ) ~0 );
+		qglStencilFunc( GL_EQUAL, 128, 0xFF );
+		qglStencilOp( GL_KEEP, GL_KEEP, GL_INCR );
+	}
+
+	qglDisable( GL_CULL_FACE );
+	qglFrontFace( GL_CCW );
+	qglDisable( GL_BLEND );
+	qglDepthFunc( GL_LEQUAL );
+	qglDepthMask( GL_FALSE );
+	qglDisable( GL_POLYGON_OFFSET_FILL );
+	qglPolygonOffset( -1.0f, 0.0f ); // units will be handled by RB_DepthOffset
+	qglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+	qglEnable( GL_DEPTH_TEST );
+	qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+	qglFrontFace( GL_CCW );
+	qglEnable( GL_SCISSOR_TEST );
+	// TODO: Pass as args
+	qglScissor( 0, 0, glConfig.width, glConfig.height );
+
+	for( int tmu = 0; tmu < MAX_TEXTURE_UNITS; ++tmu ) {
+		qglActiveTexture( GL_TEXTURE0 + tmu );
+
+		qglBindTexture( GL_TEXTURE_CUBE_MAP, 0 );
+		qglBindTexture( GL_TEXTURE_2D_ARRAY, 0 );
+		qglBindTexture( GL_TEXTURE_3D, 0 );
+		qglBindTexture( GL_TEXTURE_2D, 0 );
+	}
+
+	qglActiveTexture( GL_TEXTURE0 );
 }
 
 void RB_BeginRegistration() {
-	RB_RegisterStreamVBOs();
-	RB_BindVBO( 0 );
+	RB_SetDefaultGLState( glConfig.stencilBits );
 
-	// unbind all texture targets on all TMUs
-	rb.glState->unbindAllTextures();
+	RB_RegisterStreamVBOs();
+	RB_BindVBO( nullptr, 0 );
 }
 
 void RB_EndRegistration() {
-	RB_BindVBO( 0 );
+	RB_BindVBO( nullptr, 0 );
 }
 
-void RB_SetTime( int64_t time ) {
-	rb.globalState.time = time;
-	rb.globalState.nullEnt.shaderTime = Sys_Milliseconds();
+void RB_SetTime( BackendState *backendState, int64_t time ) {
+	backendState->global.time = time;
+	backendState->global.nullEnt.shaderTime = Sys_Milliseconds();
 }
 
-void RB_BeginFrame() {
-	Vector4Set( rb.globalState.nullEnt.shaderRGBA, 1, 1, 1, 1 );
-	rb.globalState.nullEnt.scale = 1;
-	VectorClear( rb.globalState.nullEnt.origin );
-	Matrix3_Identity( rb.globalState.nullEnt.axis );
+void RB_BeginUsingBackendState( BackendState *backendState ) {
+	RB_SetDefaultGLState( glConfig.stencilBits );
+
+	memset( &rb.programState, 0, sizeof( rb.programState ) );
+
+	Vector4Set( backendState->global.nullEnt.shaderRGBA, 1, 1, 1, 1 );
+	backendState->global.nullEnt.scale = 1;
+	VectorClear( backendState->global.nullEnt.origin );
+	Matrix3_Identity( backendState->global.nullEnt.axis );
 
 	// start fresh each frame
-	RB_SetShaderStateMask( ~0, 0 );
-	RB_BindVBO( 0 );
-	RB_FlushTextureCache();
+	RB_SetShaderStateMask( backendState, ~0, 0 );
+	RB_BindVBO( backendState, 0 );
 }
 
-void RB_EndFrame() {
+void RB_EndUsingBackendState( BackendState * ) {
 }
 
-void RB_FlushTextureCache( void ) {
-	if( rb.glState ) {
-		rb.glState->flushTextureCache();
-	}
+void RB_DepthRange( BackendState *backendState, float depthmin, float depthmax ) {
+	backendState->gl.setDepthRange( depthmin, depthmax );
 }
 
-void RB_DepthRange( float depthmin, float depthmax ) {
-	rb.glState->setDepthRange( depthmin, depthmax );
+void RB_GetDepthRange( BackendState *backendState, float *depthmin, float *depthmax ) {
+	backendState->gl.getDepthRange( depthmin, depthmax );
 }
 
-void RB_GetDepthRange( float* depthmin, float *depthmax ) {
-	rb.glState->getDepthRange( depthmin, depthmax );
+void RB_SaveDepthRange( BackendState *backendState ) {
+	backendState->gl.saveDepthRange();
 }
 
-void RB_SaveDepthRange() {
-	rb.glState->saveDepthRange();
+void RB_RestoreDepthRange( BackendState *backendState ) {
+	backendState->gl.restoreDepthRange();
 }
 
-void RB_RestoreDepthRange() {
-	rb.glState->restoreDepthRange();
+void RB_LoadCameraMatrix( BackendState *backendState, const mat4_t m ) {
+	Matrix4_Copy( m, backendState->global.cameraMatrix );
 }
 
-void RB_LoadCameraMatrix( const mat4_t m ) {
-	Matrix4_Copy( m, rb.globalState.cameraMatrix );
+void RB_LoadObjectMatrix( BackendState *backendState, const mat4_t m ) {
+	Matrix4_Copy( m, backendState->global.objectMatrix );
+	Matrix4_MultiplyFast( backendState->global.cameraMatrix, m, backendState->global.modelviewMatrix );
+	Matrix4_Multiply( backendState->global.projectionMatrix, backendState->global.modelviewMatrix, backendState->global.modelviewProjectionMatrix );
 }
 
-void RB_LoadObjectMatrix( const mat4_t m ) {
-	Matrix4_Copy( m, rb.globalState.objectMatrix );
-	Matrix4_MultiplyFast( rb.globalState.cameraMatrix, m, rb.globalState.modelviewMatrix );
-	Matrix4_Multiply( rb.globalState.projectionMatrix, rb.globalState.modelviewMatrix, rb.globalState.modelviewProjectionMatrix );
+void RB_GetObjectMatrix( BackendState *backendState, float *m ) {
+	Matrix4_Copy( backendState->global.objectMatrix, m );
 }
 
-void RB_GetObjectMatrix( float *m ) {
-	Matrix4_Copy( rb.globalState.objectMatrix, m );
+void RB_LoadProjectionMatrix( BackendState *backendState, const mat4_t m ) {
+	Matrix4_Copy( m, backendState->global.projectionMatrix );
+	Matrix4_Multiply( m, backendState->global.modelviewMatrix, backendState->global.modelviewProjectionMatrix );
 }
 
-void RB_LoadProjectionMatrix( const mat4_t m ) {
-	Matrix4_Copy( m, rb.globalState.projectionMatrix );
-	Matrix4_Multiply( m, rb.globalState.modelviewMatrix, rb.globalState.modelviewProjectionMatrix );
+void RB_FlipFrontFace( BackendState *backendState ) {
+	backendState->gl.flipFrontFace();
 }
 
-void RB_FlipFrontFace( void ) {
-	rb.glState->flipFrontFace();
+void RB_Scissor( BackendState *backendState, int x, int y, int w, int h ) {
+	backendState->gl.setScissor( x, y, w, h );
 }
 
-void RB_Scissor( int x, int y, int w, int h ) {
-	rb.glState->setScissor( x, y, w, h );
+void RB_GetScissor( BackendState *backendState, int *x, int *y, int *w, int *h ) {
+	backendState->gl.getScissor( x, y, w, h );
 }
 
-void RB_GetScissor( int *x, int *y, int *w, int *h ) {
-	rb.glState->getScissor( x, y, w, h );
+void RB_Viewport( BackendState *backendState, int x, int y, int w, int h ) {
+	backendState->gl.setViewport( x, y, w, h );
 }
 
-void RB_Viewport( int x, int y, int w, int h ) {
-	rb.glState->setViewport( x, y, w, h );
-}
-
-void RB_Clear( int bits, float r, float g, float b, float a ) {
-	unsigned state = rb.glState->getState();
+void RB_Clear( BackendState *backendState, int bits, float r, float g, float b, float a ) {
+	unsigned state = backendState->gl.getState();
 
 	if( bits & GL_DEPTH_BUFFER_BIT ) {
 		state |= GLSTATE_DEPTHWRITE;
 	}
+
+	// TODO: Beware of direct calls
 
 	if( bits & GL_STENCIL_BUFFER_BIT ) {
 		qglClearStencil( 128 );
@@ -192,18 +227,19 @@ void RB_Clear( int bits, float r, float g, float b, float a ) {
 		qglClearColor( r, g, b, a );
 	}
 
-	rb.glState->setState( state );
+	backendState->gl.setState( state );
 
-	rb.glState->applyScissor();
+	backendState->gl.applyScissor();
 
 	qglClear( bits );
 
-	rb.glState->setDepthRange( 0.0f, 1.0f );
+	backendState->gl.setDepthRange( 0.0f, 1.0f );
 }
 
-void RB_BindFrameBufferObject( RenderTargetComponents *components ) {
+void RB_BindFrameBufferObject( BackendState *backendState, RenderTargetComponents *components ) {
 	// TODO: Resolve object lifetime problems/initialization order so we don't have to call it like this...
-	GLStateProxy::bindFramebufferObject( rb.glState, components );
+	// TODO: Same for backend state
+	GLStateProxy::bindFramebufferObject( backendState ? &backendState->gl : nullptr, components );
 }
 
 void RB_RegisterStreamVBOs() {
@@ -236,7 +272,7 @@ void RB_RegisterStreamVBOs() {
 	}
 }
 
-mesh_vbo_s *RB_BindVBO( int id ) {
+mesh_vbo_s *RB_BindVBO( BackendState *backendState, int id ) {
 	mesh_vbo_t *vbo;
 	if( id > 0 ) [[likely]] {
 		vbo = R_GetVBOByIndex( id );
@@ -248,12 +284,15 @@ mesh_vbo_s *RB_BindVBO( int id ) {
 		vbo = nullptr;
 	}
 
-	if( vbo ) {
-		rb.glState->bindVertexBuffer( vbo->vertexId );
-		rb.glState->bindIndexBuffer( vbo->elemId );
+	const GLuint vertexId = vbo ? vbo->vertexId : 0;
+	const GLuint elemId   = vbo ? vbo->elemId : 0;
+	// TODO: Split the code path properly so we don't have to pass the null backend state
+	if( backendState ) {
+		backendState->gl.bindVertexBuffer( vertexId );
+		backendState->gl.bindIndexBuffer( elemId );
 	} else {
-		rb.glState->bindVertexBuffer( 0 );
-		rb.glState->bindIndexBuffer( 0 );
+		qglBindBuffer( GL_ARRAY_BUFFER, vertexId );
+		qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, elemId );
 	}
 
 	return vbo;
@@ -326,7 +365,7 @@ void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVerte
 void R_EndUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes ) {
 	assert( group < std::size( rb.vertexUploads ) );
 	if( vertexDataSizeInBytes && indexDataSizeInBytes ) {
-		RB_BindVBO( RB_VBOIdForFrameUploads( group ) );
+		RB_BindVBO( nullptr, RB_VBOIdForFrameUploads( group ) );
 		const auto &vu = rb.vertexUploads[group];
 
 		qglBufferSubData( GL_ARRAY_BUFFER, 0, vertexDataSizeInBytes, vu.vboData );
@@ -359,13 +398,13 @@ void RB_CommitUniformBlock( unsigned binding, void *blockData, size_t blockSize 
 	}
 }
 
-void RB_DoDrawMeshVerts( const DrawMeshVertSpan *vertSpan, int primitive ) {
+void RB_DoDrawMeshVerts( BackendState *backendState, const DrawMeshVertSpan *vertSpan, int primitive ) {
 	// TODO: What's the purpose of v_drawElements
-	if( !( v_drawElements.get() || rb.materialState.currentEntity == &rb.globalState.nullEnt ) ) [[unlikely]] {
+	if( !( v_drawElements.get() || backendState->material.currentEntity == &backendState->global.nullEnt ) ) [[unlikely]] {
 		return;
 	}
 
-	rb.glState->applyScissor();
+	backendState->gl.applyScissor();
 
 	if( const auto *mdSpan = std::get_if<MultiDrawElemSpan>( vertSpan ) ) {
 		qglMultiDrawElements( primitive, mdSpan->counts, GL_UNSIGNED_SHORT, mdSpan->indices, mdSpan->numDraws );
@@ -382,46 +421,46 @@ void RB_DoDrawMeshVerts( const DrawMeshVertSpan *vertSpan, int primitive ) {
 	}
 }
 
-void RB_DrawMesh( const FrontendToBackendShared *fsh, int vboId, const VboSpanLayout *layout, const DrawMeshVertSpan *drawMeshVertSpan, int primitive ) {
-	const mesh_vbo_s *vbo = RB_BindVBO( vboId );
+void RB_DrawMesh( BackendState *backendState, const FrontendToBackendShared *fsh, int vboId, const VboSpanLayout *layout, const DrawMeshVertSpan *drawMeshVertSpan, int primitive ) {
+	const mesh_vbo_s *vbo = RB_BindVBO( backendState, vboId );
 
 	if( !layout ) [[likely]] {
 		layout = &vbo->layout;
 	}
 
-	rb.drawState.currentVAttribs &= ~VATTRIB_INSTANCES_BITS;
+	backendState->draw.currentVAttribs &= ~VATTRIB_INSTANCES_BITS;
 
-	assert( rb.materialState.currentShader );
+	assert( backendState->material.currentShader );
 
-	rb.glState->enableVertexAttribs( rb.drawState.currentVAttribs, layout );
+	backendState->gl.enableVertexAttribs( backendState->draw.currentVAttribs, layout );
 
-	if( rb.globalState.wireframe ) {
-		RB_DrawWireframeMesh( fsh, drawMeshVertSpan, primitive );
+	if( backendState->global.wireframe ) {
+		RB_DrawWireframeMesh( backendState, fsh, drawMeshVertSpan, primitive );
 	} else {
-		RB_DrawShadedMesh( fsh, drawMeshVertSpan, primitive );
+		RB_DrawShadedMesh( backendState, fsh, drawMeshVertSpan, primitive );
 	}
 }
 
-void RB_SetCamera( const vec3_t cameraOrigin, const mat3_t cameraAxis ) {
-	VectorCopy( cameraOrigin, rb.globalState.cameraOrigin );
-	Matrix3_Copy( cameraAxis, rb.globalState.cameraAxis );
+void RB_SetCamera( BackendState *backendState, const vec3_t cameraOrigin, const mat3_t cameraAxis ) {
+	VectorCopy( cameraOrigin, backendState->global.cameraOrigin );
+	Matrix3_Copy( cameraAxis, backendState->global.cameraAxis );
 }
 
-void RB_SetRenderFlags( int flags ) {
-	rb.globalState.renderFlags = flags;
+void RB_SetRenderFlags( BackendState *backendState, int flags ) {
+	backendState->global.renderFlags = flags;
 }
 
-bool RB_EnableWireframe( bool enable ) {
-	const bool oldVal = rb.globalState.wireframe;
+bool RB_EnableWireframe( BackendState *backendState, bool enable ) {
+	const bool oldVal = backendState->global.wireframe;
 
-	if( rb.globalState.wireframe != enable ) {
-		rb.globalState.wireframe = enable;
+	if( backendState->global.wireframe != enable ) {
+		backendState->global.wireframe = enable;
 
 		if( enable ) {
-			RB_SetShaderStateMask( 0, GLSTATE_NO_DEPTH_TEST );
+			RB_SetShaderStateMask( backendState, 0, GLSTATE_NO_DEPTH_TEST );
 			qglPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
 		} else {
-			RB_SetShaderStateMask( ~0, 0 );
+			RB_SetShaderStateMask( backendState, ~0, 0 );
 			qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 		}
 	}
@@ -429,114 +468,116 @@ bool RB_EnableWireframe( bool enable ) {
 	return oldVal;
 }
 
-static void RB_UpdateVertexAttribs( void ) {
-	vattribmask_t vattribs = rb.materialState.currentShader->vattribs;
-	if( rb.drawState.superLightStyle ) {
-		vattribs |= rb.drawState.superLightStyle->vattribs;
+static void RB_UpdateVertexAttribs( BackendState *backendState ) {
+	vattribmask_t vattribs = backendState->material.currentShader->vattribs;
+	if( backendState->draw.superLightStyle ) {
+		vattribs |= backendState->draw.superLightStyle->vattribs;
 	}
-	if( rb.drawState.bonesData.numBones ) {
+	if( backendState->draw.bonesData.numBones ) {
 		vattribs |= VATTRIB_BONES_BITS;
 	}
-	if( rb.materialState.currentEntity->outlineHeight != 0.0f ) {
+	if( backendState->material.currentEntity->outlineHeight != 0.0f ) {
 		vattribs |= VATTRIB_NORMAL_BIT;
 	}
-	if( DRAWFLAT() ) {
+	if( DRAWFLAT( backendState ) ) {
 		vattribs |= VATTRIB_NORMAL_BIT;
 	}
-	if( rb.drawState.currentShadowBits && ( rb.materialState.currentModelType == mod_brush ) ) {
+	if( backendState->draw.currentShadowBits && ( backendState->material.currentModelType == mod_brush ) ) {
 		vattribs |= VATTRIB_NORMAL_BIT;
 	}
-	rb.drawState.currentVAttribs = vattribs;
+	backendState->draw.currentVAttribs = vattribs;
 }
 
-void RB_BindShader( const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable,
-					const shader_t *shader, const mfog_t *fog, const portalSurface_s *portalSurface ) {
-	rb.materialState.currentShader = shader;
-	rb.materialState.fog = fog;
-	rb.materialState.texFog = rb.materialState.colorFog = NULL;
+void RB_BindShader( BackendState *backendState, const entity_t *e, const ShaderParams *overrideParams,
+					const ShaderParamsTable *paramsTable, const shader_t *shader,
+					const mfog_t *fog, const portalSurface_s *portalSurface ) {
+	backendState->material.currentShader = shader;
+	backendState->material.fog = fog;
+	backendState->material.texFog = backendState->material.colorFog = NULL;
 
-	rb.drawState.doneDepthPass = false;
-	rb.drawState.dirtyUniformState = true;
+	backendState->draw.doneDepthPass = false;
+	backendState->draw.dirtyUniformState = true;
 
-	rb.materialState.currentEntity = e ? e : &rb.globalState.nullEnt;
-	rb.materialState.currentModelType = rb.materialState.currentEntity->rtype == RT_MODEL &&
-										rb.materialState.currentEntity->model ? rb.materialState.currentEntity->model->type : mod_bad;
+	backendState->material.currentEntity = e ? e : &backendState->global.nullEnt;
 
-	rb.drawState.currentDlightBits = 0;
-	rb.drawState.currentShadowBits = 0;
-	rb.drawState.superLightStyle = nullptr;
+	backendState->material.currentModelType = backendState->material.currentEntity->rtype == RT_MODEL &&
+		backendState->material.currentEntity->model ? backendState->material.currentEntity->model->type : mod_bad;
 
-	rb.drawState.bonesData.numBones = 0;
-	rb.drawState.bonesData.maxWeights = 0;
+	backendState->draw.currentDlightBits = 0;
+	backendState->draw.currentShadowBits = 0;
+	backendState->draw.superLightStyle = nullptr;
 
-	rb.materialState.currentPortalSurface = portalSurface;
+	backendState->draw.bonesData.numBones = 0;
+	backendState->draw.bonesData.maxWeights = 0;
+
+	backendState->material.currentPortalSurface = portalSurface;
 
 	if( !e ) {
 		if( const ShaderParams::Material *materialParams = ShaderParams::getMaterialParams( overrideParams, paramsTable ) ) {
-			rb.materialState.currentShaderTime = 1e-3 * (double)materialParams->shaderTime;
-			rb.materialState.currentShaderFrac = materialParams->shaderFrac;
+			backendState->material.currentShaderTime = 1e-3 * (double)materialParams->shaderTime;
+			backendState->material.currentShaderFrac = materialParams->shaderFrac;
 		} else {
-			rb.materialState.currentShaderTime = 1e-3 * (double)rb.globalState.nullEnt.shaderTime;
-			rb.materialState.currentShaderFrac = 0.0f;
+			backendState->material.currentShaderTime = 1e-3 * (double)backendState->global.nullEnt.shaderTime;
+			backendState->material.currentShaderFrac = 0.0f;
 		}
-		rb.materialState.alphaHack = false;
-		rb.materialState.greyscale = false;
-		rb.materialState.noDepthTest = false;
-		rb.materialState.noColorWrite =  false;
-		rb.materialState.depthEqual = false;
+		backendState->material.alphaHack = false;
+		backendState->material.greyscale = false;
+		backendState->material.noDepthTest = false;
+		backendState->material.noColorWrite =  false;
+		backendState->material.depthEqual = false;
 	} else {
-		Vector4Copy( rb.materialState.currentEntity->shaderRGBA, rb.materialState.entityColor );
-		Vector4Copy( rb.materialState.currentEntity->outlineColor, rb.materialState.entityOutlineColor );
+		Vector4Copy( backendState->material.currentEntity->shaderRGBA, backendState->material.entityColor );
+		Vector4Copy( backendState->material.currentEntity->outlineColor, backendState->material.entityOutlineColor );
 		int64_t givenShaderTime;
 		if( const ShaderParams::Material *materialParams = ShaderParams::getMaterialParams( overrideParams, paramsTable ) ) {
 			givenShaderTime = materialParams->shaderTime;
-			rb.materialState.currentShaderFrac = materialParams->shaderFrac;
+			backendState->material.currentShaderFrac = materialParams->shaderFrac;
 		} else {
-			givenShaderTime = rb.materialState.currentEntity->shaderTime;
-			rb.materialState.currentShaderFrac = 0.0f;
+			givenShaderTime = backendState->material.currentEntity->shaderTime;
+			backendState->material.currentShaderFrac = 0.0f;
 		}
-		if( givenShaderTime > rb.globalState.time ) {
-			rb.materialState.currentShaderTime = 0;
+		if( givenShaderTime > backendState->global.time ) {
+			backendState->material.currentShaderTime = 0;
 		} else {
-			rb.materialState.currentShaderTime = 1e-3 * (double)( rb.globalState.time - givenShaderTime );
+			backendState->material.currentShaderTime = 1e-3 * (double)( backendState->global.time - givenShaderTime );
 		}
-		rb.materialState.alphaHack = e->renderfx & RF_ALPHAHACK ? true : false;
-		rb.materialState.hackedAlpha = (float)e->shaderRGBA[3] / 255.0f;
-		rb.materialState.greyscale = e->renderfx & RF_GREYSCALE ? true : false;
-		rb.materialState.noDepthTest = e->renderfx & RF_NODEPTHTEST && e->rtype == RT_SPRITE ? true : false;
-		rb.materialState.noColorWrite = e->renderfx & RF_NOCOLORWRITE ? true : false;
-		rb.materialState.depthEqual = rb.materialState.alphaHack && ( e->renderfx & RF_WEAPONMODEL );
+		backendState->material.alphaHack = e->renderfx & RF_ALPHAHACK ? true : false;
+		backendState->material.hackedAlpha = (float)e->shaderRGBA[3] / 255.0f;
+		backendState->material.greyscale = e->renderfx & RF_GREYSCALE ? true : false;
+		backendState->material.noDepthTest = e->renderfx & RF_NODEPTHTEST && e->rtype == RT_SPRITE ? true : false;
+		backendState->material.noColorWrite = e->renderfx & RF_NOCOLORWRITE ? true : false;
+		backendState->material.depthEqual = backendState->material.alphaHack && ( e->renderfx & RF_WEAPONMODEL );
 	}
 
-	if( fog && fog->shader && !rb.materialState.noColorWrite ) {
+	if( fog && fog->shader && !backendState->material.noColorWrite ) {
 		// should we fog the geometry with alpha texture or scale colors?
-		if( !rb.materialState.alphaHack && Shader_UseTextureFog( shader ) ) {
-			rb.materialState.texFog = fog;
+		if( !backendState->material.alphaHack && Shader_UseTextureFog( shader ) ) {
+			backendState->material.texFog = fog;
 		} else {
 			// use scaling of colors
-			rb.materialState.colorFog = fog;
+			backendState->material.colorFog = fog;
 		}
 	}
 
-	RB_UpdateVertexAttribs();
+	RB_UpdateVertexAttribs( backendState );
 }
 
-void RB_SetLightstyle( const superLightStyle_t *lightStyle ) {
-	assert( rb.materialState.currentShader != NULL );
-	rb.drawState.superLightStyle = lightStyle;
-	rb.drawState.dirtyUniformState = true;
+void RB_SetLightstyle( BackendState *backendState, const superLightStyle_t *lightStyle ) {
+	assert( backendState->material.currentShader != NULL );
+	backendState->draw.superLightStyle = lightStyle;
+	backendState->draw.dirtyUniformState = true;
 
-	RB_UpdateVertexAttribs();
+	RB_UpdateVertexAttribs( backendState );
 }
 
-void RB_SetDlightBits( unsigned int dlightBits ) {
-	assert( rb.materialState.currentShader != NULL );
-	rb.drawState.currentDlightBits = dlightBits;
-	rb.drawState.dirtyUniformState = true;
+void RB_SetDlightBits( BackendState *backendState, unsigned dlightBits ) {
+	assert( backendState->material.currentShader != NULL );
+	backendState->draw.currentDlightBits = dlightBits;
+	backendState->draw.dirtyUniformState = true;
 }
 
-void RB_SetBonesData( int numBones, dualquat_t *dualQuats, int maxWeights ) {
-	assert( rb.materialState.currentShader != NULL );
+void RB_SetBonesData( BackendState *backendState, int numBones, dualquat_t *dualQuats, int maxWeights ) {
+	assert( backendState->material.currentShader != NULL );
 
 	if( numBones > MAX_GLSL_UNIFORM_BONES ) {
 		numBones = MAX_GLSL_UNIFORM_BONES;
@@ -545,29 +586,29 @@ void RB_SetBonesData( int numBones, dualquat_t *dualQuats, int maxWeights ) {
 		maxWeights = 4;
 	}
 
-	rb.drawState.bonesData.numBones = numBones;
-	memcpy( rb.drawState.bonesData.dualQuats, dualQuats, numBones * sizeof( *dualQuats ) );
-	rb.drawState.bonesData.maxWeights = maxWeights;
+	backendState->draw.bonesData.numBones = numBones;
+	memcpy( backendState->draw.bonesData.dualQuats, dualQuats, numBones * sizeof( *dualQuats ) );
+	backendState->draw.bonesData.maxWeights = maxWeights;
 
-	rb.drawState.dirtyUniformState = true;
+	backendState->draw.dirtyUniformState = true;
 
-	RB_UpdateVertexAttribs();
+	RB_UpdateVertexAttribs( backendState );
 }
 
-void RB_SetZClip( float zNear, float zFar ) {
-	rb.globalState.zNear = zNear;
-	rb.globalState.zFar = zFar;
+void RB_SetZClip( BackendState *backendState, float zNear, float zFar ) {
+	backendState->global.zNear = zNear;
+	backendState->global.zFar = zFar;
 }
 
-void RB_SetLightParams( float minLight, bool noWorldLight, float hdrExposure ) {
-	rb.globalState.minLight = minLight;
-	rb.globalState.noWorldLight = noWorldLight;
-	rb.globalState.hdrExposure = hdrExposure;
+void RB_SetLightParams( BackendState *backendState, float minLight, bool noWorldLight, float hdrExposure ) {
+	backendState->global.minLight = minLight;
+	backendState->global.noWorldLight = noWorldLight;
+	backendState->global.hdrExposure = hdrExposure;
 }
 
-void RB_SetShaderStateMask( unsigned ANDmask, unsigned ORmask ) {
-	rb.globalState.shaderStateANDmask = ANDmask;
-	rb.globalState.shaderStateORmask  = ORmask;
+void RB_SetShaderStateMask( BackendState *backendState, unsigned ANDmask, unsigned ORmask ) {
+	backendState->global.shaderStateANDmask = ANDmask;
+	backendState->global.shaderStateORmask  = ORmask;
 }
 
 int RB_RegisterProgram( int type, const shader_s *materialToGetDeforms, uint64_t features ) {
@@ -590,7 +631,7 @@ int RB_RegisterProgram( int type, const shader_s *materialToGetDeforms, uint64_t
 	return program;
 }
 
-int RB_BindProgram( int program ) {
+int RB_BindProgram( BackendState *backendState, int program ) {
 	if( program == rb.programState.currentProgram ) {
 		return rb.programState.currentProgramObject;
 	}
@@ -608,11 +649,12 @@ int RB_BindProgram( int program ) {
 	}
 
 	rb.programState.currentProgramObject = object;
-	rb.drawState.dirtyUniformState = true;
+	// TODO: This is going to kill all state caching unless we do early lookups of programs (and postpone only if needed)
+	backendState->draw.dirtyUniformState = true;
 	return object;
 }
 
-void R_SubmitAliasSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceAlias_t *drawSurf ) {
+void R_SubmitAliasSurfToBackend( BackendState *backendState, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceAlias_t *drawSurf ) {
 	const maliasmesh_t *aliasmesh = drawSurf->mesh;
 
 	const DrawMeshVertSpan drawMeshVertSpan = VertElemSpan {
@@ -620,10 +662,10 @@ void R_SubmitAliasSurfToBackend( const FrontendToBackendShared *fsh, const entit
 		.firstElem = 0, .numElems = 3u * aliasmesh->numtris,
 	};
 
-	RB_DrawMesh( fsh, aliasmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+	RB_DrawMesh( backendState, fsh, aliasmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 }
 
-void R_SubmitSkeletalSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceSkeletal_t *drawSurf ) {
+void R_SubmitSkeletalSurfToBackend( BackendState *backendState, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceSkeletal_t *drawSurf ) {
 	const model_t *mod = drawSurf->model;
 	const mskmodel_t *skmodel = ( const mskmodel_t * )mod->extradata;
 	const mskmesh_t *skmesh = drawSurf->mesh;
@@ -647,44 +689,43 @@ void R_SubmitSkeletalSurfToBackend( const FrontendToBackendShared *fsh, const en
 	if( !cache || R_SkeletalRenderAsFrame0( cache ) ) {
 		// fastpath: render static frame 0 as is
 		if( skmesh->vbo ) {
-			RB_DrawMesh( fsh, skmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+			RB_DrawMesh( backendState, fsh, skmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 			return;
 		}
 	}
 
 	if( bonePoseRelativeDQ && skmesh->vbo ) {
 		// another fastpath: transform the initial pose on the GPU
-		RB_SetBonesData( skmodel->numbones, bonePoseRelativeDQ, skmesh->maxWeights );
-		RB_DrawMesh( fsh, skmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+		RB_SetBonesData( backendState, skmodel->numbones, bonePoseRelativeDQ, skmesh->maxWeights );
+		RB_DrawMesh( backendState, fsh, skmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 		return;
 	}
 }
 
-void R_SubmitBSPSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceBSP_t *drawSurf ) {
+void R_SubmitBSPSurfToBackend( BackendState *backendState, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceBSP_t *drawSurf ) {
 	const MergedBspSurface *mergedBspSurf = drawSurf->mergedBspSurf;
 
 	assert( !mergedBspSurf->numInstances );
 
-	RB_SetDlightBits( drawSurf->dlightBits );
-	RB_SetLightstyle( mergedBspSurf->superLightStyle );
+	RB_SetDlightBits( backendState, drawSurf->dlightBits );
+	RB_SetLightstyle( backendState, mergedBspSurf->superLightStyle );
 
 	const DrawMeshVertSpan &drawMeshVertSpan = drawSurf->mdSpan;
 
-	RB_DrawMesh( fsh, mergedBspSurf->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+	RB_DrawMesh( backendState, fsh, mergedBspSurf->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 }
 
-void R_SubmitNullSurfToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const void * ) {
+void R_SubmitNullSurfToBackend( BackendState *backendState, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const void * ) {
 	assert( rsh.nullVBO != NULL );
 
 	const DrawMeshVertSpan drawMeshVertSpan = VertElemSpan {
 		.firstVert = 0, .numVerts = 6, .firstElem = 0, .numElems = 6,
 	};
 
-	RB_DrawMesh( fsh, rsh.nullVBO->index, nullptr, &drawMeshVertSpan, GL_LINES );
+	RB_DrawMesh( backendState, fsh, rsh.nullVBO->index, nullptr, &drawMeshVertSpan, GL_LINES );
 }
 
-void R_SubmitDynamicMeshToBackend( const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader,
-									const mfog_t *fog, const portalSurface_t *portalSurface, const DynamicMeshDrawSurface *drawSurface ) {
+void R_SubmitDynamicMeshToBackend( BackendState *backendState, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const DynamicMeshDrawSurface *drawSurface ) {
 	// Protect against the case when fillMeshBuffers() produces zero vertices
 	if( drawSurface->actualNumVertices && drawSurface->actualNumIndices ) {
 		const DrawMeshVertSpan drawMeshVertSpan = VertElemSpan {
@@ -694,30 +735,30 @@ void R_SubmitDynamicMeshToBackend( const FrontendToBackendShared *fsh, const ent
 			.numElems  = drawSurface->actualNumIndices,
 		};
 
-		RB_DrawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH ), nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+		RB_DrawMesh( backendState, fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH ), nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 	}
 }
 
-void R_SubmitBatchedSurfsToBackend( const FrontendToBackendShared *fsh, const entity_t *e,
+void R_SubmitBatchedSurfsToBackend( BackendState *backendState, const FrontendToBackendShared *fsh, const entity_t *e,
 									const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable,
 									const shader_t *shader, const mfog_t *fog,
 									const portalSurface_t *portalSurface, unsigned vertElemSpanIndex ) {
 	const VertElemSpan &vertElemSpan = fsh->batchedVertElemSpans[vertElemSpanIndex];
 	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
-		RB_BindShader( e, overrideParams, paramsTable, shader, fog, nullptr );
+		RB_BindShader( backendState, e, overrideParams, paramsTable, shader, fog, nullptr );
 		const DrawMeshVertSpan drawMeshVertSpan = vertElemSpan;
-		RB_DrawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH ), nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+		RB_DrawMesh( backendState, fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH ), nullptr, &drawMeshVertSpan, GL_TRIANGLES );
 	}
 }
 
-void R_SubmitBatchedSurfsToBackendExt( const FrontendToBackendShared *fsh, const entity_t *e,
+void R_SubmitBatchedSurfsToBackendExt( BackendState *backendState, const FrontendToBackendShared *fsh, const entity_t *e,
 									   const ShaderParams *, const ShaderParamsTable *paramsTable,
 									   const shader_s *shader, const mfog_t *fog,
 									   const portalSurface_t *portalSurface, unsigned vertElemSpanAndVboSpanIndex ) {
 	const auto &[vertElemSpan, vboSpanLayout] = fsh->batchedVertElemAndVboSpans[vertElemSpanAndVboSpanIndex];
 	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
-		RB_BindShader( e, nullptr, paramsTable, shader, fog, nullptr );
+		RB_BindShader( backendState, e, nullptr, paramsTable, shader, fog, nullptr );
 		const DrawMeshVertSpan drawMeshVertSpan = vertElemSpan;
-		RB_DrawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT ), &vboSpanLayout, &drawMeshVertSpan, GL_TRIANGLES );
+		RB_DrawMesh( backendState, fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT ), &vboSpanLayout, &drawMeshVertSpan, GL_TRIANGLES );
 	}
 }

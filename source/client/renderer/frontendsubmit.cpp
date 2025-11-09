@@ -26,11 +26,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <algorithm>
 
-void R_TransformForWorld( void ) {
-	RB_LoadObjectMatrix( mat4x4_identity );
+void R_TransformForWorld( BackendState *backendState ) {
+	RB_LoadObjectMatrix( backendState, mat4x4_identity );
 }
 
-void R_TranslateForEntity( const entity_t *e ) {
+void R_TranslateForEntity( BackendState *backendState, const entity_t *e ) {
 	mat4_t objectMatrix;
 
 	Matrix4_Identity( objectMatrix );
@@ -42,10 +42,10 @@ void R_TranslateForEntity( const entity_t *e ) {
 	objectMatrix[13] = e->origin[1];
 	objectMatrix[14] = e->origin[2];
 
-	RB_LoadObjectMatrix( objectMatrix );
+	RB_LoadObjectMatrix( backendState, objectMatrix );
 }
 
-void R_TransformForEntity( const entity_t *e ) {
+void R_TransformForEntity( BackendState *backendState, const entity_t *e ) {
 	assert( e->rtype == RT_MODEL && e->number != kWorldEntNumber );
 
 	mat4_t objectMatrix;
@@ -80,12 +80,12 @@ void R_TransformForEntity( const entity_t *e ) {
 	objectMatrix[14] = e->origin[2];
 	objectMatrix[15] = 1.0;
 
-	RB_LoadObjectMatrix( objectMatrix );
+	RB_LoadObjectMatrix( backendState, objectMatrix );
 }
 
 namespace wsw {
 
-using drawSurf_cb = void (*)( const FrontendToBackendShared *, const entity_t *, const struct shader_s *,
+using drawSurf_cb = void (*)( BackendState *, const FrontendToBackendShared *, const entity_t *, const struct shader_s *,
 							  const struct mfog_s *, const struct portalSurface_s *, const void * );
 
 static const drawSurf_cb r_drawSurfCb[ST_MAX_TYPES] = {
@@ -280,10 +280,8 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 																			 prevShader, prevSurfType,
 																			 { batchSpanBegin, batchSpanEnd } );
 
-				drawActionTape->append( [=]( FrontendToBackendShared *fsh ) {
-					//RB_FlushDynamicMeshes();
-					submitFn( fsh, prevEntity, prevOverrideParams, paramsTable, prevShader, prevFog, prevPortalSurface, offset );
-					//RB_FlushDynamicMeshes();
+				drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared *fsh ) {
+					submitFn( backendState, fsh, prevEntity, prevOverrideParams, paramsTable, prevShader, prevFog, prevPortalSurface, offset );
 				});
 			}
 
@@ -297,20 +295,18 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			if( entity->flags & RF_WEAPONMODEL ) {
 				if( !depthHack ) {
 					depthHack = true;
-					drawActionTape->append( [=]( FrontendToBackendShared *fsh ) {
-						//RB_FlushDynamicMeshes();
+					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared *fsh ) {
 						float depthmin = 0.0f, depthmax = 0.0f;
-						RB_GetDepthRange( &depthmin, &depthmax );
-						RB_SaveDepthRange();
-						RB_DepthRange( depthmin, depthmin + 0.3f * ( depthmax - depthmin ) );
+						RB_GetDepthRange( backendState, &depthmin, &depthmax );
+						RB_SaveDepthRange( backendState );
+						RB_DepthRange( backendState, depthmin, depthmin + 0.3f * ( depthmax - depthmin ) );
 					});
 				}
 			} else {
 				if( depthHack ) {
 					depthHack = false;
-					drawActionTape->append( [=]( FrontendToBackendShared * ) {
-						//RB_FlushDynamicMeshes();
-						RB_RestoreDepthRange();
+					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
+						RB_RestoreDepthRange( backendState );
 					});
 				}
 			}
@@ -320,9 +316,8 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 				bool oldCullHack = cullHack;
 				cullHack = ( ( entity->flags & RF_CULLHACK ) ? true : false );
 				if( cullHack != oldCullHack ) {
-					drawActionTape->append( [=]( FrontendToBackendShared * ) {
-						//RB_FlushDynamicMeshes();
-						RB_FlipFrontFace();
+					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
+						RB_FlipFrontFace( backendState );
 					});
 				}
 			}
@@ -332,17 +327,15 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			const bool infiniteProj = entity->renderfx & RF_NODEPTHTEST ? true : false;
 			if( infiniteProj != prevInfiniteProj ) {
 				if( infiniteProj ) {
-					drawActionTape->append( [=]( FrontendToBackendShared * ) {
-						//RB_FlushDynamicMeshes();
+					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
 						mat4_t projectionMatrix;
 						Matrix4_Copy( stateForCamera->projectionMatrix, projectionMatrix );
 						Matrix4_PerspectiveProjectionToInfinity( Z_NEAR, projectionMatrix, glConfig.depthEpsilon );
-						RB_LoadProjectionMatrix( projectionMatrix );
+						RB_LoadProjectionMatrix( backendState, projectionMatrix );
 					});
 				} else {
-					drawActionTape->append( [=]( FrontendToBackendShared * ) {
-						//RB_FlushDynamicMeshes();
-						RB_LoadProjectionMatrix( stateForCamera->projectionMatrix );
+					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
+						RB_LoadProjectionMatrix( backendState, stateForCamera->projectionMatrix );
 					});
 				}
 			}
@@ -350,33 +343,33 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			if( isDrawSurfBatched ) {
 				// don't transform batched surfaces
 				if( !prevIsDrawSurfBatched ) {
-					drawActionTape->append( [=]( FrontendToBackendShared * ) {
-						RB_LoadObjectMatrix( mat4x4_identity );
+					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
+						RB_LoadObjectMatrix( backendState, mat4x4_identity );
 					});
 				}
 			} else {
 				if( ( entNum != prevEntNum ) || prevIsDrawSurfBatched ) {
-					drawActionTape->append( [=]( FrontendToBackendShared * ) {
+					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
 						if( entity->number == kWorldEntNumber ) [[likely]] {
-							R_TransformForWorld();
+							R_TransformForWorld( backendState );
 						} else if( entity->rtype == RT_MODEL ) {
-							R_TransformForEntity( entity );
+							R_TransformForEntity( backendState, entity );
 						} else if( shader->flags & SHADER_AUTOSPRITE ) {
-							R_TranslateForEntity( entity );
+							R_TranslateForEntity( backendState, entity );
 						} else {
-							R_TransformForWorld();
+							R_TransformForWorld( backendState );
 						}
 					});
 				}
 			}
 
 			if( !isDrawSurfBatched ) {
-				drawActionTape->append( [=]( FrontendToBackendShared *fsh ) {
+				drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared *fsh ) {
 					assert( r_drawSurfCb[surfType] );
 
-					RB_BindShader( entity, overrideParams, paramsTable, shader, fog, portalSurface );
+					RB_BindShader( backendState, entity, overrideParams, paramsTable, shader, fog, portalSurface );
 
-					r_drawSurfCb[surfType]( fsh, entity, shader, fog, portalSurface, sds->drawSurf );
+					r_drawSurfCb[surfType]( backendState, fsh, entity, shader, fog, portalSurface, sds->drawSurf );
 				});
 			}
 
@@ -406,21 +399,19 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 																	 prevShader, prevSurfType,
 																	 { batchSpanBegin, batchSpanEnd } );
 
-		drawActionTape->append( [=]( FrontendToBackendShared *fsh ) {
-			//RB_FlushDynamicMeshes();
-			submitFn( fsh, prevEntity, prevOverrideParams, paramsTable, prevShader, prevFog, prevPortalSurface, offset );
-			//RB_FlushDynamicMeshes();
+		drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared *fsh ) {
+			submitFn( backendState, fsh, prevEntity, prevOverrideParams, paramsTable, prevShader, prevFog, prevPortalSurface, offset );
 		});
 	}
 
 	if( depthHack ) {
-		drawActionTape->append( [=]( FrontendToBackendShared * ) {
-			RB_RestoreDepthRange();
+		drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
+			RB_RestoreDepthRange( backendState );
 		});
 	}
 	if( cullHack ) {
-		drawActionTape->append( [=]( FrontendToBackendShared * ) {
-			RB_FlipFrontFace();
+		drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
+			RB_FlipFrontFace( backendState );
 		});
 	}
 }
@@ -601,7 +592,7 @@ void RendererFrontend::markBuffersOfVariousDynamicsForUpload( std::span<std::pai
 	}
 }
 
-void RendererFrontend::submitDrawActionsList( StateForCamera *stateForCamera, Scene *scene ) {
+void RendererFrontend::submitDrawActionsList( BackendState *backendState, StateForCamera *stateForCamera, Scene *scene ) {
 	FrontendToBackendShared fsh;
 	fsh.dynamicLights               = scene->m_dynamicLights.data();
 	fsh.particleAggregates          = scene->m_particles.data();
@@ -615,10 +606,10 @@ void RendererFrontend::submitDrawActionsList( StateForCamera *stateForCamera, Sc
 	std::memcpy( fsh.viewAxis, stateForCamera->viewAxis, sizeof( mat3_t ) );
 	VectorCopy( stateForCamera->viewOrigin, fsh.viewOrigin );
 
-	stateForCamera->drawActionTape->exec( &fsh );
+	stateForCamera->drawActionTape->exec( backendState, &fsh );
 }
 
-void RendererFrontend::submitDebugStuffToBackend( StateForCamera *stateForCamera, Scene *scene ) {
+void RendererFrontend::submitDebugStuffToBackend( BackendState *backendState, StateForCamera *stateForCamera, Scene *scene ) {
 	if( !stateForCamera->debugLines->empty() ) {
 		// TODO: Reduce this copying
 		vec4_t verts[2];
@@ -640,11 +631,11 @@ void RendererFrontend::submitDebugStuffToBackend( StateForCamera *stateForCamera
 			VectorCopy( line.p2, verts[1] );
 			std::memcpy( colors[0], &line.color, 4 );
 			std::memcpy( colors[1], &line.color, 4 );
-			addAuxiliaryDynamicMesh( UPLOAD_GROUP_DEBUG_MESH, scene->m_worldent, rsh.whiteShader,
+			addAuxiliaryDynamicMesh( UPLOAD_GROUP_DEBUG_MESH, backendState, scene->m_worldent, rsh.whiteShader,
 									 nullptr, nullptr, 0, &mesh, GL_LINES, 0.0f, 0.0f );
 		}
 
-		flushAuxiliaryDynamicMeshes( UPLOAD_GROUP_DEBUG_MESH );
+		flushAuxiliaryDynamicMeshes( UPLOAD_GROUP_DEBUG_MESH, backendState );
 
 		stateForCamera->debugLines->clear();
 	}
@@ -671,7 +662,8 @@ void RendererFrontend::beginAddingAuxiliaryDynamicMeshes( unsigned uploadGroup )
 	R_BeginUploads( uploadGroup );
 }
 
-void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, const entity_t *entity, const shader_t *shader,
+void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, BackendState *backendState,
+												const entity_t *entity, const shader_t *shader,
 												const struct mfog_s *fog, const struct portalSurface_s *portalSurface,
 												unsigned shadowBits, const struct mesh_s *mesh, int primitive,
 												float xOffset, float yOffset ) {
@@ -697,7 +689,7 @@ void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, const enti
 	}
 
 	int scissor[4];
-	RB_GetScissor( &scissor[0], &scissor[1], &scissor[2], &scissor[3] );
+	RB_GetScissor( backendState, &scissor[0], &scissor[1], &scissor[2], &scissor[3] );
 
 	bool merge = false;
 	if( prev ) [[likely]] {
@@ -755,7 +747,7 @@ void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, const enti
 	stream->numElemsSoFar += numMeshElems;
 }
 
-void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup ) {
+void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup, BackendState *backendState ) {
 	if( AuxiliaryDynamicStream *const stream = getStreamForUploadGroup( uploadGroup ); !stream->draws.empty() ) {
 		const unsigned vertexSize     = RB_VBOSpanLayoutForFrameUploads( uploadGroup )->vertexSize;
 		const unsigned vertexDataSize = vertexSize * stream->numVertsSoFar;
@@ -764,10 +756,10 @@ void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup ) {
 		R_EndUploads( uploadGroup, vertexDataSize, indexDataSize );
 
 		int sx, sy, sw, sh;
-		RB_GetScissor( &sx, &sy, &sw, &sh );
+		RB_GetScissor( backendState, &sx, &sy, &sw, &sh );
 
 		mat4_t m;
-		RB_GetObjectMatrix( m );
+		RB_GetObjectMatrix( backendState, m );
 
 		const float transx = m[12];
 		const float transy = m[13];
@@ -778,8 +770,8 @@ void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup ) {
 
 		for( const AuxiliaryDynamicDraw &draw: stream->draws ) {
 			assert( draw.shader );
-			RB_BindShader( draw.entity, nullptr, nullptr, draw.shader, draw.fog, nullptr );
-			RB_Scissor( draw.scissor[0], draw.scissor[1], draw.scissor[2], draw.scissor[3] );
+			RB_BindShader( backendState, draw.entity, nullptr, nullptr, draw.shader, draw.fog, nullptr );
+			RB_Scissor( backendState, draw.scissor[0], draw.scissor[1], draw.scissor[2], draw.scissor[3] );
 
 			// translate the mesh in 2D
 			if(( xOffset != draw.offset[0] ) || ( yOffset != draw.offset[1] ) ) {
@@ -787,22 +779,22 @@ void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup ) {
 				yOffset = draw.offset[1];
 				m[12] = transx + xOffset;
 				m[13] = transy + yOffset;
-				RB_LoadObjectMatrix( m );
+				RB_LoadObjectMatrix( backendState, m );
 			}
 
 			assert( draw.drawElements.numVerts > 0 && draw.drawElements.numElems > 0 );
 			const DrawMeshVertSpan drawMeshVertSpan = draw.drawElements;
 			assert( draw.primitive == GL_TRIANGLES || draw.primitive == GL_LINES );
-			RB_DrawMesh( nullptr, vboId, nullptr, &drawMeshVertSpan, draw.primitive );
+			RB_DrawMesh( backendState, nullptr, vboId, nullptr, &drawMeshVertSpan, draw.primitive );
 		}
 
-		RB_Scissor( sx, sy, sw, sh );
+		RB_Scissor( backendState, sx, sy, sw, sh );
 
 		// restore the original translation in the object matrix if it has been changed
 		if( xOffset != 0.0f || yOffset != 0.0f ) {
 			m[12] = transx;
 			m[13] = transy;
-			RB_LoadObjectMatrix( m );
+			RB_LoadObjectMatrix( backendState, m );
 		}
 
 		stream->draws.clear();
@@ -1601,7 +1593,8 @@ void RendererFrontend::prepareLegacySprites( PrepareSpriteSurfWorkload *workload
 											 workload->indexOfFirstIndex, &mesh );
 }
 
-void RendererFrontend::submitRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2, float angle,
+void RendererFrontend::submitRotatedStretchPic( BackendState *backendState, int x, int y, int w, int h,
+												float s1, float t1, float s2, float t2, float angle,
 												const float *color, const shader_s *material ) {
 	vec4_t pic_xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
 	vec4_t pic_normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
@@ -1649,7 +1642,7 @@ void RendererFrontend::submitRotatedStretchPic( int x, int y, int w, int h, floa
 		}
 	}
 
-	addAuxiliaryDynamicMesh( UPLOAD_GROUP_2D_MESH, nullptr, material, nullptr, nullptr, 0, &pic_mesh, GL_TRIANGLES, 0.0f, 0.0f );
+	addAuxiliaryDynamicMesh( UPLOAD_GROUP_2D_MESH, backendState, nullptr, material, nullptr, nullptr, 0, &pic_mesh, GL_TRIANGLES, 0.0f, 0.0f );
 }
 
 }
