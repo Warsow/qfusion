@@ -20,6 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef R_BACKEND_LOCAL_H
 #define R_BACKEND_LOCAL_H
 
+#include "glstateproxy.h"
+
 #define MAX_STREAM_VBO_VERTS        8192
 #define MAX_STREAM_VBO_ELEMENTS     MAX_STREAM_VBO_VERTS * 6
 #define MAX_STREAM_VBO_TRIANGLES    MAX_STREAM_VBO_ELEMENTS / 3
@@ -39,25 +41,7 @@ class GLStateProxy;
 void *RB_GetTmpUniformBlock( unsigned binding, size_t blockSize );
 void RB_CommitUniformBlock( unsigned binding, void *blockData, size_t blockSize );
 
-typedef struct r_backend_s {
-	struct {
-		mesh_vbo_t *vbo;
-		void *vboData;
-		void *iboData;
-		unsigned vboCapacityInVerts;
-		unsigned vboCapacityInBytes;
-		unsigned iboCapacityInElems;
-	} vertexUploads[5];
-
-	struct {
-		GLuint id;
-		void *lastUploadedData;
-		void *scratchpadData;
-		unsigned lastSize;
-	} uniformUploads[MAX_UNIFORM_BINDINGS];
-
-	// Either persistent during the entire frame or changes much less often than RB_BindShader() calls
-	// TODO: Should it be split into truly-persistent and changing states?
+struct BackendState {
 	struct {
 		entity_t nullEnt;
 		int64_t time;
@@ -83,7 +67,7 @@ typedef struct r_backend_s {
 
 		unsigned shaderStateORmask;
 		unsigned shaderStateANDmask;
-	} globalState;
+	} global;
 
 	// Gets modified only by RB_BindShader() call
 	struct {
@@ -106,7 +90,7 @@ typedef struct r_backend_s {
 		bool noColorWrite;
 		bool depthEqual;
 		float hackedAlpha;
-	} materialState;
+	} material;
 
 	// Gets modified by RB_BindShader() and some consequent calls, including drawing passes
 	struct {
@@ -119,7 +103,29 @@ typedef struct r_backend_s {
 		bool dirtyUniformState;
 		bool doneDepthPass;
 		int donePassesTotal;
-	} drawState;
+	} draw;
+
+	BackendState( int width, int height );
+
+	GLStateProxy gl;
+};
+
+typedef struct r_backend_s {
+	struct {
+		mesh_vbo_t *vbo;
+		void *vboData;
+		void *iboData;
+		unsigned vboCapacityInVerts;
+		unsigned vboCapacityInBytes;
+		unsigned iboCapacityInElems;
+	} vertexUploads[5];
+
+	struct {
+		GLuint id;
+		void *lastUploadedData;
+		void *scratchpadData;
+		unsigned lastSize;
+	} uniformUploads[MAX_UNIFORM_BINDINGS];
 
 	struct {
 		// TODO: Move to GLStateProxy?
@@ -132,20 +138,18 @@ typedef struct r_backend_s {
 		int currentRegProgramType;
 		uint64_t currentRegProgramFeatures;
 	} programState;
-
-	GLStateProxy *glState;
 } rbackend_t;
 
 extern rbackend_t rb;
 
-void RB_DoDrawMeshVerts( const DrawMeshVertSpan *vertSpan, int primitive );
+void RB_DoDrawMeshVerts( BackendState *backendState, const DrawMeshVertSpan *vertSpan, int primitive );
 
-#define DRAWFLAT() \
-	( ( rb.materialState.currentModelType == mod_brush ) && \
-	( rb.globalState.renderFlags & ( RF_DRAWFLAT | RF_DRAWBRIGHT ) ) && \
-	!( rb.materialState.currentShader->flags & SHADER_NODRAWFLAT ) )
+#define DRAWFLAT( state ) \
+	( ( ( state )->material.currentModelType == mod_brush ) && \
+	( ( state )->global.renderFlags & ( RF_DRAWFLAT | RF_DRAWBRIGHT ) ) && \
+	!( ( state )->material.currentShader->flags & SHADER_NODRAWFLAT ) )
 
 int RB_RegisterProgram( int type, const shader_s *materialToGetDeforms, uint64_t features );
-int RB_BindProgram( int program );
+int RB_BindProgram( BackendState *backendState, int program );
 
 #endif // R_BACKEND_LOCAL_H

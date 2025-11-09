@@ -21,36 +21,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "glstateproxy.h"
 #include "local.h"
 
-GLStateProxy::GLStateProxy( int initialWidth, int initialHeight, int stencilBits ) {
-	if( stencilBits ) {
-		assert( stencilBits == 8 );
-		qglStencilMask( ( GLuint ) ~0 );
-		qglStencilFunc( GL_EQUAL, 128, 0xFF );
-		qglStencilOp( GL_KEEP, GL_KEEP, GL_INCR );
-	}
-
-	qglDisable( GL_CULL_FACE );
-	qglFrontFace( GL_CCW );
-	qglDisable( GL_BLEND );
-	qglDepthFunc( GL_LEQUAL );
-	qglDepthMask( GL_FALSE );
-	qglDisable( GL_POLYGON_OFFSET_FILL );
-	qglPolygonOffset( -1.0f, 0.0f ); // units will be handled by RB_DepthOffset
-	qglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
-	qglEnable( GL_DEPTH_TEST );
-	qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-	qglFrontFace( GL_CCW );
-	qglEnable( GL_SCISSOR_TEST );
-
-	m_scissor[2] = initialWidth;
-	m_scissor[3] = initialHeight;
+GLStateProxy::GLStateProxy( int width, int height ) {
+	assert( m_scissor[0] == 0 && m_scissor[1] == 0 );
+	m_scissor[2]     = width;
+	m_scissor[3]     = height;
 	m_scissorChanged = true;
-
-	unbindAllTextures();
+	m_fbWidth        = width;
+	m_fbHeight       = height;
+	std::memset( m_currentTextures, 0, sizeof( m_currentTextures ) );
 }
 
 void GLStateProxy::setViewport( int x, int y, int w, int h ) {
 	Vector4Set( m_viewport, x, y, w, h );
+	assert( m_fbWidth > 0 && m_fbHeight > 0 );
 	qglViewport( x, m_fbHeight - h - y, w, h );
 }
 
@@ -80,6 +63,7 @@ void GLStateProxy::applyScissor() {
 	if( m_scissorChanged ) {
 		m_scissorChanged = false;
 		const int h = m_scissor[3];
+		assert( m_fbWidth > 0 && m_fbHeight > 0 );
 		qglScissor( m_scissor[0], m_fbHeight - h - m_scissor[1], m_scissor[2], h );
 	}
 }
@@ -150,11 +134,6 @@ void GLStateProxy::bindTexture( int multitextureNumber, const Texture *texture )
 	assert( texture );
 	assert( texture->texnum != 0 );
 
-	if( m_flushTextures ) {
-		m_flushTextures = false;
-		memset( m_currentTextures, 0, sizeof( m_currentTextures ) );
-	}
-
 	const GLuint texnum = texture->texnum;
 	if( m_currentTextures[multitextureNumber] != texnum ) {
 		m_currentTextures[multitextureNumber] = texnum;
@@ -168,19 +147,6 @@ void GLStateProxy::selectActiveMultitexture( int multitextureNumber ) {
 		m_currentTMU = multitextureNumber;
 		qglActiveTexture( GL_TEXTURE0 + multitextureNumber );
 	}
-}
-
-void GLStateProxy::unbindAllTextures() {
-	for( int tmu = 0; tmu < MAX_TEXTURE_UNITS; ++tmu ) {
-		selectActiveMultitexture( tmu );
-
-		qglBindTexture( GL_TEXTURE_CUBE_MAP, 0 );
-		qglBindTexture( GL_TEXTURE_2D_ARRAY, 0 );
-		qglBindTexture( GL_TEXTURE_3D, 0 );
-		qglBindTexture( GL_TEXTURE_2D, 0 );
-	}
-
-	flushTextureCache();
 }
 
 void GLStateProxy::bindVertexBuffer( GLuint buffer ) {

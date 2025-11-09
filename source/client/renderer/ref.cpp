@@ -169,7 +169,7 @@ static shader_s *R_WrapExternalTextureHandle( GLuint externalTexNum, int storage
 
 	wsw::HashedStringView name;
 	Texture *texture;
-	if( externalTexNum == 0 ) {
+	if( storageIndex == 0 ) {
 		name = kExternalMenuImage;
 		texture = TextureCache::instance()->wrapMenuTextureHandle( externalTexNum );
 	} else {
@@ -245,7 +245,6 @@ void R_DeferDataSync( void ) {
 	if( !rsh.registrationOpen ) {
 		rf.dataSync = true;
 		qglFlush();
-		RB_FlushTextureCache();
 	}
 }
 
@@ -558,12 +557,15 @@ void R_BeginFrame( bool forceClear, int swapInterval ) {
 
 	GLimp_BeginFrame();
 
-	RB_BeginFrame();
+	//RB_BeginFrame();
 
 	qglDrawBuffer( GL_BACK );
 
 	if( forceClear ) {
-		RB_Clear( GL_COLOR_BUFFER_BIT, 0, 0, 0, 1 );
+		qglClearColor( 0, 0, 0, 1 );
+		qglClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT );
+		assert( qglGetError() == GL_NO_ERROR );
+		//RB_Clear( GL_COLOR_BUFFER_BIT, 0, 0, 0, 1 );
 	}
 
 	// set swap interval (vertical synchronization)
@@ -580,17 +582,10 @@ void R_BeginFrame( bool forceClear, int swapInterval ) {
 		rf.frameTime.oldCount = rf.frameTime.count;
 	}
 
-	R_Set2DMode( true );
 }
 
 void R_EndFrame( void ) {
 	WSW_PROFILER_SCOPE();
-
-	// reset the 2D state so that the mode will be
-	// properly set back again in R_BeginFrame
-	R_Set2DMode( false );
-
-	RB_EndFrame();
 
 	GLimp_EndFrame();
 

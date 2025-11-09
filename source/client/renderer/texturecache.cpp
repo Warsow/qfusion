@@ -78,8 +78,8 @@ TextureCache::TextureCache() {
 		components->depthBuffer  = m_miniviewRenderTargetDepthBuffer;
 
 		// Setup attachments TODO: Fix state management
-		RB_BindFrameBufferObject( components );
-		RB_BindFrameBufferObject( nullptr );
+		RB_BindFrameBufferObject( nullptr, components );
+		RB_BindFrameBufferObject( nullptr, nullptr );
 	} else {
 		// TODO: Eliminate this duplication
 		wsw::failWithRuntimeError( "Failed to create miniview render target" );
@@ -276,14 +276,12 @@ auto TextureManagementShared::findFilterByName( const wsw::StringView &name ) ->
 
 void TextureManagementShared::bindToModify( GLenum target, GLuint texture ) {
 	qglBindTexture( target, texture );
-	RB_FlushTextureCache();
 	assert( qglGetError() == GL_NO_ERROR );
 }
 
 void TextureManagementShared::unbindModified( GLenum target, GLuint texture ) {
 	// TODO: Check whether it's actively bound (it must be) for debugging purposes
 	qglBindTexture( target, 0 );
-	RB_FlushTextureCache();
 	assert( qglGetError() == GL_NO_ERROR );
 }
 

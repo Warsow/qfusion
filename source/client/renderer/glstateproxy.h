@@ -32,7 +32,7 @@ class Texture;
 
 class GLStateProxy {
 public:
-	GLStateProxy( int initialWidth, int initialHeight, int stencilBits );
+	GLStateProxy( int width, int height );
 
 	[[nodiscard]]
 	auto getState() const -> unsigned { return m_state; }
@@ -60,8 +60,6 @@ public:
 	auto getViewport() const -> const int * { return m_viewport; }
 
 	void bindTexture( int multitextureNumber, const Texture *texture );
-	void flushTextureCache() { m_flushTextures = true; }
-	void unbindAllTextures();
 
 	void bindVertexBuffer( GLuint buffer );
 	void bindIndexBuffer( GLuint buffer );
@@ -103,9 +101,7 @@ private:
 	bool m_hasSavedDepth { false };
 	bool m_depthOffset { false };
 
-	bool m_flushTextures { false };
 	int m_currentTMU { 0 };
-
 	unsigned m_currentTextures[MAX_TEXTURE_UNITS];
 };
 

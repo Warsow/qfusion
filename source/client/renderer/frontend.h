@@ -100,8 +100,10 @@ public:
 
 	void destroyVolatileAssets();
 
-	void set2DMode( bool enable );
-	void set2DScissor( int x, int y, int w, int h );
+	void set2DScissor( BackendState *backendState, int x, int y, int w, int h );
+
+	void enter2DMode( BackendState *backendState, int width, int height );
+	void leave2DMode( BackendState *backendState );
 
 	void dynLightDirForOrigin( const float *origin, float radius, vec3_t dir, vec3_t diffuseLocal, vec3_t ambientLocal );
 
@@ -211,7 +213,7 @@ private:
 		// TODO: We don't really need a growable vector, preallocate at it start
 		wsw::PodVector<sortedDrawSurf_t> *sortList;
 
-		wsw::ActionTape<FrontendToBackendShared *> *drawActionTape;
+		wsw::ActionTape<BackendState *, FrontendToBackendShared *> *drawActionTape;
 
 		wsw::PodVector<PrepareBatchedSurfWorkload> *preparePolysWorkload;
 		wsw::PodVector<PrepareBatchedSurfWorkload> *prepareCoronasWorkload;
@@ -278,7 +280,7 @@ private:
 	[[nodiscard]]
 	auto getFogForSphere( const StateForCamera *stateForCamera, const vec3_t centre, const float radius ) -> mfog_t *;
 
-	void bindRenderTargetAndViewport( RenderTargetComponents *renderTargetComponents, const StateForCamera *stateForCamera );
+	void bindRenderTargetAndViewport( BackendState *backendState, RenderTargetComponents *renderTargetComponents, const StateForCamera *stateForCamera );
 
 	[[nodiscard]]
 	auto getDefaultFarClip( const refdef_t *fd ) const -> float;
@@ -424,7 +426,7 @@ private:
 
 	void addDebugLine( StateForCamera *stateForCamera, const float *p1, const float *p2, int color = COLOR_RGB( 255, 255, 255 ) );
 
-	void submitDebugStuffToBackend( StateForCamera *stateForCamera, Scene *scene );
+	void submitDebugStuffToBackend( BackendState *backendState, StateForCamera *stateForCamera, Scene *scene );
 
 	// The template parameter is needed just to make instatiation of methods in different translation units correct
 
@@ -620,11 +622,10 @@ private:
 	auto findNearestPortalEntity( const portalSurface_t *portalSurface, Scene *scene ) -> const entity_t *;
 
 	void processSortList( StateForCamera *stateForCamera, Scene *scene );
-	void submitDrawActionsList( StateForCamera *stateForCamera, Scene *scene );
+	void submitDrawActionsList( BackendState *, StateForCamera *stateForCamera, Scene *scene );
 
-	using SubmitBatchedSurfFn = void(*)( const FrontendToBackendShared *, const entity_t *,
-		const ShaderParams *, const ShaderParamsTable *,
-		const shader_t *, const mfog_t *, const portalSurface_t *, unsigned );
+	using SubmitBatchedSurfFn = void(*)( BackendState *, const FrontendToBackendShared *, const entity_t *,
+		const ShaderParams *, const ShaderParamsTable *, const shader_t *, const mfog_t *, const portalSurface_t *, unsigned );
 
 	// TODO: Rename, as it's no longer just "batched"
 	[[nodiscard]]
@@ -645,8 +646,7 @@ private:
 
 	void prepareLegacySprites( PrepareSpriteSurfWorkload *workload );
 
-	// TODO: Should we care of preparing the data in async fashion?
-	void submitRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2,
+	void submitRotatedStretchPic( BackendState *backendState, int x, int y, int w, int h, float s1, float t1, float s2, float t2,
 								  float angle, const float *color, const shader_s *material );
 
 	struct AuxiliaryDynamicStream;
@@ -656,11 +656,11 @@ private:
 
 	void beginAddingAuxiliaryDynamicMeshes( unsigned uploadGroup );
 
-	void addAuxiliaryDynamicMesh( unsigned uploadGroup, const entity_t *entity, const shader_t *shader,
+	void addAuxiliaryDynamicMesh( unsigned uploadGroup, BackendState *backendState, const entity_t *entity, const shader_t *shader,
 								  const struct mfog_s *fog, const struct portalSurface_s *portalSurface, unsigned shadowBits,
 								  const struct mesh_s *mesh, int primitive, float x_offset, float y_offset );
 
-	void flushAuxiliaryDynamicMeshes( unsigned uploadGroup );
+	void flushAuxiliaryDynamicMeshes( unsigned uploadGroup, BackendState *backendState );
 
 	auto ( RendererFrontend::*m_collectVisibleWorldLeavesArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
 	auto ( RendererFrontend::*m_collectVisibleOccludersArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
@@ -696,7 +696,7 @@ private:
 		wsw::PodVector<ShaderParams::Material> materialParamsStorage;
 
 		wsw::PodVector<sortedDrawSurf_t> meshSortList;
-		wsw::ActionTape<FrontendToBackendShared *> drawActionTape;
+		wsw::ActionTape<BackendState *, FrontendToBackendShared *> drawActionTape;
 
 		wsw::PodVector<PrepareBatchedSurfWorkload> preparePolysWorkloadBuffer;
 		wsw::PodVector<PrepareBatchedSurfWorkload> prepareCoronasWorkloadBuffer;
