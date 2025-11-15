@@ -613,6 +613,18 @@ public:
 	}
 
 	[[nodiscard]]
+	auto findProgramForParams( int type, const wsw::StringView &maybeRequestedName, uint64_t features = 0,
+							   const DeformSig &deformSig = DeformSig(),
+							   std::span<const deformv_t> deforms = {} ) -> int;
+
+	[[nodiscard]]
+	auto findProgramForParams( int type, const char *maybeName, uint64_t features = 0,
+							   const DeformSig &deformSig = DeformSig(),
+							   std::span<const deformv_t> deforms = {} ) -> int {
+		return findProgramForParams( type, wsw::StringView( maybeName ? maybeName : "" ), features, deformSig, deforms );
+	}
+
+	[[nodiscard]]
 	auto getProgramById( int id ) -> ShaderProgram * {
 		assert( id > 0 && id < MAX_GLSL_PROGRAMS + 1 );
 		return m_programForIndex[id - 1];
@@ -623,6 +635,9 @@ private:
 
 	ShaderProgramCache();
 	~ShaderProgramCache();
+
+	[[nodiscard]]
+	auto findProgramInBin( int type, unsigned binIndex, uint64_t features, const DeformSig &deformSig ) const -> int;
 
 	[[nodiscard]]
 	auto createProgramFromSource( const wsw::StringView &name, int type, uint64_t features, std::span<const deformv_t> deforms )
@@ -1306,18 +1321,45 @@ static bool addDeformSourceLines( std::span<const deformv_t> deforms, DeformStri
 	return true;
 }
 
-auto ShaderProgramCache::getProgramForParams( int type, const wsw::StringView &maybeRequestedName, uint64_t features,
-											  const DeformSig &deformSig, std::span<const deformv_t> deforms ) -> int {
-	assert( qglGetError() == GL_NO_ERROR );
-	if( type <= GLSL_PROGRAM_TYPE_NONE || type >= GLSL_PROGRAM_TYPE_MAXTYPE ) {
-		return 0;
-	}
-
+[[nodiscard]]
+static inline auto getBinIndexForFeatures( uint64_t features ) -> unsigned {
 	// TODO: Shuffle bits better
 	const auto featureWord1 = (uint32_t)( features >> 32 );
 	const auto featureWord2 = (uint32_t)( features & 0xFFFF'FFFFu );
 	const auto featureHash  = featureWord1 ^ featureWord2;
 	const auto binIndex     = featureHash % GLSL_PROGRAMS_HASH_SIZE;
+	return binIndex;
+}
+
+auto ShaderProgramCache::findProgramInBin( int type, unsigned binIndex, uint64_t features, const DeformSig &deformSig ) const -> int {
+	for( ShaderProgram *program = m_hashBinsForType[type][binIndex]; program; program = program->nextInHashBin ) {
+		if( program->features == features && program->deformSig == deformSig ) {
+			return (int)( program->index + 1 );
+		}
+	}
+	return 0;
+}
+
+auto ShaderProgramCache::findProgramForParams( int type, const wsw::StringView &maybeRequestedName, uint64_t features,
+											   const DeformSig &deformSig, std::span<const deformv_t> deforms ) -> int {
+	//assert( qglGetError() == GL_NO_ERROR );
+	// TODO: Convert to an assertion?
+	if( type <= GLSL_PROGRAM_TYPE_NONE || type >= GLSL_PROGRAM_TYPE_MAXTYPE ) {
+		return 0;
+	}
+
+	return findProgramInBin( type, getBinIndexForFeatures( features ), features, deformSig );
+}
+
+auto ShaderProgramCache::getProgramForParams( int type, const wsw::StringView &maybeRequestedName, uint64_t features,
+											  const DeformSig &deformSig, std::span<const deformv_t> deforms ) -> int {
+	//assert( qglGetError() == GL_NO_ERROR );
+	// TODO: Convert to an assertion?
+	if( type <= GLSL_PROGRAM_TYPE_NONE || type >= GLSL_PROGRAM_TYPE_MAXTYPE ) {
+		return 0;
+	}
+
+	const unsigned binIndex = getBinIndexForFeatures( features );
 
 	for( ShaderProgram *program = m_hashBinsForType[type][binIndex]; program; program = program->nextInHashBin ) {
 		if( program->features == features && program->deformSig == deformSig ) {
@@ -1724,8 +1766,14 @@ bool ShaderProgramCache::linkProgram( GLuint programId, GLuint vertexShaderId, G
 	return true;
 }
 
-int RP_RegisterProgram( int type, const char *name, const DeformSig &deformSig, const deformv_t *deforms, int numDeforms, uint64_t features ) {
-	return g_programCacheInstanceHolder.instance()->getProgramForParams( type, name, features, deformSig, { deforms, (size_t)numDeforms } );
+int RP_GetProgram( int type, const shader_s *materialToGetDeforms, uint64_t features ) {
+	std::span<const deformv_t> deforms = { materialToGetDeforms->deforms, materialToGetDeforms->numdeforms };
+	return g_programCacheInstanceHolder.instance()->getProgramForParams( type, nullptr, features, materialToGetDeforms->deformSig, deforms );
+}
+
+int RP_FindProgram( int type, const shader_s *materialToGetDeforms, uint64_t features ) {
+	std::span<const deformv_t> deforms = { materialToGetDeforms->deforms, materialToGetDeforms->numdeforms };
+	return g_programCacheInstanceHolder.instance()->findProgramForParams( type, nullptr, features, materialToGetDeforms->deformSig, deforms );
 }
 
 int RP_GetProgramObject( int elem ) {
@@ -1907,13 +1955,13 @@ struct UniformBlock {
 };
 
 template <typename Block>
-auto allocUniformBlock() -> Block * {
-	return (Block *)RB_GetTmpUniformBlock( Block::kBinding, sizeof( Block ) );
+auto allocUniformBlock( BackendState *backendState ) -> Block * {
+	return (Block *)RB_GetTmpUniformBlock( backendState, Block::kBinding, sizeof( Block ) );
 }
 
 template <typename Block>
-void commitUniformBlock( Block *block ) {
-	RB_CommitUniformBlock( Block::kBinding, block, sizeof( Block ) );
+void commitUniformBlock( BackendState *backendState, Block *block ) {
+	RB_CommitUniformBlock( backendState, Block::kBinding, block, sizeof( Block ) );
 }
 
 static inline void copyMat3ToStd140Layout( const mat3_t from, float *to ) {
@@ -1926,14 +1974,11 @@ static inline void copyMat4ToStd140Layout( const mat4_t from, float *to ) {
 	Matrix4_Copy( from, to );
 }
 
-/*
-* RP_UpdateShaderUniforms
-*/
-void RP_UpdateShaderUniforms( float shaderTime,
+void RP_UpdateShaderUniforms( BackendState *backendState, float shaderTime,
 							  const vec3_t entOrigin, const vec3_t entDist, const uint8_t *entityColor,
 							  const uint8_t *constColor, const float *rgbGenFuncArgs, const float *alphaGenFuncArgs,
 							  const mat4_t texMatrix, float colorMod ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::Shader>();
+	auto *const __restrict block = allocUniformBlock<UniformBlock::Shader>( backendState );
 
 	if( entOrigin ) {
 		VectorCopy( entOrigin, block->entityOrigin );
@@ -1964,15 +2009,15 @@ void RP_UpdateShaderUniforms( float shaderTime,
 
 	block->colorMod = colorMod;
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
-void RP_UpdateViewUniforms( const mat4_t modelviewMatrix, const mat4_t modelviewProjectionMatrix,
+void RP_UpdateViewUniforms( BackendState *backendState, const mat4_t modelviewMatrix, const mat4_t modelviewProjectionMatrix,
 							const vec3_t viewOrigin, const mat3_t viewAxis,
 							float mirrorSide,
 							const int *viewport,
 							float zNear, float zFar ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::View>();
+	auto *const __restrict block = allocUniformBlock<UniformBlock::View>( backendState );
 
 	copyMat4ToStd140Layout( modelviewMatrix, block->modelViewMatrix );
 	copyMat4ToStd140Layout( modelviewProjectionMatrix, block->modelViewProjectionMatrix );
@@ -1991,11 +2036,12 @@ void RP_UpdateViewUniforms( const mat4_t modelviewMatrix, const mat4_t modelview
 
 	block->mirrorSide = mirrorSide;
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
-void RP_UpdateDeformBuiltinUniforms( float shaderTime, const vec3_t viewOrigin, const mat3_t viewAxis, const vec3_t entOrigin, float mirrorSide ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::DeformBuiltin>();
+void RP_UpdateDeformBuiltinUniforms( BackendState *backendState, float shaderTime, const vec3_t viewOrigin,
+									 const mat3_t viewAxis, const vec3_t entOrigin, float mirrorSide ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::DeformBuiltin>( backendState );
 
 	if( viewOrigin ) {
 		VectorCopy( viewOrigin, block->viewOrigin );
@@ -2010,7 +2056,7 @@ void RP_UpdateDeformBuiltinUniforms( float shaderTime, const vec3_t viewOrigin, 
 	block->shaderTime = shaderTime;
 	block->mirrorSide = mirrorSide;
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
 /*
@@ -2021,30 +2067,30 @@ void RP_UpdateDeformBuiltinUniforms( float shaderTime, const vec3_t viewOrigin, 
 * to be used in the following manner:
 * color *= mix(myhalf4(1.0), myhalf4(scale), u_BlendMix.xxxy);
 */
-void RP_UpdateBlendMixUniform( vec2_t blendMix ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::BlendMix>();
+void RP_UpdateBlendMixUniform( BackendState *backendState, vec2_t blendMix ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::BlendMix>( backendState );
 
 	Vector2Copy( blendMix, block->blendMix );
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
 /*
 * RP_UpdateSoftParticlesUniforms
 */
-void RP_UpdateSoftParticlesUniforms( float scale ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::SoftParticles>();
+void RP_UpdateSoftParticlesUniforms( BackendState *backendState, float scale ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::SoftParticles>( backendState );
 
 	block->softParticlesScale = scale;
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
 /*
 * RP_UpdateDiffuseLightUniforms
 */
-void RP_UpdateDiffuseLightUniforms( const vec3_t lightDir, const vec4_t lightAmbient, const vec4_t lightDiffuse ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::DiffuseLight>();
+void RP_UpdateDiffuseLightUniforms( BackendState *backendState, const vec3_t lightDir, const vec4_t lightAmbient, const vec4_t lightDiffuse ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::DiffuseLight>( backendState );
 
 	if( lightDir ) {
 		VectorCopy( lightDir, block->lightDir );
@@ -2058,65 +2104,66 @@ void RP_UpdateDiffuseLightUniforms( const vec3_t lightDir, const vec4_t lightAmb
 		VectorCopy( lightDiffuse, block->lightDiffuse );
 	}
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
 /*
 * RP_UpdateMaterialUniforms
 */
-void RP_UpdateMaterialUniforms( float offsetmappingScale, float glossIntensity, float glossExponent ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::Material>();
+void RP_UpdateMaterialUniforms( BackendState *backendState, float offsetmappingScale, float glossIntensity, float glossExponent ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::Material>( backendState );
 
 	block->glossFactors[0] = glossIntensity;
 	block->glossFactors[1] = glossExponent;
 	block->offsetMappingScale = offsetmappingScale;
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
-void RP_UpdateDistortionUniforms( bool frontPlane ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::Distortion>();
+void RP_UpdateDistortionUniforms( BackendState *backendState, bool frontPlane ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::Distortion>( backendState );
 
 	block->frontPlane = frontPlane ? +1.0f : -1.0f;
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
-void RP_UpdateTextureUniforms( int TexWidth, int TexHeight ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::TextureParams>();
+void RP_UpdateTextureUniforms( BackendState *backendState, int TexWidth, int TexHeight ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::TextureParams>( backendState );
 
 	Vector4Set( block->textureParams, TexWidth, TexHeight, TexWidth ? 1.0 / TexWidth : 1.0, TexHeight ? 1.0 / TexHeight : 1.0 );
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
 /*
 * RP_UpdateOutlineUniforms
 */
-void RP_UpdateOutlineUniforms( float projDistance ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::Outline>();
+void RP_UpdateOutlineUniforms( BackendState *backendState, float projDistance ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::Outline>( backendState );
 
 	block->outlineHeight = projDistance;
 	block->outlineCutoff = wsw::max( 0.0f, v_outlinesCutoff.get() );
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
 /*
 * RP_UpdateFogUniforms
 */
-void RP_UpdateFogUniforms( byte_vec4_t color, float clearDist, float opaqueDist, cplane_t *fogPlane, cplane_t *eyePlane, float eyeDist ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::Fog>();
+void RP_UpdateFogUniforms( BackendState *backendState, byte_vec4_t color, float clearDist, float opaqueDist,
+						   cplane_t *fogPlane, cplane_t *eyePlane, float eyeDist ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::Fog>( backendState );
 
 	VectorScale( color, ( 1.0 / 255.0 ), block->color );
 	Vector2Set( block->scaleAndEyeDist, 1.0 / ( opaqueDist - clearDist ), eyeDist );
 	Vector4Set( block->plane, fogPlane->normal[0], fogPlane->normal[1], fogPlane->normal[2], fogPlane->dist );
 	Vector4Set( block->eyePlane, eyePlane->normal[0], eyePlane->normal[1], eyePlane->normal[2], eyePlane->dist );
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
-void RP_UpdateDynamicLightsUniforms( const FrontendToBackendShared *fsh,
+void RP_UpdateDynamicLightsUniforms( BackendState *backendState, const FrontendToBackendShared *fsh,
 									 const superLightStyle_t *superLightStyle,
 									 const vec3_t entOrigin, const mat3_t entAxis, unsigned int dlightbits ) {
 
@@ -2124,7 +2171,7 @@ void RP_UpdateDynamicLightsUniforms( const FrontendToBackendShared *fsh,
 		float deluxemapOffset[( MAX_LIGHTMAPS + 3 ) & ( ~3 )];
 		static_assert( MAX_LIGHTMAPS <= 4 );
 
-		auto *const __restrict block = allocUniformBlock<UniformBlock::DeluxeMap>();
+		auto *const __restrict block = allocUniformBlock<UniformBlock::DeluxeMap>( backendState );
 
 		int i = 0;
 		for( ; i < MAX_LIGHTMAPS && superLightStyle->lightmapStyles[i] != 255; i++ ) {
@@ -2139,13 +2186,13 @@ void RP_UpdateDynamicLightsUniforms( const FrontendToBackendShared *fsh,
 			Vector4Copy( deluxemapOffset, block->deluxeMapOffset );
 		}
 
-		commitUniformBlock( block );
+		commitUniformBlock( backendState, block );
 	}
 
 	if( dlightbits ) {
 		const bool identityAxis = Matrix3_Compare( entAxis, axis_identity );
 
-		auto *const __restrict block = allocUniformBlock<UniformBlock::DynamicLight>();
+		auto *const __restrict block = allocUniformBlock<UniformBlock::DynamicLight>( backendState );
 
 		vec4_t shaderColor[4];
 		memset( shaderColor, 0, sizeof( vec4_t ) * 3 );
@@ -2217,15 +2264,15 @@ void RP_UpdateDynamicLightsUniforms( const FrontendToBackendShared *fsh,
 
 		block->numDynamicLights = numAddedLights;
 
-		commitUniformBlock( block );
+		commitUniformBlock( backendState, block );
 	}
 }
 
 /*
 * RP_UpdateTexGenUniforms
 */
-void RP_UpdateTexGenUniforms( const mat4_t reflectionMatrix, const mat4_t vectorMatrix ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::TexGen>();
+void RP_UpdateTexGenUniforms( BackendState *backendState, const mat4_t reflectionMatrix, const mat4_t vectorMatrix ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::TexGen>( backendState );
 
 	mat3_t m;
 	VectorCopy( reflectionMatrix + 0, m + 0 );
@@ -2234,7 +2281,7 @@ void RP_UpdateTexGenUniforms( const mat4_t reflectionMatrix, const mat4_t vector
 	copyMat3ToStd140Layout( m, block->reflectionTexMatrix );
 	copyMat4ToStd140Layout( vectorMatrix, block->vectorTexMatrix );
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
 /*
@@ -2242,51 +2289,51 @@ void RP_UpdateTexGenUniforms( const mat4_t reflectionMatrix, const mat4_t vector
 *
 * Set uniform values for animation dual quaternions
 */
-void RP_UpdateBonesUniforms( unsigned int numBones, dualquat_t *animDualQuat ) {
+void RP_UpdateBonesUniforms( BackendState *backendState, unsigned numBones, dualquat_t *animDualQuat ) {
 	assert( numBones <= MAX_GLSL_UNIFORM_BONES );
 
-	auto *const __restrict block = allocUniformBlock<UniformBlock::Bones>();
+	auto *const __restrict block = allocUniformBlock<UniformBlock::Bones>( backendState );
 
 	// TODO: We don't need delta-comparison for anim data as it's unique for all models, do we need?
 
 	memcpy( block->dualQuats, animDualQuat, 8 * sizeof( float ) * numBones );
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
 /*
 * RP_UpdateColorCorrectionUniforms
 */
-void RP_UpdateColorCorrectionUniforms( float hdrGamma, float hdrExposure ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::ColorCorrection>();
+void RP_UpdateColorCorrectionUniforms( BackendState *backendState, float hdrGamma, float hdrExposure ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::ColorCorrection>( backendState );
 
 	block->hdrGamma = hdrGamma;
 	block->hdrExposure = hdrExposure;
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
 /*
 * RP_UpdateDrawFlatUniforms
 */
-void RP_UpdateDrawFlatUniforms( const vec3_t wallColor, const vec3_t floorColor ) {
-	auto *const __restrict block = allocUniformBlock<UniformBlock::DrawFlat>();
+void RP_UpdateDrawFlatUniforms( BackendState *backendState, const vec3_t wallColor, const vec3_t floorColor ) {
+	auto *const __restrict block = allocUniformBlock<UniformBlock::DrawFlat>( backendState );
 
 	VectorCopy( wallColor, block->wallColor );
 	VectorCopy( floorColor, block->floorColor );
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
 /*
 * RP_UpdateKawaseUniforms
 */
-void RP_UpdateKawaseUniforms( int TexWidth, int TexHeight, int iteration ) {
-	auto *const block = allocUniformBlock<UniformBlock::TextureParams>();
+void RP_UpdateKawaseUniforms( BackendState *backendState, int TexWidth, int TexHeight, int iteration ) {
+	auto *const block = allocUniformBlock<UniformBlock::TextureParams>( backendState );
 
 	Vector4Set( block->textureParams, TexWidth ? 1.0 / TexWidth : 1.0, TexHeight ? 1.0 / TexHeight : 1.0, (float)iteration, 1.0 );
 
-	commitUniformBlock( block );
+	commitUniformBlock( backendState, block );
 }
 
 void ShaderProgramCache::setupUniformsAndLocations( GLuint programId ) {
@@ -2360,6 +2407,36 @@ void ShaderProgramCache::setupUniformsAndLocations( GLuint programId ) {
 
 	// TODO: Flush GL errors, if any?
 	(void)qglGetError();
+}
+
+void RP_GetSizeOfUniformBlocks( unsigned *sizeOfBlocks ) {
+	std::memset( sizeOfBlocks, 0, sizeof( *sizeOfBlocks ) * MAX_UNIFORM_BINDINGS );
+
+	sizeOfBlocks[UniformBlock::DeformBuiltin::kBinding]   = sizeof( UniformBlock::DeformBuiltin );
+	sizeOfBlocks[UniformBlock::View::kBinding]            = sizeof( UniformBlock::View );
+	sizeOfBlocks[UniformBlock::Shader::kBinding]          = sizeof( UniformBlock::Shader );
+	sizeOfBlocks[UniformBlock::DiffuseLight::kBinding]    = sizeof( UniformBlock::DiffuseLight );
+	sizeOfBlocks[UniformBlock::DeluxeMap::kBinding]       = sizeof( UniformBlock::DeluxeMap );
+	sizeOfBlocks[UniformBlock::DynamicLight::kBinding]    = sizeof( UniformBlock::DynamicLight );
+	sizeOfBlocks[UniformBlock::Material::kBinding]        = sizeof( UniformBlock::Material );
+	sizeOfBlocks[UniformBlock::Outline::kBinding]         = sizeof( UniformBlock::Outline );
+	sizeOfBlocks[UniformBlock::Fog::kBinding]             = sizeof( UniformBlock::Fog );
+	sizeOfBlocks[UniformBlock::TextureParams::kBinding]   = sizeof( UniformBlock::TextureParams );
+	sizeOfBlocks[UniformBlock::ColorCorrection::kBinding] = sizeof( UniformBlock::ColorCorrection );
+	sizeOfBlocks[UniformBlock::DrawFlat::kBinding]        = sizeof( UniformBlock::DrawFlat );
+	sizeOfBlocks[UniformBlock::SoftParticles::kBinding]   = sizeof( UniformBlock::SoftParticles );
+	sizeOfBlocks[UniformBlock::BlendMix::kBinding]        = sizeof( UniformBlock::BlendMix );
+	sizeOfBlocks[UniformBlock::TexGen::kBinding]          = sizeof( UniformBlock::TexGen );
+	sizeOfBlocks[UniformBlock::Distortion::kBinding]      = sizeof( UniformBlock::Distortion );
+	sizeOfBlocks[UniformBlock::Bones::kBinding]           = sizeof( UniformBlock::Bones );
+
+	for( unsigned i = 0; i < MAX_UNIFORM_BINDINGS; ++i ) {
+		assert( sizeOfBlocks[i] );
+		// TODO: Use generic alignment facilities
+		if( const auto rem = sizeOfBlocks[i] % 16 ) {
+			sizeOfBlocks[i] += 16 - rem;
+		}
+	}
 }
 
 bool ShaderProgramCache::bindAttributeLocations( GLuint programId ) {

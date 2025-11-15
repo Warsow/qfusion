@@ -214,53 +214,58 @@ struct ShaderProgram {
 void RP_Init();
 void RP_Shutdown();
 
-int RP_RegisterProgram( int type, const char *name, const DeformSig &deformSig,
-						const deformv_t *deforms, int numDeforms, uint64_t features );
+int RP_FindProgram( int type, const shader_s *materialToGetDeforms, uint64_t features );
+// Creates a program if such program does not exist
+int RP_GetProgram( int type, const shader_s *materialToGetDeforms, uint64_t features );
 
 int RP_GetProgramObject( int elem );
 
-void RP_UpdateShaderUniforms( float shaderTime,
+void RP_GetSizeOfUniformBlocks( unsigned *sizeOfBlocks );
+
+void RP_UpdateShaderUniforms( BackendState *backendState, float shaderTime,
 							  const vec3_t entOrigin, const vec3_t entDist, const uint8_t *entityColor,
 							  const uint8_t *constColor, const float *rgbGenFuncArgs, const float *alphaGenFuncArgs,
 							  const mat4_t texMatrix, float colorMod );
 
-void RP_UpdateViewUniforms( const mat4_t modelviewMatrix, const mat4_t modelviewProjectionMatrix,
+void RP_UpdateViewUniforms( BackendState *backendState, const mat4_t modelviewMatrix, const mat4_t modelviewProjectionMatrix,
 							const vec3_t viewOrigin, const mat3_t viewAxis,
 							float mirrorSide,
 							const int *viewport,
 							float zNear, float zFar );
 
-void RP_UpdateDeformBuiltinUniforms( float shaderTime, const vec3_t viewOrigin, const mat3_t viewAxis, const vec3_t entOrigin, float mirrorSide );
+void RP_UpdateDeformBuiltinUniforms( BackendState *backendState, float shaderTime, const vec3_t viewOrigin,
+									 const mat3_t viewAxis, const vec3_t entOrigin, float mirrorSide );
 
-void RP_UpdateBlendMixUniform( vec2_t blendMask );
+void RP_UpdateBlendMixUniform( BackendState *backendState, vec2_t blendMask );
 
-void RP_UpdateSoftParticlesUniforms( float scale );
+void RP_UpdateSoftParticlesUniforms( BackendState *backendState, float scale );
 
-void RP_UpdateMaterialUniforms( float offsetmappingScale, float glossIntensity, float glossExponent );
+void RP_UpdateMaterialUniforms( BackendState *backendState, float offsetmappingScale, float glossIntensity, float glossExponent );
 
-void RP_UpdateDistortionUniforms( bool frontPlane );
+void RP_UpdateDistortionUniforms( BackendState *backendState, bool frontPlane );
 
-void RP_UpdateTextureUniforms( int TexWidth, int TexHeight );
+void RP_UpdateTextureUniforms( BackendState *backendState, int TexWidth, int TexHeight );
 
-void RP_UpdateOutlineUniforms( float projDistance );
+void RP_UpdateOutlineUniforms( BackendState *backendState, float projDistance );
 
-void RP_UpdateDiffuseLightUniforms( const vec3_t lightDir, const vec4_t lightAmbient, const vec4_t lightDiffuse );
+void RP_UpdateDiffuseLightUniforms( BackendState *backendState, const vec3_t lightDir,
+									const vec4_t lightAmbient, const vec4_t lightDiffuse );
 
-void RP_UpdateDynamicLightsUniforms( const FrontendToBackendShared *fsh,
+void RP_UpdateDynamicLightsUniforms( BackendState *backendState, const FrontendToBackendShared *fsh,
 									 const superLightStyle_t *superLightStyle,
 									 const vec3_t entOrigin, const mat3_t entAxis, unsigned int dlightbits );
 
-void RP_UpdateFogUniforms( byte_vec4_t color, float clearDist, float opaqueDist,
+void RP_UpdateFogUniforms( BackendState *backendState, byte_vec4_t color, float clearDist, float opaqueDist,
 						   cplane_t *fogPlane, cplane_t *eyePlane, float eyeFogDist );
 
-void RP_UpdateTexGenUniforms( const mat4_t reflectionMatrix, const mat4_t vectorMatrix );
+void RP_UpdateTexGenUniforms( BackendState *backendState, const mat4_t reflectionMatrix, const mat4_t vectorMatrix );
 
-void RP_UpdateBonesUniforms( unsigned int numBones, dualquat_t *animDualQuat );
+void RP_UpdateBonesUniforms( BackendState *backendState, unsigned numBones, dualquat_t *animDualQuat );
 
-void RP_UpdateDrawFlatUniforms( const vec3_t wallColor, const vec3_t floorColor );
+void RP_UpdateDrawFlatUniforms( BackendState *backendState, const vec3_t wallColor, const vec3_t floorColor );
 
-void RP_UpdateColorCorrectionUniforms( float hdrGamme, float hdrExposure );
+void RP_UpdateColorCorrectionUniforms( BackendState *backendState, float hdrGamme, float hdrExposure );
 
-void RP_UpdateKawaseUniforms( int TexWidth, int TexHeight, int iteration );
+void RP_UpdateKawaseUniforms( BackendState *backendState, int TexWidth, int TexHeight, int iteration );
 
 #endif // R_PROGRAM_H

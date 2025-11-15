@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "program.h"
 #include "frontend.h"
 #include "backendlocal.h"
+#include "backendactiontape.h"
 #include "glstateproxy.h"
 #include "common/facilities/cvar.h"
 #include <common/helpers/memspecbuilder.h>
@@ -31,12 +32,12 @@ rbackend_t rb;
 
 static void RB_RegisterStreamVBOs();
 
-#define MAX_UNIFORM_BLOCK_SIZE 2048
-
-BackendState::BackendState( int width, int height ) : gl( width, height ) {
+BackendState::BackendState( BackendActionTape *actionTape_, int width, int height )
+	: gl( actionTape_, width, height ), actionTape( actionTape_ ) {
 	std::memset( &global, 0, sizeof( global ) );
 	std::memset( &draw, 0, sizeof( draw ) );
 	std::memset( &material, 0, sizeof( material ) );
+	std::memset( &program, 0, sizeof( program ) );
 }
 
 void RB_Init() {
@@ -47,26 +48,34 @@ void RB_Init() {
 
 	assert( qglGetError() == GL_NO_ERROR );
 
+	unsigned sizeOfBlocks[MAX_UNIFORM_BINDINGS];
+	RP_GetSizeOfUniformBlocks( sizeOfBlocks );
+
+	// TODO: Vary it depending of actual kind of data
+	constexpr unsigned kMaxBlocksForBinding = 1 << 14;
+
 	for( unsigned i = 0; i < MAX_UNIFORM_BINDINGS; ++i ) {
 		GLuint uboId = 0;
 		qglGenBuffers( 1, &uboId );
 
 		qglBindBuffer( GL_UNIFORM_BUFFER, uboId );
 
+		const unsigned dataSize = sizeOfBlocks[i] * ( kMaxBlocksForBinding + 1 );
+		assert( dataSize > 0 );
+
 		// Zeroed by default
-		auto *data = (uint8_t *)Q_malloc( 2 * MAX_UNIFORM_BLOCK_SIZE );
+		auto *const data = (uint8_t *)Q_malloc( dataSize  );
 
 		assert( uboId != 0 );
-		rb.uniformUploads[i].id               = uboId;
-		rb.uniformUploads[i].lastSize         = 0;
-		rb.uniformUploads[i].lastUploadedData = data;
-		rb.uniformUploads[i].scratchpadData   = data + MAX_UNIFORM_BLOCK_SIZE;
+		rb.uniformUploads[i].id                   = uboId;
+		rb.uniformUploads[i].blockSize            = sizeOfBlocks[i];
+		rb.uniformUploads[i].capacity             = dataSize;
+		rb.uniformUploads[i].buffer               = data;
+		rb.uniformUploads[i].lastResortScratchpad = data + sizeOfBlocks[i] * kMaxBlocksForBinding;
 
-		qglBufferData( GL_UNIFORM_BUFFER, MAX_UNIFORM_BLOCK_SIZE, rb.uniformUploads[i].lastUploadedData, GL_DYNAMIC_DRAW );
+		qglBufferData( GL_UNIFORM_BUFFER, sizeOfBlocks[i] * kMaxBlocksForBinding, nullptr, GL_DYNAMIC_DRAW );
 
 		qglBindBuffer( GL_UNIFORM_BUFFER, 0 );
-
-		qglBindBufferBase( GL_UNIFORM_BUFFER, i, uboId );
 
 		if( qglGetError() != GL_NO_ERROR ) {
 			Com_Error( ERR_FATAL, "Failed to setup a uniform buffer" );
@@ -83,9 +92,8 @@ void RB_Shutdown() {
 	}
 	for( auto &uu: rb.uniformUploads ) {
 		qglDeleteBuffers( 1, &uu.id );
-		Q_free( uu.lastUploadedData );
-		uu.lastUploadedData = nullptr;
-		uu.scratchpadData = nullptr;
+		Q_free( uu.buffer );
+		uu.buffer = nullptr;
 	}
 }
 
@@ -122,6 +130,69 @@ void RB_SetDefaultGLState( int stencilBits ) {
 	}
 
 	qglActiveTexture( GL_TEXTURE0 );
+
+	// TODO:?
+	//qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+	//qglBindBuffer( GL_ARRAY_BUFFER, 0 );
+
+	qglUseProgram( 0 );
+}
+
+void RB_BindRenderTarget( RenderTargetComponents *components ) {
+	if( components ) {
+		RenderTarget            *const renderTarget           = components->renderTarget;
+		RenderTargetTexture     *const oldAttachedTexture     = components->renderTarget->attachedTexture;
+		RenderTargetDepthBuffer *const oldAttachedDepthBuffer = components->renderTarget->attachedDepthBuffer;
+		RenderTargetTexture     *const newTexture             = components->texture;
+		RenderTargetDepthBuffer *const newDepthBuffer         = components->depthBuffer;
+
+		bool hasChanges = false;
+		qglBindFramebuffer( GL_FRAMEBUFFER, renderTarget->fboId );
+		if( oldAttachedTexture != newTexture ) {
+			if( oldAttachedTexture ) {
+				oldAttachedTexture->attachedToRenderTarget = nullptr;
+			}
+			if( RenderTarget *oldTarget = newTexture->attachedToRenderTarget ) {
+				assert( oldTarget != renderTarget );
+				// TODO: Do we have to bind it and call detach?
+				oldTarget->attachedTexture = nullptr;
+			}
+			renderTarget->attachedTexture      = newTexture;
+			newTexture->attachedToRenderTarget = renderTarget;
+			qglFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, newTexture->texnum, 0 );
+			hasChanges = true;
+		}
+		if( oldAttachedDepthBuffer != newDepthBuffer ) {
+			if( oldAttachedDepthBuffer ) {
+				oldAttachedDepthBuffer->attachedToRenderTarget = nullptr;
+			}
+			if( RenderTarget *oldTarget = newDepthBuffer->attachedToRenderTarget ) {
+				assert( oldTarget != renderTarget );
+				// TODO: Do we have to bind it and call detach?
+				oldTarget->attachedDepthBuffer = nullptr;
+			}
+			renderTarget->attachedDepthBuffer      = newDepthBuffer;
+			newDepthBuffer->attachedToRenderTarget = renderTarget;
+			qglFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, newDepthBuffer->rboId );
+			hasChanges = true;
+		}
+		if( hasChanges ) {
+			// TODO: What to do in this case
+			if( qglCheckFramebufferStatus( GL_FRAMEBUFFER ) != GL_FRAMEBUFFER_COMPLETE ) {
+				// Just make sure that the status of attachments remains correct
+				assert( renderTarget->attachedTexture == newTexture );
+				assert( renderTarget->attachedDepthBuffer == newDepthBuffer );
+				qglFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0 );
+				qglFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0 );
+				renderTarget->attachedTexture          = nullptr;
+				renderTarget->attachedDepthBuffer      = nullptr;
+				newTexture->attachedToRenderTarget     = nullptr;
+				newDepthBuffer->attachedToRenderTarget = nullptr;
+			}
+		}
+	} else {
+		qglBindFramebuffer( GL_FRAMEBUFFER, 0 );
+	}
 }
 
 void RB_BeginRegistration() {
@@ -141,9 +212,11 @@ void RB_SetTime( BackendState *backendState, int64_t time ) {
 }
 
 void RB_BeginUsingBackendState( BackendState *backendState ) {
-	RB_SetDefaultGLState( glConfig.stencilBits );
+	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
+		R_BeginUniformUploads( binding );
+	}
 
-	memset( &rb.programState, 0, sizeof( rb.programState ) );
+	backendState->actionTape->append( []( RuntimeBackendState * ) { RB_SetDefaultGLState( glConfig.stencilBits ); } );
 
 	Vector4Set( backendState->global.nullEnt.shaderRGBA, 1, 1, 1, 1 );
 	backendState->global.nullEnt.scale = 1;
@@ -155,7 +228,12 @@ void RB_BeginUsingBackendState( BackendState *backendState ) {
 	RB_BindVBO( backendState, 0 );
 }
 
-void RB_EndUsingBackendState( BackendState * ) {
+void RB_EndUsingBackendState( BackendState *backendState ) {
+	backendState->actionTape->append( []( RuntimeBackendState * ) { qglUseProgram( 0 ); } );
+
+	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
+		R_EndUniformUploads( binding, backendState->uniform.blockState[binding].sizeSoFar );
+	}
 }
 
 void RB_DepthRange( BackendState *backendState, float depthmin, float depthmax ) {
@@ -216,30 +294,22 @@ void RB_Clear( BackendState *backendState, int bits, float r, float g, float b, 
 		state |= GLSTATE_DEPTHWRITE;
 	}
 
-	// TODO: Beware of direct calls
-
 	if( bits & GL_STENCIL_BUFFER_BIT ) {
-		qglClearStencil( 128 );
+		backendState->actionTape->clearStencil( 128 );
 	}
 
 	if( bits & GL_COLOR_BUFFER_BIT ) {
 		state = ( state & ~GLSTATE_NO_COLORWRITE ) | GLSTATE_ALPHAWRITE;
-		qglClearColor( r, g, b, a );
+		backendState->actionTape->clearColor( r, g, b, a );
 	}
 
 	backendState->gl.setState( state );
 
 	backendState->gl.applyScissor();
 
-	qglClear( bits );
+	backendState->actionTape->clear( bits );
 
 	backendState->gl.setDepthRange( 0.0f, 1.0f );
-}
-
-void RB_BindFrameBufferObject( BackendState *backendState, RenderTargetComponents *components ) {
-	// TODO: Resolve object lifetime problems/initialization order so we don't have to call it like this...
-	// TODO: Same for backend state
-	GLStateProxy::bindFramebufferObject( backendState ? &backendState->gl : nullptr, components );
 }
 
 void RB_RegisterStreamVBOs() {
@@ -323,7 +393,7 @@ unsigned RB_VboCapacityInIndexElemsForFrameUploads( unsigned group ) {
 	return rb.vertexUploads[group].iboCapacityInElems;
 }
 
-void R_BeginUploads( unsigned group ) {
+void R_BeginMeshUploads( unsigned group ) {
 	assert( group < std::size( rb.vertexUploads ) );
 }
 
@@ -362,7 +432,7 @@ void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVerte
 	}
 }
 
-void R_EndUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes ) {
+void R_EndMeshUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes ) {
 	assert( group < std::size( rb.vertexUploads ) );
 	if( vertexDataSizeInBytes && indexDataSizeInBytes ) {
 		RB_BindVBO( nullptr, RB_VBOIdForFrameUploads( group ) );
@@ -373,51 +443,75 @@ void R_EndUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned inde
 	}
 }
 
-void *RB_GetTmpUniformBlock( unsigned binding, size_t blockSize ) {
+void R_BeginUniformUploads( unsigned binding ) {
 	assert( binding < std::size( rb.uniformUploads ) );
-	assert( blockSize <= MAX_UNIFORM_BLOCK_SIZE );
-	auto &uu = rb.uniformUploads[binding];
-	assert( uu.lastSize == 0 || uu.lastSize == blockSize );
-	uu.lastSize = blockSize;
-	std::memset( uu.scratchpadData, 0, blockSize );
-	return uu.scratchpadData;
 }
 
-void RB_CommitUniformBlock( unsigned binding, void *blockData, size_t blockSize ) {
+void R_EndUniformUploads( unsigned binding, unsigned sizeInBytes ) {
 	assert( binding < std::size( rb.uniformUploads ) );
-	auto uu = rb.uniformUploads[binding];
-	assert( uu.lastSize == blockSize );
-	assert( blockData == uu.scratchpadData );
-	if( std::memcmp( uu.lastUploadedData, blockData, blockSize ) != 0 ) {
+
+	if( sizeInBytes > 0 ) {
+		const auto &uu = rb.uniformUploads[binding];
+		assert( sizeInBytes <= uu.capacity );
+		assert( ( sizeInBytes % uu.blockSize ) == 0 );
+
 		qglBindBuffer( GL_UNIFORM_BUFFER, uu.id );
-		//qglBufferSubData( GL_UNIFORM_BUFFER, 0, (GLsizeiptr)blockSize, blockData );
-		// This is much faster on Mesa
-		qglBufferData( GL_UNIFORM_BUFFER, (GLsizeiptr)blockSize, blockData, GL_DYNAMIC_DRAW );
-		std::memcpy( uu.lastUploadedData, blockData, blockSize );
+		qglBufferSubData( GL_UNIFORM_BUFFER, 0, sizeInBytes, uu.buffer );
+		// TODO: Avoid doing this
 		qglBindBuffer( GL_UNIFORM_BUFFER, 0 );
 	}
 }
 
-void RB_DoDrawMeshVerts( BackendState *backendState, const DrawMeshVertSpan *vertSpan, int primitive ) {
-	// TODO: What's the purpose of v_drawElements
-	if( !( v_drawElements.get() || backendState->material.currentEntity == &backendState->global.nullEnt ) ) [[unlikely]] {
-		return;
+void *RB_GetTmpUniformBlock( BackendState *backendState, unsigned binding, size_t requestedBlockSize ) {
+	assert( binding < std::size( rb.uniformUploads ) );
+	assert( std::size( rb.uniformUploads ) == std::size( backendState->uniform.blockState ) );
+
+	const auto *const globalState = &rb.uniformUploads[binding];
+	assert( std::abs( (int)requestedBlockSize - (int)globalState->blockSize ) < 16 );
+
+	auto *const stateOfBackendState = &backendState->uniform.blockState[binding];
+	assert( ( stateOfBackendState->sizeSoFar % globalState->blockSize ) == 0 );
+
+	void *result;
+	if( stateOfBackendState->sizeSoFar + globalState->blockSize <= globalState->capacity ) [[likely]] {
+		result = globalState->buffer + stateOfBackendState->sizeSoFar;
+	} else {
+		result = globalState->lastResortScratchpad;
 	}
 
-	backendState->gl.applyScissor();
+	std::memset( result, 0, requestedBlockSize );
+	return result;
+}
 
-	if( const auto *mdSpan = std::get_if<MultiDrawElemSpan>( vertSpan ) ) {
-		qglMultiDrawElements( primitive, mdSpan->counts, GL_UNSIGNED_SHORT, mdSpan->indices, mdSpan->numDraws );
-	} else if( const auto *vertElemSpan = std::get_if<VertElemSpan>( vertSpan ) ) {
-		const unsigned numVerts  = vertElemSpan->numVerts;
-		const unsigned numElems  = vertElemSpan->numElems;
-		const unsigned firstVert = vertElemSpan->firstVert;
-		const unsigned firstElem = vertElemSpan->firstElem;
+void RB_CommitUniformBlock( BackendState *backendState, unsigned binding, void *blockData, size_t submittedBlockSize ) {
+	assert( binding < std::size( rb.uniformUploads ) );
+	assert( std::size( rb.uniformUploads ) == std::size( backendState->uniform.blockState ) );
 
-		qglDrawRangeElements( primitive, firstVert, firstVert + numVerts - 1, (int)numElems,
-							  GL_UNSIGNED_SHORT, (GLvoid *)( firstElem * sizeof( elem_t ) ) );
+	const auto *globalState = &rb.uniformUploads[binding];
+	assert( std::abs( (int)submittedBlockSize - (int)globalState->blockSize ) < 16 );
+
+	bool updateBinding = false;
+
+	auto *const stateOfBackendState = &backendState->uniform.blockState[binding];
+	assert( ( stateOfBackendState->sizeSoFar % globalState->blockSize ) == 0 );
+
+	// TODO: The initial offset is going to be > 0 if mulitple uploads are performed in parallel (and we use slices)
+	if( stateOfBackendState->sizeSoFar > 0 ) [[likely]] {
+		assert( stateOfBackendState->sizeSoFar >= globalState->blockSize );
+		const uint8_t *prevData = globalState->buffer + ( stateOfBackendState->sizeSoFar - globalState->blockSize );
+		if( std::memcmp( prevData, blockData, submittedBlockSize ) != 0 ) {
+			if( stateOfBackendState->sizeSoFar + globalState->blockSize <= globalState->capacity ) {
+				updateBinding = true;
+			}
+		}
 	} else {
-		assert( false );
+		updateBinding = true;
+	}
+
+	if( updateBinding ) {
+		backendState->actionTape->bindBufferRange( GL_UNIFORM_BUFFER, binding, globalState->id,
+												   stateOfBackendState->sizeSoFar, globalState->blockSize );
+		stateOfBackendState->sizeSoFar += globalState->blockSize;
 	}
 }
 
@@ -458,10 +552,10 @@ bool RB_EnableWireframe( BackendState *backendState, bool enable ) {
 
 		if( enable ) {
 			RB_SetShaderStateMask( backendState, 0, GLSTATE_NO_DEPTH_TEST );
-			qglPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+			backendState->actionTape->polygonMode( GL_FRONT_AND_BACK, GL_LINE );
 		} else {
 			RB_SetShaderStateMask( backendState, ~0, 0 );
-			qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+			backendState->actionTape->polygonMode( GL_FRONT_AND_BACK, GL_FILL );
 		}
 	}
 
@@ -609,49 +703,6 @@ void RB_SetLightParams( BackendState *backendState, float minLight, bool noWorld
 void RB_SetShaderStateMask( BackendState *backendState, unsigned ANDmask, unsigned ORmask ) {
 	backendState->global.shaderStateANDmask = ANDmask;
 	backendState->global.shaderStateORmask  = ORmask;
-}
-
-int RB_RegisterProgram( int type, const shader_s *materialToGetDeforms, uint64_t features ) {
-	const DeformSig &deformSig = materialToGetDeforms->deformSig;
-	const deformv_t *deforms   = materialToGetDeforms->deforms;
-	const unsigned numDeforms  = materialToGetDeforms->numdeforms;
-	const bool noDeforms       = !numDeforms;
-
-	if( rb.programState.currentRegProgramType == type && noDeforms && rb.programState.currentRegProgramFeatures == features ) {
-		return rb.programState.currentRegProgram;
-	}
-
-	const int program = RP_RegisterProgram( type, nullptr, deformSig, deforms, numDeforms, features );
-	if( noDeforms ) {
-		rb.programState.currentRegProgram = program;
-		rb.programState.currentRegProgramType = type;
-		rb.programState.currentRegProgramFeatures = features;
-	}
-
-	return program;
-}
-
-int RB_BindProgram( BackendState *backendState, int program ) {
-	if( program == rb.programState.currentProgram ) {
-		return rb.programState.currentProgramObject;
-	}
-
-	rb.programState.currentProgram = program;
-	if( !program ) {
-		rb.programState.currentProgramObject = 0;
-		qglUseProgram( 0 );
-		return 0;
-	}
-
-	const int object = RP_GetProgramObject( program );
-	if( object ) {
-		qglUseProgram( object );
-	}
-
-	rb.programState.currentProgramObject = object;
-	// TODO: This is going to kill all state caching unless we do early lookups of programs (and postpone only if needed)
-	backendState->draw.dirtyUniformState = true;
-	return object;
 }
 
 void R_SubmitAliasSurfToBackend( BackendState *backendState, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceAlias_t *drawSurf ) {

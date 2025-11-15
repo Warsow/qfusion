@@ -37,9 +37,14 @@ typedef struct {
 } rbBonesData_t;
 
 class GLStateProxy;
+struct BackendState;
 
-void *RB_GetTmpUniformBlock( unsigned binding, size_t blockSize );
-void RB_CommitUniformBlock( unsigned binding, void *blockData, size_t blockSize );
+void *RB_GetTmpUniformBlock( BackendState *backendState, unsigned binding, size_t requestedBlockSize );
+void RB_CommitUniformBlock( BackendState *backendState, unsigned binding, void *blockData, size_t blockSize );
+
+struct RuntimeBackendState {
+	GLuint programId { 0 };
+};
 
 struct BackendState {
 	struct {
@@ -105,9 +110,24 @@ struct BackendState {
 		int donePassesTotal;
 	} draw;
 
-	BackendState( int width, int height );
+	struct {
+		int boundProgram;
+
+		int cachedFastLookupProgram;
+		int cachedFastLookupProgramType;
+		uint64_t cachedFastLookupProgramFeatures;
+	} program;
+
+	struct {
+		struct {
+			unsigned sizeSoFar { 0 };
+		} blockState[MAX_UNIFORM_BINDINGS];
+	} uniform;
 
 	GLStateProxy gl;
+	BackendActionTape *const actionTape;
+
+	BackendState( BackendActionTape *actionTape, int width, int height );
 };
 
 typedef struct r_backend_s {
@@ -122,34 +142,18 @@ typedef struct r_backend_s {
 
 	struct {
 		GLuint id;
-		void *lastUploadedData;
-		void *scratchpadData;
-		unsigned lastSize;
+		uint8_t *buffer;
+		uint8_t *lastResortScratchpad;
+		unsigned blockSize;
+		unsigned capacity;
 	} uniformUploads[MAX_UNIFORM_BINDINGS];
-
-	struct {
-		// TODO: Move to GLStateProxy?
-		// glUseProgram cache
-		int currentProgram;
-		int currentProgramObject;
-
-		// RP_RegisterProgram cache
-		int currentRegProgram;
-		int currentRegProgramType;
-		uint64_t currentRegProgramFeatures;
-	} programState;
 } rbackend_t;
 
 extern rbackend_t rb;
-
-void RB_DoDrawMeshVerts( BackendState *backendState, const DrawMeshVertSpan *vertSpan, int primitive );
 
 #define DRAWFLAT( state ) \
 	( ( ( state )->material.currentModelType == mod_brush ) && \
 	( ( state )->global.renderFlags & ( RF_DRAWFLAT | RF_DRAWBRIGHT ) ) && \
 	!( ( state )->material.currentShader->flags & SHADER_NODRAWFLAT ) )
-
-int RB_RegisterProgram( int type, const shader_s *materialToGetDeforms, uint64_t features );
-int RB_BindProgram( BackendState *backendState, int program );
 
 #endif // R_BACKEND_LOCAL_H

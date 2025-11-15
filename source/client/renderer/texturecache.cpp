@@ -78,8 +78,8 @@ TextureCache::TextureCache() {
 		components->depthBuffer  = m_miniviewRenderTargetDepthBuffer;
 
 		// Setup attachments TODO: Fix state management
-		RB_BindFrameBufferObject( nullptr, components );
-		RB_BindFrameBufferObject( nullptr, nullptr );
+		RB_BindRenderTarget( components );
+		RB_BindRenderTarget( nullptr );
 	} else {
 		// TODO: Eliminate this duplication
 		wsw::failWithRuntimeError( "Failed to create miniview render target" );

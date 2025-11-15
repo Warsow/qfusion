@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "local.h"
 #include "program.h"
+#include "backendactiontape.h"
 #include "backendlocal.h"
 #include "glstateproxy.h"
 
@@ -61,6 +62,86 @@ static const shaderpass_t kBuiltinSkyboxPass {
 };
 
 static void RB_SetShaderpassState( BackendState *backendState, unsigned passStateFlags );
+
+static void RB_DrawMeshVerts( BackendState *backendState, const DrawMeshVertSpan *vertSpan, int primitive ) {
+	// TODO: What's the purpose of v_drawElements
+	if( !( v_drawElements.get() || backendState->material.currentEntity == &backendState->global.nullEnt ) ) [[unlikely]] {
+		return;
+	}
+
+	backendState->gl.applyScissor();
+
+	if( const auto *mdSpan = std::get_if<MultiDrawElemSpan>( vertSpan ) ) {
+		backendState->gl.multiDrawElements( primitive, mdSpan->counts, GL_UNSIGNED_SHORT, mdSpan->indices, mdSpan->numDraws );
+	} else if( const auto *vertElemSpan = std::get_if<VertElemSpan>( vertSpan ) ) {
+		const unsigned numVerts  = vertElemSpan->numVerts;
+		const unsigned numElems  = vertElemSpan->numElems;
+		const unsigned firstVert = vertElemSpan->firstVert;
+		const unsigned firstElem = vertElemSpan->firstElem;
+
+		backendState->gl.drawRangeElements( primitive, firstVert, firstVert + numVerts - 1, (int)numElems,
+											GL_UNSIGNED_SHORT, (GLvoid *)( firstElem * sizeof( elem_t ) ) );
+	} else {
+		assert( false );
+	}
+}
+
+static void RB_BindExistingProgram( BackendState *backendState, int program ) {
+	assert( program > 0 );
+	if( backendState->program.boundProgram != program ) {
+		backendState->draw.dirtyUniformState = true;
+		backendState->program.boundProgram = program;
+		backendState->actionTape->bindProgram( program );
+	}
+}
+
+static void RB_SetupProgram( BackendState *backendState, int type, const shader_s *materialToGetDeforms, uint64_t features ) {
+	// Deforms bypass BackendState program cache
+	// (TODO: Why, were comparisons that expensive?)
+	if( materialToGetDeforms->numdeforms ) [[unlikely]] {
+		// Try to find an existing program in the global program cache
+		const int program = RP_FindProgram( type, materialToGetDeforms, features );
+		// TODO: Make a distinction between programs that failed to be created and programs that haven't been created yet
+		if( program ) {
+			RB_BindExistingProgram( backendState, program );
+		} else {
+			backendState->draw.dirtyUniformState = true;
+			// Invalidate bound program in the simulated backend state
+			backendState->program.boundProgram = -1;
+			// Create the program during the tape execution
+			backendState->actionTape->createAndBindProgram( type, materialToGetDeforms, features );
+		}
+	} else {
+		// Perform a fast lookup by type and features in the first-level cache
+		if( backendState->program.cachedFastLookupProgramType == type && backendState->program.cachedFastLookupProgramFeatures == features ) {
+			assert( backendState->program.cachedFastLookupProgram > 0 );
+			RB_BindExistingProgram( backendState, backendState->program.cachedFastLookupProgram );
+		} else {
+			// Try to find an existing prorgam in the global program cache
+			const int program = RP_FindProgram( type, materialToGetDeforms, features );
+			// TODO: Make a distinction between programs that failed to be created and programs that haven't been created yet
+			if( program ) {
+				RB_BindExistingProgram( backendState, program );
+				// Save it in the first-level cache
+				backendState->program.cachedFastLookupProgram         = program;
+				backendState->program.cachedFastLookupProgramType     = type;
+				backendState->program.cachedFastLookupProgramFeatures = features;
+			} else {
+				// Force the state invalidation as we don't know the exact program that is getting used
+				// TODO: Do we need additional flags, like "can reset dirty uniform state?" - looks like we can check boundProgram < 0
+				backendState->draw.dirtyUniformState = true;
+				// Invalidate lookup cache in the simulated backend state (TODO: Is it needed?)
+				backendState->program.cachedFastLookupProgram        = -1;
+				backendState->program.cachedFastLookupProgramType    = -1;
+				backendState->program.cachedFastLookupProgramFeatures = 0;
+				// Invalidate bound program in the simulated backend state
+				backendState->program.boundProgram = -1;
+				// Create the program during the tape execution
+				backendState->actionTape->createAndBindProgram( type, materialToGetDeforms, features );
+			}
+		}
+	}
+}
 
 static inline float RB_FastSin( float t ) {
 	return std::sin( t * (float)M_TWOPI );
@@ -542,7 +623,7 @@ static uint64_t RB_sRGBProgramFeatures( const shaderpass_t *pass ) {
 	return programFeatures;
 }
 
-static void RB_UpdateCommonUniforms( const BackendState *backendState, const shaderpass_t *pass, mat4_t texMatrix ) {
+static void RB_UpdateCommonUniforms( BackendState *backendState, const shaderpass_t *pass, mat4_t texMatrix ) {
 	const entity_t *e = backendState->material.currentEntity;
 
 	// the logic here should match R_TransformForEntity
@@ -567,7 +648,8 @@ static void RB_UpdateCommonUniforms( const BackendState *backendState, const sha
 	}
 
 	const float mirrorSide = ( backendState->global.renderFlags & RF_MIRRORVIEW ) ? -1 : +1;
-	RP_UpdateViewUniforms( backendState->global.modelviewMatrix, backendState->global.modelviewProjectionMatrix,
+	RP_UpdateViewUniforms( backendState, backendState->global.modelviewMatrix,
+						   backendState->global.modelviewProjectionMatrix,
 						   backendState->global.cameraOrigin, backendState->global.cameraAxis, mirrorSide,
 						   backendState->gl.getViewport(), backendState->global.zNear, backendState->global.zFar );
 
@@ -585,28 +667,28 @@ static void RB_UpdateCommonUniforms( const BackendState *backendState, const sha
 		}
 	}
 
-	RP_UpdateShaderUniforms( backendState->material.currentShaderTime,
+	RP_UpdateShaderUniforms( backendState, backendState->material.currentShaderTime,
 							 entOrigin, entDist, backendState->material.entityColor,
 							 constColor,
 							 pass->rgbgen.func.type != SHADER_FUNC_NONE ? pass->rgbgen.func.args : pass->rgbgen.args,
 							 pass->alphagen.func.type != SHADER_FUNC_NONE ? pass->alphagen.func.args : pass->alphagen.args,
 							 texMatrix, colorMod );
 
-	RP_UpdateDeformBuiltinUniforms( backendState->material.currentShaderTime, backendState->global.cameraOrigin,
+	RP_UpdateDeformBuiltinUniforms( backendState, backendState->material.currentShaderTime, backendState->global.cameraOrigin,
 									backendState->global.cameraAxis, entOrigin, mirrorSide );
 
-	RP_UpdateBlendMixUniform( blendMix );
+	RP_UpdateBlendMixUniform( backendState, blendMix );
 
-	RP_UpdateSoftParticlesUniforms( v_softParticles_scale.get() );
+	RP_UpdateSoftParticlesUniforms( backendState, v_softParticles_scale.get() );
 }
 
-static void RB_UpdateFogUniforms( const BackendState *backendState, const mfog_t *fog ) {
+static void RB_UpdateFogUniforms( BackendState *backendState, const mfog_t *fog ) {
 	assert( fog );
 
 	cplane_t fogPlane, vpnPlane;
 	const float dist = RB_TransformFogPlanes( backendState, fog, fogPlane.normal, &fogPlane.dist, vpnPlane.normal, &vpnPlane.dist );
 
-	RP_UpdateFogUniforms( fog->shader->fog_color, fog->shader->fog_clearDist,
+	RP_UpdateFogUniforms( backendState, fog->shader->fog_color, fog->shader->fog_clearDist,
 						  fog->shader->fog_dist, &fogPlane, &vpnPlane, dist );
 }
 
@@ -785,47 +867,45 @@ static void RB_RenderMeshGLSL_Q3AShader( BackendState *backendState, const Front
 		}
 	}
 
-	// update uniforms
-	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_Q3A_SHADER, backendState->material.currentShader, programFeatures );
-	if( RB_BindProgram( backendState, program ) ) {
-		RB_UpdateCommonUniforms( backendState, pass, texMatrix );
+	RB_SetupProgram( backendState, GLSL_PROGRAM_TYPE_Q3A_SHADER, backendState->material.currentShader, programFeatures );
 
-		RP_UpdateTexGenUniforms( texMatrix, genVectors );
+	RB_UpdateCommonUniforms( backendState, pass, texMatrix );
 
-		if( isWorldSurface || rgbgen == RGB_GEN_LIGHTING_DIFFUSE ) {
-			RP_UpdateDiffuseLightUniforms( lightDir, lightAmbient, lightDiffuse );
-		}
+	RP_UpdateTexGenUniforms( backendState, texMatrix, genVectors );
 
-		if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
-			RB_UpdateFogUniforms( backendState, fog );
-		}
-
-		// submit animation data
-		if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
-			RP_UpdateBonesUniforms( backendState->draw.bonesData.numBones, backendState->draw.bonesData.dualQuats );
-		}
-
-		// dynamic lights
-		if( isLightmapped || isWorldVertexLight ) {
-			RP_UpdateDynamicLightsUniforms( fsh, lightStyle, e->origin, e->axis, backendState->draw.currentDlightBits );
-		}
-
-		// r_drawflat
-		if( programFeatures & GLSL_SHADER_COMMON_DRAWFLAT ) {
-			if( backendState->global.renderFlags & RF_DRAWBRIGHT ) [[unlikely]] {
-				RP_UpdateDrawFlatUniforms( colorWhite, colorWhite );
-			} else {
-				RP_UpdateDrawFlatUniforms( rsh.wallColor, rsh.floorColor );
-			}
-		}
-
-		/*
-		if( programFeatures & GLSL_SHADER_COMMON_SOFT_PARTICLE ) {
-			RP_UpdateTextureUniforms( program, rb.st.screenDepthTex->width, rb.st.screenDepthTex->height );
-		}*/
-
-		RB_DoDrawMeshVerts( backendState, vertSpan, primitive );
+	if( isWorldSurface || rgbgen == RGB_GEN_LIGHTING_DIFFUSE ) {
+		RP_UpdateDiffuseLightUniforms( backendState, lightDir, lightAmbient, lightDiffuse );
 	}
+
+	if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
+		RB_UpdateFogUniforms( backendState, fog );
+	}
+
+	// submit animation data
+	if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
+		RP_UpdateBonesUniforms( backendState, backendState->draw.bonesData.numBones, backendState->draw.bonesData.dualQuats );
+	}
+
+	// dynamic lights
+	if( isLightmapped || isWorldVertexLight ) {
+		RP_UpdateDynamicLightsUniforms( backendState, fsh, lightStyle, e->origin, e->axis, backendState->draw.currentDlightBits );
+	}
+
+	// r_drawflat
+	if( programFeatures & GLSL_SHADER_COMMON_DRAWFLAT ) {
+		if( backendState->global.renderFlags & RF_DRAWBRIGHT ) [[unlikely]] {
+			RP_UpdateDrawFlatUniforms( backendState, colorWhite, colorWhite );
+		} else {
+			RP_UpdateDrawFlatUniforms( backendState, rsh.wallColor, rsh.floorColor );
+		}
+	}
+
+	/*
+	if( programFeatures & GLSL_SHADER_COMMON_SOFT_PARTICLE ) {
+		RP_UpdateTextureUniforms( program, rb.st.screenDepthTex->width, rb.st.screenDepthTex->height );
+	}*/
+
+	RB_DrawMeshVerts( backendState, vertSpan, primitive );
 }
 
 static void RB_RenderMeshGLSL_Material( BackendState *backendState, const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, int primitive, const shaderpass_t *pass, uint64_t programFeatures ) {
@@ -1050,36 +1130,35 @@ static void RB_RenderMeshGLSL_Material( BackendState *backendState, const Fronte
 		}
 	}
 
-	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_MATERIAL, backendState->material.currentShader, programFeatures );
-	if( RB_BindProgram( backendState, program ) ) {
-		RB_UpdateCommonUniforms( backendState, pass, texMatrix );
-		RP_UpdateMaterialUniforms( offsetmappingScale, glossIntensity, glossExponent );
-		RP_UpdateDiffuseLightUniforms( lightDir, ambient, diffuse );
+	RB_SetupProgram( backendState, GLSL_PROGRAM_TYPE_MATERIAL, backendState->material.currentShader, programFeatures );
 
-		if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
-			RB_UpdateFogUniforms( backendState, fog );
-		}
+	RB_UpdateCommonUniforms( backendState, pass, texMatrix );
+	RP_UpdateMaterialUniforms( backendState, offsetmappingScale, glossIntensity, glossExponent );
+	RP_UpdateDiffuseLightUniforms( backendState, lightDir, ambient, diffuse );
 
-		// submit animation data
-		if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
-			RP_UpdateBonesUniforms( backendState->draw.bonesData.numBones, backendState->draw.bonesData.dualQuats );
-		}
-
-		// dynamic lights
-		RP_UpdateDynamicLightsUniforms( fsh, lightStyle, backendState->material.currentEntity->origin,
-										backendState->material.currentEntity->axis, backendState->draw.currentDlightBits );
-
-		// r_drawflat
-		if( programFeatures & GLSL_SHADER_COMMON_DRAWFLAT ) {
-			if( backendState->global.renderFlags & RF_DRAWBRIGHT ) [[unlikely]] {
-				RP_UpdateDrawFlatUniforms( colorWhite, colorWhite );
-			} else {
-				RP_UpdateDrawFlatUniforms( rsh.wallColor, rsh.floorColor );
-			}
-		}
-
-		RB_DoDrawMeshVerts( backendState, vertSpan, primitive );
+	if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
+		RB_UpdateFogUniforms( backendState, fog );
 	}
+
+	// submit animation data
+	if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
+		RP_UpdateBonesUniforms( backendState, backendState->draw.bonesData.numBones, backendState->draw.bonesData.dualQuats );
+	}
+
+	// dynamic lights
+	RP_UpdateDynamicLightsUniforms( backendState, fsh, lightStyle, backendState->material.currentEntity->origin,
+									backendState->material.currentEntity->axis, backendState->draw.currentDlightBits );
+
+	// r_drawflat
+	if( programFeatures & GLSL_SHADER_COMMON_DRAWFLAT ) {
+		if( backendState->global.renderFlags & RF_DRAWBRIGHT ) [[unlikely]] {
+			RP_UpdateDrawFlatUniforms( backendState, colorWhite, colorWhite );
+		} else {
+			RP_UpdateDrawFlatUniforms( backendState, rsh.wallColor, rsh.floorColor );
+		}
+	}
+
+	RB_DrawMeshVerts( backendState, vertSpan, primitive );
 }
 
 static void RB_RenderMeshGLSL_Distortion( BackendState *backendState, const FrontendToBackendShared *,
@@ -1152,15 +1231,13 @@ static void RB_RenderMeshGLSL_Distortion( BackendState *backendState, const Fron
 	backendState->gl.bindTexture( 2, portalTextures[0] );           // reflection
 	backendState->gl.bindTexture( 3, portalTextures[1] );           // refraction
 
-	// update uniforms
-	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_DISTORTION, backendState->material.currentShader, programFeatures );
-	if( RB_BindProgram( backendState, program ) ) {
-		RB_UpdateCommonUniforms( backendState, pass, texMatrix );
-		RP_UpdateDistortionUniforms( frontPlane );
-		RP_UpdateTextureUniforms( width, height );
+	RB_SetupProgram( backendState, GLSL_PROGRAM_TYPE_DISTORTION, backendState->material.currentShader, programFeatures );
 
-		RB_DoDrawMeshVerts( backendState, vertSpan, primitive );
-	}
+	RB_UpdateCommonUniforms( backendState, pass, texMatrix );
+	RP_UpdateDistortionUniforms( backendState, frontPlane );
+	RP_UpdateTextureUniforms( backendState, width, height );
+
+	RB_DrawMeshVerts( backendState, vertSpan, primitive );
 }
 
 static void RB_RenderMeshGLSL_Outline( BackendState *backendState, const FrontendToBackendShared *,
@@ -1173,32 +1250,31 @@ static void RB_RenderMeshGLSL_Outline( BackendState *backendState, const Fronten
 	programFeatures |= RB_RGBAlphaGenToProgramFeatures( backendState, &pass->rgbgen, &pass->alphagen );
 	programFeatures |= RB_FogProgramFeatures( backendState, pass, backendState->material.fog );
 
-	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_OUTLINE, backendState->material.currentShader, programFeatures );
-	if( RB_BindProgram( backendState, program ) ) {
-		mat4_t texMatrix;
-		Matrix4_Identity( texMatrix );
+	RB_SetupProgram( backendState, GLSL_PROGRAM_TYPE_OUTLINE, backendState->material.currentShader, programFeatures );
 
-		const auto faceCull = backendState->gl.getCull();
-		backendState->gl.setCull( GL_BACK );
+	mat4_t texMatrix;
+	Matrix4_Identity( texMatrix );
 
-		RB_SetShaderpassState( backendState, pass->flags );
+	const auto faceCull = backendState->gl.getCull();
+	backendState->gl.setCull( GL_BACK );
 
-		RB_UpdateCommonUniforms( backendState, pass, texMatrix );
-		RP_UpdateOutlineUniforms( backendState->material.currentEntity->outlineHeight * v_outlinesScale.get() );
+	RB_SetShaderpassState( backendState, pass->flags );
 
-		if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
-			RB_UpdateFogUniforms( backendState, backendState->material.fog );
-		}
+	RB_UpdateCommonUniforms( backendState, pass, texMatrix );
+	RP_UpdateOutlineUniforms( backendState, backendState->material.currentEntity->outlineHeight * v_outlinesScale.get() );
 
-		// submit animation data
-		if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
-			RP_UpdateBonesUniforms( backendState->draw.bonesData.numBones, backendState->draw.bonesData.dualQuats );
-		}
-
-		RB_DoDrawMeshVerts( backendState, vertSpan, primitive );
-
-		backendState->gl.setCull( faceCull );
+	if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
+		RB_UpdateFogUniforms( backendState, backendState->material.fog );
 	}
+
+	// submit animation data
+	if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
+		RP_UpdateBonesUniforms( backendState, backendState->draw.bonesData.numBones, backendState->draw.bonesData.dualQuats );
+	}
+
+	RB_DrawMeshVerts( backendState, vertSpan, primitive );
+
+	backendState->gl.setCull( faceCull );
 }
 
 static uint64_t RB_BindCelshadeTexture( BackendState *backendState, int tmu, const Texture *texture,
@@ -1272,28 +1348,27 @@ static void RB_RenderMeshGLSL_Celshade( BackendState *backendState, const Fronte
 	programFeatures |= RB_BindCelshadeTexture( backendState, 6, lightTexture, GLSL_SHADER_CELSHADE_CEL_LIGHT, true, nullptr );
 
 	// update uniforms
-	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_CELSHADE, backendState->material.currentShader, programFeatures );
-	if( RB_BindProgram( backendState, program ) ) {
-		mat4_t texMatrix;
-		Matrix4_Identity( texMatrix );
+	RB_SetupProgram( backendState, GLSL_PROGRAM_TYPE_CELSHADE, backendState->material.currentShader, programFeatures );
 
-		mat4_t reflectionMatrix;
-		RB_VertexTCCelshadeMatrix( backendState, reflectionMatrix );
+	mat4_t texMatrix;
+	Matrix4_Identity( texMatrix );
 
-		RB_UpdateCommonUniforms( backendState, pass, texMatrix );
-		RP_UpdateTexGenUniforms( reflectionMatrix, texMatrix );
+	mat4_t reflectionMatrix;
+	RB_VertexTCCelshadeMatrix( backendState, reflectionMatrix );
 
-		if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
-			RB_UpdateFogUniforms( backendState, fog );
-		}
+	RB_UpdateCommonUniforms( backendState, pass, texMatrix );
+	RP_UpdateTexGenUniforms( backendState, reflectionMatrix, texMatrix );
 
-		// submit animation data
-		if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
-			RP_UpdateBonesUniforms( backendState->draw.bonesData.numBones, backendState->draw.bonesData.dualQuats );
-		}
-
-		RB_DoDrawMeshVerts( backendState, vertSpan, primitive );
+	if( programFeatures & GLSL_SHADER_COMMON_FOG ) {
+		RB_UpdateFogUniforms( backendState, fog );
 	}
+
+	// submit animation data
+	if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
+		RP_UpdateBonesUniforms( backendState, backendState->draw.bonesData.numBones, backendState->draw.bonesData.dualQuats );
+	}
+
+	RB_DrawMeshVerts( backendState, vertSpan, primitive );
 }
 
 static void RB_RenderMeshGLSL_Fog( BackendState *backendState, const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan, int primitive, const shaderpass_t *pass, uint64_t programFeatures ) {
@@ -1304,19 +1379,18 @@ static void RB_RenderMeshGLSL_Fog( BackendState *backendState, const FrontendToB
 	RB_SetShaderpassState( backendState, pass->flags );
 
 	// update uniforms
-	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_FOG, backendState->material.currentShader, programFeatures );
-	if( RB_BindProgram( backendState, program ) ) {
-		mat4_t texMatrix = { 0 };
-		RB_UpdateCommonUniforms( backendState, pass, texMatrix );
-		RB_UpdateFogUniforms( backendState, fog );
+	RB_SetupProgram( backendState, GLSL_PROGRAM_TYPE_FOG, backendState->material.currentShader, programFeatures );
 
-		// submit animation data
-		if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
-			RP_UpdateBonesUniforms( backendState->draw.bonesData.numBones, backendState->draw.bonesData.dualQuats );
-		}
+	mat4_t texMatrix = { 0 };
+	RB_UpdateCommonUniforms( backendState, pass, texMatrix );
+	RB_UpdateFogUniforms( backendState, fog );
 
-		RB_DoDrawMeshVerts( backendState, vertSpan, primitive );
+	// submit animation data
+	if( programFeatures & GLSL_SHADER_COMMON_BONE_TRANSFORMS ) {
+		RP_UpdateBonesUniforms( backendState, backendState->draw.bonesData.numBones, backendState->draw.bonesData.dualQuats );
 	}
+
+	RB_DrawMeshVerts( backendState, vertSpan, primitive );
 }
 
 static void RB_RenderMeshGLSL_FXAA( BackendState *backendState, const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan, int primitive, const shaderpass_t *pass, uint64_t programFeatures ) {
@@ -1329,16 +1403,15 @@ static void RB_RenderMeshGLSL_FXAA( BackendState *backendState, const FrontendTo
 		programFeatures |= GLSL_SHADER_FXAA_FXAA3;
 	}
 
-	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_FXAA, backendState->material.currentShader, programFeatures );
-	if( RB_BindProgram( backendState, program ) ) {
-		mat4_t texMatrix;
-		Matrix4_Identity( texMatrix );
+	RB_SetupProgram( backendState, GLSL_PROGRAM_TYPE_FXAA, backendState->material.currentShader, programFeatures );
 
-		RB_UpdateCommonUniforms( backendState, pass, texMatrix );
-		RP_UpdateTextureUniforms( image->width, image->height );
+	mat4_t texMatrix;
+	Matrix4_Identity( texMatrix );
 
-		RB_DoDrawMeshVerts( backendState, vertSpan, primitive );
-	}
+	RB_UpdateCommonUniforms( backendState, pass, texMatrix );
+	RP_UpdateTextureUniforms( backendState, image->width, image->height );
+
+	RB_DrawMeshVerts( backendState, vertSpan, primitive );
 }
 
 static void RB_RenderMeshGLSL_YUV( BackendState *backendState, const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan, int primitive, const shaderpass_t *pass, uint64_t programFeatures ) {
@@ -1348,15 +1421,13 @@ static void RB_RenderMeshGLSL_YUV( BackendState *backendState, const FrontendToB
 	backendState->gl.bindTexture( 1, pass->images[1] );
 	backendState->gl.bindTexture( 2, pass->images[2] );
 
-	// update uniforms
-	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_YUV, backendState->material.currentShader, programFeatures );
-	if( RB_BindProgram( backendState, program ) ) {
-		// TODO: Should we set it to identity?
-		mat4_t texMatrix = { 0 };
-		RB_UpdateCommonUniforms( backendState, pass, texMatrix );
+	RB_SetupProgram( backendState, GLSL_PROGRAM_TYPE_YUV, backendState->material.currentShader, programFeatures );
 
-		RB_DoDrawMeshVerts( backendState, vertSpan, primitive );
-	}
+	// TODO: Should we set it to identity?
+	mat4_t texMatrix = { 0 };
+	RB_UpdateCommonUniforms( backendState, pass, texMatrix );
+
+	RB_DrawMeshVerts( backendState, vertSpan, primitive );
 }
 
 static void RB_RenderMeshGLSL_ColorCorrection( BackendState *backendState, const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan, int primitive, const shaderpass_t *pass, uint64_t programFeatures ) {
@@ -1392,17 +1463,15 @@ static void RB_RenderMeshGLSL_ColorCorrection( BackendState *backendState, const
 		}
 	}
 
-	// update uniforms
-	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_COLOR_CORRECTION, backendState->material.currentShader, programFeatures );
-	if( RB_BindProgram( backendState, program ) ) {
-		mat4_t texMatrix;
-		Matrix4_Identity( texMatrix );
+	RB_SetupProgram( backendState, GLSL_PROGRAM_TYPE_COLOR_CORRECTION, backendState->material.currentShader, programFeatures );
 
-		RB_UpdateCommonUniforms( backendState, pass, texMatrix );
-		RP_UpdateColorCorrectionUniforms( v_hdrGamma.get(), backendState->global.hdrExposure );
+	mat4_t texMatrix;
+	Matrix4_Identity( texMatrix );
 
-		RB_DoDrawMeshVerts( backendState, vertSpan, primitive );
-	}
+	RB_UpdateCommonUniforms( backendState, pass, texMatrix );
+	RP_UpdateColorCorrectionUniforms( backendState, v_hdrGamma.get(), backendState->global.hdrExposure );
+
+	RB_DrawMeshVerts( backendState, vertSpan, primitive );
 }
 
 static void RB_RenderMeshGLSL_KawaseBlur( BackendState *backendState, const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, int primitive, const shaderpass_t *pass, uint64_t programFeatures ) {
@@ -1410,17 +1479,15 @@ static void RB_RenderMeshGLSL_KawaseBlur( BackendState *backendState, const Fron
 
 	backendState->gl.bindTexture( 0, pass->images[0] );
 
-	// update uniforms
-	const int program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_KAWASE_BLUR, backendState->material.currentShader, programFeatures );
-	if( RB_BindProgram( backendState, program ) ) {
-		mat4_t texMatrix = { 0 };
-		Matrix4_Identity( texMatrix );
+	RB_SetupProgram( backendState, GLSL_PROGRAM_TYPE_KAWASE_BLUR, backendState->material.currentShader, programFeatures );
 
-		RB_UpdateCommonUniforms( backendState, pass, texMatrix );
-		RP_UpdateKawaseUniforms( pass->images[0]->width, pass->images[0]->height, pass->anim_numframes );
+	mat4_t texMatrix = { 0 };
+	Matrix4_Identity( texMatrix );
 
-		RB_DoDrawMeshVerts( backendState, vertSpan, primitive );
-	}
+	RB_UpdateCommonUniforms( backendState, pass, texMatrix );
+	RP_UpdateKawaseUniforms( backendState, pass->images[0]->width, pass->images[0]->height, pass->anim_numframes );
+
+	RB_DrawMeshVerts( backendState, vertSpan, primitive );
 }
 
 static void RB_RenderMeshGLSLProgrammed( BackendState *backendState, const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, int primitive, const shaderpass_t *pass, unsigned programType ) {
@@ -1545,8 +1612,8 @@ static void RB_SetShaderpassState( BackendState *backendState, unsigned passStat
 
 static bool RB_TryExecutingSinglePassReusingBoundState( BackendState *backendState, const DrawMeshVertSpan *vertSpan, int primitive ) {
 	// reuse current GLSL state (same program bound, same uniform values)
-	if( !backendState->draw.dirtyUniformState && backendState->draw.donePassesTotal == 1 ) {
-		RB_DoDrawMeshVerts( backendState, vertSpan, primitive );
+	if( !backendState->draw.dirtyUniformState && backendState->draw.donePassesTotal == 1 && backendState->program.boundProgram >= 0 ) {
+		RB_DrawMeshVerts( backendState, vertSpan, primitive );
 		return true;
 	}
 	return false;

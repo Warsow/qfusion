@@ -18,10 +18,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
+#include "backendactiontape.h"
 #include "glstateproxy.h"
 #include "local.h"
 
-GLStateProxy::GLStateProxy( int width, int height ) {
+GLStateProxy::GLStateProxy( BackendActionTape *actionTape, int width, int height )
+	: m_actionTape( actionTape ) {
 	assert( m_scissor[0] == 0 && m_scissor[1] == 0 );
 	m_scissor[2]     = width;
 	m_scissor[3]     = height;
@@ -34,7 +36,7 @@ GLStateProxy::GLStateProxy( int width, int height ) {
 void GLStateProxy::setViewport( int x, int y, int w, int h ) {
 	Vector4Set( m_viewport, x, y, w, h );
 	assert( m_fbWidth > 0 && m_fbHeight > 0 );
-	qglViewport( x, m_fbHeight - h - y, w, h );
+	m_actionTape->viewport( x, m_fbHeight - h - y, w, h );
 }
 
 void GLStateProxy::setScissor( int x, int y, int w, int h ) {
@@ -64,7 +66,7 @@ void GLStateProxy::applyScissor() {
 		m_scissorChanged = false;
 		const int h = m_scissor[3];
 		assert( m_fbWidth > 0 && m_fbHeight > 0 );
-		qglScissor( m_scissor[0], m_fbHeight - h - m_scissor[1], m_scissor[2], h );
+		m_actionTape->scissor( m_scissor[0], m_fbHeight - h - m_scissor[1], m_scissor[2], h );
 	}
 }
 
@@ -72,12 +74,12 @@ void GLStateProxy::setCull( int cull ) {
 	if( m_faceCull != cull ) {
 		if( cull ) {
 			if( !m_faceCull ) {
-				qglEnable( GL_CULL_FACE );
+				m_actionTape->enable( GL_CULL_FACE );
 			}
-			qglCullFace( cull );
+			m_actionTape->cullFace( cull );
 			m_faceCull = cull;
 		} else {
-			qglDisable( GL_CULL_FACE );
+			m_actionTape->disable( GL_CULL_FACE );
 			m_faceCull = 0;
 		}
 	}
@@ -85,7 +87,7 @@ void GLStateProxy::setCull( int cull ) {
 
 void GLStateProxy::flipFrontFace() {
 	m_frontFace = !m_frontFace;
-	qglFrontFace( m_frontFace ? GL_CW : GL_CCW );
+	m_actionTape->frontFace( m_frontFace ? GL_CW : GL_CCW );
 }
 
 void GLStateProxy::setDepthRange( float depthMin, float depthMax ) {
@@ -97,7 +99,7 @@ void GLStateProxy::setDepthRange( float depthMin, float depthMax ) {
 	if( ( depthMin != depthMax ) && !m_depthOffset ) {
 		depthMin += 4.0f / 65535.0f;
 	}
-	qglDepthRange( depthMin, depthMax );
+	m_actionTape->depthRange( depthMin, depthMax );
 }
 
 void GLStateProxy::getDepthRange( float *depthMin, float *depthMax ) {
@@ -126,7 +128,7 @@ void GLStateProxy::setDepthOffsetEnabled( bool enabled ) {
 		if( !enabled ) {
 			depthMin += 4.0f / 65535.0f;
 		}
-		qglDepthRange( depthMin, depthMax );
+		m_actionTape->depthRange( depthMin, depthMax );
 	}
 }
 
@@ -138,20 +140,20 @@ void GLStateProxy::bindTexture( int multitextureNumber, const Texture *texture )
 	if( m_currentTextures[multitextureNumber] != texnum ) {
 		m_currentTextures[multitextureNumber] = texnum;
 		selectActiveMultitexture( multitextureNumber );
-		qglBindTexture( texture->target, texture->texnum );
+		m_actionTape->bindTexture( texture->target, texture->texnum );
 	}
 }
 
 void GLStateProxy::selectActiveMultitexture( int multitextureNumber ) {
 	if( m_currentTMU != multitextureNumber ) {
 		m_currentTMU = multitextureNumber;
-		qglActiveTexture( GL_TEXTURE0 + multitextureNumber );
+		m_actionTape->activeTexture( GL_TEXTURE0 + multitextureNumber );
 	}
 }
 
 void GLStateProxy::bindVertexBuffer( GLuint buffer ) {
 	if( m_currentVertexBuffer != buffer ) {
-		qglBindBuffer( GL_ARRAY_BUFFER, buffer );
+		m_actionTape->bindBuffer( GL_ARRAY_BUFFER, buffer );
 		m_currentVertexBuffer = buffer;
 		m_lastVAttribs = 0;
 	}
@@ -159,7 +161,7 @@ void GLStateProxy::bindVertexBuffer( GLuint buffer ) {
 
 void GLStateProxy::bindIndexBuffer( GLuint buffer ) {
 	if( m_currentIndexBuffer != buffer ) {
-		qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, buffer );
+		m_actionTape->bindBuffer( GL_ELEMENT_ARRAY_BUFFER, buffer );
 		m_currentIndexBuffer = buffer;
 	}
 }
@@ -231,55 +233,55 @@ void GLStateProxy::setState( unsigned state ) {
 			}
 
 			if( !( m_state & GLSTATE_BLEND_MASK ) ) {
-				qglEnable( GL_BLEND );
+				m_actionTape->enable( GL_BLEND );
 			}
 
-			qglBlendFuncSeparate( blendsrc, blenddst, GL_ONE, GL_ONE );
+			m_actionTape->blendFuncSeparate( blendsrc, blenddst, GL_ONE, GL_ONE );
 		} else {
-			qglDisable( GL_BLEND );
+			m_actionTape->disable( GL_BLEND );
 		}
 	}
 
 	if( diff & ( GLSTATE_NO_COLORWRITE | GLSTATE_ALPHAWRITE ) ) {
 		if( state & GLSTATE_NO_COLORWRITE ) {
-			qglColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
+			m_actionTape->colorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
 		} else {
-			qglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, ( state & GLSTATE_ALPHAWRITE ) ? GL_TRUE : GL_FALSE );
+			m_actionTape->colorMask( GL_TRUE, GL_TRUE, GL_TRUE, ( state & GLSTATE_ALPHAWRITE ) ? GL_TRUE : GL_FALSE );
 		}
 	}
 
 	if( diff & ( GLSTATE_DEPTHFUNC_EQ | GLSTATE_DEPTHFUNC_GT ) ) {
 		if( state & GLSTATE_DEPTHFUNC_EQ ) {
-			qglDepthFunc( GL_EQUAL );
+			m_actionTape->depthFunc( GL_EQUAL );
 		} else if( state & GLSTATE_DEPTHFUNC_GT ) {
-			qglDepthFunc( GL_GREATER );
+			m_actionTape->depthFunc( GL_GREATER );
 		} else {
-			qglDepthFunc( GL_LEQUAL );
+			m_actionTape->depthFunc( GL_LEQUAL );
 		}
 	}
 
 	if( diff & GLSTATE_DEPTHWRITE ) {
 		if( state & GLSTATE_DEPTHWRITE ) {
-			qglDepthMask( GL_TRUE );
+			m_actionTape->depthMask( GL_TRUE );
 		} else {
-			qglDepthMask( GL_FALSE );
+			m_actionTape->depthMask( GL_FALSE );
 		}
 	}
 
 	if( diff & GLSTATE_NO_DEPTH_TEST ) {
 		if( state & GLSTATE_NO_DEPTH_TEST ) {
-			qglDisable( GL_DEPTH_TEST );
+			m_actionTape->disable( GL_DEPTH_TEST );
 		} else {
-			qglEnable( GL_DEPTH_TEST );
+			m_actionTape->enable( GL_DEPTH_TEST );
 		}
 	}
 
 	if( diff & GLSTATE_OFFSET_FILL ) {
 		if( state & GLSTATE_OFFSET_FILL ) {
-			qglEnable( GL_POLYGON_OFFSET_FILL );
+			m_actionTape->enable( GL_POLYGON_OFFSET_FILL );
 			setDepthOffsetEnabled( true );
 		} else {
-			qglDisable( GL_POLYGON_OFFSET_FILL );
+			m_actionTape->disable( GL_POLYGON_OFFSET_FILL );
 			setDepthOffsetEnabled( false );
 		}
 	}
@@ -287,9 +289,9 @@ void GLStateProxy::setState( unsigned state ) {
 	if( diff & GLSTATE_STENCIL_TEST ) {
 		if( glConfig.stencilBits ) {
 			if( state & GLSTATE_STENCIL_TEST ) {
-				qglEnable( GL_STENCIL_TEST );
+				m_actionTape->enable( GL_STENCIL_TEST );
 			} else {
-				qglDisable( GL_STENCIL_TEST );
+				m_actionTape->disable( GL_STENCIL_TEST );
 			}
 		}
 	}
@@ -297,9 +299,9 @@ void GLStateProxy::setState( unsigned state ) {
 	if( diff & GLSTATE_ALPHATEST ) {
 		if( glConfig.ext.multisample ) {
 			if( state & GLSTATE_ALPHATEST ) {
-				qglEnable( GL_SAMPLE_ALPHA_TO_COVERAGE );
+				m_actionTape->enable( GL_SAMPLE_ALPHA_TO_COVERAGE );
 			} else {
-				qglDisable( GL_SAMPLE_ALPHA_TO_COVERAGE );
+				m_actionTape->disable( GL_SAMPLE_ALPHA_TO_COVERAGE );
 			}
 		}
 	}
@@ -313,10 +315,10 @@ void GLStateProxy::enableVertexAttrib( int index, bool enable ) {
 	if( diff ) {
 		if( enable ) {
 			m_vertexAttribEnabled |= bit;
-			qglEnableVertexAttribArray( index );
+			m_actionTape->enableVertexAttrib( index );
 		} else {
 			m_vertexAttribEnabled &= ~bit;
-			qglDisableVertexAttribArray( index );
+			m_actionTape->disableVertexAttrib( index );
 		}
 	}
 }
@@ -334,15 +336,14 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLay
 
 	// xyz position
 	enableVertexAttrib( VATTRIB_POSITION, true );
-	qglVertexAttribPointer( VATTRIB_POSITION, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_POSITION_BIT, hfa ),
-							GL_FALSE, layout->vertexSize, ( const GLvoid * )( uintptr_t )layout->baseOffset );
+	m_actionTape->vertexAttribPointer( VATTRIB_POSITION, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_POSITION_BIT, hfa ),
+							GL_FALSE, layout->vertexSize, layout->baseOffset, 0 );
 
 	// normal
 	if( vattribs & VATTRIB_NORMAL_BIT ) {
 		enableVertexAttrib( VATTRIB_NORMAL, true );
-		const auto *pointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->normalsOffset );
-		qglVertexAttribPointer( VATTRIB_NORMAL, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_NORMAL_BIT, hfa ),
-								GL_FALSE, layout->vertexSize, pointer );
+		m_actionTape->vertexAttribPointer( VATTRIB_NORMAL, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_NORMAL_BIT, hfa ),
+										   GL_FALSE, layout->vertexSize, layout->baseOffset, layout->normalsOffset );
 	} else {
 		enableVertexAttrib( VATTRIB_NORMAL, false );
 	}
@@ -350,9 +351,8 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLay
 	// s-vector
 	if( vattribs & VATTRIB_SVECTOR_BIT ) {
 		enableVertexAttrib( VATTRIB_SVECTOR, true );
-		const auto *pointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->sVectorsOffset );
-		qglVertexAttribPointer( VATTRIB_SVECTOR, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_SVECTOR_BIT, hfa ),
-								GL_FALSE, layout->vertexSize, pointer );
+		m_actionTape->vertexAttribPointer( VATTRIB_SVECTOR, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_SVECTOR_BIT, hfa ),
+										   GL_FALSE, layout->vertexSize, layout->baseOffset, layout->sVectorsOffset );
 	} else {
 		enableVertexAttrib( VATTRIB_SVECTOR, false );
 	}
@@ -360,8 +360,8 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLay
 	// color
 	if( vattribs & VATTRIB_COLOR0_BIT ) {
 		enableVertexAttrib( VATTRIB_COLOR0, true );
-		const auto *pointer = (const GLvoid * )(uintptr_t)( layout->baseOffset + layout->colorsOffset[0] );
-		qglVertexAttribPointer( VATTRIB_COLOR0, 4, GL_UNSIGNED_BYTE, GL_TRUE, layout->vertexSize, pointer );
+		m_actionTape->vertexAttribPointer( VATTRIB_COLOR0, 4, GL_UNSIGNED_BYTE, GL_TRUE, layout->vertexSize,
+										   layout->baseOffset, layout->colorsOffset[0] );
 	} else {
 		enableVertexAttrib( VATTRIB_COLOR0, false );
 	}
@@ -369,9 +369,8 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLay
 	// texture coordinates
 	if( vattribs & VATTRIB_TEXCOORDS_BIT ) {
 		enableVertexAttrib( VATTRIB_TEXCOORDS, true );
-		const auto *pointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->stOffset );
-		qglVertexAttribPointer( VATTRIB_TEXCOORDS, 2, FLOAT_VATTRIB_GL_TYPE( VATTRIB_TEXCOORDS_BIT, hfa ),
-								GL_FALSE, layout->vertexSize, pointer );
+		m_actionTape->vertexAttribPointer( VATTRIB_TEXCOORDS, 2, FLOAT_VATTRIB_GL_TYPE( VATTRIB_TEXCOORDS_BIT, hfa ),
+										   GL_FALSE, layout->vertexSize, layout->baseOffset, layout->stOffset );
 	} else {
 		enableVertexAttrib( VATTRIB_TEXCOORDS, false );
 	}
@@ -379,9 +378,8 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLay
 	if( ( vattribs & VATTRIB_AUTOSPRITE_BIT ) == VATTRIB_AUTOSPRITE_BIT ) {
 		// submit sprite point
 		enableVertexAttrib( VATTRIB_SPRITEPOINT, true );
-		const auto *pointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->spritePointsOffset );
-		qglVertexAttribPointer( VATTRIB_SPRITEPOINT, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_AUTOSPRITE_BIT, hfa ),
-								GL_FALSE, layout->vertexSize, pointer );
+		m_actionTape->vertexAttribPointer( VATTRIB_SPRITEPOINT, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_AUTOSPRITE_BIT, hfa ),
+										   GL_FALSE, layout->vertexSize, layout->baseOffset, layout->spritePointsOffset );
 	} else {
 		enableVertexAttrib( VATTRIB_SPRITEPOINT, false );
 	}
@@ -390,13 +388,13 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLay
 	if( ( vattribs & VATTRIB_BONES_BITS ) == VATTRIB_BONES_BITS ) {
 		// submit indices
 		enableVertexAttrib( VATTRIB_BONESINDICES, true );
-		const auto *indicesPointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->bonesIndicesOffset );
-		qglVertexAttribPointer( VATTRIB_BONESINDICES, 4, GL_UNSIGNED_BYTE, GL_FALSE, layout->vertexSize, indicesPointer );
+		m_actionTape->vertexAttribPointer( VATTRIB_BONESINDICES, 4, GL_UNSIGNED_BYTE, GL_FALSE, layout->vertexSize,
+										   layout->baseOffset, layout->bonesIndicesOffset );
 
 		// submit weights
 		enableVertexAttrib( VATTRIB_BONESWEIGHTS, true );
-		const auto *weightsPointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->bonesWeightsOffset );
-		qglVertexAttribPointer( VATTRIB_BONESWEIGHTS, 4, GL_UNSIGNED_BYTE, GL_TRUE, layout->vertexSize, weightsPointer );
+		m_actionTape->vertexAttribPointer( VATTRIB_BONESWEIGHTS, 4, GL_UNSIGNED_BYTE, GL_TRUE, layout->vertexSize,
+										   layout->baseOffset, layout->bonesWeightsOffset );
 	} else {
 		// lightmap texture coordinates - aliasing bones, so not disabling bones
 		int lmattr = VATTRIB_LMCOORDS01;
@@ -405,10 +403,9 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLay
 		for( int i = 0; i < ( MAX_LIGHTMAPS + 1 ) / 2; i++ ) {
 			if( vattribs & lmattrbit ) {
 				enableVertexAttrib( lmattr, true );
-				const auto *pointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->lmstOffset[i] );
-				qglVertexAttribPointer( lmattr, layout->lmstSize[i],
-										FLOAT_VATTRIB_GL_TYPE( VATTRIB_LMCOORDS0_BIT, hfa ),
-										GL_FALSE, layout->vertexSize, pointer );
+				m_actionTape->vertexAttribPointer( lmattr, layout->lmstSize[i],
+												   FLOAT_VATTRIB_GL_TYPE( VATTRIB_LMCOORDS0_BIT, hfa ),
+												   GL_FALSE, layout->vertexSize, layout->baseOffset, layout->lmstOffset[i] );
 			} else {
 				enableVertexAttrib( lmattr, false );
 			}
@@ -423,8 +420,8 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLay
 		for( int i = 0; i < ( MAX_LIGHTMAPS + 3 ) / 4; i++ ) {
 			if( vattribs & ( VATTRIB_LMLAYERS0123_BIT << i ) ) {
 				enableVertexAttrib( lmattr, true );
-				const auto *pointer = ( const GLvoid * )(uintptr_t)( layout->baseOffset + layout->lmlayersOffset[i] );
-				qglVertexAttribPointer( lmattr, 4, GL_UNSIGNED_BYTE, GL_FALSE, layout->vertexSize, pointer );
+				m_actionTape->vertexAttribPointer( lmattr, 4, GL_UNSIGNED_BYTE, GL_FALSE, layout->vertexSize,
+												   layout->baseOffset, layout->lmlayersOffset[i] );
 			} else {
 				enableVertexAttrib( lmattr, false );
 			}
@@ -435,85 +432,38 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLay
 
 	if( ( vattribs & VATTRIB_INSTANCES_BITS ) == VATTRIB_INSTANCES_BITS ) {
 		enableVertexAttrib( VATTRIB_INSTANCE_QUAT, true );
-		qglVertexAttribPointer( VATTRIB_INSTANCE_QUAT, 4, GL_FLOAT, GL_FALSE, 8 * sizeof( vec_t ),
-								( const GLvoid * )(uintptr_t)layout->instancesOffset );
-		qglVertexAttribDivisor( VATTRIB_INSTANCE_QUAT, 1 );
+		m_actionTape->vertexAttribPointer( VATTRIB_INSTANCE_QUAT, 4, GL_FLOAT, GL_FALSE, 8 * sizeof( vec_t ),
+										   layout->instancesOffset, 0 );
+		m_actionTape->vertexAttribDivisor( VATTRIB_INSTANCE_QUAT, 1 );
 
 		enableVertexAttrib( VATTRIB_INSTANCE_XYZS, true );
-		qglVertexAttribPointer( VATTRIB_INSTANCE_XYZS, 4, GL_FLOAT, GL_FALSE, 8 * sizeof( vec_t ),
-								( const GLvoid * )(uintptr_t)( layout->instancesOffset + sizeof( vec_t ) * 4 ) );
-		qglVertexAttribDivisor( VATTRIB_INSTANCE_XYZS, 1 );
+		m_actionTape->vertexAttribPointer( VATTRIB_INSTANCE_XYZS, 4, GL_FLOAT, GL_FALSE, 8 * sizeof( vec_t ),
+										   layout->instancesOffset, sizeof( vec_t ) * 4 );
+		m_actionTape->vertexAttribDivisor( VATTRIB_INSTANCE_XYZS, 1 );
 	} else {
 		enableVertexAttrib( VATTRIB_INSTANCE_QUAT, false );
 		enableVertexAttrib( VATTRIB_INSTANCE_XYZS, false );
 	}
 }
 
-void GLStateProxy::bindFramebufferObject( GLStateProxy *holder, RenderTargetComponents *components ) {
+void GLStateProxy::drawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const void *indices ) {
+	m_actionTape->drawRangeElements( mode, start, end, count, type, indices );
+}
+
+void GLStateProxy::multiDrawElements( GLenum mode, const GLsizei *count, GLenum type, const void *const *indices, GLsizei drawcount ) {
+	m_actionTape->multiDrawElements( mode, count, type, indices, drawcount );
+}
+
+void GLStateProxy::bindRenderTarget( RenderTargetComponents *components ) {
 	const int width  = components ? components->texture->width : glConfig.width;
 	const int height = components ? components->texture->height : glConfig.height;
 
-	if( holder ) {
-		if( holder->m_fbWidth != width || holder->m_fbHeight != height ) {
-			holder->m_scissorChanged = true;
-		}
-		holder->m_fbWidth = width;
-		holder->m_fbHeight = height;
+	if( m_fbWidth != width || m_fbHeight != height ) {
+		m_fbWidth        = width;
+		m_fbHeight       = height;
+		m_scissorChanged = true;
 	}
 
-	// TODO: Track the currently bound FBO
-	if( components ) {
-		RenderTarget            *const renderTarget           = components->renderTarget;
-		RenderTargetTexture     *const oldAttachedTexture     = components->renderTarget->attachedTexture;
-		RenderTargetDepthBuffer *const oldAttachedDepthBuffer = components->renderTarget->attachedDepthBuffer;
-		RenderTargetTexture     *const newTexture             = components->texture;
-		RenderTargetDepthBuffer *const newDepthBuffer         = components->depthBuffer;
-
-		bool hasChanges = false;
-		qglBindFramebuffer( GL_FRAMEBUFFER, renderTarget->fboId );
-		if( oldAttachedTexture != newTexture ) {
-			if( oldAttachedTexture ) {
-				oldAttachedTexture->attachedToRenderTarget = nullptr;
-			}
-			if( RenderTarget *oldTarget = newTexture->attachedToRenderTarget ) {
-				assert( oldTarget != renderTarget );
-				// TODO: Do we have to bind it and call detach?
-				oldTarget->attachedTexture = nullptr;
-			}
-			renderTarget->attachedTexture      = newTexture;
-			newTexture->attachedToRenderTarget = renderTarget;
-			qglFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, newTexture->texnum, 0 );
-			hasChanges = true;
-		}
-		if( oldAttachedDepthBuffer != newDepthBuffer ) {
-			if( oldAttachedDepthBuffer ) {
-				oldAttachedDepthBuffer->attachedToRenderTarget = nullptr;
-			}
-			if( RenderTarget *oldTarget = newDepthBuffer->attachedToRenderTarget ) {
-				assert( oldTarget != renderTarget );
-				// TODO: Do we have to bind it and call detach?
-				oldTarget->attachedDepthBuffer = nullptr;
-			}
-			renderTarget->attachedDepthBuffer      = newDepthBuffer;
-			newDepthBuffer->attachedToRenderTarget = renderTarget;
-			qglFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, newDepthBuffer->rboId );
-			hasChanges = true;
-		}
-		if( hasChanges ) {
-			// TODO: What to do in this case
-			if( qglCheckFramebufferStatus( GL_FRAMEBUFFER ) != GL_FRAMEBUFFER_COMPLETE ) {
-				// Just make sure that the status of attachments remains correct
-				assert( renderTarget->attachedTexture == newTexture );
-				assert( renderTarget->attachedDepthBuffer == newDepthBuffer );
-				qglFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0 );
-				qglFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0 );
-				renderTarget->attachedTexture          = nullptr;
-				renderTarget->attachedDepthBuffer      = nullptr;
-				newTexture->attachedToRenderTarget     = nullptr;
-				newDepthBuffer->attachedToRenderTarget = nullptr;
-			}
-		}
-	} else {
-		qglBindFramebuffer( GL_FRAMEBUFFER, 0 );
-	}
+	// TODO: Track the currently bound render target?
+	m_actionTape->bindRenderTarget( components );
 }
