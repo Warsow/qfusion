@@ -28,11 +28,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 struct mesh_vbo_s;
 struct VboSpanLayout;
 class RenderTargetComponents;
+class BackendActionTape;
 class Texture;
 
 class GLStateProxy {
 public:
-	GLStateProxy( int width, int height );
+	GLStateProxy( BackendActionTape *actionTape, int width, int height );
 
 	[[nodiscard]]
 	auto getState() const -> unsigned { return m_state; }
@@ -66,8 +67,10 @@ public:
 
 	void enableVertexAttribs( vattribmask_t attribs, const VboSpanLayout *layout );
 
-	// TODO: There are problems with initialization order
-	static void bindFramebufferObject( GLStateProxy *holder, RenderTargetComponents *components );
+	void drawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const void *indices );
+	void multiDrawElements( GLenum mode, const GLsizei *count, GLenum type, const void *const *indices, GLsizei drawcount );
+
+	void bindRenderTarget( RenderTargetComponents *components );
 
 private:
 	void selectActiveMultitexture( int multitextureNumber );
@@ -103,6 +106,8 @@ private:
 
 	int m_currentTMU { 0 };
 	unsigned m_currentTextures[MAX_TEXTURE_UNITS];
+
+	BackendActionTape *const m_actionTape;
 };
 
 #endif

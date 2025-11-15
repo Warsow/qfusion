@@ -659,7 +659,7 @@ auto RendererFrontend::getStreamForUploadGroup( unsigned uploadGroup ) -> Auxili
 void RendererFrontend::beginAddingAuxiliaryDynamicMeshes( unsigned uploadGroup ) {
 	assert( getStreamForUploadGroup( uploadGroup )->numVertsSoFar == 0 );
 	assert( getStreamForUploadGroup( uploadGroup )->numElemsSoFar == 0 );
-	R_BeginUploads( uploadGroup );
+	R_BeginMeshUploads( uploadGroup );
 }
 
 void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, BackendState *backendState,
@@ -753,7 +753,8 @@ void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup, Backen
 		const unsigned vertexDataSize = vertexSize * stream->numVertsSoFar;
 		const unsigned indexDataSize  = sizeof( elem_t ) * stream->numElemsSoFar;
 		assert( vertexDataSize > 0 && indexDataSize > 0 );
-		R_EndUploads( uploadGroup, vertexDataSize, indexDataSize );
+		// TODO: Ensure that it always gets called for correctness reasons (should not guarded by the enclosing if)
+		R_EndMeshUploads( uploadGroup, vertexDataSize, indexDataSize );
 
 		int sx, sy, sw, sh;
 		RB_GetScissor( backendState, &sx, &sy, &sw, &sh );

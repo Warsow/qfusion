@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "frontend.h"
 #include "materiallocal.h"
 #include "backendlocal.h"
+#include "backendactiontape.h"
 #include <common/helpers/singletonholder.h>
 #include <common/helpers/links.h>
 #include <common/facilities/profilerscope.h>
@@ -136,7 +137,12 @@ void RendererFrontend::bindRenderTargetAndViewport( BackendState *backendState, 
 	rf.frameBufferWidth  = width;
 	rf.frameBufferHeight = height;
 
-	RB_BindFrameBufferObject( backendState, components );
+	if( backendState ) {
+		backendState->gl.bindRenderTarget( components );
+	} else {
+		assert( components == nullptr );
+		RB_BindRenderTarget( nullptr );
+	}
 
 	if( stateForCamera ) {
 		RB_Viewport( backendState, stateForCamera->viewport[0], stateForCamera->viewport[1], stateForCamera->viewport[2], stateForCamera->viewport[3] );
@@ -238,7 +244,9 @@ auto RendererFrontend::createDraw2DRequest() -> Draw2DRequest * {
 void RendererFrontend::commitDraw2DRequest( Draw2DRequest *request ) {
 	m_mainThreadChecker.checkCallingThread();
 
-	BackendState backendState( glConfig.width, glConfig.height );
+	BackendActionTape actionTape;
+
+	BackendState backendState( &actionTape, glConfig.width, glConfig.height );
 	RB_BeginUsingBackendState( &backendState );
 
 	enter2DMode( &backendState, glConfig.width, glConfig.height );
@@ -257,6 +265,9 @@ void RendererFrontend::commitDraw2DRequest( Draw2DRequest *request ) {
 	// TODO .... Flush dynamic meshes explicitly
 	leave2DMode( &backendState );
 	RB_EndUsingBackendState( &backendState );
+
+	RuntimeBackendState rbs {};
+	actionTape.exec( &rbs );
 }
 
 void RendererFrontend::recycleDraw2DRequest( Draw2DRequest *request ) {
@@ -794,9 +805,9 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 		self->m_spriteSurfOffsetOfVertices = 0;
 		self->m_spriteSurfCounterOfIndices = 0;
 
-		R_BeginUploads( UPLOAD_GROUP_DYNAMIC_MESH );
-		R_BeginUploads( UPLOAD_GROUP_BATCHED_MESH );
-		R_BeginUploads( UPLOAD_GROUP_BATCHED_MESH_EXT );
+		R_BeginMeshUploads( UPLOAD_GROUP_DYNAMIC_MESH );
+		R_BeginMeshUploads( UPLOAD_GROUP_BATCHED_MESH );
+		R_BeginMeshUploads( UPLOAD_GROUP_BATCHED_MESH_EXT );
 
 		workloadStorage = &self->m_dynamicStuffWorkloadStorage[0];
 	}
@@ -935,16 +946,16 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 		const VboSpanLayout *dynamicMeshLayout = RB_VBOSpanLayoutForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
 		const unsigned dynamicMeshVertexDataSize = dynamicMeshLayout->vertexSize * self->m_dynamicMeshCountersOfVerticesAndIndices.first;
 		const unsigned dynamicMeshIndexDataSize = sizeof( elem_t ) * self->m_dynamicMeshCountersOfVerticesAndIndices.second;
-		R_EndUploads( UPLOAD_GROUP_DYNAMIC_MESH, dynamicMeshVertexDataSize, dynamicMeshIndexDataSize );
+		R_EndMeshUploads( UPLOAD_GROUP_DYNAMIC_MESH, dynamicMeshVertexDataSize, dynamicMeshIndexDataSize );
 
 		const VboSpanLayout *batchedMeshLayout = RB_VBOSpanLayoutForFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
 		const unsigned batchedMeshVertexDataSize = batchedMeshLayout->vertexSize * self->m_batchedSurfCountersOfVerticesAndIndices.first;
 		const unsigned batchedMeshIndexDataSize = sizeof( elem_t ) * self->m_batchedSurfCountersOfVerticesAndIndices.second;
-		R_EndUploads( UPLOAD_GROUP_BATCHED_MESH, batchedMeshVertexDataSize, batchedMeshIndexDataSize );
+		R_EndMeshUploads( UPLOAD_GROUP_BATCHED_MESH, batchedMeshVertexDataSize, batchedMeshIndexDataSize );
 
 		const unsigned spriteVertexDataSize = self->m_spriteSurfOffsetOfVertices;
 		const unsigned spriteIndexDataSize  = sizeof( elem_t ) * self->m_spriteSurfCounterOfIndices;
-		R_EndUploads( UPLOAD_GROUP_BATCHED_MESH_EXT, spriteVertexDataSize, spriteIndexDataSize );
+		R_EndMeshUploads( UPLOAD_GROUP_BATCHED_MESH_EXT, spriteVertexDataSize, spriteIndexDataSize );
 	}
 }
 
@@ -974,7 +985,9 @@ void RendererFrontend::performPreparedRenderingFromThisCamera( Scene *scene, Sta
 		}
 	}
 
-	BackendState backendState( glConfig.width, glConfig.height );
+	BackendActionTape actionTape;
+
+	BackendState backendState( &actionTape, glConfig.width, glConfig.height );
 	RB_BeginUsingBackendState( &backendState );
 
 	RB_SetTime( &backendState, stateForCamera->refdef.time );
@@ -1059,6 +1072,9 @@ void RendererFrontend::performPreparedRenderingFromThisCamera( Scene *scene, Sta
 	RB_SetShaderStateMask( &backendState, ~0, 0 );
 
 	RB_EndUsingBackendState( &backendState );
+
+	RuntimeBackendState rbs {};
+	actionTape.exec( &rbs );
 }
 
 

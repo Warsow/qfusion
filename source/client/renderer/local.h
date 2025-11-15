@@ -769,10 +769,9 @@ void RB_Viewport( BackendState *backendState, int x, int y, int w, int h );
 void RB_Clear( BackendState *backendState, int bits, float r, float g, float b, float a );
 void RB_SetZClip( BackendState *backendState, float zNear, float zFar );
 
-void RB_BindFrameBufferObject( BackendState *backendState, RenderTargetComponents *renderTargetComponents );
-
 [[maybe_unused]]
 struct mesh_vbo_s *RB_BindVBO( BackendState *backendState, int id );
+void RB_BindRenderTarget( RenderTargetComponents *components );
 
 enum : unsigned {
 	UPLOAD_GROUP_DYNAMIC_MESH     = 0,
@@ -793,12 +792,15 @@ unsigned RB_VboCapacityInVertexBytesForFrameUploads( unsigned group );
 unsigned RB_VboCapacityInVerticesForFrameUploads( unsigned group );
 unsigned RB_VboCapacityInIndexElemsForFrameUploads( unsigned group );
 
-void R_BeginUploads( unsigned group );
+void R_BeginMeshUploads( unsigned group );
 void R_SetUploadedSubdataFromMeshUsingOffsets( unsigned group, unsigned baseVertex, unsigned verticesOffsetInBytes,
 											   unsigned indicesOffsetInBytes, const mesh_t *mesh );
 void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVertex, const VboSpanLayout *layout,
 											  unsigned indexOfFirstIndex, const mesh_t *mesh );
-void R_EndUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes );
+void R_EndMeshUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes );
+
+void R_BeginUniformUploads( unsigned binding );
+void R_EndUniformUploads( unsigned binding, unsigned uniformDataSizeInBytes );
 
 struct VertElemSpan {
 	unsigned firstVert;
