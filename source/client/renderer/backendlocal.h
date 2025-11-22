@@ -37,16 +37,153 @@ typedef struct {
 } rbBonesData_t;
 
 class GLStateProxy;
-struct BackendState;
+class SimulatedBackendState;
 
-void *RB_GetTmpUniformBlock( BackendState *backendState, unsigned binding, size_t requestedBlockSize );
-void RB_CommitUniformBlock( BackendState *backendState, unsigned binding, void *blockData, size_t blockSize );
+void *RB_GetTmpUniformBlock( SimulatedBackendState *backendState, unsigned binding, size_t requestedBlockSize );
+void RB_CommitUniformBlock( SimulatedBackendState *backendState, unsigned binding, void *blockData, size_t blockSize );
 
 struct RuntimeBackendState {
 	GLuint programId { 0 };
 };
 
-struct BackendState {
+class SimulatedBackendState {
+public:
+	SimulatedBackendState( BackendActionTape *actionTape, int width, int height );
+
+	void loadCameraMatrix( const mat4_t m );
+	void getObjectMatrix( float *m );
+	void loadObjectMatrix( const mat4_t m );
+	void loadProjectionMatrix( const mat4_t m );
+
+	void transformForWorld();
+	void translateForEntity( const entity_t *e );
+	void transformForEntity( const entity_t *e );
+
+	void setTime( int64_t requestTime, int64_t globalTime );
+
+	void setDepthRange( float depthmin, float depthmax );
+	void getDepthRange( float *depthmin, float *depthmax );
+	void saveDepthRange();
+	void restoreDepthRange();
+
+	void flipFrontFace();
+	void setScissor( int x, int y, int w, int h );
+	void getScissor( int *x, int *y, int *w, int *h );
+	void setViewport( int x, int y, int w, int h );
+	void clear( int bits, float r, float g, float b, float a );
+	void setZClip( float zNear, float zFar );
+
+	void bindShader( const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable,
+					 const shader_s *shader, const mfog_s *fog, const struct portalSurface_s *portalSurface );
+	void setLightstyle( const struct superLightStyle_s *lightStyle );
+	void setDlightBits( unsigned dlightBits );
+	void setBonesData( int numBones, dualquat_t *dualQuats, int maxWeights );
+	void setRenderFlags( int flags );
+	void setLightParams( float minLight, bool noWorldLight, float hdrExposure = 1.0f );
+	void setShaderStateMask( unsigned ANDmask, unsigned ORmask );
+	void setCamera( const vec3_t cameraOrigin, const mat3_t cameraAxis );
+	bool enableWireframe( bool enable );
+
+	void bindVbo( const mesh_vbo_s *vbo );
+	void bindRenderTarget( RenderTargetComponents *components );
+
+	[[nodiscard]]
+	auto getCurrUniformDataSize( unsigned binding ) const -> unsigned;
+	void registerUniformBlockUpdate( unsigned binding, GLuint bufferId, unsigned blockSize );
+
+	void drawMesh( const FrontendToBackendShared *fsh, int vboId, const VboSpanLayout *vboSpanLayout, const DrawMeshVertSpan *vertSpan, int primitive );
+private:
+	[[nodiscard]]
+	bool shouldApplyDrawflatInCurrentState() const;
+
+	[[nodiscard]]
+	auto transformFogPlanes( const mfog_t *fog, vec3_t fogNormal, float *fogDist, vec3_t vpnNormal, float *vpnDist ) const -> float;
+
+	void buildTCModMatrix( const shaderpass_t *pass, mat4_t result ) const;
+	void buildTCCelshadeMatrix( mat4_t matrix ) const;
+
+	void updateCommonUniforms( const shaderpass_t *pass, mat4_t texMatrix );
+	void updateFogUniforms( const mfog_t *fog );
+
+	[[nodiscard]]
+	auto getProgramFeaturesForRgbaGen( const colorgen_t *rgbgen, const colorgen_t *alphagen ) const -> uint64_t;
+	[[nodiscard]]
+	auto getProgramFeaturesForBoneTransforms() const -> uint64_t;
+	[[nodiscard]]
+	auto getProgramFeaturesForDlightBits( unsigned dlightBits ) const -> uint64_t;
+	[[nodiscard]]
+	auto getProgramFeaturesForAutosprite() const -> uint64_t;
+	[[nodiscard]]
+	auto getProgramFeaturesForInstancedArrays() const -> uint64_t;
+	[[nodiscard]]
+	auto getProgramFeaturesForFog( const shaderpass_t *pass, const mfog_t *fog ) const -> uint64_t;
+	[[nodiscard]]
+	auto getProgramFeaturesForAlphaTest( const shaderpass_t *pass ) const -> uint64_t;
+	[[nodiscard]]
+	auto getProgramFeaturesForTCMod( const shaderpass_t *pass ) const -> uint64_t;
+	[[nodiscard]]
+	auto getProgramFeaturesForTCGen( int tcgen, float *tcgenVec, mat4_t texMatrix, mat4_t genVectors ) const -> uint64_t;
+	[[nodiscard]]
+	auto getProgramFeaturesForSrgb( const shaderpass_t *pass ) const -> uint64_t;
+
+	[[nodiscard]]
+	auto getPassColor( const shaderpass_t *pass, byte_vec4_t rgba_ ) const -> float;
+	[[nodiscard]]
+	auto getPassRgb( const shaderpass_t *pass, int *rgb ) const -> float;
+	[[nodiscard]]
+	auto getPassAlpha( const shaderpass_t *pass ) const -> int;
+
+	[[nodiscard]]
+	auto getPassTexture( const shaderpass_t *pass ) -> Texture *;
+
+	[[nodiscard]]
+	auto bindCelshadeTexture( int tmu, const Texture *texture, uint64_t feature, bool canAdd, const Texture *replacement ) -> uint64_t;
+
+	void bindExistingProgram( int program );
+	void setupProgram( int type, uint64_t features );
+
+	void setPassStateFlags( unsigned passStateFlags );
+	void updateCurrentShaderState();
+	void updateRequiredVertexAttribs();
+
+	[[nodiscard]]
+	// -> &'static
+	auto getCurrWireframeColor() const -> const float *;
+
+	void renderMeshUsingQ3AProgram( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan,
+									int primitive, const shaderpass_t *pass, uint64_t programFeatures );
+	void renderMeshUsingMaterialProgram( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan,
+										 int primitive, const shaderpass_t *pass, uint64_t programFeatures );
+	void renderMeshUsingOutlineProgram( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan,
+										int primitive, const shaderpass_t *pass, uint64_t programFeatures );
+	void renderMeshUsingCelshadeProgram( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan,
+										 int primitive, const shaderpass_t *pass, uint64_t programFeatures );
+	void renderMeshUsingDistortionProgram( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan,
+										   int primitive, const shaderpass_t *pass, uint64_t programFeatures );
+	void renderMeshUsingFogProgram( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan,
+									int primitive, const shaderpass_t *pass, uint64_t programFeatures );
+	void renderMeshUsingYuvProgram( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan,
+									int primitive, const shaderpass_t *pass, uint64_t programFeatures );
+	void renderMeshUsingFxaaProgram( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan,
+									 int primitive, const shaderpass_t *pass, uint64_t programFeatures );
+	void renderMeshUsingColorCorrectionProgram( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan,
+												int primitive, const shaderpass_t *pass, uint64_t programFeatures );
+	void renderMeshUsingKawaseProgram( const FrontendToBackendShared *, const DrawMeshVertSpan *vertSpan,
+									   int primitive, const shaderpass_t *pass, uint64_t programFeatures );
+
+	void renderMeshUsingAppropriateProgram( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan,
+											int primitive, const shaderpass_t *pass, unsigned programType );
+
+	void renderPass( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, int primitive, const shaderpass_t *pass );
+
+	void drawMeshVerts( const DrawMeshVertSpan *vertSpan, int primitive );
+
+	void drawWireframeMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, int primitive );
+	void drawShadedMesh( const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, int primitive );
+
+	[[nodiscard]]
+	bool tryExecutingSinglePassReusingBoundState( const DrawMeshVertSpan *vertSpan, int primitive );
+
 	struct {
 		entity_t nullEnt;
 		int64_t time;
@@ -72,7 +209,7 @@ struct BackendState {
 
 		unsigned shaderStateORmask;
 		unsigned shaderStateANDmask;
-	} global;
+	} m_globalState;
 
 	// Gets modified only by RB_BindShader() call
 	struct {
@@ -95,7 +232,7 @@ struct BackendState {
 		bool noColorWrite;
 		bool depthEqual;
 		float hackedAlpha;
-	} material;
+	} m_materialState;
 
 	// Gets modified by RB_BindShader() and some consequent calls, including drawing passes
 	struct {
@@ -108,7 +245,7 @@ struct BackendState {
 		bool dirtyUniformState;
 		bool doneDepthPass;
 		int donePassesTotal;
-	} draw;
+	} m_drawState;
 
 	struct {
 		int boundProgram;
@@ -116,18 +253,16 @@ struct BackendState {
 		int cachedFastLookupProgram;
 		int cachedFastLookupProgramType;
 		uint64_t cachedFastLookupProgramFeatures;
-	} program;
+	} m_programState;
 
 	struct {
 		struct {
 			unsigned sizeSoFar { 0 };
 		} blockState[MAX_UNIFORM_BINDINGS];
-	} uniform;
+	} m_uniformState;
 
-	GLStateProxy gl;
-	BackendActionTape *const actionTape;
-
-	BackendState( BackendActionTape *actionTape, int width, int height );
+	GLStateProxy m_glState;
+	BackendActionTape *const m_actionTape;
 };
 
 typedef struct r_backend_s {
@@ -150,10 +285,5 @@ typedef struct r_backend_s {
 } rbackend_t;
 
 extern rbackend_t rb;
-
-#define DRAWFLAT( state ) \
-	( ( ( state )->material.currentModelType == mod_brush ) && \
-	( ( state )->global.renderFlags & ( RF_DRAWFLAT | RF_DRAWBRIGHT ) ) && \
-	!( ( state )->material.currentShader->flags & SHADER_NODRAWFLAT ) )
 
 #endif // R_BACKEND_LOCAL_H

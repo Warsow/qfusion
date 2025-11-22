@@ -40,6 +40,9 @@ public:
 
 	void setState( unsigned state );
 
+	[[nodiscard]]
+	bool isAlphaBlendingEnabled() const;
+
 	void setCull( int cull );
 	[[nodiscard]]
 	auto getCull() const -> int { return m_faceCull; }

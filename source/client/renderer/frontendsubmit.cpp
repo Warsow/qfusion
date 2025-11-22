@@ -23,70 +23,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "frontend.h"
 #include "program.h"
 #include "materiallocal.h"
+#include "backendlocal.h"
 
 #include <algorithm>
 
-void R_TransformForWorld( BackendState *backendState ) {
-	RB_LoadObjectMatrix( backendState, mat4x4_identity );
-}
-
-void R_TranslateForEntity( BackendState *backendState, const entity_t *e ) {
-	mat4_t objectMatrix;
-
-	Matrix4_Identity( objectMatrix );
-
-	objectMatrix[0] = e->scale;
-	objectMatrix[5] = e->scale;
-	objectMatrix[10] = e->scale;
-	objectMatrix[12] = e->origin[0];
-	objectMatrix[13] = e->origin[1];
-	objectMatrix[14] = e->origin[2];
-
-	RB_LoadObjectMatrix( backendState, objectMatrix );
-}
-
-void R_TransformForEntity( BackendState *backendState, const entity_t *e ) {
-	assert( e->rtype == RT_MODEL && e->number != kWorldEntNumber );
-
-	mat4_t objectMatrix;
-
-	if( e->scale != 1.0f ) {
-		objectMatrix[0] = e->axis[0] * e->scale;
-		objectMatrix[1] = e->axis[1] * e->scale;
-		objectMatrix[2] = e->axis[2] * e->scale;
-		objectMatrix[4] = e->axis[3] * e->scale;
-		objectMatrix[5] = e->axis[4] * e->scale;
-		objectMatrix[6] = e->axis[5] * e->scale;
-		objectMatrix[8] = e->axis[6] * e->scale;
-		objectMatrix[9] = e->axis[7] * e->scale;
-		objectMatrix[10] = e->axis[8] * e->scale;
-	} else {
-		objectMatrix[0] = e->axis[0];
-		objectMatrix[1] = e->axis[1];
-		objectMatrix[2] = e->axis[2];
-		objectMatrix[4] = e->axis[3];
-		objectMatrix[5] = e->axis[4];
-		objectMatrix[6] = e->axis[5];
-		objectMatrix[8] = e->axis[6];
-		objectMatrix[9] = e->axis[7];
-		objectMatrix[10] = e->axis[8];
-	}
-
-	objectMatrix[3] = 0;
-	objectMatrix[7] = 0;
-	objectMatrix[11] = 0;
-	objectMatrix[12] = e->origin[0];
-	objectMatrix[13] = e->origin[1];
-	objectMatrix[14] = e->origin[2];
-	objectMatrix[15] = 1.0;
-
-	RB_LoadObjectMatrix( backendState, objectMatrix );
-}
-
 namespace wsw {
 
-using drawSurf_cb = void (*)( BackendState *, const FrontendToBackendShared *, const entity_t *, const struct shader_s *,
-							  const struct mfog_s *, const struct portalSurface_s *, const void * );
+using drawSurf_cb = void (*)( SimulatedBackendState *, const FrontendToBackendShared *, const entity_t *,
+							  const struct shader_s *, const struct mfog_s *, const struct portalSurface_s *, const void * );
 
 static const drawSurf_cb r_drawSurfCb[ST_MAX_TYPES] = {
 	/* ST_NONE */
@@ -280,8 +224,8 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 																			 prevShader, prevSurfType,
 																			 { batchSpanBegin, batchSpanEnd } );
 
-				drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared *fsh ) {
-					submitFn( backendState, fsh, prevEntity, prevOverrideParams, paramsTable, prevShader, prevFog, prevPortalSurface, offset );
+				drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared *fsh ) {
+					submitFn( sbs, fsh, prevEntity, prevOverrideParams, paramsTable, prevShader, prevFog, prevPortalSurface, offset );
 				});
 			}
 
@@ -295,18 +239,18 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			if( entity->flags & RF_WEAPONMODEL ) {
 				if( !depthHack ) {
 					depthHack = true;
-					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared *fsh ) {
+					drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared *fsh ) {
 						float depthmin = 0.0f, depthmax = 0.0f;
-						RB_GetDepthRange( backendState, &depthmin, &depthmax );
-						RB_SaveDepthRange( backendState );
-						RB_DepthRange( backendState, depthmin, depthmin + 0.3f * ( depthmax - depthmin ) );
+						sbs->getDepthRange( &depthmin, &depthmax );
+						sbs->saveDepthRange();
+						sbs->setDepthRange( depthmin, depthmin + 0.3f * ( depthmax - depthmin ) );
 					});
 				}
 			} else {
 				if( depthHack ) {
 					depthHack = false;
-					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
-						RB_RestoreDepthRange( backendState );
+					drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared * ) {
+						sbs->restoreDepthRange();
 					});
 				}
 			}
@@ -316,8 +260,8 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 				bool oldCullHack = cullHack;
 				cullHack = ( ( entity->flags & RF_CULLHACK ) ? true : false );
 				if( cullHack != oldCullHack ) {
-					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
-						RB_FlipFrontFace( backendState );
+					drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared * ) {
+						sbs->flipFrontFace();
 					});
 				}
 			}
@@ -327,15 +271,15 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			const bool infiniteProj = entity->renderfx & RF_NODEPTHTEST ? true : false;
 			if( infiniteProj != prevInfiniteProj ) {
 				if( infiniteProj ) {
-					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
+					drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared * ) {
 						mat4_t projectionMatrix;
 						Matrix4_Copy( stateForCamera->projectionMatrix, projectionMatrix );
 						Matrix4_PerspectiveProjectionToInfinity( Z_NEAR, projectionMatrix, glConfig.depthEpsilon );
-						RB_LoadProjectionMatrix( backendState, projectionMatrix );
+						sbs->loadProjectionMatrix( projectionMatrix );
 					});
 				} else {
-					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
-						RB_LoadProjectionMatrix( backendState, stateForCamera->projectionMatrix );
+					drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared * ) {
+						sbs->loadProjectionMatrix( stateForCamera->projectionMatrix );
 					});
 				}
 			}
@@ -343,33 +287,33 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			if( isDrawSurfBatched ) {
 				// don't transform batched surfaces
 				if( !prevIsDrawSurfBatched ) {
-					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
-						RB_LoadObjectMatrix( backendState, mat4x4_identity );
+					drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared * ) {
+						sbs->loadObjectMatrix( mat4x4_identity );
 					});
 				}
 			} else {
 				if( ( entNum != prevEntNum ) || prevIsDrawSurfBatched ) {
-					drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
+					drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared * ) {
 						if( entity->number == kWorldEntNumber ) [[likely]] {
-							R_TransformForWorld( backendState );
+							sbs->transformForWorld();
 						} else if( entity->rtype == RT_MODEL ) {
-							R_TransformForEntity( backendState, entity );
+							sbs->transformForEntity(  entity );
 						} else if( shader->flags & SHADER_AUTOSPRITE ) {
-							R_TranslateForEntity( backendState, entity );
+							sbs->translateForEntity( entity );
 						} else {
-							R_TransformForWorld( backendState );
+							sbs->transformForWorld();
 						}
 					});
 				}
 			}
 
 			if( !isDrawSurfBatched ) {
-				drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared *fsh ) {
+				drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared *fsh ) {
 					assert( r_drawSurfCb[surfType] );
 
-					RB_BindShader( backendState, entity, overrideParams, paramsTable, shader, fog, portalSurface );
+					sbs->bindShader( entity, overrideParams, paramsTable, shader, fog, portalSurface );
 
-					r_drawSurfCb[surfType]( backendState, fsh, entity, shader, fog, portalSurface, sds->drawSurf );
+					r_drawSurfCb[surfType]( sbs, fsh, entity, shader, fog, portalSurface, sds->drawSurf );
 				});
 			}
 
@@ -399,19 +343,19 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 																	 prevShader, prevSurfType,
 																	 { batchSpanBegin, batchSpanEnd } );
 
-		drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared *fsh ) {
-			submitFn( backendState, fsh, prevEntity, prevOverrideParams, paramsTable, prevShader, prevFog, prevPortalSurface, offset );
+		drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared *fsh ) {
+			submitFn( sbs, fsh, prevEntity, prevOverrideParams, paramsTable, prevShader, prevFog, prevPortalSurface, offset );
 		});
 	}
 
 	if( depthHack ) {
-		drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
-			RB_RestoreDepthRange( backendState );
+		drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared * ) {
+			sbs->restoreDepthRange();
 		});
 	}
 	if( cullHack ) {
-		drawActionTape->append( [=]( BackendState *backendState, FrontendToBackendShared * ) {
-			RB_FlipFrontFace( backendState );
+		drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared * ) {
+			sbs->flipFrontFace();
 		});
 	}
 }
@@ -592,7 +536,7 @@ void RendererFrontend::markBuffersOfVariousDynamicsForUpload( std::span<std::pai
 	}
 }
 
-void RendererFrontend::submitDrawActionsList( BackendState *backendState, StateForCamera *stateForCamera, Scene *scene ) {
+void RendererFrontend::submitDrawActionsList( SimulatedBackendState *backendState, StateForCamera *stateForCamera, Scene *scene ) {
 	FrontendToBackendShared fsh;
 	fsh.dynamicLights               = scene->m_dynamicLights.data();
 	fsh.particleAggregates          = scene->m_particles.data();
@@ -609,7 +553,7 @@ void RendererFrontend::submitDrawActionsList( BackendState *backendState, StateF
 	stateForCamera->drawActionTape->exec( backendState, &fsh );
 }
 
-void RendererFrontend::submitDebugStuffToBackend( BackendState *backendState, StateForCamera *stateForCamera, Scene *scene ) {
+void RendererFrontend::submitDebugStuffToBackend( SimulatedBackendState *backendState, StateForCamera *stateForCamera, Scene *scene ) {
 	if( !stateForCamera->debugLines->empty() ) {
 		// TODO: Reduce this copying
 		vec4_t verts[2];
@@ -662,7 +606,7 @@ void RendererFrontend::beginAddingAuxiliaryDynamicMeshes( unsigned uploadGroup )
 	R_BeginMeshUploads( uploadGroup );
 }
 
-void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, BackendState *backendState,
+void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, SimulatedBackendState *backendState,
 												const entity_t *entity, const shader_t *shader,
 												const struct mfog_s *fog, const struct portalSurface_s *portalSurface,
 												unsigned shadowBits, const struct mesh_s *mesh, int primitive,
@@ -689,7 +633,7 @@ void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, BackendSta
 	}
 
 	int scissor[4];
-	RB_GetScissor( backendState, &scissor[0], &scissor[1], &scissor[2], &scissor[3] );
+	backendState->getScissor( &scissor[0], &scissor[1], &scissor[2], &scissor[3] );
 
 	bool merge = false;
 	if( prev ) [[likely]] {
@@ -747,7 +691,7 @@ void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, BackendSta
 	stream->numElemsSoFar += numMeshElems;
 }
 
-void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup, BackendState *backendState ) {
+void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup, SimulatedBackendState *backendState ) {
 	if( AuxiliaryDynamicStream *const stream = getStreamForUploadGroup( uploadGroup ); !stream->draws.empty() ) {
 		const unsigned vertexSize     = RB_VBOSpanLayoutForFrameUploads( uploadGroup )->vertexSize;
 		const unsigned vertexDataSize = vertexSize * stream->numVertsSoFar;
@@ -757,10 +701,10 @@ void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup, Backen
 		R_EndMeshUploads( uploadGroup, vertexDataSize, indexDataSize );
 
 		int sx, sy, sw, sh;
-		RB_GetScissor( backendState, &sx, &sy, &sw, &sh );
+		backendState->getScissor( &sx, &sy, &sw, &sh );
 
 		mat4_t m;
-		RB_GetObjectMatrix( backendState, m );
+		backendState->getObjectMatrix( m );
 
 		const float transx = m[12];
 		const float transy = m[13];
@@ -771,8 +715,8 @@ void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup, Backen
 
 		for( const AuxiliaryDynamicDraw &draw: stream->draws ) {
 			assert( draw.shader );
-			RB_BindShader( backendState, draw.entity, nullptr, nullptr, draw.shader, draw.fog, nullptr );
-			RB_Scissor( backendState, draw.scissor[0], draw.scissor[1], draw.scissor[2], draw.scissor[3] );
+			backendState->bindShader( draw.entity, nullptr, nullptr, draw.shader, draw.fog, nullptr );
+			backendState->setScissor( draw.scissor[0], draw.scissor[1], draw.scissor[2], draw.scissor[3] );
 
 			// translate the mesh in 2D
 			if(( xOffset != draw.offset[0] ) || ( yOffset != draw.offset[1] ) ) {
@@ -780,22 +724,22 @@ void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup, Backen
 				yOffset = draw.offset[1];
 				m[12] = transx + xOffset;
 				m[13] = transy + yOffset;
-				RB_LoadObjectMatrix( backendState, m );
+				backendState->loadObjectMatrix( m );
 			}
 
 			assert( draw.drawElements.numVerts > 0 && draw.drawElements.numElems > 0 );
 			const DrawMeshVertSpan drawMeshVertSpan = draw.drawElements;
 			assert( draw.primitive == GL_TRIANGLES || draw.primitive == GL_LINES );
-			RB_DrawMesh( backendState, nullptr, vboId, nullptr, &drawMeshVertSpan, draw.primitive );
+			backendState->drawMesh( nullptr, vboId, nullptr, &drawMeshVertSpan, draw.primitive );
 		}
 
-		RB_Scissor( backendState, sx, sy, sw, sh );
+		backendState->setScissor( sx, sy, sw, sh );
 
 		// restore the original translation in the object matrix if it has been changed
 		if( xOffset != 0.0f || yOffset != 0.0f ) {
 			m[12] = transx;
 			m[13] = transy;
-			RB_LoadObjectMatrix( backendState, m );
+			backendState->loadObjectMatrix( m );
 		}
 
 		stream->draws.clear();
@@ -1594,7 +1538,7 @@ void RendererFrontend::prepareLegacySprites( PrepareSpriteSurfWorkload *workload
 											 workload->indexOfFirstIndex, &mesh );
 }
 
-void RendererFrontend::submitRotatedStretchPic( BackendState *backendState, int x, int y, int w, int h,
+void RendererFrontend::submitRotatedStretchPic( SimulatedBackendState *backendState, int x, int y, int w, int h,
 												float s1, float t1, float s2, float t2, float angle,
 												const float *color, const shader_s *material ) {
 	vec4_t pic_xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };

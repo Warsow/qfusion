@@ -735,42 +735,23 @@ struct shader_s;
 struct mfog_s;
 struct superLightStyle_s;
 struct portalSurface_s;
-struct refScreenTexSet_s;
 
-struct BackendState;
+class SimulatedBackendState;
 
 // core
 void RB_Init();
 void RB_Shutdown();
 void RB_SetDefaultGLState( int stencilBits );
 
-void RB_SetTime( BackendState *backendState, int64_t time );
-void RB_BeginUsingBackendState( BackendState *backendState );
-void RB_EndUsingBackendState( BackendState *backendState );
+void RB_BeginUsingBackendState( SimulatedBackendState *backendState );
+void RB_EndUsingBackendState( SimulatedBackendState *backendState );
+
 void RB_BeginRegistration();
 void RB_EndRegistration();
 
-void RB_LoadCameraMatrix( BackendState *backendState, const mat4_t m );
-// TODO....
-void RB_GetObjectMatrix( BackendState *backendState, float *m );
-void RB_LoadObjectMatrix( BackendState *backendState, const mat4_t m );
-void RB_LoadProjectionMatrix( BackendState *backendState, const mat4_t m );
-
-void RB_DepthRange( BackendState *backendState, float depthmin, float depthmax );
-void RB_GetDepthRange( BackendState *backendState, float* depthmin, float *depthmax );
-//void RB_DepthOffset( bool enable );
-void RB_SaveDepthRange( BackendState *backendState );
-void RB_RestoreDepthRange( BackendState *backendState );
-
-void RB_FlipFrontFace( BackendState *backendState );
-void RB_Scissor( BackendState *backendState, int x, int y, int w, int h );
-void RB_GetScissor( BackendState *backendState, int *x, int *y, int *w, int *h );
-void RB_Viewport( BackendState *backendState, int x, int y, int w, int h );
-void RB_Clear( BackendState *backendState, int bits, float r, float g, float b, float a );
-void RB_SetZClip( BackendState *backendState, float zNear, float zFar );
-
 [[maybe_unused]]
-struct mesh_vbo_s *RB_BindVBO( BackendState *backendState, int id );
+struct mesh_vbo_s *RB_BindVBO( SimulatedBackendState *backendState, int id );
+// TODO: GetVBO by id/ReallyBindVBo/bind in state
 void RB_BindRenderTarget( RenderTargetComponents *components );
 
 enum : unsigned {
@@ -810,22 +791,6 @@ struct VertElemSpan {
 };
 
 using DrawMeshVertSpan = std::variant<VertElemSpan, MultiDrawElemSpan>;
-
-void RB_DrawMesh( BackendState *backendState, const FrontendToBackendShared *fsh, int vboId, const VboSpanLayout *vboSpanLayout, const DrawMeshVertSpan *vertSpan, int primitive );
-
-void RB_DrawWireframeMesh( BackendState *backendState, const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, int primitive );
-void RB_DrawShadedMesh( BackendState *backendState, const FrontendToBackendShared *fsh, const DrawMeshVertSpan *vertSpan, int primitive );
-
-// shader
-void RB_BindShader( BackendState *backendState, const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable, const shader_s *shader, const mfog_s *fog, const struct portalSurface_s *portalSurface );
-void RB_SetLightstyle( BackendState *backendState, const struct superLightStyle_s *lightStyle );
-void RB_SetDlightBits( BackendState *backendState, unsigned dlightBits );
-void RB_SetBonesData( BackendState *backendState, int numBones, dualquat_t *dualQuats, int maxWeights );
-void RB_SetRenderFlags( BackendState *backendState, int flags );
-void RB_SetLightParams( BackendState *backendState, float minLight, bool noWorldLight, float hdrExposure = 1.0f );
-void RB_SetShaderStateMask( BackendState *backendState, unsigned ANDmask, unsigned ORmask );
-void RB_SetCamera( BackendState *backendState, const vec3_t cameraOrigin, const mat3_t cameraAxis );
-bool RB_EnableWireframe( BackendState *backendState, bool enable );
 
 /*
 ==============================================================================
@@ -1490,16 +1455,16 @@ struct FrontendToBackendShared {
 	unsigned sceneIndex;
 };
 
-struct BackendState;
+class SimulatedBackendState;
 
-void R_SubmitAliasSurfToBackend( BackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceAlias_t *drawSurf );
-void R_SubmitSkeletalSurfToBackend( BackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceSkeletal_t *drawSurf );
-void R_SubmitDynamicMeshToBackend( BackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const DynamicMeshDrawSurface *drawSurf );
-void R_SubmitBSPSurfToBackend( BackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceBSP_t *drawSurf );
-void R_SubmitNullSurfToBackend( BackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const void * );
+void R_SubmitAliasSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceAlias_t *drawSurf );
+void R_SubmitSkeletalSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceSkeletal_t *drawSurf );
+void R_SubmitDynamicMeshToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const DynamicMeshDrawSurface *drawSurf );
+void R_SubmitBSPSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceBSP_t *drawSurf );
+void R_SubmitNullSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const void * );
 
-void R_SubmitBatchedSurfsToBackend( BackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, unsigned vertElemSpanOffset );
-void R_SubmitBatchedSurfsToBackendExt( BackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, unsigned vertAndVboSpanOffset );
+void R_SubmitBatchedSurfsToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, unsigned vertElemSpanOffset );
+void R_SubmitBatchedSurfsToBackendExt( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, unsigned vertAndVboSpanOffset );
 
 //
 // r_poly.c

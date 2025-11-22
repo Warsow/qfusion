@@ -28,10 +28,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/profilerscope.h>
 #include <common/facilities/syspublic.h>
 
-void R_TransformForWorld( BackendState *backendState );
-void R_TranslateForEntity( BackendState *backendState, const entity_t *e );
-void R_TransformForEntity( BackendState *backendState, const entity_t *e );
-
 namespace wsw {
 
 auto RendererFrontend::getDefaultFarClip( const refdef_s *fd ) const -> float {
@@ -83,7 +79,7 @@ auto RendererFrontend::getFogForSphere( const StateForCamera *stateForCamera, co
 	return getFogForBounds( stateForCamera, mins, maxs );
 }
 
-void RendererFrontend::enter2DMode( BackendState *backendState, int width, int height ) {
+void RendererFrontend::enter2DMode( SimulatedBackendState *backendState, int width, int height ) {
 	assert( !rf.in2D );
 	assert( width > 0 && height > 0 );
 
@@ -94,24 +90,23 @@ void RendererFrontend::enter2DMode( BackendState *backendState, int width, int h
 
 	Matrix4_OrthogonalProjection( 0, width, height, 0, -99999, 99999, projectionMatrix );
 
-	// set 2D virtual screen size
-	RB_Scissor( backendState, 0, 0, width, height );
-	RB_Viewport( backendState, 0, 0, width, height );
+	backendState->setScissor( 0, 0, width, height );
+	backendState->setViewport( 0, 0, width, height );
 
-	RB_LoadProjectionMatrix( backendState, projectionMatrix );
-	RB_LoadCameraMatrix( backendState, mat4x4_identity );
-	RB_LoadObjectMatrix( backendState, mat4x4_identity );
+	backendState->loadProjectionMatrix( projectionMatrix );
+	backendState->loadCameraMatrix( mat4x4_identity );
+	backendState->loadObjectMatrix( mat4x4_identity );
 
-	RB_SetShaderStateMask( backendState, ~0, GLSTATE_NO_DEPTH_TEST );
+	backendState->setShaderStateMask( ~0, GLSTATE_NO_DEPTH_TEST );
 
-	RB_SetRenderFlags( backendState, 0 );
+	backendState->setRenderFlags( 0 );
 
 	beginAddingAuxiliaryDynamicMeshes( UPLOAD_GROUP_2D_MESH );
 
 	rf.in2D = true;
 }
 
-void RendererFrontend::leave2DMode( BackendState *backendState ) {
+void RendererFrontend::leave2DMode( SimulatedBackendState *backendState ) {
 	assert( rf.in2D );
 
 	// render previously batched 2D geometry, if any
@@ -119,17 +114,19 @@ void RendererFrontend::leave2DMode( BackendState *backendState ) {
 	flushAuxiliaryDynamicMeshes( UPLOAD_GROUP_2D_MESH, backendState );
 
 	// TODO: Should we care? Are we going to continue using the backend state this frame?
-	RB_SetShaderStateMask( backendState, ~0, 0 );
+	backendState->setShaderStateMask( ~0, 0 );
 
 	rf.in2D = false;
 }
 
-void RendererFrontend::set2DScissor( BackendState *backendState, int x, int y, int w, int h ) {
+void RendererFrontend::set2DScissor( SimulatedBackendState *backendState, int x, int y, int w, int h ) {
 	assert( rf.in2D );
-	RB_Scissor( backendState, x, y, w, h );
+	backendState->setScissor( x, y, w, h );
 }
 
-void RendererFrontend::bindRenderTargetAndViewport( BackendState *backendState, RenderTargetComponents *components, const StateForCamera *stateForCamera ) {
+void RendererFrontend::bindRenderTargetAndViewport( SimulatedBackendState *backendState,
+													RenderTargetComponents *components,
+													const StateForCamera *stateForCamera ) {
 	// TODO: This is for the default render target
 	const int width  = components ? components->texture->width : glConfig.width;
 	const int height = components ? components->texture->height : glConfig.height;
@@ -138,21 +135,20 @@ void RendererFrontend::bindRenderTargetAndViewport( BackendState *backendState, 
 	rf.frameBufferHeight = height;
 
 	if( backendState ) {
-		backendState->gl.bindRenderTarget( components );
+		backendState->bindRenderTarget( components );
 	} else {
 		assert( components == nullptr );
 		RB_BindRenderTarget( nullptr );
 	}
 
 	if( stateForCamera ) {
-		RB_Viewport( backendState, stateForCamera->viewport[0], stateForCamera->viewport[1], stateForCamera->viewport[2], stateForCamera->viewport[3] );
-		RB_Scissor( backendState, stateForCamera->scissor[0], stateForCamera->scissor[1], stateForCamera->scissor[2], stateForCamera->scissor[3] );
+		backendState->setViewport( stateForCamera->viewport[0], stateForCamera->viewport[1], stateForCamera->viewport[2], stateForCamera->viewport[3] );
+		backendState->setScissor( stateForCamera->scissor[0], stateForCamera->scissor[1], stateForCamera->scissor[2], stateForCamera->scissor[3] );
 	} else {
 		// TODO????
 		if( backendState ) {
-			// TODO: Are we going to clear in this case?
-			RB_Viewport( backendState, 0, 0, glConfig.width, glConfig.height );
-			RB_Scissor( backendState, 0, 0, glConfig.width, glConfig.height );
+			backendState->setViewport( 0, 0, glConfig.width, glConfig.height );
+			backendState->setScissor( 0, 0, glConfig.width, glConfig.height );
 		}
 	}
 }
@@ -246,7 +242,7 @@ void RendererFrontend::commitDraw2DRequest( Draw2DRequest *request ) {
 
 	BackendActionTape actionTape;
 
-	BackendState backendState( &actionTape, glConfig.width, glConfig.height );
+	SimulatedBackendState backendState( &actionTape, glConfig.width, glConfig.height );
 	RB_BeginUsingBackendState( &backendState );
 
 	enter2DMode( &backendState, glConfig.width, glConfig.height );
@@ -987,29 +983,30 @@ void RendererFrontend::performPreparedRenderingFromThisCamera( Scene *scene, Sta
 
 	BackendActionTape actionTape;
 
-	BackendState backendState( &actionTape, glConfig.width, glConfig.height );
+	SimulatedBackendState backendState( &actionTape, glConfig.width, glConfig.height );
 	RB_BeginUsingBackendState( &backendState );
 
-	RB_SetTime( &backendState, stateForCamera->refdef.time );
+	backendState.setTime( stateForCamera->refdef.time, rf.frameTime.time );
 
 	bindRenderTargetAndViewport( &backendState, stateForCamera->refdef.renderTarget, stateForCamera );
 
 	const int *const scissor = stateForCamera->scissor;
-	RB_Scissor( &backendState, scissor[0], scissor[1], scissor[2], scissor[3] );
+	// TODO: Allow supplying an array of integers
+	backendState.setScissor( scissor[0], scissor[1], scissor[2], scissor[3] );
 
 	const int *const viewport = stateForCamera->viewport;
-	RB_Viewport( &backendState, viewport[0], viewport[1], viewport[2], viewport[3] );
+	backendState.setViewport( viewport[0], viewport[1], viewport[2], viewport[3] );
 
-	RB_SetZClip( &backendState, Z_NEAR, stateForCamera->farClip );
-	RB_SetCamera( &backendState, stateForCamera->viewOrigin, stateForCamera->viewAxis );
-	RB_SetLightParams( &backendState, stateForCamera->refdef.minLight, !drawWorld );
-	RB_SetRenderFlags( &backendState, renderFlags );
-	RB_LoadProjectionMatrix( &backendState, stateForCamera->projectionMatrix );
-	RB_LoadCameraMatrix( &backendState, stateForCamera->cameraMatrix );
-	RB_LoadObjectMatrix( &backendState, mat4x4_identity );
+	backendState.setZClip( Z_NEAR, stateForCamera->farClip );
+	backendState.setCamera( stateForCamera->viewOrigin, stateForCamera->viewAxis );
+	backendState.setLightParams( stateForCamera->refdef.minLight, !drawWorld );
+	backendState.setRenderFlags( renderFlags );
+	backendState.loadProjectionMatrix( stateForCamera->projectionMatrix );
+	backendState.loadCameraMatrix( stateForCamera->cameraMatrix );
+	backendState.loadObjectMatrix( mat4x4_identity );
 
 	if( renderFlags & RF_SHADOWMAPVIEW ) {
-		RB_SetShaderStateMask( &backendState, ~0, GLSTATE_NO_COLORWRITE );
+		backendState.setShaderStateMask( ~0, GLSTATE_NO_COLORWRITE );
 	}
 
 	// Unused?
@@ -1039,37 +1036,37 @@ void RendererFrontend::performPreparedRenderingFromThisCamera( Scene *scene, Sta
 		}
 	}
 
-	int bits = 0;
+	int bitsToClear = 0;
 	if( !didDrawADepthMask ) {
-		bits |= GL_DEPTH_BUFFER_BIT;
+		bitsToClear |= GL_DEPTH_BUFFER_BIT;
 	}
 	if( shouldClearColor ) {
-		bits |= GL_COLOR_BUFFER_BIT;
+		bitsToClear |= GL_COLOR_BUFFER_BIT;
 	}
 
-	RB_Clear( &backendState, bits, clearColor[0], clearColor[1], clearColor[2], clearColor[3] );
+	backendState.clear( bitsToClear, clearColor[0], clearColor[1], clearColor[2], clearColor[3] );
 
 	submitDrawActionsList( &backendState, stateForCamera, scene );
 
 	if( v_showTris.get() && !( renderFlags & RF_SHADOWMAPVIEW ) ) {
-		RB_EnableWireframe( &backendState, true );
+		backendState.enableWireframe( true );
 
 		submitDrawActionsList( &backendState, stateForCamera, scene );
 
-		RB_EnableWireframe( &backendState, false );
+		backendState.enableWireframe( false );
 	}
 
-	R_TransformForWorld( &backendState );
+	backendState.transformForWorld();
 
 	if( stateForCamera->renderFlags & RF_SHADOWMAPVIEW ) {
-		RB_SetShaderStateMask( &backendState, ~0, 0 );
+		backendState.setShaderStateMask( ~0, 0 );
 	}
 
-	RB_SetShaderStateMask( &backendState, ~0, GLSTATE_NO_DEPTH_TEST );
+	backendState.setShaderStateMask( ~0, GLSTATE_NO_DEPTH_TEST );
 
 	submitDebugStuffToBackend( &backendState, stateForCamera, scene );
 
-	RB_SetShaderStateMask( &backendState, ~0, 0 );
+	backendState.setShaderStateMask( ~0, 0 );
 
 	RB_EndUsingBackendState( &backendState );
 
