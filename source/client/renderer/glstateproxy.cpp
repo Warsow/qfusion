@@ -166,6 +166,13 @@ void GLStateProxy::bindIndexBuffer( GLuint buffer ) {
 	}
 }
 
+bool GLStateProxy::isAlphaBlendingEnabled() const {
+	const auto src = m_state & GLSTATE_SRCBLEND_MASK;
+	const auto dst = m_state & GLSTATE_DSTBLEND_MASK;
+	return src == GLSTATE_SRCBLEND_SRC_ALPHA || dst == GLSTATE_DSTBLEND_SRC_ALPHA ||
+	       src == GLSTATE_SRCBLEND_ONE_MINUS_SRC_ALPHA || dst == GLSTATE_DSTBLEND_ONE_MINUS_SRC_ALPHA;
+}
+
 void GLStateProxy::setState( unsigned state ) {
 	const unsigned diff = m_state ^ state;
 	if( !diff ) {
