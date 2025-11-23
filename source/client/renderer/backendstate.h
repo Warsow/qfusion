@@ -22,32 +22,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "glstateproxy.h"
 
-#define MAX_STREAM_VBO_VERTS        8192
-#define MAX_STREAM_VBO_ELEMENTS     MAX_STREAM_VBO_VERTS * 6
-#define MAX_STREAM_VBO_TRIANGLES    MAX_STREAM_VBO_ELEMENTS / 3
-
-#define MAX_DYNAMIC_DRAWS           2048
-
-#define MAX_UNIFORM_BINDINGS        17
-
-typedef struct {
-	unsigned int numBones;
-	dualquat_t dualQuats[MAX_GLSL_UNIFORM_BONES];
-	unsigned int maxWeights;
-} rbBonesData_t;
-
-class GLStateProxy;
-class SimulatedBackendState;
-
-void *RB_GetTmpUniformBlock( SimulatedBackendState *backendState, unsigned binding, size_t requestedBlockSize );
-void RB_CommitUniformBlock( SimulatedBackendState *backendState, unsigned binding, void *blockData, size_t blockSize );
-
 struct RuntimeBackendState {
 	GLuint programId { 0 };
 };
 
 class SimulatedBackendState {
 public:
+	unsigned m_totalDraws { 0 };
+	unsigned m_fastDraws { 0 };
+
 	SimulatedBackendState( BackendActionTape *actionTape, int width, int height );
 
 	void loadCameraMatrix( const mat4_t m );
@@ -77,7 +60,7 @@ public:
 					 const shader_s *shader, const mfog_s *fog, const struct portalSurface_s *portalSurface );
 	void setLightstyle( const struct superLightStyle_s *lightStyle );
 	void setDlightBits( unsigned dlightBits );
-	void setBonesData( int numBones, dualquat_t *dualQuats, int maxWeights );
+	void setBonesData( int numBones, const dualquat_t *dualQuats, int maxWeights );
 	void setRenderFlags( int flags );
 	void setLightParams( float minLight, bool noWorldLight, float hdrExposure = 1.0f );
 	void setShaderStateMask( unsigned ANDmask, unsigned ORmask );
@@ -239,7 +222,11 @@ private:
 		vattribmask_t currentVAttribs;
 		unsigned currentDlightBits;
 		unsigned currentShadowBits;
-		rbBonesData_t bonesData;
+		struct {
+			unsigned int numBones;
+			dualquat_t dualQuats[MAX_GLSL_UNIFORM_BONES];
+			unsigned int maxWeights;
+		} bonesData;
 		const superLightStyle_t *superLightStyle;
 		unsigned currentShaderState;
 		bool dirtyUniformState;
@@ -264,26 +251,5 @@ private:
 	GLStateProxy m_glState;
 	BackendActionTape *const m_actionTape;
 };
-
-typedef struct r_backend_s {
-	struct {
-		mesh_vbo_t *vbo;
-		void *vboData;
-		void *iboData;
-		unsigned vboCapacityInVerts;
-		unsigned vboCapacityInBytes;
-		unsigned iboCapacityInElems;
-	} vertexUploads[5];
-
-	struct {
-		GLuint id;
-		uint8_t *buffer;
-		uint8_t *lastResortScratchpad;
-		unsigned blockSize;
-		unsigned capacity;
-	} uniformUploads[MAX_UNIFORM_BINDINGS];
-} rbackend_t;
-
-extern rbackend_t rb;
 
 #endif // R_BACKEND_LOCAL_H

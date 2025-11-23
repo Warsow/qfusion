@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "local.h"
 #include "program.h"
 #include "backendactiontape.h"
-#include "backendlocal.h"
+#include "backendstate.h"
 #include "glstateproxy.h"
 
 #include <common/helpers/noise.h>
@@ -62,7 +62,7 @@ SimulatedBackendState::SimulatedBackendState( BackendActionTape *actionTape, int
 	VectorClear( m_globalState.nullEnt.origin );
 	Matrix3_Identity( m_globalState.nullEnt.axis );
 
-	actionTape->append( []( RuntimeBackendState * ) { RB_SetDefaultGLState( glConfig.stencilBits ); } );
+	actionTape->append( []( RuntimeBackendState * ) { R_SetDefaultGLState(); } );
 }
 
 void SimulatedBackendState::setTime( int64_t requestTime, int64_t globalTime ) {
@@ -348,7 +348,7 @@ void SimulatedBackendState::setDlightBits( unsigned dlightBits ) {
 	m_drawState.dirtyUniformState = true;
 }
 
-void SimulatedBackendState::setBonesData( int numBones, dualquat_t *dualQuats, int maxWeights ) {
+void SimulatedBackendState::setBonesData( int numBones, const dualquat_t *dualQuats, int maxWeights ) {
 	assert( m_materialState.currentShader );
 
 	if( numBones > MAX_GLSL_UNIFORM_BONES ) {

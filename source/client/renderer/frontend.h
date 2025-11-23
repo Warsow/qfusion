@@ -624,6 +624,9 @@ private:
 	void processSortList( StateForCamera *stateForCamera, Scene *scene );
 	void submitDrawActionsList( SimulatedBackendState *, StateForCamera *stateForCamera, Scene *scene );
 
+	using SubmitSurfFn = void (*)( SimulatedBackendState *, const FrontendToBackendShared *, const entity_t *,
+								   const struct shader_s *, const struct mfog_s *, const struct portalSurface_s *, const void * );
+
 	using SubmitBatchedSurfFn = void(*)( SimulatedBackendState *, const FrontendToBackendShared *, const entity_t *,
 		const ShaderParams *, const ShaderParamsTable *, const shader_t *, const mfog_t *, const portalSurface_t *, unsigned );
 
@@ -662,6 +665,31 @@ private:
 								  const struct mesh_s *mesh, int primitive, float x_offset, float y_offset );
 
 	void flushAuxiliaryDynamicMeshes( unsigned uploadGroup, SimulatedBackendState *backendState );
+
+	static void submitAliasSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh,
+										  const entity_t *e, const shader_t *shader, const mfog_t *fog,
+										  const portalSurface_t *portalSurface, const drawSurfaceAlias_t *drawSurf );
+	static void submitSkeletalSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh,
+											 const entity_t *e, const shader_t *shader, const mfog_t *fog,
+											 const portalSurface_t *portalSurface, const drawSurfaceSkeletal_t *drawSurf );
+	static void submitDynamicMeshToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh,
+											const entity_t *e, const shader_t *shader, const mfog_t *fog,
+											const portalSurface_t *portalSurface, const DynamicMeshDrawSurface *drawSurf );
+	static void submitBspSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh,
+										const entity_t *e, const shader_t *shader, const mfog_t *fog,
+										const portalSurface_t *portalSurface, const drawSurfaceBSP_t *drawSurf );
+	static void submitNullSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh,
+										 const entity_t *e, const shader_t *shader, const mfog_t *fog,
+										 const portalSurface_t *portalSurface, const void * );
+
+	static void submitBatchedSurfsToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh,
+											 const entity_t *e, const ShaderParams *overrideParams,
+											 const ShaderParamsTable *paramsTable, const shader_t *shader,
+											 const mfog_t *fog, const portalSurface_t *portalSurface, unsigned vertElemSpanOffset );
+	static void submitBatchedSurfsToBackendExt( SimulatedBackendState *, const FrontendToBackendShared *fsh,
+												const entity_t *e, const ShaderParams *overrideParams,
+												const ShaderParamsTable *paramsTable, const shader_t *shader,
+												const mfog_t *fog, const portalSurface_t *portalSurface, unsigned vertAndVboSpanOffset );
 
 	auto ( RendererFrontend::*m_collectVisibleWorldLeavesArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
 	auto ( RendererFrontend::*m_collectVisibleOccludersArchMethod )( StateForCamera * ) -> std::span<const unsigned>;

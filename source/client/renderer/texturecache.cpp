@@ -78,8 +78,8 @@ TextureCache::TextureCache() {
 		components->depthBuffer  = m_miniviewRenderTargetDepthBuffer;
 
 		// Setup attachments TODO: Fix state management
-		RB_BindRenderTarget( components );
-		RB_BindRenderTarget( nullptr );
+		R_BindRenderTarget( components );
+		R_BindRenderTarget( nullptr );
 	} else {
 		// TODO: Eliminate this duplication
 		wsw::failWithRuntimeError( "Failed to create miniview render target" );
@@ -403,4 +403,62 @@ auto TextureCache::getPortalRenderTarget( unsigned drawSceneFrameNum ) -> Render
 
 auto TextureCache::getMiniviewRenderTarget() -> RenderTargetComponents * {
 	return m_miniviewRenderTarget.data();
+}
+
+// TODO: Is there a more appropritate place to put this subroutine
+void R_BindRenderTarget( RenderTargetComponents *components ) {
+	if( components ) {
+		RenderTarget            *const renderTarget           = components->renderTarget;
+		RenderTargetTexture     *const oldAttachedTexture     = components->renderTarget->attachedTexture;
+		RenderTargetDepthBuffer *const oldAttachedDepthBuffer = components->renderTarget->attachedDepthBuffer;
+		RenderTargetTexture     *const newTexture             = components->texture;
+		RenderTargetDepthBuffer *const newDepthBuffer         = components->depthBuffer;
+
+		bool hasChanges = false;
+		qglBindFramebuffer( GL_FRAMEBUFFER, renderTarget->fboId );
+		if( oldAttachedTexture != newTexture ) {
+			if( oldAttachedTexture ) {
+				oldAttachedTexture->attachedToRenderTarget = nullptr;
+			}
+			if( RenderTarget *oldTarget = newTexture->attachedToRenderTarget ) {
+				assert( oldTarget != renderTarget );
+				// TODO: Do we have to bind it and call detach?
+				oldTarget->attachedTexture = nullptr;
+			}
+			renderTarget->attachedTexture      = newTexture;
+			newTexture->attachedToRenderTarget = renderTarget;
+			qglFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, newTexture->texnum, 0 );
+			hasChanges = true;
+		}
+		if( oldAttachedDepthBuffer != newDepthBuffer ) {
+			if( oldAttachedDepthBuffer ) {
+				oldAttachedDepthBuffer->attachedToRenderTarget = nullptr;
+			}
+			if( RenderTarget *oldTarget = newDepthBuffer->attachedToRenderTarget ) {
+				assert( oldTarget != renderTarget );
+				// TODO: Do we have to bind it and call detach?
+				oldTarget->attachedDepthBuffer = nullptr;
+			}
+			renderTarget->attachedDepthBuffer      = newDepthBuffer;
+			newDepthBuffer->attachedToRenderTarget = renderTarget;
+			qglFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, newDepthBuffer->rboId );
+			hasChanges = true;
+		}
+		if( hasChanges ) {
+			// TODO: What to do in this case
+			if( qglCheckFramebufferStatus( GL_FRAMEBUFFER ) != GL_FRAMEBUFFER_COMPLETE ) {
+				// Just make sure that the status of attachments remains correct
+				assert( renderTarget->attachedTexture == newTexture );
+				assert( renderTarget->attachedDepthBuffer == newDepthBuffer );
+				qglFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0 );
+				qglFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0 );
+				renderTarget->attachedTexture          = nullptr;
+				renderTarget->attachedDepthBuffer      = nullptr;
+				newTexture->attachedToRenderTarget     = nullptr;
+				newDepthBuffer->attachedToRenderTarget = nullptr;
+			}
+		}
+	} else {
+		qglBindFramebuffer( GL_FRAMEBUFFER, 0 );
+	}
 }

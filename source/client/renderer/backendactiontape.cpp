@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "backendactiontape.h"
-#include "backendlocal.h"
+#include "backendstate.h"
 #include "program.h"
 #include "local.h"
 
@@ -125,7 +125,7 @@ void BackendActionTape::multiDrawElements( GLenum mode, const GLsizei *count, GL
 }
 
 void BackendActionTape::bindRenderTarget( RenderTargetComponents *components ) {
-	append( [=]( RuntimeBackendState * ) { RB_BindRenderTarget( components ); } );
+	append( [=]( RuntimeBackendState * ) { R_BindRenderTarget( components ); } );
 }
 
 void BackendActionTape::bindProgram( int program ) {

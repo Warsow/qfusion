@@ -646,6 +646,7 @@ void RF_BeginRegistration( void ) {
 	R_DeferDataSync();
 	R_DataSync();
 
+	R_SetDefaultGLState();
 	RB_BeginRegistration();
 }
 
@@ -782,6 +783,46 @@ static void R_FillStartupBackgroundColor( float r, float g, float b ) {
 	qglClear( GL_COLOR_BUFFER_BIT );
 	qglFinish();
 	GLimp_EndFrame();
+}
+
+void R_SetDefaultGLState() {
+	if( glConfig.stencilBits ) {
+		assert( glConfig.stencilBits == 8 );
+		qglStencilMask( ( GLuint ) ~0 );
+		qglStencilFunc( GL_EQUAL, 128, 0xFF );
+		qglStencilOp( GL_KEEP, GL_KEEP, GL_INCR );
+	}
+
+	qglDisable( GL_CULL_FACE );
+	qglFrontFace( GL_CCW );
+	qglDisable( GL_BLEND );
+	qglDepthFunc( GL_LEQUAL );
+	qglDepthMask( GL_FALSE );
+	qglDisable( GL_POLYGON_OFFSET_FILL );
+	qglPolygonOffset( -1.0f, 0.0f ); // units will be handled by RB_DepthOffset
+	qglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+	qglEnable( GL_DEPTH_TEST );
+	qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+	qglFrontFace( GL_CCW );
+	qglEnable( GL_SCISSOR_TEST );
+	qglScissor( 0, 0, glConfig.width, glConfig.height );
+
+	for( int tmu = 0; tmu < MAX_TEXTURE_UNITS; ++tmu ) {
+		qglActiveTexture( GL_TEXTURE0 + tmu );
+
+		qglBindTexture( GL_TEXTURE_CUBE_MAP, 0 );
+		qglBindTexture( GL_TEXTURE_2D_ARRAY, 0 );
+		qglBindTexture( GL_TEXTURE_3D, 0 );
+		qglBindTexture( GL_TEXTURE_2D, 0 );
+	}
+
+	qglActiveTexture( GL_TEXTURE0 );
+
+	// TODO:?
+	//qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+	//qglBindBuffer( GL_ARRAY_BUFFER, 0 );
+
+	qglUseProgram( 0 );
 }
 
 rserr_t R_Init( const char *applicationName, const char *screenshotPrefix, int startupColor,

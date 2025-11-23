@@ -741,7 +741,9 @@ class SimulatedBackendState;
 // core
 void RB_Init();
 void RB_Shutdown();
-void RB_SetDefaultGLState( int stencilBits );
+
+void R_SetDefaultGLState();
+void R_BindRenderTarget( RenderTargetComponents *components );
 
 void RB_BeginUsingBackendState( SimulatedBackendState *backendState );
 void RB_EndUsingBackendState( SimulatedBackendState *backendState );
@@ -751,8 +753,6 @@ void RB_EndRegistration();
 
 [[maybe_unused]]
 struct mesh_vbo_s *RB_BindVBO( SimulatedBackendState *backendState, int id );
-// TODO: GetVBO by id/ReallyBindVBo/bind in state
-void RB_BindRenderTarget( RenderTargetComponents *components );
 
 enum : unsigned {
 	UPLOAD_GROUP_DYNAMIC_MESH     = 0,
@@ -779,6 +779,11 @@ void R_SetUploadedSubdataFromMeshUsingOffsets( unsigned group, unsigned baseVert
 void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVertex, const VboSpanLayout *layout,
 											  unsigned indexOfFirstIndex, const mesh_t *mesh );
 void R_EndMeshUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes );
+
+#define MAX_UNIFORM_BINDINGS  ( 17 )
+
+void *RB_GetTmpUniformBlock( SimulatedBackendState *backendState, unsigned binding, size_t requestedBlockSize );
+void RB_CommitUniformBlock( SimulatedBackendState *backendState, unsigned binding, void *blockData, size_t blockSize );
 
 void R_BeginUniformUploads( unsigned binding );
 void R_EndUniformUploads( unsigned binding, unsigned uniformDataSizeInBytes );
@@ -1454,17 +1459,6 @@ struct FrontendToBackendShared {
 	unsigned cameraId;
 	unsigned sceneIndex;
 };
-
-class SimulatedBackendState;
-
-void R_SubmitAliasSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceAlias_t *drawSurf );
-void R_SubmitSkeletalSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceSkeletal_t *drawSurf );
-void R_SubmitDynamicMeshToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const DynamicMeshDrawSurface *drawSurf );
-void R_SubmitBSPSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const drawSurfaceBSP_t *drawSurf );
-void R_SubmitNullSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, const void * );
-
-void R_SubmitBatchedSurfsToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, unsigned vertElemSpanOffset );
-void R_SubmitBatchedSurfsToBackendExt( SimulatedBackendState *, const FrontendToBackendShared *fsh, const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable, const shader_t *shader, const mfog_t *fog, const portalSurface_t *portalSurface, unsigned vertAndVboSpanOffset );
 
 //
 // r_poly.c

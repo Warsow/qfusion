@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "local.h"
 #include "frontend.h"
 #include "materiallocal.h"
-#include "backendlocal.h"
+#include "backendstate.h"
 #include "backendactiontape.h"
 #include <common/helpers/singletonholder.h>
 #include <common/helpers/links.h>
@@ -138,7 +138,7 @@ void RendererFrontend::bindRenderTargetAndViewport( SimulatedBackendState *backe
 		backendState->bindRenderTarget( components );
 	} else {
 		assert( components == nullptr );
-		RB_BindRenderTarget( nullptr );
+		R_BindRenderTarget( nullptr );
 	}
 
 	if( stateForCamera ) {

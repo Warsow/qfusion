@@ -23,44 +23,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "frontend.h"
 #include "program.h"
 #include "materiallocal.h"
-#include "backendlocal.h"
+#include "backendstate.h"
 
 #include <algorithm>
 
 namespace wsw {
 
-using drawSurf_cb = void (*)( SimulatedBackendState *, const FrontendToBackendShared *, const entity_t *,
-							  const struct shader_s *, const struct mfog_s *, const struct portalSurface_s *, const void * );
-
-static const drawSurf_cb r_drawSurfCb[ST_MAX_TYPES] = {
-	/* ST_NONE */
-	nullptr,
-	/* ST_BSP */
-	( drawSurf_cb ) &R_SubmitBSPSurfToBackend,
-	/* ST_ALIAS */
-	( drawSurf_cb ) &R_SubmitAliasSurfToBackend,
-	/* ST_SKELETAL */
-	( drawSurf_cb ) &R_SubmitSkeletalSurfToBackend,
-	/* ST_SPRITE */
-	nullptr,
-	/* ST_QUAD_POLY */
-	nullptr,
-	/* ST_DYNAMIC_MESH */
-	( drawSurf_cb ) &R_SubmitDynamicMeshToBackend,
-	/* ST_PARTICLE */
-	nullptr,
-	/* ST_CORONA */
-	nullptr,
-	/* ST_NULLMODEL */
-	( drawSurf_cb ) & R_SubmitNullSurfToBackend,
-};
-
 auto RendererFrontend::registerBuildingBatchedSurf( StateForCamera *stateForCamera, Scene *scene,
 													const shader_s *material, unsigned surfType,
 													std::span<const sortedDrawSurf_t> batchSpan )
 	-> std::pair<SubmitBatchedSurfFn, unsigned> {
-	assert( !r_drawSurfCb[surfType] );
-
 	SubmitBatchedSurfFn resultFn;
 	unsigned resultOffset;
 	if( surfType != ST_SPRITE ) [[likely]] {
@@ -86,7 +58,7 @@ auto RendererFrontend::registerBuildingBatchedSurf( StateForCamera *stateForCame
 			.vertSpanOffset = resultOffset,
 		});
 
-		resultFn = R_SubmitBatchedSurfsToBackend;
+		resultFn = submitBatchedSurfsToBackend;
 	} else {
 		resultOffset = stateForCamera->preparedSpriteVertElemAndVboSpans->size();
 		stateForCamera->preparedSpriteVertElemAndVboSpans->append( {} );
@@ -99,7 +71,7 @@ auto RendererFrontend::registerBuildingBatchedSurf( StateForCamera *stateForCame
 			.vertAndVboSpanOffset = resultOffset,
 		});
 
-		resultFn = R_SubmitBatchedSurfsToBackendExt;
+		resultFn = submitBatchedSurfsToBackendExt;
 	}
 
 	return { resultFn, resultOffset };
@@ -134,6 +106,29 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 
 	std::sort( stateForCamera->sortList->begin(), stateForCamera->sortList->end(), cmp );
 
+	const SubmitSurfFn submitFns[ST_MAX_TYPES] = {
+		/* ST_NONE */
+		nullptr,
+		/* ST_BSP */
+		(SubmitSurfFn)&RendererFrontend::submitBspSurfToBackend,
+		/* ST_ALIAS */
+		(SubmitSurfFn)&RendererFrontend::submitAliasSurfToBackend,
+		/* ST_SKELETAL */
+		(SubmitSurfFn)&RendererFrontend::submitSkeletalSurfToBackend,
+		/* ST_SPRITE */
+		nullptr,
+		/* ST_QUAD_POLY */
+		nullptr,
+		/* ST_DYNAMIC_MESH */
+		(SubmitSurfFn)&RendererFrontend::submitDynamicMeshToBackend,
+		/* ST_PARTICLE */
+		nullptr,
+		/* ST_CORONA */
+		nullptr,
+		/* ST_NULLMODEL */
+		(SubmitSurfFn)&RendererFrontend::submitNullSurfToBackend,
+	};
+
 	auto *const materialCache  = MaterialCache::instance();
 	auto *const drawActionTape = stateForCamera->drawActionTape;
 
@@ -167,7 +162,7 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 
 		assert( surfType > ST_NONE && surfType < ST_MAX_TYPES );
 
-		const bool isDrawSurfBatched = ( r_drawSurfCb[surfType] == nullptr );
+		const bool isDrawSurfBatched = ( submitFns[surfType] == nullptr );
 
 		unsigned shaderNum, entNum;
 		int fogNum, portalNum, paramsNum;
@@ -308,12 +303,11 @@ void RendererFrontend::processSortList( StateForCamera *stateForCamera, Scene *s
 			}
 
 			if( !isDrawSurfBatched ) {
+				const SubmitSurfFn submitFn = submitFns[surfType];
+				assert( submitFn );
 				drawActionTape->append( [=]( SimulatedBackendState *sbs, FrontendToBackendShared *fsh ) {
-					assert( r_drawSurfCb[surfType] );
-
 					sbs->bindShader( entity, overrideParams, paramsTable, shader, fog, portalSurface );
-
-					r_drawSurfCb[surfType]( sbs, fsh, entity, shader, fog, portalSurface, sds->drawSurf );
+					submitFn( sbs, fsh, entity, shader, fog, portalSurface, sds->drawSurf );
 				});
 			}
 
@@ -1588,6 +1582,125 @@ void RendererFrontend::submitRotatedStretchPic( SimulatedBackendState *backendSt
 	}
 
 	addAuxiliaryDynamicMesh( UPLOAD_GROUP_2D_MESH, backendState, nullptr, material, nullptr, nullptr, 0, &pic_mesh, GL_TRIANGLES, 0.0f, 0.0f );
+}
+
+void RendererFrontend::submitAliasSurfToBackend( SimulatedBackendState *sbs, const FrontendToBackendShared *fsh,
+												 const entity_t *e, const shader_t *shader, const mfog_t *fog,
+												 const portalSurface_t *portalSurface, const drawSurfaceAlias_t *drawSurf ) {
+	const maliasmesh_t *aliasmesh = drawSurf->mesh;
+
+	const DrawMeshVertSpan drawMeshVertSpan = VertElemSpan {
+		.firstVert = 0, .numVerts = 1u * aliasmesh->numverts,
+		.firstElem = 0, .numElems = 3u * aliasmesh->numtris,
+	};
+
+	sbs->drawMesh( fsh, aliasmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+}
+
+void RendererFrontend::submitSkeletalSurfToBackend( SimulatedBackendState *sbs, const FrontendToBackendShared *fsh,
+													const entity_t *e, const shader_t *shader, const mfog_t *fog,
+													const portalSurface_t *portalSurface, const drawSurfaceSkeletal_t *drawSurf ) {
+	const model_t *mod                   = drawSurf->model;
+	const auto *skmodel                  = (const mskmodel_t *)mod->extradata;
+	const mskmesh_t *skmesh              = drawSurf->mesh;
+	skmcacheentry_s *cache               = nullptr;
+	const dualquat_t *bonePoseRelativeDQ = nullptr;
+
+	if( skmodel->numbones && skmodel->numframes > 0 ) {
+		cache = R_GetSkeletalCache( e->number, mod->lodnum, fsh->sceneIndex );
+	}
+
+	if( cache ) {
+		bonePoseRelativeDQ = R_GetSkeletalBones( cache );
+	}
+
+	const DrawMeshVertSpan drawMeshVertSpan = VertElemSpan {
+		.firstVert = 0, .numVerts = 1u * skmesh->numverts,
+		.firstElem = 0, .numElems = 3u * skmesh->numtris,
+	};
+
+	if( !cache || R_SkeletalRenderAsFrame0( cache ) ) {
+		// fastpath: render static frame 0 as is
+		if( skmesh->vbo ) {
+			sbs->drawMesh( fsh, skmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+			return;
+		}
+	}
+
+	if( bonePoseRelativeDQ && skmesh->vbo ) {
+		// another fastpath: transform the initial pose on the GPU
+		sbs->setBonesData( skmodel->numbones, bonePoseRelativeDQ, skmesh->maxWeights );
+		sbs->drawMesh( fsh, skmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+		return;
+	}
+}
+
+void RendererFrontend::submitBspSurfToBackend( SimulatedBackendState *sbs, const FrontendToBackendShared *fsh,
+											   const entity_t *e, const shader_t *shader, const mfog_t *fog,
+											   const portalSurface_t *portalSurface, const drawSurfaceBSP_t *drawSurf ) {
+	const MergedBspSurface *mergedBspSurf = drawSurf->mergedBspSurf;
+
+	assert( !mergedBspSurf->numInstances );
+
+	sbs->setDlightBits( drawSurf->dlightBits );
+	sbs->setLightstyle( mergedBspSurf->superLightStyle );
+
+	const DrawMeshVertSpan &drawMeshVertSpan = drawSurf->mdSpan;
+
+	sbs->drawMesh( fsh, mergedBspSurf->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+}
+
+void RendererFrontend::submitNullSurfToBackend( SimulatedBackendState *sbs, const FrontendToBackendShared *fsh,
+												const entity_t *e, const shader_t *shader, const mfog_t *fog,
+												const portalSurface_t *portalSurface, const void * ) {
+	assert( rsh.nullVBO );
+
+	const DrawMeshVertSpan drawMeshVertSpan = VertElemSpan {
+		.firstVert = 0, .numVerts = 6, .firstElem = 0, .numElems = 6,
+	};
+
+	sbs->drawMesh( fsh, rsh.nullVBO->index, nullptr, &drawMeshVertSpan, GL_LINES );
+}
+
+void RendererFrontend::submitDynamicMeshToBackend( SimulatedBackendState *sbs, const FrontendToBackendShared *fsh,
+												   const entity_t *e, const shader_t *shader, const mfog_t *fog,
+												   const portalSurface_t *portalSurface, const DynamicMeshDrawSurface *drawSurface ) {
+	// Protect against the case when fillMeshBuffers() produces zero vertices
+	if( drawSurface->actualNumVertices && drawSurface->actualNumIndices ) {
+		const DrawMeshVertSpan drawMeshVertSpan = VertElemSpan {
+			.firstVert = drawSurface->verticesOffset,
+			.numVerts  = drawSurface->actualNumVertices,
+			.firstElem = drawSurface->indicesOffset,
+			.numElems  = drawSurface->actualNumIndices,
+		};
+
+		sbs->drawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH ), nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+	}
+}
+
+void RendererFrontend::submitBatchedSurfsToBackend( SimulatedBackendState *sbs, const FrontendToBackendShared *fsh,
+													const entity_t *e, const ShaderParams *overrideParams,
+													const ShaderParamsTable *paramsTable, const shader_t *shader, const mfog_t *fog,
+													const portalSurface_t *portalSurface, unsigned vertElemSpanIndex ) {
+	const VertElemSpan &vertElemSpan = fsh->batchedVertElemSpans[vertElemSpanIndex];
+	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
+		sbs->bindShader( e, overrideParams, paramsTable, shader, fog, nullptr );
+		const DrawMeshVertSpan drawMeshVertSpan = vertElemSpan;
+		sbs->drawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH ), nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+	}
+}
+
+void RendererFrontend::submitBatchedSurfsToBackendExt( SimulatedBackendState *sbs, const FrontendToBackendShared *fsh,
+													   const entity_t *e, const ShaderParams *,
+													   const ShaderParamsTable *paramsTable, const shader_s *shader,
+													   const mfog_t *fog, const portalSurface_t *portalSurface,
+													   unsigned vertElemSpanAndVboSpanIndex ) {
+	const auto &[vertElemSpan, vboSpanLayout] = fsh->batchedVertElemAndVboSpans[vertElemSpanAndVboSpanIndex];
+	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
+		sbs->bindShader( e, nullptr, paramsTable, shader, fog, nullptr );
+		const DrawMeshVertSpan drawMeshVertSpan = vertElemSpan;
+		sbs->drawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT ), &vboSpanLayout, &drawMeshVertSpan, GL_TRIANGLES );
+	}
 }
 
 }
