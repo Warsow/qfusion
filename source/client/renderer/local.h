@@ -968,15 +968,8 @@ typedef enum {
 } vbo_tag_t;
 
 typedef struct mesh_vbo_s {
-	void   *owner;
-
-	// TODO: This is practically unused except for merging bsp surfaces.
-	// Also it's meaninggless for heterogenous buffers.
-	unsigned numVerts;
-	unsigned numElems;
-
-	unsigned index;
 	int registrationSequence;
+	unsigned index;
 
 	vbo_tag_t tag;
 
@@ -988,13 +981,12 @@ typedef struct mesh_vbo_s {
 } mesh_vbo_t;
 
 void        R_InitVBO( void );
-mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numInstances,
+mesh_vbo_t *R_CreateMeshVBO( int numVerts, int numElems, int numInstances,
 							 vattribmask_t vattribs, vbo_tag_t tag, vattribmask_t halfFloatVattribs );
 void        R_ReleaseMeshVBO( mesh_vbo_t *vbo );
 void        R_TouchMeshVBO( mesh_vbo_t *vbo );
 mesh_vbo_t *R_GetVBOByIndex( int index );
-int         R_GetNumberOfActiveVBOs( void );
-vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, const VboSpanLayout *layout, vattribmask_t vattribs, const mesh_t *mesh, void *outData );
+vattribmask_t R_FillVBOVertexDataBuffer( const VboSpanLayout *layout, vattribmask_t vattribs, const mesh_t *mesh, void *outData );
 void        R_UploadVBOVertexRawData( mesh_vbo_t *vbo, int vertsOffset, int numVerts, const void *data );
 vattribmask_t R_UploadVBOVertexData( mesh_vbo_t *vbo, int vertsOffset, vattribmask_t vattribs, const mesh_t *mesh );
 void        R_UploadVBOElemData( mesh_vbo_t *vbo, int vertsOffset, int elemsOffset, const mesh_t *mesh );

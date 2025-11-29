@@ -981,7 +981,7 @@ rserr_t R_TrySettingMode( int x, int y, int width, int height, int displayFreque
 
 mesh_vbo_t *R_InitNullModelVBO( void ) {
 	const vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_TEXCOORDS_BIT | VATTRIB_COLOR0_BIT;
-	mesh_vbo_s *vbo = R_CreateMeshVBO( &rf, 6, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
+	mesh_vbo_s *vbo = R_CreateMeshVBO( 6, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
 	if( !vbo ) {
 		return NULL;
 	}
@@ -1027,7 +1027,7 @@ mesh_vbo_t *R_InitNullModelVBO( void ) {
 
 mesh_vbo_t *R_InitPostProcessingVBO( void ) {
 	const vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_TEXCOORDS_BIT;
-	mesh_vbo_t *vbo = R_CreateMeshVBO( &rf, 4, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
+	mesh_vbo_t *vbo = R_CreateMeshVBO( 4, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
 	if( !vbo ) {
 		return NULL;
 	}

@@ -729,7 +729,18 @@ static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned modnum ) {
 
 	unsigned maxTempVBOs = 1024;
 
-	auto *tempVBOs = ( mesh_vbo_t * )Q_malloc( maxTempVBOs * sizeof( mesh_vbo_t ) );
+	struct MergeVboHelper {
+		void   *owner;
+
+		unsigned numVerts;
+		unsigned numElems;
+
+		unsigned index;
+
+		vattribmask_t vattribs;
+	};
+
+	auto *tempVBOs = (  MergeVboHelper* )Q_malloc( maxTempVBOs * sizeof( MergeVboHelper ) );
 	const unsigned startDrawSurface = loadbmodel->numMergedSurfaces;
 
 	bm->numModelDrawSurfaces = 0;
@@ -913,14 +924,13 @@ merge:
 		// create temp VBO to hold pre-batched info
 		if( numTempVBOs == maxTempVBOs ) {
 			maxTempVBOs += 1024;
-			tempVBOs = (mesh_vbo_s *)Q_realloc( tempVBOs, maxTempVBOs * sizeof( *tempVBOs ) );
+			tempVBOs = (MergeVboHelper *)Q_realloc( tempVBOs, maxTempVBOs * sizeof( *tempVBOs ) );
 		}
 
-		mesh_vbo_t *vbo = &tempVBOs[numTempVBOs++];
+		MergeVboHelper *vbo = &tempVBOs[numTempVBOs++];
 		vbo->numVerts = numVerts;
 		vbo->numElems = numElems;
-		assert( vbo->layout.baseOffset == 0 );
-		vbo->layout.vertexAttribs = vattribs;
+		vbo->vattribs = vattribs;
 		if( numFaces == 1 ) {
 			// non-mergable
 			vbo->index = numTempVBOs;
@@ -979,13 +989,13 @@ merge:
 			break;
 		}
 
-		mesh_vbo_t *const vbo = &tempVBOs[i];
+		MergeVboHelper *const vbo = &tempVBOs[i];
 		if( vbo->index == 0 ) {
 			for( unsigned j = i + 1; j < numTempVBOs; j++ ) {
-				mesh_vbo_t *const vbo2 = &tempVBOs[j];
+				MergeVboHelper *const vbo2 = &tempVBOs[j];
 				// If unmerged
 				if( vbo2->index == 0 ) {
-					if( vbo2->layout.vertexAttribs == vbo->layout.vertexAttribs ) {
+					if( vbo2->vattribs == vbo->vattribs ) {
 						if( vbo->numVerts + vbo2->numVerts < USHRT_MAX ) {
 							MergedBspSurface *const mergedSurf = &loadbmodel->mergedSurfaces[startDrawSurface + j];
 							mergedSurf->firstVboVert = vbo->numVerts;
@@ -1014,7 +1024,7 @@ merge:
 	// create real VBOs and assign owner pointers
 	numUnmergedVBOs = numTempVBOs;
 	for( unsigned i = 0; i < numTempVBOs; i++ ) {
-		mesh_vbo_t *const vbo = &tempVBOs[i];
+		MergeVboHelper *const vbo = &tempVBOs[i];
 
 		if( !numUnmergedVBOs ) {
 			break;
@@ -1032,13 +1042,13 @@ merge:
 		MergedBspSurface *mergedSurf = &loadbmodel->mergedSurfaces[startDrawSurface + i];
 
 		// don't use half-floats for XYZ due to precision issues
-		vbo->owner = R_CreateMeshVBO( mergedSurf, vbo->numVerts, vbo->numElems, mergedSurf->numInstances,
-									  vbo->layout.vertexAttribs, VBO_TAG_WORLD, vbo->layout.vertexAttribs & ~floatVattribs );
+		vbo->owner = R_CreateMeshVBO( vbo->numVerts, vbo->numElems, mergedSurf->numInstances,
+									  vbo->vattribs, VBO_TAG_WORLD, vbo->vattribs & ~floatVattribs );
 		mergedSurf->vbo = (mesh_vbo_s *)vbo->owner;
 
 		if( mergedSurf->numInstances == 0 ) {
 			for( unsigned j = i + 1; j < numTempVBOs; j++ ) {
-				mesh_vbo_t *vbo2 = &tempVBOs[j];
+				MergeVboHelper *vbo2 = &tempVBOs[j];
 				if( vbo2->index == i + 1 ) {
 					vbo2->owner = vbo->owner;
 					mergedSurf = &loadbmodel->mergedSurfaces[startDrawSurface + j];

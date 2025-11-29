@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "local.h"
 #include <common/helpers/half_float.h>
+#include <common/types/podbuffer.h>
 
 /*
 =========================================================
@@ -45,30 +46,15 @@ static mesh_vbo_t r_mesh_vbo[MAX_MESH_VERTEX_BUFFER_OBJECTS];
 static vbohandle_t r_vbohandles[MAX_MESH_VERTEX_BUFFER_OBJECTS];
 static vbohandle_t r_vbohandles_headnode, *r_free_vbohandles;
 
-static elem_t *r_vbo_tempelems;
-static unsigned r_vbo_numtempelems;
-
-static void *r_vbo_tempvsoup;
-static size_t r_vbo_tempvsoupsize;
-
 static int r_num_active_vbos;
 
 static GLuint r_vao;
 
-static elem_t *R_VBOElemBuffer( unsigned numElems );
-static void *R_VBOVertBuffer( unsigned numVerts, size_t vertSize );
+static PodBuffer<uint8_t> g_tmpVertexDataBuffer;
+static PodBuffer<uint8_t> g_tmpIndexDataBuffer;
 
-/*
-* R_InitVBO
-*/
 void R_InitVBO( void ) {
 	int i;
-
-	r_vbo_tempelems = NULL;
-	r_vbo_numtempelems = 0;
-
-	r_vbo_tempvsoup = NULL;
-	r_vbo_tempvsoupsize = 0;
 
 	r_num_active_vbos = 0;
 
@@ -190,15 +176,7 @@ auto buildVertexLayoutForVattribs( VboSpanLayout *layout, vattribmask_t vattribs
 	return dataSize;
 }
 
-/*
-* R_CreateMeshVBO
-*
-* Create two static buffer objects: vertex buffer and elements buffer, the real
-* data is uploaded by calling R_UploadVBOVertexData and R_UploadVBOElemData.
-*
-* Tag allows vertex buffer objects to be grouped and released simultaneously.
-*/
-mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numInstances,
+mesh_vbo_t *R_CreateMeshVBO( int numVerts, int numElems, int numInstances,
 							 vattribmask_t vattribs, vbo_tag_t tag, vattribmask_t halfFloatVattribs ) {
 	GLuint vbo_id;
 	vbohandle_t *vboh = NULL;
@@ -267,9 +245,6 @@ mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numIns
 	r_num_active_vbos++;
 
 	vbo->registrationSequence = rsh.registrationSequence;
-	vbo->numVerts = numVerts;
-	vbo->numElems = numElems;
-	vbo->owner = owner;
 	vbo->index = vboh->index + 1;
 	vbo->tag = tag;
 
@@ -283,16 +258,10 @@ error:
 	return NULL;
 }
 
-/*
-* R_TouchMeshVBO
-*/
 void R_TouchMeshVBO( mesh_vbo_t *vbo ) {
 	vbo->registrationSequence = rsh.registrationSequence;
 }
 
-/*
-* R_VBOByIndex
-*/
 mesh_vbo_t *R_GetVBOByIndex( int index ) {
 	if( index >= 1 && index <= MAX_MESH_VERTEX_BUFFER_OBJECTS ) {
 		return r_mesh_vbo + index - 1;
@@ -300,9 +269,6 @@ mesh_vbo_t *R_GetVBOByIndex( int index ) {
 	return NULL;
 }
 
-/*
-* R_ReleaseMeshVBO
-*/
 void R_ReleaseMeshVBO( mesh_vbo_t *vbo ) {
 	GLuint vbo_id;
 
@@ -339,44 +305,170 @@ void R_ReleaseMeshVBO( mesh_vbo_t *vbo ) {
 	vbo->tag = VBO_TAG_NONE;
 }
 
-/*
-* R_GetNumberOfActiveVBOs
-*/
-int R_GetNumberOfActiveVBOs( void ) {
-	return r_num_active_vbos;
+template <typename InType, typename OutType, unsigned NumComponents>
+[[nodiscard]]
+static auto fillAttribData( vattribmask_t attrib, const void *inData, size_t outStride, size_t numVerts, void *outData ) -> vattribmask_t {
+	assert( numVerts && NumComponents );
+	if( inData ) {
+		size_t vertNum = 0;
+		do {
+			auto *const __restrict out      = (OutType *)( (const uint8_t *)outData + vertNum * outStride );
+			const auto *const __restrict in = ( (const InType *)inData ) + vertNum * NumComponents;
+			assert( ( ( (uintptr_t)out ) % alignof( OutType ) ) == 0 );
+			assert( ( ( (uintptr_t)in ) % alignof( InType ) ) == 0 );
+			unsigned componentNum = 0;
+			do {
+				if constexpr( std::is_same_v<InType, float> && std::is_same_v<OutType, GLhalf> ) {
+					out[componentNum] = Com_FloatToHalf( in[componentNum] );
+				} else {
+					out[componentNum] = in[componentNum];
+				}
+			} while( ++componentNum < NumComponents );
+		} while( ++vertNum < numVerts );
+		return 0;
+	} else {
+		return attrib;
+	}
 }
 
-/*
-* R_FillVertexBuffer
-*/
-#define R_FillVertexBuffer( intype,outtype,in,size,stride,numVerts,out ) \
-	R_FillVertexBuffer ## intype ## outtype( in,size,stride,numVerts,(outtype *)( out ) )
+template <vattribmask_t Attrib, unsigned NumComponents>
+[[nodiscard]]
+static auto fillFloatAttribData( const void *inData, vattribmask_t hfa, size_t outStride, size_t numVerts, void *outData ) -> vattribmask_t {
+	if( FLOAT_VATTRIB_GL_TYPE( Attrib, hfa ) == GL_HALF_FLOAT ) {
+		return fillAttribData<float, GLhalf, NumComponents>( Attrib, inData, outStride, numVerts, outData );
+	} else {
+		return fillAttribData<float, float, NumComponents>( Attrib, inData, outStride, numVerts, outData );
+	}
+}
 
-#define R_FillVertexBuffer_f( intype,outtype,conv ) \
-	static void R_FillVertexBuffer ## intype ## outtype( intype * in, size_t size, \
-														 size_t stride, unsigned numVerts, outtype * out ) \
-	{ \
-		size_t i, j; \
-		for( i = 0; i < numVerts; i++ ) { \
-			for( j = 0; j < size; j++ ) { \
-				out[j] = conv( *in++ ); \
-			} \
-			out = ( outtype * )( ( uint8_t * )out + stride ); \
-		} \
+template <unsigned NumComponents>
+[[nodiscard]]
+static auto fillFloatAttribData( vattribbit_t attrib, const void *inData, vattribmask_t hfa, size_t outStride,
+								 size_t numVerts, void *outData ) -> vattribmask_t {
+	if( FLOAT_VATTRIB_GL_TYPE( attrib, hfa ) == GL_HALF_FLOAT ) {
+		return fillAttribData<float, GLhalf, NumComponents>( attrib, inData, outStride, numVerts, outData );
+	} else {
+		return fillAttribData<float, float, NumComponents>( attrib, inData, outStride, numVerts, outData );
+	}
+}
+
+static void fillAutosprite2Attribs( const mesh_t *mesh, const VboSpanLayout *layout, vattribmask_t hfa, uint8_t *data ) {
+	// for autosprite2 also upload vertices that form the longest axis
+	// the remaining vertex can be trivially computed in vertex shader
+
+	unsigned numQuads;
+	vec4_t *const verts = mesh->xyzArray;
+	const elem_t *elems = mesh->elems;
+	const elem_t trifanElems[6] { 0, 1, 2, 0, 2, 3 };
+	assert( ( mesh->elems && mesh->numElems ) || ( mesh->numVerts == 4 ) );
+	if( mesh->elems && mesh->numElems ) {
+		numQuads = mesh->numElems / 6;
+
+		// protect against bogus autosprite2 meshes
+		if( numQuads > mesh->numVerts / 4 ) {
+			numQuads = mesh->numVerts / 4;
+		}
+	} else if( mesh->numVerts == 4 ) {
+		// single quad as triangle fan
+		numQuads = 1;
+		elems    = trifanElems;
+	} else {
+		numQuads = 0;
 	}
 
-R_FillVertexBuffer_f( float, float, );
-R_FillVertexBuffer_f( float, GLhalf, Com_FloatToHalf );
-R_FillVertexBuffer_f( int, int, );
-#define R_FillVertexBuffer_float_or_half( gl_type,in,size,stride,numVerts,out ) \
-	do { \
-		if( gl_type == GL_HALF_FLOAT ) { \
-			R_FillVertexBuffer( float, GLhalf, in, size, stride, numVerts, out ); \
-		} \
-		else { \
-			R_FillVertexBuffer( float, float, in, size, stride, numVerts, out ); \
-		} \
-	} while( 0 )
+	const auto vertSize  = layout->vertexSize;
+	size_t bufferOffset0 = layout->spritePointsOffset;
+	size_t bufferOffset1 = layout->sVectorsOffset;
+	for( unsigned i = 0; i < numQuads; i++ ) {
+		// find the longest edge, the long edge and the short edge
+		int longest_edge = -1, longer_edge = -1;
+		float longest_dist = 0, longer_dist = 0;
+		float d[3];
+		vec3_t vd[3];
+		const int edges[3][2] = { { 1, 0 }, { 2, 0 }, { 2, 1 } };
+		for( int j = 0; j < 3; j++ ) {
+			VectorSubtract( verts[elems[edges[j][0]]], verts[elems[edges[j][1]]], vd[j] );
+			float len = VectorLength( vd[j] );
+			if( len == 0.0f ) {
+				len = 1.0f;
+			}
+			d[j] = len;
+
+			if( longest_edge == -1 || longest_dist < len ) {
+				longer_dist = longest_dist;
+				longer_edge = longest_edge;
+				longest_dist = len;
+				longest_edge = j;
+			} else if( longer_dist < len ) {
+				longer_dist = len;
+				longer_edge = j;
+			}
+		}
+
+		if( const int short_edge = 3 - ( longest_edge + longer_edge ); short_edge <= 2 ) {
+			vec4_t centre[4], axes[4];
+
+			// centre
+			VectorAdd( verts[elems[edges[longest_edge][0]]], verts[elems[edges[longest_edge][1]]], centre[0] );
+			VectorScale( centre[0], 0.5f, centre[0] );
+			// radius
+			centre[0][3] = d[longest_edge] * 0.5f; // unused
+			// right axis, normalized
+			VectorScale( vd[short_edge], 1.0 / d[short_edge], vd[short_edge] );
+			// up axis, normalized
+			VectorScale( vd[longer_edge], 1.0 / d[longer_edge], vd[longer_edge] );
+
+			NormToLatLong( vd[short_edge], &axes[0][0] );
+			NormToLatLong( vd[longer_edge], &axes[0][2] );
+
+			for( unsigned j = 1; j < 4; j++ ) {
+				Vector4Copy( centre[0], centre[j] );
+				Vector4Copy( axes[0], axes[j] );
+			}
+
+			(void)fillFloatAttribData<VATTRIB_AUTOSPRITE_BIT, 4>( centre, hfa, vertSize, 4, data + bufferOffset0 );
+			(void)fillFloatAttribData<VATTRIB_SVECTOR_BIT, 4>( axes, hfa, vertSize, 4, data + bufferOffset1 );
+
+			bufferOffset0 += 4 * vertSize;
+			bufferOffset1 += 4 * vertSize;
+		}
+
+		elems += 6;
+	}
+}
+
+static void fillAutospriteAttribs( const mesh_s *mesh, const VboSpanLayout *layout, vattribmask_t hfa, uint8_t *data ) {
+	vec4_t *verts;
+	unsigned numQuads;
+	if( mesh->xyzArray ) {
+		verts = mesh->xyzArray;
+		numQuads = mesh->numVerts / 4;
+	} else {
+		verts = nullptr;
+		numQuads = 0;
+	}
+
+	const auto vertSize = layout->vertexSize;
+	size_t bufferOffset = layout->spritePointsOffset;
+	for( unsigned i = 0; i < numQuads; i++ ) {
+		vec4_t centre[4];
+		// centre
+		for( unsigned j = 0; j < 3; j++ ) {
+			centre[0][j] = ( verts[0][j] + verts[1][j] + verts[2][j] + verts[3][j] ) * 0.25f;
+		}
+		// radius
+		centre[0][3] = Distance( verts[0], centre[0] ) * 0.707106f;     // 1.0f / sqrt(2)
+
+		for( unsigned j = 1; j < 4; j++ ) {
+			Vector4Copy( centre[0], centre[j] );
+		}
+
+		(void)fillFloatAttribData<VATTRIB_AUTOSPRITE_BIT, 4>( centre, hfa, vertSize, 4, data + bufferOffset );
+
+		bufferOffset += 4 * vertSize;
+		verts += 4;
+	}
+}
 
 /*
 * R_FillVBOVertexDataBuffer
@@ -388,375 +480,127 @@ R_FillVertexBuffer_f( int, int, );
 * VATTRIB_POSITION_BIT is not set, it will also reset bits for other positional
 * attributes such as autosprite pos and instance pos.
 */
-vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, const VboSpanLayout *layout, vattribmask_t vattribs, const mesh_t *mesh, void *outData ) {
-	int i, j;
-	unsigned numVerts;
-	size_t vertSize;
-	vattribmask_t errMask;
-	vattribmask_t hfa;
-
-	assert( vbo != NULL );
-	assert( mesh != NULL );
-
-	if( !vbo ) {
-		return 0;
-	}
-
-	if( !layout ) {
-		layout = &vbo->layout;
-	}
-	uint8_t *data = (uint8_t *)outData + layout->baseOffset;
-
-	errMask = 0;
-	numVerts = mesh->numVerts;
-	vertSize = layout->vertexSize;
-
-	hfa = layout->halfFloatAttribs;
+vattribmask_t R_FillVBOVertexDataBuffer( const VboSpanLayout *layout, vattribmask_t vattribs, const mesh_t *mesh, void *outData ) {
+	vattribmask_t errMask   = 0;
+	const unsigned numVerts = mesh->numVerts;
+	const size_t vertSize   = layout->vertexSize;
+	const vattribmask_t hfa = layout->halfFloatAttribs;
+	uint8_t *const data     = (uint8_t *)outData + layout->baseOffset;
 
 	// upload vertex xyz data
 	if( vattribs & VATTRIB_POSITION_BIT ) {
-		if( !mesh->xyzArray ) {
-			errMask |= VATTRIB_POSITION_BIT;
-		} else {
-			R_FillVertexBuffer_float_or_half( FLOAT_VATTRIB_GL_TYPE( VATTRIB_POSITION_BIT, hfa ),
-											  mesh->xyzArray[0],
-											  4, vertSize, numVerts, data + 0 );
-		}
+		errMask |= fillFloatAttribData<VATTRIB_POSITION_BIT, 4>( mesh->xyzArray, hfa, vertSize, numVerts, data + 0 );
 	}
 
 	// upload normals data
 	if( layout->normalsOffset && ( vattribs & VATTRIB_NORMAL_BIT ) ) {
-		if( !mesh->normalsArray ) {
-			errMask |= VATTRIB_NORMAL_BIT;
-		} else {
-			R_FillVertexBuffer_float_or_half( FLOAT_VATTRIB_GL_TYPE( VATTRIB_NORMAL_BIT, hfa ),
-											  mesh->normalsArray[0],
-											  4, vertSize, numVerts, data + layout->normalsOffset );
-		}
+		errMask |= fillFloatAttribData<VATTRIB_NORMAL_BIT, 4>( mesh->normalsArray, hfa, vertSize,
+															   numVerts, data + layout->normalsOffset );
 	}
 
 	// upload tangent vectors
 	if( layout->sVectorsOffset && ( ( vattribs & ( VATTRIB_SVECTOR_BIT | VATTRIB_AUTOSPRITE2_BIT ) ) == VATTRIB_SVECTOR_BIT ) ) {
-		if( !mesh->sVectorsArray ) {
-			errMask |= VATTRIB_SVECTOR_BIT;
-		} else {
-			R_FillVertexBuffer_float_or_half( FLOAT_VATTRIB_GL_TYPE( VATTRIB_SVECTOR_BIT, hfa ),
-											  mesh->sVectorsArray[0],
-											  4, vertSize, numVerts, data + layout->sVectorsOffset );
-		}
+		errMask |= fillFloatAttribData<VATTRIB_SVECTOR_BIT, 4>( mesh->sVectorsArray, hfa, vertSize,
+																numVerts, data + layout->sVectorsOffset );
 	}
 
 	// upload texture coordinates
 	if( layout->stOffset && ( vattribs & VATTRIB_TEXCOORDS_BIT ) ) {
-		if( !mesh->stArray ) {
-			errMask |= VATTRIB_TEXCOORDS_BIT;
-		} else {
-			R_FillVertexBuffer_float_or_half( FLOAT_VATTRIB_GL_TYPE( VATTRIB_TEXCOORDS_BIT, hfa ),
-											  mesh->stArray[0],
-											  2, vertSize, numVerts, data + layout->stOffset );
-		}
+		errMask |= fillFloatAttribData<VATTRIB_TEXCOORDS_BIT, 2>( mesh->stArray[0], hfa, vertSize,
+																  numVerts, data + layout->stOffset );
 	}
 
 	// upload lightmap texture coordinates
-	if( vbo->layout.lmstOffset[0] && ( vattribs & VATTRIB_LMCOORDS0_BIT ) ) {
-		vattribbit_t lmattrbit;
-		int type = FLOAT_VATTRIB_GL_TYPE( VATTRIB_LMCOORDS0_BIT, hfa );
-		int lmstSize = ( ( type == GL_HALF_FLOAT ) ? 2 * sizeof( GLhalf ) : 2 * sizeof( float ) );
+	if( layout->lmstOffset[0] && ( vattribs & VATTRIB_LMCOORDS0_BIT ) ) {
+		const auto type       = FLOAT_VATTRIB_GL_TYPE( VATTRIB_LMCOORDS0_BIT, hfa );
+		const size_t lmstSize = ( ( type == GL_HALF_FLOAT ) ? 2 * sizeof( GLhalf ) : 2 * sizeof( float ) );
 
-		lmattrbit = VATTRIB_LMCOORDS0_BIT;
-
-		for( i = 0; i < ( MAX_LIGHTMAPS + 1 ) / 2; i++ ) {
+		unsigned lmattrbit = VATTRIB_LMCOORDS0_BIT;
+		for( unsigned i = 0; i < ( MAX_LIGHTMAPS + 1 ) / 2; i++ ) {
 			if( !( vattribs & lmattrbit ) ) {
 				break;
 			}
-			if( !mesh->lmstArray[i * 2 + 0] ) {
-				errMask |= lmattrbit;
+			assert( !( errMask & lmattrbit ) );
+			errMask = fillFloatAttribData<2>( (vattribbit_t)lmattrbit, mesh->lmstArray[i * 2 + 0], hfa, vertSize,
+											  numVerts, data + layout->lmstOffset[i] );
+			if( errMask & lmattrbit ) {
 				break;
 			}
-
-			R_FillVertexBuffer_float_or_half( type,
-											  mesh->lmstArray[i * 2 + 0][0],
-											  2, vertSize, numVerts, data + vbo->layout.lmstOffset[i] );
-
-			if( vattribs & ( lmattrbit << 1 ) ) {
-				if( !mesh->lmstArray[i * 2 + 1] ) {
-					errMask |= lmattrbit << 1;
+			lmattrbit <<= 1;
+			if( vattribs & lmattrbit ) {
+				assert( !( errMask & lmattrbit ) );
+				errMask = fillFloatAttribData<2>( (vattribbit_t)lmattrbit, mesh->lmstArray[i * 2 + 1], hfa, vertSize,
+												  numVerts, data + layout->lmstOffset[i] + lmstSize );
+				if( errMask & lmattrbit ) {
 					break;
 				}
-				R_FillVertexBuffer_float_or_half( type,
-												  mesh->lmstArray[i * 2 + 1][0],
-												  2, vertSize, numVerts, data + vbo->layout.lmstOffset[i] + lmstSize );
 			}
-
-			lmattrbit = ( decltype( lmattrbit ) )( lmattrbit << 2 );
+			lmattrbit <<= 1;
 		}
 	}
 
 	// upload lightmap array texture layers
-	if( vbo->layout.lmlayersOffset[0] && ( vattribs & VATTRIB_LMLAYERS0123_BIT ) ) {
-		vattribbit_t lmattrbit;
-
-		lmattrbit = VATTRIB_LMLAYERS0123_BIT;
-
-		for( i = 0; i < ( MAX_LIGHTMAPS + 3 ) / 4; i++ ) {
+	if( layout->lmlayersOffset[0] && ( vattribs & VATTRIB_LMLAYERS0123_BIT ) ) {
+		vattribbit_t lmattrbit = VATTRIB_LMLAYERS0123_BIT;
+		for( unsigned i = 0; i < ( MAX_LIGHTMAPS + 3 ) / 4; i++ ) {
 			if( !( vattribs & lmattrbit ) ) {
 				break;
 			}
-			if( !mesh->lmlayersArray[i] ) {
-				errMask |= lmattrbit;
+			assert( !( errMask & lmattrbit ) );
+			errMask |= fillAttribData<int, int, 1>( lmattrbit, mesh->lmlayersArray[i], vertSize,
+													numVerts, data + layout->lmlayersOffset[i] );
+			if( errMask & lmattrbit ) {
 				break;
 			}
-
-			R_FillVertexBuffer( int, int,
-								( int * )&mesh->lmlayersArray[i][0],
-								1, vertSize, numVerts, data + vbo->layout.lmlayersOffset[i] );
-
 			lmattrbit = ( decltype( lmattrbit ) )( lmattrbit << 1 );
 		}
 	}
 
 	// upload vertex colors (although indices > 0 are never used)
-	if( vbo->layout.colorsOffset[0] && ( vattribs & VATTRIB_COLOR0_BIT ) ) {
-		if( !mesh->colorsArray[0] ) {
-			errMask |= VATTRIB_COLOR0_BIT;
-		} else {
-			R_FillVertexBuffer( int, int,
-								(int *)&mesh->colorsArray[0][0],
-								1, vertSize, numVerts, data + vbo->layout.colorsOffset[0] );
-		}
+	if( layout->colorsOffset[0] && ( vattribs & VATTRIB_COLOR0_BIT ) ) {
+		errMask |= fillAttribData<int, int, 1>( VATTRIB_COLOR0_BIT, mesh->colorsArray[0], vertSize,
+												numVerts, data + layout->colorsOffset[0] );
 	}
 
 	// upload centre and radius for autosprites
 	// this code assumes that the mesh has been properly pretransformed
-	if( vbo->layout.spritePointsOffset && ( ( vattribs & VATTRIB_AUTOSPRITE2_BIT ) == VATTRIB_AUTOSPRITE2_BIT ) ) {
-		// for autosprite2 also upload vertices that form the longest axis
-		// the remaining vertex can be trivially computed in vertex shader
-		vec3_t vd[3];
-		float d[3];
-		int longest_edge = -1, longer_edge = -1, short_edge;
-		float longest_dist = 0, longer_dist = 0;
-		const int edges[3][2] = { { 1, 0 }, { 2, 0 }, { 2, 1 } };
-		vec4_t centre[4];
-		vec4_t axes[4];
-		vec4_t *verts = mesh->xyzArray;
-		const elem_t *elems = mesh->elems, trifanElems[6] = { 0, 1, 2, 0, 2, 3 };
-		int numQuads;
-		size_t bufferOffset0 = vbo->layout.spritePointsOffset;
-		size_t bufferOffset1 = vbo->layout.sVectorsOffset;
-
-		assert( ( mesh->elems && mesh->numElems ) || ( numVerts == 4 ) );
-		if( mesh->elems && mesh->numElems ) {
-			numQuads = mesh->numElems / 6;
-
-			// protect against bogus autosprite2 meshes
-			if( numQuads > mesh->numVerts / 4 ) {
-				numQuads = mesh->numVerts / 4;
-			}
-		} else if( numVerts == 4 ) {
-			// single quad as triangle fan
-			numQuads = 1;
-			elems = trifanElems;
-		} else {
-			numQuads = 0;
-		}
-
-		for( i = 0; i < numQuads; i++, elems += 6 ) {
-			// find the longest edge, the long edge and the short edge
-			longest_edge = longer_edge = -1;
-			longest_dist = longer_dist = 0;
-			for( j = 0; j < 3; j++ ) {
-				float len;
-
-				VectorSubtract( verts[elems[edges[j][0]]], verts[elems[edges[j][1]]], vd[j] );
-				len = VectorLength( vd[j] );
-				if( !len ) {
-					len = 1;
-				}
-				d[j] = len;
-
-				if( longest_edge == -1 || longest_dist < len ) {
-					longer_dist = longest_dist;
-					longer_edge = longest_edge;
-					longest_dist = len;
-					longest_edge = j;
-				} else if( longer_dist < len ) {
-					longer_dist = len;
-					longer_edge = j;
-				}
-			}
-
-			short_edge = 3 - ( longest_edge + longer_edge );
-			if( short_edge > 2 ) {
-				continue;
-			}
-
-			// centre
-			VectorAdd( verts[elems[edges[longest_edge][0]]], verts[elems[edges[longest_edge][1]]], centre[0] );
-			VectorScale( centre[0], 0.5, centre[0] );
-			// radius
-			centre[0][3] = d[longest_edge] * 0.5; // unused
-			// right axis, normalized
-			VectorScale( vd[short_edge], 1.0 / d[short_edge], vd[short_edge] );
-			// up axis, normalized
-			VectorScale( vd[longer_edge], 1.0 / d[longer_edge], vd[longer_edge] );
-
-			NormToLatLong( vd[short_edge], &axes[0][0] );
-			NormToLatLong( vd[longer_edge], &axes[0][2] );
-
-			for( j = 1; j < 4; j++ ) {
-				Vector4Copy( centre[0], centre[j] );
-				Vector4Copy( axes[0], axes[j] );
-			}
-
-			R_FillVertexBuffer_float_or_half( FLOAT_VATTRIB_GL_TYPE( VATTRIB_AUTOSPRITE_BIT, hfa ),
-											  centre[0],
-											  4, vertSize, 4, data + bufferOffset0 );
-			R_FillVertexBuffer_float_or_half( FLOAT_VATTRIB_GL_TYPE( VATTRIB_SVECTOR_BIT, hfa ),
-											  axes[0],
-											  4, vertSize, 4, data + bufferOffset1 );
-
-			bufferOffset0 += 4 * vertSize;
-			bufferOffset1 += 4 * vertSize;
-		}
-	} else if( vbo->layout.spritePointsOffset && ( ( vattribs & VATTRIB_AUTOSPRITE_BIT ) == VATTRIB_AUTOSPRITE_BIT ) ) {
-		vec4_t *verts;
-		vec4_t centre[4];
-		int numQuads;
-		size_t bufferOffset = vbo->layout.spritePointsOffset;
-
-		if( mesh->xyzArray ) {
-			verts = mesh->xyzArray;
-			numQuads = numVerts / 4;
-		} else {
-			verts = NULL;
-			numQuads = 0;
-		}
-
-		for( i = 0; i < numQuads; i++ ) {
-			// centre
-			for( j = 0; j < 3; j++ ) {
-				centre[0][j] = ( verts[0][j] + verts[1][j] + verts[2][j] + verts[3][j] ) * 0.25;
-			}
-			// radius
-			centre[0][3] = Distance( verts[0], centre[0] ) * 0.707106f;     // 1.0f / sqrt(2)
-
-			for( j = 1; j < 4; j++ ) {
-				Vector4Copy( centre[0], centre[j] );
-			}
-
-			R_FillVertexBuffer_float_or_half( FLOAT_VATTRIB_GL_TYPE( VATTRIB_AUTOSPRITE_BIT, hfa ),
-											  centre[0],
-											  4, vertSize, 4, data + bufferOffset );
-
-			bufferOffset += 4 * vertSize;
-			verts += 4;
-		}
+	if( layout->spritePointsOffset && ( ( vattribs & VATTRIB_AUTOSPRITE2_BIT ) == VATTRIB_AUTOSPRITE2_BIT ) ) {
+		fillAutosprite2Attribs( mesh, layout, hfa, data );
+	} else if( layout->spritePointsOffset && ( ( vattribs & VATTRIB_AUTOSPRITE_BIT ) == VATTRIB_AUTOSPRITE_BIT ) ) {
+		fillAutospriteAttribs( mesh, layout, hfa, data );
 	}
 
 	if( vattribs & VATTRIB_BONES_BITS ) {
 		if( layout->bonesIndicesOffset ) {
-			if( !mesh->blendIndices ) {
-				errMask |= VATTRIB_BONESINDICES_BIT;
-			} else {
-				R_FillVertexBuffer( int, int,
-									(int *)&mesh->blendIndices[0],
-									1, vertSize, numVerts, data + layout->bonesIndicesOffset );
-			}
+			errMask |= fillAttribData<int, int, 1>( VATTRIB_BONESINDICES_BIT, mesh->blendIndices, vertSize,
+													numVerts, data + layout->bonesIndicesOffset );
 		}
 		if( layout->bonesWeightsOffset ) {
-			if( !mesh->blendWeights ) {
-				errMask |= VATTRIB_BONESWEIGHTS_BIT;
-			} else {
-				R_FillVertexBuffer( int, int,
-									(int *)&mesh->blendWeights[0],
-									1, vertSize, numVerts, data + layout->bonesWeightsOffset );
-			}
+			errMask |= fillAttribData<int, int, 1>( VATTRIB_BONESWEIGHTS_BIT, mesh->blendWeights, vertSize,
+													numVerts, data + layout->bonesWeightsOffset );
 		}
 	}
 
 	return errMask;
 }
 
-/*
-* R_UploadVBOVertexRawData
-*/
 void R_UploadVBOVertexRawData( mesh_vbo_t *vbo, int vertsOffset, int numVerts, const void *data ) {
-	assert( vbo != NULL );
-	if( !vbo || !vbo->vertexId ) {
-		return;
-	}
-
 	qglBindBuffer( GL_ARRAY_BUFFER, vbo->vertexId );
 	qglBufferSubData( GL_ARRAY_BUFFER, vertsOffset * vbo->layout.vertexSize, numVerts * vbo->layout.vertexSize, data );
 }
 
-/*
-* R_UploadVBOVertexData
-*/
 vattribmask_t R_UploadVBOVertexData( mesh_vbo_t *vbo, int vertsOffset, vattribmask_t vattribs, const mesh_t *mesh ) {
-	void *data;
-	vattribmask_t errMask;
-
-	assert( vbo != NULL );
-	assert( mesh != NULL );
-	if( !vbo || !vbo->vertexId ) {
-		return 0;
-	}
-
-	data = R_VBOVertBuffer( mesh->numVerts, vbo->layout.vertexSize );
-	errMask = R_FillVBOVertexDataBuffer( vbo, nullptr, vattribs, mesh, data );
+	void *data = g_tmpVertexDataBuffer.reserveAndGet( mesh->numVerts * vbo->layout.vertexSize );
+	vattribmask_t errMask = R_FillVBOVertexDataBuffer( &vbo->layout, vattribs, mesh, data );
 	R_UploadVBOVertexRawData( vbo, vertsOffset, mesh->numVerts, data );
 	return errMask;
 }
 
-/*
-* R_VBOElemBuffer
-*/
-static elem_t *R_VBOElemBuffer( unsigned numElems ) {
-	if( numElems > r_vbo_numtempelems ) {
-		if( r_vbo_numtempelems ) {
-			Q_free( r_vbo_tempelems );
-		}
-		r_vbo_numtempelems = numElems;
-		r_vbo_tempelems = ( elem_t * )Q_malloc( sizeof( *r_vbo_tempelems ) * numElems );
-	}
-
-	return r_vbo_tempelems;
-}
-
-/*
-* R_VBOVertBuffer
-*/
-static void *R_VBOVertBuffer( unsigned numVerts, size_t vertSize ) {
-	size_t size = numVerts * vertSize;
-	if( size > r_vbo_tempvsoupsize ) {
-		if( r_vbo_tempvsoup ) {
-			Q_free( r_vbo_tempvsoup );
-		}
-		r_vbo_tempvsoupsize = size;
-		r_vbo_tempvsoup = ( float * )Q_malloc( size );
-	}
-	return r_vbo_tempvsoup;
-}
-
-/*
-* R_UploadVBOElemData
-*
-* Upload elements into the buffer, properly offsetting them (batching)
-*/
 void R_UploadVBOElemData( mesh_vbo_t *vbo, int vertsOffset, int elemsOffset, const mesh_t *mesh ) {
-	int i;
 	elem_t *ielems = mesh->elems;
-
-	assert( vbo != NULL );
-
-	if( !vbo->elemId ) {
-		return;
-	}
-
 	if( vertsOffset ) {
-		ielems = R_VBOElemBuffer( mesh->numElems );
-		for( i = 0; i < mesh->numElems; i++ ) {
+		ielems = (elem_t *)g_tmpIndexDataBuffer.reserveAndGet( mesh->numElems * sizeof( elem_t ) );
+		for( unsigned i = 0; i < mesh->numElems; i++ ) {
 			ielems[i] = vertsOffset + mesh->elems[i];
 		}
 	}
@@ -766,9 +610,6 @@ void R_UploadVBOElemData( mesh_vbo_t *vbo, int vertsOffset, int elemsOffset, con
 						 mesh->numElems * sizeof( elem_t ), ielems );
 }
 
-/*
-* R_UploadVBOInstancesData
-*/
 vattribmask_t R_UploadVBOInstancesData( mesh_vbo_t *vbo, int instOffset, int numInstances, instancePoint_t *instances ) {
 	vattribmask_t errMask = 0;
 
@@ -796,11 +637,6 @@ vattribmask_t R_UploadVBOInstancesData( mesh_vbo_t *vbo, int instOffset, int num
 	return 0;
 }
 
-/*
-* R_FreeVBOsByTag
-*
-* Release all vertex buffer objects with specified tag.
-*/
 void R_FreeVBOsByTag( vbo_tag_t tag ) {
 	mesh_vbo_t *vbo;
 	vbohandle_t *vboh, *next, *hnode;
@@ -820,9 +656,6 @@ void R_FreeVBOsByTag( vbo_tag_t tag ) {
 	}
 }
 
-/*
-* R_FreeUnusedVBOs
-*/
 void R_FreeUnusedVBOs( void ) {
 	mesh_vbo_t *vbo;
 	vbohandle_t *vboh, *next, *hnode;
@@ -842,9 +675,6 @@ void R_FreeUnusedVBOs( void ) {
 	}
 }
 
-/*
-* R_ShutdownVBO
-*/
 void R_ShutdownVBO( void ) {
 	mesh_vbo_t *vbo;
 	vbohandle_t *vboh, *next, *hnode;
@@ -860,11 +690,6 @@ void R_ShutdownVBO( void ) {
 
 		R_ReleaseMeshVBO( vbo );
 	}
-
-	if( r_vbo_tempelems ) {
-		Q_free( r_vbo_tempelems );
-	}
-	r_vbo_numtempelems = 0;
 
 	qglBindVertexArray( 0 );
 	qglDeleteVertexArrays( 1, &r_vao );

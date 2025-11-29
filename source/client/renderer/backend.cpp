@@ -152,7 +152,7 @@ void RB_RegisterStreamVBOs() {
 			}
 			unsigned capacityInElems = 6 * capacityInVerts;
 			// TODO: Allow to supplying capacity in bytes for heterogenous buffers
-			vu.vbo = R_CreateMeshVBO( &rb, capacityInVerts, capacityInElems, 0, vattribs, VBO_TAG_STREAM, 0 );
+			vu.vbo = R_CreateMeshVBO( capacityInVerts, capacityInElems, 0, vattribs, VBO_TAG_STREAM, 0 );
 			vu.vboData = Q_malloc( capacityInVerts * vu.vbo->layout.vertexSize );
 			vu.iboData = Q_malloc( capacityInElems * sizeof( uint16_t ) );
 			vu.vboCapacityInVerts = capacityInVerts;
@@ -223,7 +223,7 @@ void R_SetUploadedSubdataFromMeshUsingOffsets( unsigned group, unsigned baseVert
 		auto *const destVertexData = (uint8_t *)vu.vboData + verticesOffsetInBytes;
 		auto *const destIndexData  = (uint16_t *)((uint8_t *)vu.iboData + indicesOffsetInBytes );
 
-		R_FillVBOVertexDataBuffer( vu.vbo, &vu.vbo->layout, vu.vbo->layout.vertexAttribs, mesh, destVertexData );
+		R_FillVBOVertexDataBuffer( &vu.vbo->layout, vu.vbo->layout.vertexAttribs, mesh, destVertexData );
 		for( unsigned i = 0; i < mesh->numElems; ++i ) {
 			// TODO: Current frontend-enforced limitations are the sole protection from overflow
 			// TODO: Use draw elements base vertex
@@ -238,7 +238,7 @@ void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVerte
 	if( mesh->numVerts && mesh->numElems ) {
 		auto &vu = rb.vertexUploads[group];
 
-		R_FillVBOVertexDataBuffer( vu.vbo, layout, layout->vertexAttribs, mesh, vu.vboData );
+		R_FillVBOVertexDataBuffer( layout, layout->vertexAttribs, mesh, vu.vboData );
 
 		auto *const destIndexData  = ( (uint16_t *)vu.iboData ) + indexOfFirstIndex;
 		for( unsigned i = 0; i < mesh->numElems; ++i ) {
