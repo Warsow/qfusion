@@ -67,14 +67,14 @@ public:
 	void setCamera( const vec3_t cameraOrigin, const mat3_t cameraAxis );
 	bool enableWireframe( bool enable );
 
-	void bindVbo( const mesh_vbo_s *vbo );
+	void bindMeshBuffer( const MeshBuffer *buffer );
 	void bindRenderTarget( RenderTargetComponents *components );
 
 	[[nodiscard]]
 	auto getCurrUniformDataSize( unsigned binding ) const -> unsigned;
 	void registerUniformBlockUpdate( unsigned binding, GLuint bufferId, unsigned blockSize );
 
-	void drawMesh( const FrontendToBackendShared *fsh, int vboId, const VboSpanLayout *vboSpanLayout, const DrawMeshVertSpan *vertSpan, int primitive );
+	void drawMesh( const FrontendToBackendShared *fsh, const MeshBuffer *buffer, const VboSpanLayout *layout, const DrawMeshVertSpan *vertSpan, int primitive );
 private:
 	[[nodiscard]]
 	bool shouldApplyDrawflatInCurrentState() const;

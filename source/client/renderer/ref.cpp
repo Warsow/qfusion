@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "local.h"
 #include "program.h"
+#include "buffermanagement.h"
 #include "materiallocal.h"
 #include "texturemanagement.h"
 #include "frontend.h"
@@ -630,13 +631,10 @@ void RF_BeginRegistration( void ) {
 	R_BeginRegistration_();
 
 	R_SetDefaultGLState();
-	RB_BeginRegistration();
 }
 
 void RF_EndRegistration( void ) {
 	R_EndRegistration_();
-
-	RB_EndRegistration();
 }
 
 int RF_GetAverageFrametime( void ) {
@@ -798,9 +796,8 @@ void R_SetDefaultGLState() {
 
 	qglActiveTexture( GL_TEXTURE0 );
 
-	// TODO:?
-	//qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
-	//qglBindBuffer( GL_ARRAY_BUFFER, 0 );
+	qglBindBuffer( GL_ARRAY_BUFFER, 0 );
+	qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
 
 	qglUseProgram( 0 );
 }
@@ -979,75 +976,73 @@ rserr_t R_TrySettingMode( int x, int y, int width, int height, int displayFreque
 	return rserr_ok;
 }
 
-mesh_vbo_t *R_InitNullModelVBO( void ) {
+MeshBuffer *R_InitNullModelVBO( BufferCache *bufferCache ) {
 	const vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_TEXCOORDS_BIT | VATTRIB_COLOR0_BIT;
-	mesh_vbo_s *vbo = R_CreateMeshVBO( &rf, 6, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
-	if( !vbo ) {
-		return NULL;
+	MeshBuffer *const buffer = bufferCache->createMeshBuffer( 6, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
+	if( buffer ) {
+		vec4_t xyz[6];
+		byte_vec4_t colors[6];
+
+		constexpr float scale = 15;
+		Vector4Set( xyz[0], 0, 0, 0, 1 );
+		Vector4Set( xyz[1], scale, 0, 0, 1 );
+		Vector4Set( colors[0], 255, 0, 0, 127 );
+		Vector4Set( colors[1], 255, 0, 0, 127 );
+
+		Vector4Set( xyz[2], 0, 0, 0, 1 );
+		Vector4Set( xyz[3], 0, scale, 0, 1 );
+		Vector4Set( colors[2], 0, 255, 0, 127 );
+		Vector4Set( colors[3], 0, 255, 0, 127 );
+
+		Vector4Set( xyz[4], 0, 0, 0, 1 );
+		Vector4Set( xyz[5], 0, 0, scale, 1 );
+		Vector4Set( colors[4], 0, 0, 255, 127 );
+		Vector4Set( colors[5], 0, 0, 255, 127 );
+
+		vec4_t normals[6] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
+		vec2_t texcoords[6] = { {0,0}, {0,1}, {0,0}, {0,1}, {0,0}, {0,1} };
+		elem_t elems[6] = { 0, 1, 2, 3, 4, 5 };
+
+		mesh_t mesh;
+		memset( &mesh, 0, sizeof( mesh ) );
+		mesh.numVerts = 6;
+		mesh.xyzArray = xyz;
+		mesh.normalsArray = normals;
+		mesh.stArray = texcoords;
+		mesh.colorsArray[0] = colors;
+		mesh.numElems = 6;
+		mesh.elems = elems;
+
+		const VboSpanLayout *layout = bufferCache->getLayoutForBuffer( buffer );
+		bufferCache->getUnderlyingFactory()->uploadVertexData( buffer, layout, 0, vattribs, &mesh );
+		bufferCache->getUnderlyingFactory()->uploadIndexData( buffer, 0, 0, &mesh );
 	}
 
-	vec4_t xyz[6];
-	byte_vec4_t colors[6];
-
-	constexpr float scale = 15;
-	Vector4Set( xyz[0], 0, 0, 0, 1 );
-	Vector4Set( xyz[1], scale, 0, 0, 1 );
-	Vector4Set( colors[0], 255, 0, 0, 127 );
-	Vector4Set( colors[1], 255, 0, 0, 127 );
-
-	Vector4Set( xyz[2], 0, 0, 0, 1 );
-	Vector4Set( xyz[3], 0, scale, 0, 1 );
-	Vector4Set( colors[2], 0, 255, 0, 127 );
-	Vector4Set( colors[3], 0, 255, 0, 127 );
-
-	Vector4Set( xyz[4], 0, 0, 0, 1 );
-	Vector4Set( xyz[5], 0, 0, scale, 1 );
-	Vector4Set( colors[4], 0, 0, 255, 127 );
-	Vector4Set( colors[5], 0, 0, 255, 127 );
-
-	vec4_t normals[6] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
-	vec2_t texcoords[6] = { {0,0}, {0,1}, {0,0}, {0,1}, {0,0}, {0,1} };
-	elem_t elems[6] = { 0, 1, 2, 3, 4, 5 };
-
-	mesh_t mesh;
-	memset( &mesh, 0, sizeof( mesh ) );
-	mesh.numVerts = 6;
-	mesh.xyzArray = xyz;
-	mesh.normalsArray = normals;
-	mesh.stArray = texcoords;
-	mesh.colorsArray[0] = colors;
-	mesh.numElems = 6;
-	mesh.elems = elems;
-
-	R_UploadVBOVertexData( vbo, 0, vattribs, &mesh );
-	R_UploadVBOElemData( vbo, 0, 0, &mesh );
-
-	return vbo;
+	return buffer;
 }
 
-mesh_vbo_t *R_InitPostProcessingVBO( void ) {
+MeshBuffer *R_InitPostProcessingVBO( BufferCache *bufferCache ) {
 	const vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_TEXCOORDS_BIT;
-	mesh_vbo_t *vbo = R_CreateMeshVBO( &rf, 4, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
-	if( !vbo ) {
-		return NULL;
+	MeshBuffer *const buffer = bufferCache->createMeshBuffer( 4, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
+	if( buffer ) {
+		vec2_t texcoords[4] = { {0,1}, {1,1}, {1,0}, {0,0} };
+		elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
+		vec4_t xyz[4] = { {0,0,0,1}, {1,0,0,1}, {1,1,0,1}, {0,1,0,1} };
+
+		mesh_t mesh;
+		memset( &mesh, 0, sizeof( mesh ) );
+		mesh.numVerts = 4;
+		mesh.xyzArray = xyz;
+		mesh.stArray = texcoords;
+		mesh.numElems = 6;
+		mesh.elems = elems;
+
+		const VboSpanLayout *layout = bufferCache->getLayoutForBuffer( buffer );
+		bufferCache->getUnderlyingFactory()->uploadVertexData( buffer, layout, 0, vattribs, &mesh );
+		bufferCache->getUnderlyingFactory()->uploadIndexData( buffer, 0, 0, &mesh );
 	}
 
-	vec2_t texcoords[4] = { {0,1}, {1,1}, {1,0}, {0,0} };
-	elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
-	vec4_t xyz[4] = { {0,0,0,1}, {1,0,0,1}, {1,1,0,1}, {0,1,0,1} };
-
-	mesh_t mesh;
-	memset( &mesh, 0, sizeof( mesh ) );
-	mesh.numVerts = 4;
-	mesh.xyzArray = xyz;
-	mesh.stArray = texcoords;
-	mesh.numElems = 6;
-	mesh.elems = elems;
-
-	R_UploadVBOVertexData( vbo, 0, vattribs, &mesh );
-	R_UploadVBOElemData( vbo, 0, 0, &mesh );
-
-	return vbo;
+	return buffer;
 }
 
 static void R_InitVolatileAssets() {
@@ -1062,16 +1057,18 @@ static void R_InitVolatileAssets() {
 	rsh.whiteShader = materialCache->loadDefaultMaterial( wsw::StringView( "$whiteimage" ), SHADER_TYPE_2D );
 	rsh.emptyFogShader = materialCache->loadDefaultMaterial( wsw::StringView( "$emptyfog" ), SHADER_TYPE_FOG );
 
+	BufferCache *bufferCache = getBufferCache();
+
 	if( !rsh.nullVBO ) {
-		rsh.nullVBO = R_InitNullModelVBO();
+		rsh.nullVBO = R_InitNullModelVBO( bufferCache );
 	} else {
-		R_TouchMeshVBO( rsh.nullVBO );
+		bufferCache->touchMeshBuffer( rsh.nullVBO );
 	}
 
 	if( !rsh.postProcessingVBO ) {
-		rsh.postProcessingVBO = R_InitPostProcessingVBO();
+		rsh.postProcessingVBO = R_InitPostProcessingVBO( bufferCache );
 	} else {
-		R_TouchMeshVBO( rsh.postProcessingVBO );
+		bufferCache->touchMeshBuffer( rsh.postProcessingVBO );
 	}
 }
 
@@ -1102,7 +1099,7 @@ void R_EndRegistration_( void ) {
 		rsh.registrationOpen = false;
 
 		R_FreeUnusedModels();
-		R_FreeUnusedVBOs();
+		getBufferCache()->freeUnusedBuffers();
 
 		MaterialCache::instance()->freeUnusedObjects();
 

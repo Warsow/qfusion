@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "local.h"
 #include "frontend.h"
+#include "buffermanagement.h"
 
 /*
 * Mod_AliasBuildStaticVBOForMesh
@@ -40,10 +41,9 @@ static void Mod_AliasBuildStaticVBOForMesh( maliasmesh_t *mesh ) {
 		}
 	}
 
-	mesh->vbo = R_CreateMeshVBO( ( void * )mesh,
-								 mesh->numverts, mesh->numtris * 3, 0, vattribs, VBO_TAG_MODEL, vattribs );
-
-	if( !mesh->vbo ) {
+	BufferCache *bufferCache = getBufferCache();
+	mesh->buffer = bufferCache->createMeshBuffer( mesh->numverts, mesh->numtris * 3, 0, vattribs, VBO_TAG_MODEL, vattribs );
+	if( !mesh->buffer ) {
 		return;
 	}
 
@@ -58,8 +58,9 @@ static void Mod_AliasBuildStaticVBOForMesh( maliasmesh_t *mesh ) {
 	aliasmesh.normalsArray = mesh->normalsArray;
 	aliasmesh.sVectorsArray = mesh->sVectorsArray;
 
-	R_UploadVBOVertexData( mesh->vbo, 0, vattribs, &aliasmesh );
-	R_UploadVBOElemData( mesh->vbo, 0, 0, &aliasmesh );
+	const VboSpanLayout *layout = getBufferCache()->getLayoutForBuffer( mesh->buffer );
+	bufferCache->getUnderlyingFactory()->uploadVertexData( mesh->buffer, layout, 0, vattribs, &aliasmesh );
+	bufferCache->getUnderlyingFactory()->uploadIndexData( mesh->buffer, 0, 0, &aliasmesh );
 }
 
 /*
@@ -118,8 +119,8 @@ static void Mod_TouchAliasModel( model_t *mod ) {
 			}
 		}
 
-		if( mesh->vbo ) {
-			R_TouchMeshVBO( mesh->vbo );
+		if( mesh->buffer ) {
+			getBufferCache()->touchMeshBuffer( mesh->buffer );
 		}
 	}
 }

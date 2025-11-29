@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "program.h"
 #include "backendactiontape.h"
 #include "backendstate.h"
+#include "buffermanagement.h"
 #include "glstateproxy.h"
 #include "texturemanagement.h"
 
@@ -402,10 +403,10 @@ void SimulatedBackendState::drawMeshVerts( const DrawMeshVertSpan *vertSpan, int
 	}
 }
 
-void SimulatedBackendState::bindVbo( const mesh_vbo_s *vbo ) {
-	if( vbo ) {
-		m_glState.bindVertexBuffer( vbo->vertexId );
-		m_glState.bindIndexBuffer( vbo->elemId );
+void SimulatedBackendState::bindMeshBuffer( const MeshBuffer *buffer ) {
+	if( buffer ) {
+		m_glState.bindVertexBuffer( buffer->vboId );
+		m_glState.bindIndexBuffer( buffer->iboId );
 	} else {
 		m_glState.bindVertexBuffer( 0 );
 		m_glState.bindIndexBuffer( 0 );
@@ -2061,13 +2062,11 @@ void SimulatedBackendState::drawShadedMesh( const FrontendToBackendShared *fsh, 
 	}
 }
 
-void SimulatedBackendState::drawMesh( const FrontendToBackendShared *fsh, int vboId, const VboSpanLayout *layout,
-									  const DrawMeshVertSpan *drawMeshVertSpan, int primitive ) {
-	const mesh_vbo_s *vbo = RB_BindVBO( this, vboId );
+void SimulatedBackendState::drawMesh( const FrontendToBackendShared *fsh, const MeshBuffer *buffer,
+									  const VboSpanLayout *layout, const DrawMeshVertSpan *drawMeshVertSpan, int primitive ) {
+	assert( buffer && layout );
 
-	if( !layout ) [[likely]] {
-		layout = &vbo->layout;
-	}
+	bindMeshBuffer( buffer );
 
 	m_drawState.currentVAttribs &= ~VATTRIB_INSTANCES_BITS;
 

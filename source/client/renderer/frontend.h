@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/actiontape.h>
 #include <common/helpers/qthreads.h>
 #include <common/facilities/tasksystem.h>
+#include "vattribs.h"
 
 struct alignas( 32 )Frustum {
 	alignas( 32 ) float planeX[8];

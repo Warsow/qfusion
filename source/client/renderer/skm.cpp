@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "local.h"
 #include "iqm.h"
 #include "frontend.h"
+#include "buffermanagement.h"
 #include <common/helpers/textstreamwriterextras.h>
 
 #include <climits>
@@ -60,10 +61,9 @@ static void Mod_SkeletalBuildStaticVBOForMesh( mskmesh_t *mesh ) {
 		vattribs |= mesh->skin.shader->vattribs;
 	}
 
-	mesh->vbo = R_CreateMeshVBO( ( void * )mesh,
-								 mesh->numverts, mesh->numtris * 3, 0, vattribs, VBO_TAG_MODEL, vattribs );
-
-	if( !mesh->vbo ) {
+	BufferCache *bufferCache = getBufferCache();
+	mesh->buffer = bufferCache->createMeshBuffer( mesh->numverts, mesh->numtris * 3, 0, vattribs, VBO_TAG_MODEL, vattribs );
+	if( !mesh->buffer ) {
 		return;
 	}
 
@@ -81,8 +81,9 @@ static void Mod_SkeletalBuildStaticVBOForMesh( mskmesh_t *mesh ) {
 	skmmesh.blendIndices = mesh->blendIndices;
 	skmmesh.blendWeights = mesh->blendWeights;
 
-	R_UploadVBOVertexData( mesh->vbo, 0, vattribs, &skmmesh );
-	R_UploadVBOElemData( mesh->vbo, 0, 0, &skmmesh );
+	const VboSpanLayout *layout = bufferCache->getLayoutForBuffer( mesh->buffer );
+	bufferCache->getUnderlyingFactory()->uploadVertexData( mesh->buffer, layout, 0, vattribs, &skmmesh );
+	bufferCache->getUnderlyingFactory()->uploadIndexData( mesh->buffer, 0, 0, &skmmesh );
 }
 
 /*
@@ -102,8 +103,8 @@ static void Mod_TouchSkeletalModel( model_t *mod ) {
 		if( skin->shader ) {
 			R_TouchShader( skin->shader );
 		}
-		if( mesh->vbo ) {
-			R_TouchMeshVBO( mesh->vbo );
+		if( mesh->buffer ) {
+			getBufferCache()->touchMeshBuffer( mesh->buffer );
 		}
 	}
 }

@@ -23,13 +23,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "frontend.h"
 #include "backendstate.h"
 #include "backendactiontape.h"
+#include "buffermanagement.h"
 #include "glstateproxy.h"
 #include "common/facilities/cvar.h"
 #include <common/helpers/memspecbuilder.h>
 
 typedef struct r_backend_s {
 	struct {
-		mesh_vbo_t *vbo;
+		MeshBuffer buffer;
+		VboSpanLayout layout;
 		void *vboData;
 		void *iboData;
 		unsigned vboCapacityInVerts;
@@ -53,8 +55,34 @@ static void RB_RegisterStreamVBOs();
 void RB_Init() {
 	memset( &rb, 0, sizeof( rb ) );
 
-	// create VBO's we're going to use for streamed data
-	RB_RegisterStreamVBOs();
+	BufferFactory *const bufferFactory = getBufferCache()->getUnderlyingFactory();
+	for( auto &vu: rb.vertexUploads ) {
+		const auto group = std::addressof( vu ) - rb.vertexUploads;
+		vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_COLOR0_BIT | VATTRIB_TEXCOORDS_BIT;
+		if( group != UPLOAD_GROUP_2D_MESH && group != UPLOAD_GROUP_DEBUG_MESH ) {
+			vattribs |= VATTRIB_NORMAL_BIT;
+		}
+		unsigned capacityInVerts;
+		if( group != UPLOAD_GROUP_BATCHED_MESH_EXT && group != UPLOAD_GROUP_2D_MESH ) {
+			capacityInVerts = ( 1 << 16 ) - 1;
+		} else {
+			// We don't need that much for sprites and 2D stuff
+			capacityInVerts = 4 * 4096;
+		}
+		unsigned capacityInElems = 6 * capacityInVerts;
+		size_t vertexDataSize = buildVertexLayoutForVattribs( &vu.layout, vattribs, 0, capacityInVerts, 0 );
+		size_t indexDataSize  = sizeof( elem_t ) * capacityInElems;
+		std::optional<MeshBuffer> buffer = bufferFactory->createVboAndIbo( vertexDataSize, indexDataSize, BufferFactory::Usage::Dynamic );
+		if( !buffer ) {
+			wsw::failWithRuntimeError( "Failed to create a stream buffer" );
+		}
+		vu.buffer = *buffer;
+		vu.vboData = Q_malloc( vertexDataSize );
+		vu.iboData = Q_malloc( indexDataSize );
+		vu.vboCapacityInVerts = capacityInVerts;
+		vu.vboCapacityInBytes = vertexDataSize;
+		vu.iboCapacityInElems = capacityInElems;
+	}
 
 	assert( qglGetError() == GL_NO_ERROR );
 
@@ -94,7 +122,9 @@ void RB_Init() {
 }
 
 void RB_Shutdown() {
+	BufferFactory *const bufferFactory = getBufferCache()->getUnderlyingFactory();
 	for( auto &vu: rb.vertexUploads ) {
+		bufferFactory->destroyMeshBuffer( &vu.buffer );
 		Q_free( vu.vboData );
 		vu.vboData = nullptr;
 		Q_free( vu.iboData );
@@ -107,15 +137,6 @@ void RB_Shutdown() {
 	}
 }
 
-void RB_BeginRegistration() {
-	RB_RegisterStreamVBOs();
-	RB_BindVBO( nullptr, 0 );
-}
-
-void RB_EndRegistration() {
-	RB_BindVBO( nullptr, 0 );
-}
-
 void RB_BeginUsingBackendState( SimulatedBackendState *backendState ) {
 	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
 		R_BeginUniformUploads( binding );
@@ -123,7 +144,7 @@ void RB_BeginUsingBackendState( SimulatedBackendState *backendState ) {
 
 	// start fresh each frame
 	backendState->setShaderStateMask( ~0, 0 );
-	RB_BindVBO( backendState, 0 );
+	backendState->bindMeshBuffer( nullptr );
 }
 
 void RB_EndUsingBackendState( SimulatedBackendState *backendState ) {
@@ -133,66 +154,17 @@ void RB_EndUsingBackendState( SimulatedBackendState *backendState ) {
 }
 
 void RB_RegisterStreamVBOs() {
-	for( auto &vu: rb.vertexUploads ) {
-		// TODO: Allow to create explictly managed vertex buffers, so we don't have to touch auxiliary buffers
-		if( vu.vbo ) {
-			R_TouchMeshVBO( vu.vbo );
-		} else {
-			const auto group = std::addressof( vu ) - rb.vertexUploads;
-			vattribmask_t vattribs = VATTRIB_POSITION_BIT | VATTRIB_COLOR0_BIT | VATTRIB_TEXCOORDS_BIT;
-			if( group != UPLOAD_GROUP_2D_MESH && group != UPLOAD_GROUP_DEBUG_MESH ) {
-				vattribs |= VATTRIB_NORMAL_BIT;
-			}
-			unsigned capacityInVerts;
-			if( group != UPLOAD_GROUP_BATCHED_MESH_EXT && group != UPLOAD_GROUP_2D_MESH ) {
-				capacityInVerts = ( 1 << 16 ) - 1;
-			} else {
-				// We don't need that much for sprites and 2D stuff
-				capacityInVerts = 4096;
-			}
-			unsigned capacityInElems = 6 * capacityInVerts;
-			// TODO: Allow to supplying capacity in bytes for heterogenous buffers
-			vu.vbo = R_CreateMeshVBO( &rb, capacityInVerts, capacityInElems, 0, vattribs, VBO_TAG_STREAM, 0 );
-			vu.vboData = Q_malloc( capacityInVerts * vu.vbo->layout.vertexSize );
-			vu.iboData = Q_malloc( capacityInElems * sizeof( uint16_t ) );
-			vu.vboCapacityInVerts = capacityInVerts;
-			vu.vboCapacityInBytes = capacityInVerts * vu.vbo->layout.vertexSize;
-			vu.iboCapacityInElems = capacityInElems;
-		}
-	}
+
 }
 
-mesh_vbo_s *RB_BindVBO( SimulatedBackendState *backendState, int id ) {
-	mesh_vbo_t *vbo;
-	if( id > 0 ) [[likely]] {
-		vbo = R_GetVBOByIndex( id );
-	} else if( id < 0 ) {
-		const auto group = (unsigned)( -1 - id );
-		assert( group < std::size( rb.vertexUploads ) );
-		vbo = rb.vertexUploads[group].vbo;
-	} else {
-		vbo = nullptr;
-	}
-
-	// TODO: Split the code path properly so we don't have to pass the null backend state
-	if( backendState ) {
-		backendState->bindVbo( vbo );
-	} else {
-		qglBindBuffer( GL_ARRAY_BUFFER, vbo ? vbo->vertexId : 0 );
-		qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, vbo ? vbo->elemId : 0 );
-	}
-
-	return vbo;
-}
-
-int RB_VBOIdForFrameUploads( unsigned group ) {
+const MeshBuffer *RB_VBOForFrameUploads( unsigned group ) {
 	assert( group < std::size( rb.vertexUploads ) );
-	return -1 - (signed)group;
+	return &rb.vertexUploads[group].buffer;
 }
 
 const VboSpanLayout *RB_VBOSpanLayoutForFrameUploads( unsigned group ) {
 	assert( group < std::size( rb.vertexUploads ) );
-	return &rb.vertexUploads[group].vbo->layout;
+	return &rb.vertexUploads[group].layout;
 }
 
 unsigned RB_VboCapacityInVertexBytesForFrameUploads( unsigned group ) {
@@ -223,7 +195,7 @@ void R_SetUploadedSubdataFromMeshUsingOffsets( unsigned group, unsigned baseVert
 		auto *const destVertexData = (uint8_t *)vu.vboData + verticesOffsetInBytes;
 		auto *const destIndexData  = (uint16_t *)((uint8_t *)vu.iboData + indicesOffsetInBytes );
 
-		R_FillVBOVertexDataBuffer( vu.vbo, &vu.vbo->layout, vu.vbo->layout.vertexAttribs, mesh, destVertexData );
+		fillMeshVertexData( &vu.layout, vu.layout.vertexAttribs, mesh, destVertexData );
 		for( unsigned i = 0; i < mesh->numElems; ++i ) {
 			// TODO: Current frontend-enforced limitations are the sole protection from overflow
 			// TODO: Use draw elements base vertex
@@ -238,7 +210,7 @@ void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVerte
 	if( mesh->numVerts && mesh->numElems ) {
 		auto &vu = rb.vertexUploads[group];
 
-		R_FillVBOVertexDataBuffer( vu.vbo, layout, layout->vertexAttribs, mesh, vu.vboData );
+		fillMeshVertexData( layout, layout->vertexAttribs, mesh, vu.vboData );
 
 		auto *const destIndexData  = ( (uint16_t *)vu.iboData ) + indexOfFirstIndex;
 		for( unsigned i = 0; i < mesh->numElems; ++i ) {
@@ -252,8 +224,12 @@ void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVerte
 void R_EndMeshUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes ) {
 	assert( group < std::size( rb.vertexUploads ) );
 	if( vertexDataSizeInBytes && indexDataSizeInBytes ) {
-		RB_BindVBO( nullptr, RB_VBOIdForFrameUploads( group ) );
-		const auto &vu = rb.vertexUploads[group];
+		const MeshBuffer *buffer = RB_VBOForFrameUploads( group );
+		const auto &vu           = rb.vertexUploads[group];
+
+		// TODO: This should go to buffermanagement.cpp
+		qglBindBuffer( GL_ARRAY_BUFFER, buffer->vboId );
+		qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, buffer->iboId );
 
 		qglBufferSubData( GL_ARRAY_BUFFER, 0, vertexDataSizeInBytes, vu.vboData );
 		qglBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, indexDataSizeInBytes, vu.iboData );
