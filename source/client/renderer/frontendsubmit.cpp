@@ -705,7 +705,7 @@ void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup, Simula
 
 		float xOffset = 0.0f, yOffset = 0.0f;
 
-		const auto vboId = RB_VBOIdForFrameUploads( uploadGroup );
+		const mesh_vbo_s *vbo = RB_VBOForFrameUploads( uploadGroup );
 
 		for( const AuxiliaryDynamicDraw &draw: stream->draws ) {
 			assert( draw.shader );
@@ -724,7 +724,7 @@ void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup, Simula
 			assert( draw.drawElements.numVerts > 0 && draw.drawElements.numElems > 0 );
 			const DrawMeshVertSpan drawMeshVertSpan = draw.drawElements;
 			assert( draw.primitive == GL_TRIANGLES || draw.primitive == GL_LINES );
-			backendState->drawMesh( nullptr, vboId, nullptr, &drawMeshVertSpan, draw.primitive );
+			backendState->drawMesh( nullptr, vbo, &vbo->layout, &drawMeshVertSpan, draw.primitive );
 		}
 
 		backendState->setScissor( sx, sy, sw, sh );
@@ -1594,7 +1594,7 @@ void RendererFrontend::submitAliasSurfToBackend( SimulatedBackendState *sbs, con
 		.firstElem = 0, .numElems = 3u * aliasmesh->numtris,
 	};
 
-	sbs->drawMesh( fsh, aliasmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+	sbs->drawMesh( fsh, aliasmesh->vbo, &aliasmesh->vbo->layout, &drawMeshVertSpan, GL_TRIANGLES );
 }
 
 void RendererFrontend::submitSkeletalSurfToBackend( SimulatedBackendState *sbs, const FrontendToBackendShared *fsh,
@@ -1622,7 +1622,7 @@ void RendererFrontend::submitSkeletalSurfToBackend( SimulatedBackendState *sbs, 
 	if( !cache || R_SkeletalRenderAsFrame0( cache ) ) {
 		// fastpath: render static frame 0 as is
 		if( skmesh->vbo ) {
-			sbs->drawMesh( fsh, skmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+			sbs->drawMesh( fsh, skmesh->vbo, &skmesh->vbo->layout, &drawMeshVertSpan, GL_TRIANGLES );
 			return;
 		}
 	}
@@ -1630,7 +1630,7 @@ void RendererFrontend::submitSkeletalSurfToBackend( SimulatedBackendState *sbs, 
 	if( bonePoseRelativeDQ && skmesh->vbo ) {
 		// another fastpath: transform the initial pose on the GPU
 		sbs->setBonesData( skmodel->numbones, bonePoseRelativeDQ, skmesh->maxWeights );
-		sbs->drawMesh( fsh, skmesh->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+		sbs->drawMesh( fsh, skmesh->vbo, &skmesh->vbo->layout, &drawMeshVertSpan, GL_TRIANGLES );
 		return;
 	}
 }
@@ -1647,7 +1647,7 @@ void RendererFrontend::submitBspSurfToBackend( SimulatedBackendState *sbs, const
 
 	const DrawMeshVertSpan &drawMeshVertSpan = drawSurf->mdSpan;
 
-	sbs->drawMesh( fsh, mergedBspSurf->vbo->index, nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+	sbs->drawMesh( fsh, mergedBspSurf->vbo, &mergedBspSurf->vbo->layout, &drawMeshVertSpan, GL_TRIANGLES );
 }
 
 void RendererFrontend::submitNullSurfToBackend( SimulatedBackendState *sbs, const FrontendToBackendShared *fsh,
@@ -1659,7 +1659,7 @@ void RendererFrontend::submitNullSurfToBackend( SimulatedBackendState *sbs, cons
 		.firstVert = 0, .numVerts = 6, .firstElem = 0, .numElems = 6,
 	};
 
-	sbs->drawMesh( fsh, rsh.nullVBO->index, nullptr, &drawMeshVertSpan, GL_LINES );
+	sbs->drawMesh( fsh, rsh.nullVBO, &rsh.nullVBO->layout, &drawMeshVertSpan, GL_LINES );
 }
 
 void RendererFrontend::submitDynamicMeshToBackend( SimulatedBackendState *sbs, const FrontendToBackendShared *fsh,
@@ -1674,7 +1674,8 @@ void RendererFrontend::submitDynamicMeshToBackend( SimulatedBackendState *sbs, c
 			.numElems  = drawSurface->actualNumIndices,
 		};
 
-		sbs->drawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH ), nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+		const mesh_vbo_s *vbo = RB_VBOForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
+		sbs->drawMesh( fsh, vbo, &vbo->layout, &drawMeshVertSpan, GL_TRIANGLES );
 	}
 }
 
@@ -1686,7 +1687,8 @@ void RendererFrontend::submitBatchedSurfsToBackend( SimulatedBackendState *sbs, 
 	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
 		sbs->bindShader( e, overrideParams, paramsTable, shader, fog, nullptr );
 		const DrawMeshVertSpan drawMeshVertSpan = vertElemSpan;
-		sbs->drawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH ), nullptr, &drawMeshVertSpan, GL_TRIANGLES );
+		const mesh_vbo_s *vbo = RB_VBOForFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
+		sbs->drawMesh( fsh, vbo, &vbo->layout, &drawMeshVertSpan, GL_TRIANGLES );
 	}
 }
 
@@ -1699,7 +1701,8 @@ void RendererFrontend::submitBatchedSurfsToBackendExt( SimulatedBackendState *sb
 	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
 		sbs->bindShader( e, nullptr, paramsTable, shader, fog, nullptr );
 		const DrawMeshVertSpan drawMeshVertSpan = vertElemSpan;
-		sbs->drawMesh( fsh, RB_VBOIdForFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT ), &vboSpanLayout, &drawMeshVertSpan, GL_TRIANGLES );
+		const mesh_vbo_s *vbo = RB_VBOForFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT );
+		sbs->drawMesh( fsh, vbo, &vboSpanLayout, &drawMeshVertSpan, GL_TRIANGLES );
 	}
 }
 

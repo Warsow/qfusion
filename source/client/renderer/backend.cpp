@@ -109,11 +109,9 @@ void RB_Shutdown() {
 
 void RB_BeginRegistration() {
 	RB_RegisterStreamVBOs();
-	RB_BindVBO( nullptr, 0 );
 }
 
 void RB_EndRegistration() {
-	RB_BindVBO( nullptr, 0 );
 }
 
 void RB_BeginUsingBackendState( SimulatedBackendState *backendState ) {
@@ -123,7 +121,7 @@ void RB_BeginUsingBackendState( SimulatedBackendState *backendState ) {
 
 	// start fresh each frame
 	backendState->setShaderStateMask( ~0, 0 );
-	RB_BindVBO( backendState, 0 );
+	backendState->bindVbo( nullptr );
 }
 
 void RB_EndUsingBackendState( SimulatedBackendState *backendState ) {
@@ -152,7 +150,7 @@ void RB_RegisterStreamVBOs() {
 			}
 			unsigned capacityInElems = 6 * capacityInVerts;
 			// TODO: Allow to supplying capacity in bytes for heterogenous buffers
-			vu.vbo = R_CreateMeshVBO( &rb, capacityInVerts, capacityInElems, 0, vattribs, VBO_TAG_STREAM, 0 );
+			vu.vbo = R_CreateMeshVBO( capacityInVerts, capacityInElems, 0, vattribs, VBO_TAG_STREAM, 0 );
 			vu.vboData = Q_malloc( capacityInVerts * vu.vbo->layout.vertexSize );
 			vu.iboData = Q_malloc( capacityInElems * sizeof( uint16_t ) );
 			vu.vboCapacityInVerts = capacityInVerts;
@@ -162,32 +160,9 @@ void RB_RegisterStreamVBOs() {
 	}
 }
 
-mesh_vbo_s *RB_BindVBO( SimulatedBackendState *backendState, int id ) {
-	mesh_vbo_t *vbo;
-	if( id > 0 ) [[likely]] {
-		vbo = R_GetVBOByIndex( id );
-	} else if( id < 0 ) {
-		const auto group = (unsigned)( -1 - id );
-		assert( group < std::size( rb.vertexUploads ) );
-		vbo = rb.vertexUploads[group].vbo;
-	} else {
-		vbo = nullptr;
-	}
-
-	// TODO: Split the code path properly so we don't have to pass the null backend state
-	if( backendState ) {
-		backendState->bindVbo( vbo );
-	} else {
-		qglBindBuffer( GL_ARRAY_BUFFER, vbo ? vbo->vertexId : 0 );
-		qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, vbo ? vbo->elemId : 0 );
-	}
-
-	return vbo;
-}
-
-int RB_VBOIdForFrameUploads( unsigned group ) {
+const mesh_vbo_s *RB_VBOForFrameUploads( unsigned group ) {
 	assert( group < std::size( rb.vertexUploads ) );
-	return -1 - (signed)group;
+	return rb.vertexUploads[group].vbo;
 }
 
 const VboSpanLayout *RB_VBOSpanLayoutForFrameUploads( unsigned group ) {
@@ -223,7 +198,7 @@ void R_SetUploadedSubdataFromMeshUsingOffsets( unsigned group, unsigned baseVert
 		auto *const destVertexData = (uint8_t *)vu.vboData + verticesOffsetInBytes;
 		auto *const destIndexData  = (uint16_t *)((uint8_t *)vu.iboData + indicesOffsetInBytes );
 
-		R_FillVBOVertexDataBuffer( vu.vbo, &vu.vbo->layout, vu.vbo->layout.vertexAttribs, mesh, destVertexData );
+		R_FillVBOVertexDataBuffer( &vu.vbo->layout, vu.vbo->layout.vertexAttribs, mesh, destVertexData );
 		for( unsigned i = 0; i < mesh->numElems; ++i ) {
 			// TODO: Current frontend-enforced limitations are the sole protection from overflow
 			// TODO: Use draw elements base vertex
@@ -238,7 +213,7 @@ void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVerte
 	if( mesh->numVerts && mesh->numElems ) {
 		auto &vu = rb.vertexUploads[group];
 
-		R_FillVBOVertexDataBuffer( vu.vbo, layout, layout->vertexAttribs, mesh, vu.vboData );
+		R_FillVBOVertexDataBuffer( layout, layout->vertexAttribs, mesh, vu.vboData );
 
 		auto *const destIndexData  = ( (uint16_t *)vu.iboData ) + indexOfFirstIndex;
 		for( unsigned i = 0; i < mesh->numElems; ++i ) {
@@ -252,8 +227,11 @@ void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVerte
 void R_EndMeshUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes ) {
 	assert( group < std::size( rb.vertexUploads ) );
 	if( vertexDataSizeInBytes && indexDataSizeInBytes ) {
-		RB_BindVBO( nullptr, RB_VBOIdForFrameUploads( group ) );
-		const auto &vu = rb.vertexUploads[group];
+		const mesh_vbo_s *vbo = RB_VBOForFrameUploads( group );
+		const auto &vu        = rb.vertexUploads[group];
+
+		qglBindBuffer( GL_ARRAY_BUFFER, vbo->vertexId );
+		qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, vbo->elemId );
 
 		qglBufferSubData( GL_ARRAY_BUFFER, 0, vertexDataSizeInBytes, vu.vboData );
 		qglBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, indexDataSizeInBytes, vu.iboData );

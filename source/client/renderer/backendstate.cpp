@@ -2061,13 +2061,11 @@ void SimulatedBackendState::drawShadedMesh( const FrontendToBackendShared *fsh, 
 	}
 }
 
-void SimulatedBackendState::drawMesh( const FrontendToBackendShared *fsh, int vboId, const VboSpanLayout *layout,
+void SimulatedBackendState::drawMesh( const FrontendToBackendShared *fsh, const mesh_vbo_s *vbo, const VboSpanLayout *layout,
 									  const DrawMeshVertSpan *drawMeshVertSpan, int primitive ) {
-	const mesh_vbo_s *vbo = RB_BindVBO( this, vboId );
+	assert( vbo && layout );
 
-	if( !layout ) [[likely]] {
-		layout = &vbo->layout;
-	}
+	bindVbo( vbo );
 
 	m_drawState.currentVAttribs &= ~VATTRIB_INSTANCES_BITS;
 

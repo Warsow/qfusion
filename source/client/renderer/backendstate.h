@@ -74,7 +74,7 @@ public:
 	auto getCurrUniformDataSize( unsigned binding ) const -> unsigned;
 	void registerUniformBlockUpdate( unsigned binding, GLuint bufferId, unsigned blockSize );
 
-	void drawMesh( const FrontendToBackendShared *fsh, int vboId, const VboSpanLayout *vboSpanLayout, const DrawMeshVertSpan *vertSpan, int primitive );
+	void drawMesh( const FrontendToBackendShared *fsh, const mesh_vbo_s *vbo, const VboSpanLayout *vboSpanLayout, const DrawMeshVertSpan *vertSpan, int primitive );
 private:
 	[[nodiscard]]
 	bool shouldApplyDrawflatInCurrentState() const;

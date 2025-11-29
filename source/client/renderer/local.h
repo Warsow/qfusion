@@ -188,9 +188,6 @@ void RB_EndUsingBackendState( SimulatedBackendState *backendState );
 void RB_BeginRegistration();
 void RB_EndRegistration();
 
-[[maybe_unused]]
-struct mesh_vbo_s *RB_BindVBO( SimulatedBackendState *backendState, int id );
-
 enum : unsigned {
 	UPLOAD_GROUP_DYNAMIC_MESH     = 0,
 	UPLOAD_GROUP_BATCHED_MESH     = 1,
@@ -204,7 +201,7 @@ enum : unsigned {
 
 struct VboSpanLayout;
 
-int RB_VBOIdForFrameUploads( unsigned group );
+const mesh_vbo_s *RB_VBOForFrameUploads( unsigned group );
 const VboSpanLayout *RB_VBOSpanLayoutForFrameUploads( unsigned group );
 unsigned RB_VboCapacityInVertexBytesForFrameUploads( unsigned group );
 unsigned RB_VboCapacityInVerticesForFrameUploads( unsigned group );
@@ -851,26 +848,7 @@ void R_BuildTangentVectors( int numVertexes, vec4_t *xyzArray, vec4_t *normalsAr
 
 struct ParticleDrawSurface { uint16_t aggregateIndex; uint16_t particleIndex; };
 
-struct VboSpanLayout {
-	vattribmask_t vertexAttribs;
-	vattribmask_t halfFloatAttribs;
 
-	unsigned baseOffset;
-	unsigned instancesOffset;
-
-	uint8_t vertexSize;
-
-	uint8_t normalsOffset;
-	uint8_t sVectorsOffset;
-	uint8_t stOffset;
-	uint8_t lmstOffset[( MAX_LIGHTMAPS + 1 ) / 2];
-	uint8_t lmstSize[( MAX_LIGHTMAPS + 1 ) / 2];
-	uint8_t lmlayersOffset[( MAX_LIGHTMAPS + 3 ) / 4];
-	uint8_t colorsOffset[MAX_LIGHTMAPS];
-	uint8_t bonesIndicesOffset;
-	uint8_t bonesWeightsOffset;
-	uint8_t spritePointsOffset;              // autosprite or autosprite2 centre + radius
-};
 
 struct FrontendToBackendShared {
 	const Scene::DynamicLight *dynamicLights;
@@ -968,15 +946,8 @@ typedef enum {
 } vbo_tag_t;
 
 typedef struct mesh_vbo_s {
-	void   *owner;
-
-	// TODO: This is practically unused except for merging bsp surfaces.
-	// Also it's meaninggless for heterogenous buffers.
-	unsigned numVerts;
-	unsigned numElems;
-
-	unsigned index;
 	int registrationSequence;
+	unsigned index;
 
 	vbo_tag_t tag;
 
@@ -988,13 +959,11 @@ typedef struct mesh_vbo_s {
 } mesh_vbo_t;
 
 void        R_InitVBO( void );
-mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numInstances,
+mesh_vbo_t *R_CreateMeshVBO( int numVerts, int numElems, int numInstances,
 							 vattribmask_t vattribs, vbo_tag_t tag, vattribmask_t halfFloatVattribs );
 void        R_ReleaseMeshVBO( mesh_vbo_t *vbo );
 void        R_TouchMeshVBO( mesh_vbo_t *vbo );
-mesh_vbo_t *R_GetVBOByIndex( int index );
-int         R_GetNumberOfActiveVBOs( void );
-vattribmask_t R_FillVBOVertexDataBuffer( mesh_vbo_t *vbo, const VboSpanLayout *layout, vattribmask_t vattribs, const mesh_t *mesh, void *outData );
+vattribmask_t R_FillVBOVertexDataBuffer( const VboSpanLayout *layout, vattribmask_t vattribs, const mesh_t *mesh, void *outData );
 void        R_UploadVBOVertexRawData( mesh_vbo_t *vbo, int vertsOffset, int numVerts, const void *data );
 vattribmask_t R_UploadVBOVertexData( mesh_vbo_t *vbo, int vertsOffset, vattribmask_t vattribs, const mesh_t *mesh );
 void        R_UploadVBOElemData( mesh_vbo_t *vbo, int vertsOffset, int elemsOffset, const mesh_t *mesh );

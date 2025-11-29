@@ -60,8 +60,7 @@ static void Mod_SkeletalBuildStaticVBOForMesh( mskmesh_t *mesh ) {
 		vattribs |= mesh->skin.shader->vattribs;
 	}
 
-	mesh->vbo = R_CreateMeshVBO( ( void * )mesh,
-								 mesh->numverts, mesh->numtris * 3, 0, vattribs, VBO_TAG_MODEL, vattribs );
+	mesh->vbo = R_CreateMeshVBO( mesh->numverts, mesh->numtris * 3, 0, vattribs, VBO_TAG_MODEL, vattribs );
 
 	if( !mesh->vbo ) {
 		return;
