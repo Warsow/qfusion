@@ -242,19 +242,6 @@ void R_Flush( void ) {
 	qglFlush();
 }
 
-void R_DeferDataSync( void ) {
-	if( !rsh.registrationOpen ) {
-		rf.dataSync = true;
-		qglFlush();
-	}
-}
-
-void R_DataSync( void ) {
-	if( rf.dataSync ) {
-		rf.dataSync = false;
-	}
-}
-
 int R_SetSwapInterval( int swapInterval, int oldSwapInterval ) {
 	if( swapInterval != oldSwapInterval ) {
 		GLimp_SetSwapInterval( swapInterval );
@@ -627,8 +614,6 @@ static void RF_CheckCvars( void ) {
 void RF_BeginFrame( bool forceClear, bool forceVsync, bool uncappedFPS ) {
 	RF_CheckCvars();
 
-	R_DataSync();
-
 	// TODO: Should it be a boolean variable?
 	int swapInterval = ( v_swapInterval.get() || forceVsync ) ? 1 : 0;
 	///clamp_low( swapInterval, r_swapinterval_min->integer );
@@ -644,18 +629,12 @@ void RF_BeginRegistration( void ) {
 	// sync to the backend thread to ensure it's not using old assets for drawing
 	R_BeginRegistration_();
 
-	R_DeferDataSync();
-	R_DataSync();
-
 	R_SetDefaultGLState();
 	RB_BeginRegistration();
 }
 
 void RF_EndRegistration( void ) {
 	R_EndRegistration_();
-
-	R_DeferDataSync();
-	R_DataSync();
 
 	RB_EndRegistration();
 }
@@ -1116,10 +1095,6 @@ void R_BeginRegistration_( void ) {
 	rsh.registrationOpen = true;
 
 	R_InitVolatileAssets();
-
-	R_DeferDataSync();
-
-	R_DataSync();
 }
 
 void R_EndRegistration_( void ) {
@@ -1132,10 +1107,6 @@ void R_EndRegistration_( void ) {
 		MaterialCache::instance()->freeUnusedObjects();
 
 		TextureCache::instance()->freeAllUnusedTextures();
-
-		R_DeferDataSync();
-
-		R_DataSync();
 	}
 }
 

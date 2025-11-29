@@ -840,16 +840,6 @@ void        R_SetGamma( float gamma );
 void        R_SetWallFloorColors( int wallColor, int floorColor );
 void        R_Flush( void );
 
-/**
- * Calls R_Finish if data sync was previously deferred.
- */
-void        R_DataSync( void );
-
-/**
- * Defer R_DataSync call at the start/end of the next frame.
- */
-void        R_DeferDataSync( void );
-
 int         R_LODForSphere( const vec3_t origin, float radius, const float *viewOrigin, float fovLodScale, float viewLodScale );
 
 void        R_InitCustomColors( void );

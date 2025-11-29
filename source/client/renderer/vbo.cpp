@@ -686,10 +686,6 @@ void R_UploadVBOVertexRawData( mesh_vbo_t *vbo, int vertsOffset, int numVerts, c
 		return;
 	}
 
-	if( vbo->tag != VBO_TAG_STREAM ) {
-		R_DeferDataSync();
-	}
-
 	qglBindBuffer( GL_ARRAY_BUFFER, vbo->vertexId );
 	qglBufferSubData( GL_ARRAY_BUFFER, vertsOffset * vbo->layout.vertexSize, numVerts * vbo->layout.vertexSize, data );
 }
@@ -705,10 +701,6 @@ vattribmask_t R_UploadVBOVertexData( mesh_vbo_t *vbo, int vertsOffset, vattribma
 	assert( mesh != NULL );
 	if( !vbo || !vbo->vertexId ) {
 		return 0;
-	}
-
-	if( vbo->tag != VBO_TAG_STREAM ) {
-		R_DeferDataSync();
 	}
 
 	data = R_VBOVertBuffer( mesh->numVerts, vbo->layout.vertexSize );
@@ -769,10 +761,6 @@ void R_UploadVBOElemData( mesh_vbo_t *vbo, int vertsOffset, int elemsOffset, con
 		}
 	}
 
-	if( vbo->tag != VBO_TAG_STREAM ) {
-		R_DeferDataSync();
-	}
-
 	qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, vbo->elemId );
 	qglBufferSubData( GL_ELEMENT_ARRAY_BUFFER, elemsOffset * sizeof( elem_t ),
 						 mesh->numElems * sizeof( elem_t ), ielems );
@@ -796,10 +784,6 @@ vattribmask_t R_UploadVBOInstancesData( mesh_vbo_t *vbo, int instOffset, int num
 
 	if( errMask ) {
 		return errMask;
-	}
-
-	if( vbo->tag != VBO_TAG_STREAM ) {
-		R_DeferDataSync();
 	}
 
 	if( vbo->layout.instancesOffset ) {
@@ -834,8 +818,6 @@ void R_FreeVBOsByTag( vbo_tag_t tag ) {
 			R_ReleaseMeshVBO( vbo );
 		}
 	}
-
-	R_DeferDataSync();
 }
 
 /*
@@ -858,8 +840,6 @@ void R_FreeUnusedVBOs( void ) {
 			R_ReleaseMeshVBO( vbo );
 		}
 	}
-
-	R_DeferDataSync();
 }
 
 /*
