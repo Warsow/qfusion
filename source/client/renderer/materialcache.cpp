@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "local.h"
 #include "program.h"
+#include "texturemanagement.h"
 #include <common/helpers/hash.h>
 #include <common/helpers/links.h>
 #include <common/helpers/memspecbuilder.h>

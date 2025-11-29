@@ -18,6 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "local.h"
+#include "texturemanagement.h"
 #include <common/helpers/hash.h>
 #include <common/helpers/links.h>
 #include <common/facilities/wswfs.h>
@@ -35,6 +36,62 @@ using wsw::operator""_asHView;
 #include <memory>
 #include <utility>
 #include <unordered_map>
+
+// TODO: Just use PodBuffer<>
+class ImageBuffer {
+	static inline ImageBuffer *s_head;
+
+	ImageBuffer *m_next { nullptr };
+	uint8_t *m_data { nullptr };
+	size_t m_capacity { 0 };
+public:
+	ImageBuffer() noexcept {
+		m_next = s_head;
+		s_head = this;
+	}
+
+	~ImageBuffer() {
+		::free( m_data );
+	}
+
+	[[nodiscard]]
+	auto reserveAndGet( size_t size ) -> uint8_t * {
+		if( m_capacity < size ) {
+			// TODO: Use something like ::mmap()/VirtualAlloc() for this kind of allocations
+			if( auto *newData = (uint8_t *)::realloc( m_data, size ) ) {
+				m_data = newData;
+				m_capacity = size;
+			} else {
+				wsw::failWithBadAlloc();
+			}
+		}
+		return m_data;
+	}
+
+	[[nodiscard]]
+	auto reserveForCubemapAndGet( size_t sideSize ) -> uint8_t ** {
+		if( auto rem = sideSize % 4 ) {
+			sideSize += 4 - rem;
+		}
+		size_t headerSize = 6 * sizeof( uint8_t );
+		uint8_t *rawData = reserveAndGet( headerSize + 6 * sideSize );
+		auto *const header = (uint8_t **)rawData;
+		rawData += headerSize;
+		for( unsigned i = 0; i < 6; ++i ) {
+			header[i] = rawData;
+			rawData += sideSize;
+		}
+		return header;
+	}
+
+	static void freeAllBuffers() {
+		for( ImageBuffer *buffer = s_head; buffer; buffer = buffer->m_next ) {
+			::free( buffer->m_data );
+			buffer->m_data = nullptr;
+			buffer->m_capacity = 0;
+		}
+	}
+};
 
 TextureFactory::TextureFactory() {
 	// Cubemap names are put after material ones in the same chunk

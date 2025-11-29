@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/singletonholder.h>
 #include <common/helpers/links.h>
 #include "local.h"
+#include "texturemanagement.h"
 
 using wsw::operator""_asView;
 

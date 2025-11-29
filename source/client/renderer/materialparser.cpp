@@ -1,4 +1,5 @@
 #include "materiallocal.h"
+#include "texturemanagement.h"
 #include "local.h"
 #include "program.h"
 #include "shader.h"
