@@ -90,7 +90,7 @@ struct DynamicMeshDrawSurface {
 struct MergedBspSurface {
 	struct shader_s *shader;
 	struct mfog_s *fog;
-	struct mesh_vbo_s *vbo;
+	struct MeshBuffer *buffer;
 	struct superLightStyle_s *superLightStyle;
 	instancePoint_t *instances;
 	unsigned numVerts, numElems;
@@ -185,9 +185,6 @@ void R_BindRenderTarget( RenderTargetComponents *components );
 void RB_BeginUsingBackendState( SimulatedBackendState *backendState );
 void RB_EndUsingBackendState( SimulatedBackendState *backendState );
 
-void RB_BeginRegistration();
-void RB_EndRegistration();
-
 enum : unsigned {
 	UPLOAD_GROUP_DYNAMIC_MESH     = 0,
 	UPLOAD_GROUP_BATCHED_MESH     = 1,
@@ -200,8 +197,9 @@ enum : unsigned {
 };
 
 struct VboSpanLayout;
+struct MeshBuffer;
 
-const mesh_vbo_s *RB_VBOForFrameUploads( unsigned group );
+const MeshBuffer *RB_VBOForFrameUploads( unsigned group );
 const VboSpanLayout *RB_VBOSpanLayoutForFrameUploads( unsigned group );
 unsigned RB_VboCapacityInVertexBytesForFrameUploads( unsigned group );
 unsigned RB_VboCapacityInVerticesForFrameUploads( unsigned group );
@@ -456,7 +454,7 @@ typedef struct maliasmesh_s {
 	int numskins;
 	maliasskin_t    *skins;
 
-	struct mesh_vbo_s *vbo;
+	MeshBuffer *buffer;
 } maliasmesh_t;
 
 typedef struct maliasmodel_s {
@@ -525,7 +523,7 @@ typedef struct mskmesh_s {
 
 	mskskin_t skin;
 
-	struct mesh_vbo_s *vbo;
+	struct MeshBuffer *buffer;
 } mskmesh_t;
 
 typedef struct {
@@ -696,8 +694,8 @@ typedef struct {
 	model_t         *worldModel;
 	mbrushmodel_t   *worldBrushModel;
 
-	struct mesh_vbo_s *nullVBO;
-	struct mesh_vbo_s *postProcessingVBO;
+	struct MeshBuffer *nullVBO;
+	struct MeshBuffer *postProcessingVBO;
 
 	vec3_t wallColor, floorColor;
 
@@ -944,37 +942,6 @@ typedef enum {
 	VBO_TAG_MODEL,
 	VBO_TAG_STREAM
 } vbo_tag_t;
-
-typedef struct mesh_vbo_s {
-	int registrationSequence;
-	unsigned index;
-
-	vbo_tag_t tag;
-
-	unsigned vertexId;
-	unsigned elemId;
-
-	// TODO: Don't store it inline in this aggregate
-	VboSpanLayout layout;
-} mesh_vbo_t;
-
-void        R_InitVBO( void );
-mesh_vbo_t *R_CreateMeshVBO( int numVerts, int numElems, int numInstances,
-							 vattribmask_t vattribs, vbo_tag_t tag, vattribmask_t halfFloatVattribs );
-void        R_ReleaseMeshVBO( mesh_vbo_t *vbo );
-void        R_TouchMeshVBO( mesh_vbo_t *vbo );
-vattribmask_t R_FillVBOVertexDataBuffer( const VboSpanLayout *layout, vattribmask_t vattribs, const mesh_t *mesh, void *outData );
-void        R_UploadVBOVertexRawData( mesh_vbo_t *vbo, int vertsOffset, int numVerts, const void *data );
-vattribmask_t R_UploadVBOVertexData( mesh_vbo_t *vbo, int vertsOffset, vattribmask_t vattribs, const mesh_t *mesh );
-void        R_UploadVBOElemData( mesh_vbo_t *vbo, int vertsOffset, int elemsOffset, const mesh_t *mesh );
-vattribmask_t R_UploadVBOInstancesData( mesh_vbo_t *vbo, int instOffset, int numInstances, instancePoint_t *instances );
-void        R_FreeVBOsByTag( vbo_tag_t tag );
-void        R_FreeUnusedVBOs( void );
-void        R_ShutdownVBO( void );
-
-[[nodiscard]]
-auto buildVertexLayoutForVattribs( VboSpanLayout *layout, vattribmask_t vattribs, vattribmask_t halfFloatVattribs,
-								   int numVerts, int numInstances ) -> size_t;
 
 typedef struct {
 	int overbrightBits;                     // map specific overbright bits

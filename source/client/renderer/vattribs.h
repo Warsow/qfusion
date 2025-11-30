@@ -20,6 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef R_VATTRIBS_H
 #define R_VATTRIBS_H
 
+#include <common/facilities/qfiles.h>
+
 typedef enum vattrib_e {
 	VATTRIB_POSITION        = 0,
 
@@ -87,6 +89,27 @@ typedef enum vattribbit_e {
 } vattribbit_t;
 
 typedef unsigned int vattribmask_t;
+
+struct VboSpanLayout {
+	vattribmask_t vertexAttribs;
+	vattribmask_t halfFloatAttribs;
+
+	unsigned baseOffset;
+	unsigned instancesOffset;
+
+	uint8_t vertexSize;
+
+	uint8_t normalsOffset;
+	uint8_t sVectorsOffset;
+	uint8_t stOffset;
+	uint8_t lmstOffset[( MAX_LIGHTMAPS + 1 ) / 2];
+	uint8_t lmstSize[( MAX_LIGHTMAPS + 1 ) / 2];
+	uint8_t lmlayersOffset[( MAX_LIGHTMAPS + 3 ) / 4];
+	uint8_t colorsOffset[MAX_LIGHTMAPS];
+	uint8_t bonesIndicesOffset;
+	uint8_t bonesWeightsOffset;
+	uint8_t spritePointsOffset;              // autosprite or autosprite2 centre + radius
+};
 
 #define FLOAT_VATTRIB_TYPE( vattrib,halfFloatVattribs ) \
 	( (int)( halfFloatVattribs & vattrib ) == vattrib ? GLhalf : float )

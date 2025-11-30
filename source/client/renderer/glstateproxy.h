@@ -25,8 +25,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "vattribs.h"
 #include "glimp.h"
 
-struct mesh_vbo_s;
 struct VboSpanLayout;
+struct MeshBuffer;
 class RenderTargetComponents;
 class BackendActionTape;
 class Texture;

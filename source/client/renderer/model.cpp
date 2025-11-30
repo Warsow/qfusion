@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "local.h"
 #include "frontend.h"
+#include "buffermanagement.h"
 #include "iqm.h"
 
 #include "../../../third-party/recastnavigation/Recast/Include/Recast.h"
@@ -730,7 +731,7 @@ static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned modnum ) {
 	unsigned maxTempVBOs = 1024;
 
 	struct MergeVboHelper {
-		void   *owner;
+		MeshBuffer *builtBuffer;
 
 		unsigned numVerts;
 		unsigned numElems;
@@ -1021,6 +1022,8 @@ merge:
 
 	assert( numUnmergedVBOs == 0 );
 
+	BufferCache *const bufferCache = getBufferCache();
+
 	// create real VBOs and assign owner pointers
 	numUnmergedVBOs = numTempVBOs;
 	for( unsigned i = 0; i < numTempVBOs; i++ ) {
@@ -1030,7 +1033,7 @@ merge:
 			break;
 		}
 
-		if( vbo->owner != nullptr ) {
+		if( vbo->builtBuffer != nullptr ) {
 			// already assigned to a real VBO
 			continue;
 		}
@@ -1042,17 +1045,17 @@ merge:
 		MergedBspSurface *mergedSurf = &loadbmodel->mergedSurfaces[startDrawSurface + i];
 
 		// don't use half-floats for XYZ due to precision issues
-		vbo->owner = R_CreateMeshVBO( vbo->numVerts, vbo->numElems, mergedSurf->numInstances,
-									  vbo->vattribs, VBO_TAG_WORLD, vbo->vattribs & ~floatVattribs );
-		mergedSurf->vbo = (mesh_vbo_s *)vbo->owner;
+		vbo->builtBuffer = bufferCache->createMeshBuffer( vbo->numVerts, vbo->numElems, mergedSurf->numInstances,
+														  vbo->vattribs, VBO_TAG_WORLD, vbo->vattribs & ~floatVattribs );
+		mergedSurf->buffer = vbo->builtBuffer;
 
 		if( mergedSurf->numInstances == 0 ) {
 			for( unsigned j = i + 1; j < numTempVBOs; j++ ) {
 				MergeVboHelper *vbo2 = &tempVBOs[j];
 				if( vbo2->index == i + 1 ) {
-					vbo2->owner = vbo->owner;
+					vbo2->builtBuffer = vbo->builtBuffer;
 					mergedSurf = &loadbmodel->mergedSurfaces[startDrawSurface + j];
-					mergedSurf->vbo = (mesh_vbo_s *)vbo->owner;
+					mergedSurf->buffer = vbo->builtBuffer;
 					numUnmergedVBOs--;
 				}
 			}
@@ -1064,20 +1067,23 @@ merge:
 
 	assert( numUnmergedVBOs == 0 );
 
+	BufferFactory *const bufferFactory = bufferCache->getUnderlyingFactory();
+
 	// upload data to merged VBO's and assign offsets to drawSurfs
 	for( unsigned i = 0; i < numSurfaces; i++ ) {
 		msurface_t *const surf = surfaces[i];
 		if( surf->mergedSurfNum ) {
 			MergedBspSurface *const drawSurf = &loadbmodel->mergedSurfaces[surf->mergedSurfNum - 1];
 			const mesh_t *mesh = &surf->mesh;
-			mesh_vbo_t *const vbo = drawSurf->vbo;
+			MeshBuffer *const buffer = drawSurf->buffer;
+			const VboSpanLayout *layout = bufferCache->getLayoutForBuffer( buffer );
 
 			const int vertsOffset = drawSurf->firstVboVert + surf->firstDrawSurfVert;
 			const int elemsOffset = drawSurf->firstVboElem + surf->firstDrawSurfElem;
 
-			R_UploadVBOVertexData( vbo, vertsOffset, vbo->layout.vertexAttribs, mesh );
-			R_UploadVBOElemData( vbo, vertsOffset, elemsOffset, mesh );
-			R_UploadVBOInstancesData( vbo, 0, surf->numInstances, surf->instances );
+			bufferFactory->uploadVertexData( buffer, layout, vertsOffset, layout->vertexAttribs, mesh );
+			bufferFactory->uploadIndexData( buffer, vertsOffset, elemsOffset, mesh );
+			bufferFactory->uploadInstancesData( buffer, layout, 0, surf->numInstances, surf->instances );
 		}
 	}
 
@@ -1104,7 +1110,7 @@ void Mod_CreateVertexBufferObjects( model_t *mod ) {
 	// we won't end up with both maps residing in video memory
 	// until R_FreeUnusedVBOs call
 	if( r_prevworldmodel && r_prevworldmodel->registrationSequence != rsh.registrationSequence ) {
-		R_FreeVBOsByTag( VBO_TAG_WORLD );
+		getBufferCache()->freeBuffersByTag( VBO_TAG_WORLD );
 	}
 
 	// allocate memory for drawsurfs
@@ -1173,7 +1179,7 @@ static void Mod_TouchBrushModel( model_t *model ) {
 	for( unsigned i = 0; i < loadbmodel->numMergedSurfaces; i++ ) {
 		MergedBspSurface *mergedSurf = &loadbmodel->mergedSurfaces[i];
 		R_TouchShader( mergedSurf->shader );
-		R_TouchMeshVBO( mergedSurf->vbo );
+		getBufferCache()->touchMeshBuffer( mergedSurf->buffer );
 	}
 
 	for( unsigned i = 0; i < loadbmodel->numfogs; i++ ) {
