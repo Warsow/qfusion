@@ -551,17 +551,16 @@ void RendererFrontend::submitDrawActionsList( SimulatedBackendState *backendStat
 void RendererFrontend::submitDebugStuffToBackend( SimulatedBackendState *backendState, StateForCamera *stateForCamera, Scene *scene ) {
 	if( !stateForCamera->debugLines->empty() ) {
 		// TODO: Reduce this copying
-		vec4_t verts[2];
+		vec4_t verts[2] { { 0, 0, 0, 1 }, { 0, 0, 0, 1 } };
 		byte_vec4_t colors[2] { { 0, 0, 0, 1 }, { 0, 0, 0, 1 } };
 		elem_t elems[2] { 0, 1 };
 
 		mesh_t mesh {};
 		mesh.colorsArray[0] = colors;
-		mesh.xyzArray = verts;
-		mesh.numVerts = 2;
-		mesh.numElems = 2;
-		mesh.elems = elems;
-		verts[0][3] = verts[1][3] = 1.0f;
+		mesh.xyzArray       = verts;
+		mesh.numVerts       = 2;
+		mesh.numElems       = 2;
+		mesh.elems          = elems;
 
 		beginAddingAuxiliaryDynamicMeshes( UPLOAD_GROUP_DEBUG_MESH );
 
@@ -891,6 +890,63 @@ static void uploadBatchedMesh( MeshBuilder *builder, VertElemSpan *inOutSpan ) {
 	}
 }
 
+static inline void buildSpritePositions( vec4_t *__restrict positions, float radius, float mirrorSign,
+										 const float *__restrict origin, const float *__restrict left,
+										 const float *__restrict up ) {
+	const float orientedRadius = radius * mirrorSign;
+
+	positions[0][3] = 1.0f;
+	positions[1][3] = 1.0f;
+	positions[2][3] = 1.0f;
+	positions[3][3] = 1.0f;
+
+	vec3_t point1, point2;
+	VectorMA( origin, -radius, up, point1 );
+	VectorMA( origin, +radius, up, point2 );
+
+	VectorMA( point1, +orientedRadius, left, positions[0] );
+	VectorMA( point1, -orientedRadius, left, positions[3] );
+
+	VectorMA( point2, +orientedRadius, left, positions[1] );
+	VectorMA( point2, -orientedRadius, left, positions[2] );
+}
+
+// TODO: Support mirrors
+static inline void buildBeamPositions( vec4_t *__restrict positions, float halfWidth,
+									   const float *__restrict from, const float *__restrict to,
+									   const float *__restrict fromRight, const float *__restrict toRight ) {
+	positions[0][3] = 1.0f;
+	positions[1][3] = 1.0f;
+	positions[2][3] = 1.0f;
+	positions[3][3] = 1.0f;
+
+	VectorMA( from, +halfWidth, fromRight, positions[0] );
+	VectorMA( from, -halfWidth, fromRight, positions[1] );
+	VectorMA( to, -halfWidth, toRight, positions[2] );
+	VectorMA( to, +halfWidth, toRight, positions[3] );
+}
+
+static inline void setVertexColorFromFloatColor( uint8_t *__restrict dest, const float *__restrict src ) {
+	dest[0] = (uint8_t)( 255.0f * src[0] );
+	dest[1] = (uint8_t)( 255.0f * src[1] );
+	dest[2] = (uint8_t)( 255.0f * src[2] );
+	dest[3] = (uint8_t)( 255.0f * src[3] );
+}
+
+static inline void setVertexColorFromFloatColorClamping( uint8_t *__restrict dest, const float *__restrict src ) {
+	dest[0] = (uint8_t)wsw::clamp( 255.0f * src[0], 0.0f, 255.0f );
+	dest[1] = (uint8_t)wsw::clamp( 255.0f * src[1], 0.0f, 255.0f );
+	dest[2] = (uint8_t)wsw::clamp( 255.0f * src[2], 0.0f, 255.0f );
+	dest[3] = (uint8_t)wsw::clamp( 255.0f * src[3], 0.0f, 255.0f );
+}
+
+static inline void copyFirstVertexColorToOtherQuadColors( byte_vec4_t *quadColors ) {
+	assert( ( (uintptr_t)&quadColors[0][0] ) % alignof( uint32_t ) == 0 );
+	assert( sizeof( *quadColors ) == sizeof( uint32_t ) );
+	auto *p = (uint32_t *)&quadColors[0][0];
+	p[1] = p[0], p[2] = p[0], p[3] = p[0];
+}
+
 static void buildMeshForSpriteParticles( MeshBuilder *meshBuilder,
 										 const Scene::ParticlesAggregate *aggregate,
 										 std::span<const sortedDrawSurf_t> surfSpan,
@@ -900,20 +956,13 @@ static void buildMeshForSpriteParticles( MeshBuilder *meshBuilder,
 	const auto *__restrict appearanceRules = &aggregate->appearanceRules;
 	const auto *__restrict spriteRules     = std::get_if<Particle::SpriteRules>( &appearanceRules->geometryRules );
 	const bool applyLight                  = !affectingLightIndices.empty();
+	const float mirrorSign                 = shouldMirrorView ? -1.0f : +1.0f;
 
 	for( const sortedDrawSurf_t &sds: surfSpan ) {
 		// TODO: Write directly to mapped buffers
-		elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
-		vec4_t xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
 		// TODO: Do we need normals?
-		// vec4_t normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
-		byte_vec4_t colors[4];
-		vec2_t texcoords[4] = { {0, 1}, {0, 0}, {1,0}, {1,1} };
 
 		const auto *drawSurf = (const ParticleDrawSurface *)sds.drawSurf;
-
-		// Ensure that the aggregate is the same
-		//assert( fsh->particleAggregates + drawSurf->aggregateIndex == aggregate );
 
 		assert( drawSurf->particleIndex < aggregate->numParticles );
 		const Particle *const __restrict particle = aggregate->particles + drawSurf->particleIndex;
@@ -936,29 +985,19 @@ static void buildMeshForSpriteParticles( MeshBuilder *meshBuilder,
 			continue;
 		}
 
-		vec3_t v_left, v_up;
+		mat3_t tmpAxis;
+		const float *left, *up;
 		if( particle->rotationAngle != 0.0f ) {
-			mat3_t axis;
-			Matrix3_Rotate( viewAxis, particle->rotationAngle, &viewAxis[AXIS_FORWARD], axis );
-			VectorCopy( &axis[AXIS_RIGHT], v_left );
-			VectorCopy( &axis[AXIS_UP], v_up );
+			Matrix3_Rotate( viewAxis, particle->rotationAngle, &viewAxis[AXIS_FORWARD], tmpAxis );
+			left = &tmpAxis[AXIS_RIGHT];
+			up   = &tmpAxis[AXIS_UP];
 		} else {
-			VectorCopy( &viewAxis[AXIS_RIGHT], v_left );
-			VectorCopy( &viewAxis[AXIS_UP], v_up );
+			left = &viewAxis[AXIS_RIGHT];
+			up   = &viewAxis[AXIS_UP];
 		}
 
-		if( shouldMirrorView ) {
-			VectorInverse( v_left );
-		}
-
-		vec3_t point;
-		VectorMA( particle->origin, -radius, v_up, point );
-		VectorMA( point, radius, v_left, xyz[0] );
-		VectorMA( point, -radius, v_left, xyz[3] );
-
-		VectorMA( particle->origin, radius, v_up, point );
-		VectorMA( point, radius, v_left, xyz[1] );
-		VectorMA( point, -radius, v_left, xyz[2] );
+		vec4_t positions[4];
+		buildSpritePositions( positions, radius, mirrorSign, particle->origin, left, up );
 
 		vec4_t colorBuffer;
 		const RgbaLifespan &colorLifespan = appearanceRules->colors[particle->instanceColorIndex];
@@ -974,17 +1013,11 @@ static void buildMeshForSpriteParticles( MeshBuilder *meshBuilder,
 			colorBuffer[2] = wsw::min( 1.0f, colorBuffer[2] + addedLight[2] );
 		}
 
-		Vector4Set( colors[0],
-					(uint8_t)( 255 * colorBuffer[0] ),
-					(uint8_t)( 255 * colorBuffer[1] ),
-					(uint8_t)( 255 * colorBuffer[2] ),
-					(uint8_t)( 255 * colorBuffer[3] ) );
+		byte_vec4_t colors[4];
+		setVertexColorFromFloatColor( colors[0], colorBuffer );
+		copyFirstVertexColorToOtherQuadColors( colors );
 
-		Vector4Copy( colors[0], colors[1] );
-		Vector4Copy( colors[0], colors[2] );
-		Vector4Copy( colors[0], colors[3] );
-
-		meshBuilder->appendQuad( xyz, texcoords, colors, elems );
+		meshBuilder->appendQuad( positions, kQuadTexCoords, colors, kQuadIndices );
 	}
 }
 
@@ -1000,17 +1033,8 @@ static void buildMeshForSparkParticles( MeshBuilder *meshBuilder,
 
 	for( const sortedDrawSurf_t &sds: surfSpan ) {
 		// TODO: Write directly to mapped buffers
-		elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
-		vec4_t xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
 		// TODO: Do we need normals?
-		// vec4_t normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
-		byte_vec4_t colors[4];
-		vec2_t texcoords[4] = { {0, 1}, {0, 0}, {1,0}, {1,1} };
-
 		const auto *drawSurf = (const ParticleDrawSurface *)sds.drawSurf;
-
-		// Ensure that the aggregate is the same
-		//assert( fsh->particleAggregates + drawSurf->aggregateIndex == aggregate );
 
 		assert( drawSurf->particleIndex < aggregate->numParticles );
 		const Particle *const __restrict particle = aggregate->particles + drawSurf->particleIndex;
@@ -1086,19 +1110,13 @@ static void buildMeshForSparkParticles( MeshBuilder *meshBuilder,
 		VectorMA( particle->origin, toFrac * length, particleDir, to );
 		VectorAvg( from, to, mid );
 
+		vec4_t positions[4];
 		vec3_t viewToMid, right;
 		VectorSubtract( mid, viewOrigin, viewToMid );
 		CrossProduct( viewToMid, particleDir, right );
 		if( const float squareLength = VectorLengthSquared( right ); squareLength > wsw::square( 0.001f ) ) [[likely]] {
-			const float rcpLength = Q_RSqrt( squareLength );
-			VectorScale( right, rcpLength, right );
-
-			const float halfWidth = 0.5f * width;
-
-			VectorMA( from, +halfWidth, right, xyz[0] );
-			VectorMA( from, -halfWidth, right, xyz[1] );
-			VectorMA( to, -halfWidth, right, xyz[2] );
-			VectorMA( to, +halfWidth, right, xyz[3] );
+			// Pass scaled width to avoid separate `right` normalization
+			buildBeamPositions( positions, 0.5f * width * Q_RSqrt( squareLength ), from, to, right, right );
 		} else {
 			continue;
 		}
@@ -1118,17 +1136,11 @@ static void buildMeshForSparkParticles( MeshBuilder *meshBuilder,
 			colorBuffer[2] = wsw::min( 1.0f, colorBuffer[2] + addedLight[2] );
 		}
 
-		Vector4Set( colors[0],
-					(uint8_t)( 255 * colorBuffer[0] ),
-					(uint8_t)( 255 * colorBuffer[1] ),
-					(uint8_t)( 255 * colorBuffer[2] ),
-					(uint8_t)( 255 * colorBuffer[3] ) );
+		byte_vec4_t colors[4];
+		setVertexColorFromFloatColor( colors[0], colorBuffer );
+		copyFirstVertexColorToOtherQuadColors( colors );
 
-		Vector4Copy( colors[0], colors[1] );
-		Vector4Copy( colors[0], colors[2] );
-		Vector4Copy( colors[0], colors[3] );
-
-		meshBuilder->appendQuad( xyz, texcoords, colors, elems );
+		meshBuilder->appendQuad( positions, kQuadTexCoords, colors, kQuadIndices );
 	}
 }
 
@@ -1171,54 +1183,28 @@ void RendererFrontend::prepareBatchedParticles( PrepareBatchedSurfWorkload *work
 }
 
 void RendererFrontend::prepareBatchedCoronas( PrepareBatchedSurfWorkload *workload ) {
-	vec3_t v_left, v_up;
-	VectorCopy( &workload->stateForCamera->viewAxis[AXIS_RIGHT], v_left );
-	VectorCopy( &workload->stateForCamera->viewAxis[AXIS_UP], v_up );
-
-	if( workload->stateForCamera->renderFlags & RF_MIRRORVIEW ) {
-		VectorInverse( v_left );
-	}
+	const float *const left = &workload->stateForCamera->viewAxis[AXIS_RIGHT];
+	const float *const up   = &workload->stateForCamera->viewAxis[AXIS_UP];
+	const float mirrorSign  = ( workload->stateForCamera->renderFlags & RF_MIRRORVIEW ) ? -1.0f : +1.0f;
 
 	MeshBuilder *const meshBuilder = &tl_meshBuilder;
 	meshBuilder->reserveForNumQuads( workload->batchSpan.size() );
 
 	for( const sortedDrawSurf_t &sds: workload->batchSpan ) {
-		elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
-		vec4_t xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
-		// TODO: Do we need normals?
-		// vec4_t normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
-		byte_vec4_t colors[4];
-		vec2_t texcoords[4] = { {0, 1}, {0, 0}, {1,0}, {1,1} };
-
 		const auto *light = (const Scene::DynamicLight *)sds.drawSurf;
-
 		assert( light && light->hasCoronaLight );
 
-		const float radius = light->coronaRadius;
+		vec4_t positions[4];
+		buildSpritePositions( positions, light->coronaRadius, mirrorSign, light->origin, left, up );
 
-		vec3_t origin;
-		VectorCopy( light->origin, origin );
+		byte_vec4_t colors[4];
+		vec4_t color { 0.0f, 0.0f, 0.0f, 255.0f };
+		// Downscale for additive blending. TODO: Make this scale aware sRGB-correct
+		VectorScale( light->color, 96.0f / 255.0f, color );
+		setVertexColorFromFloatColorClamping( colors[0], color );
+		copyFirstVertexColorToOtherQuadColors( colors );
 
-		vec3_t point;
-		VectorMA( origin, -radius, v_up, point );
-		VectorMA( point, radius, v_left, xyz[0] );
-		VectorMA( point, -radius, v_left, xyz[3] );
-
-		VectorMA( origin, radius, v_up, point );
-		VectorMA( point, radius, v_left, xyz[1] );
-		VectorMA( point, -radius, v_left, xyz[2] );
-
-		Vector4Set( colors[0],
-					bound( 0, light->color[0] * 96, 255 ),
-					bound( 0, light->color[1] * 96, 255 ),
-					bound( 0, light->color[2] * 96, 255 ),
-					255 );
-
-		Vector4Copy( colors[0], colors[1] );
-		Vector4Copy( colors[0], colors[2] );
-		Vector4Copy( colors[0], colors[3] );
-
-		meshBuilder->appendQuad( xyz, texcoords, colors, elems );
+		meshBuilder->appendQuad( positions, kQuadTexCoords, colors, kQuadIndices );
 	}
 
 	uploadBatchedMesh( meshBuilder, workload->stateForCamera->batchedSurfVertSpans->data() + workload->vertSpanOffset );
@@ -1230,17 +1216,10 @@ void RendererFrontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *work
 
 	[[maybe_unused]] const float *const viewOrigin = workload->stateForCamera->viewOrigin;
 	[[maybe_unused]] const float *const viewAxis   = workload->stateForCamera->viewAxis;
-	[[maybe_unused]] const bool shouldMirrorView   = ( workload->stateForCamera->renderFlags & RF_MIRRORVIEW ) != 0;
+
+	[[maybe_unused]] const float mirrorSign = ( workload->stateForCamera->renderFlags & RF_MIRRORVIEW ) ? -1.0f : 1.0f;
 
 	for( const sortedDrawSurf_t &sds: workload->batchSpan ) {
-		uint16_t indices[6] { 0, 1, 2, 0, 2, 3 };
-
-		vec4_t positions[4];
-		byte_vec4_t colors[4];
-		vec2_t texCoords[4];
-
-		positions[0][3] = positions[1][3] = positions[2][3] = positions[3][3] = 1.0f;
-
 		const auto *__restrict poly = (const QuadPoly *)sds.drawSurf;
 
 		if( const auto *__restrict beamRules = std::get_if<QuadPoly::ViewAlignedBeamRules>( &poly->appearanceRules ) ) {
@@ -1326,10 +1305,8 @@ void RendererFrontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *work
 							}
 						}
 
-						VectorMA( from, +halfWidth, fromRight, positions[0] );
-						VectorMA( from, -halfWidth, fromRight, positions[1] );
-						VectorMA( to, -halfWidth, toRight, positions[2] );
-						VectorMA( to, +halfWidth, toRight, positions[3] );
+						vec4_t positions[4];
+						buildBeamPositions( positions, halfWidth, from, to, fromRight, toRight );
 
 						float segStxStart, segStxEnd;
 						if( beamRules->tileLength > 0 ) {
@@ -1340,6 +1317,7 @@ void RendererFrontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *work
 							segStxEnd   = segEndFrac;
 						}
 
+						vec2_t texCoords[4];
 						Vector2Set( texCoords[0], segStxStart, 0.0f );
 						Vector2Set( texCoords[1], segStxStart, 1.0f );
 						Vector2Set( texCoords[2], segStxEnd, 1.0f );
@@ -1350,71 +1328,44 @@ void RendererFrontend::prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *work
 						Vector4Lerp( beamRules->fromColor, segStartFrac, beamRules->toColor, segStartColor );
 						Vector4Lerp( beamRules->fromColor, segEndFrac, beamRules->toColor, segEndColor );
 
-						const byte_vec4_t startColorAsBytes {
-							(uint8_t)( segStartColor[0] * 255 ),
-							(uint8_t)( segStartColor[1] * 255 ),
-							(uint8_t)( segStartColor[2] * 255 ),
-							(uint8_t)( segStartColor[3] * 255 ),
-						};
-						const byte_vec4_t endColorAsBytes {
-							(uint8_t)( segEndColor[0] * 255 ),
-							(uint8_t)( segEndColor[1] * 255 ),
-							(uint8_t)( segEndColor[2] * 255 ),
-							(uint8_t)( segEndColor[3] * 255 ),
-						};
+						byte_vec4_t colors[4];
+						setVertexColorFromFloatColor( colors[0], segStartColor );
+						Vector4Copy( colors[0], colors[1] );
+						setVertexColorFromFloatColor( colors[2], segEndColor );
+						Vector4Copy( colors[2], colors[3] );
 
-						Vector4Copy( startColorAsBytes, colors[0] );
-						Vector4Copy( startColorAsBytes, colors[1] );
-						Vector4Copy( endColorAsBytes, colors[2] );
-						Vector4Copy( endColorAsBytes, colors[3] );
-
-						meshBuilder->appendQuad( positions, texCoords, colors, indices );
+						meshBuilder->appendQuad( positions, texCoords, colors, kQuadIndices );
 					} while( ++segmentNum < numSegments );
 				} while( ++planeNum < numDrawnPlanes );
 			}
 		} else {
-			vec3_t left, up;
-			const float *color;
+			const float *color, *left, *up;
 
 			if( const auto *orientedRules = std::get_if<QuadPoly::OrientedSpriteRules>( &poly->appearanceRules ) ) {
 				color = orientedRules->color;
-				VectorCopy( &orientedRules->axis[AXIS_RIGHT], left );
-				VectorCopy( &orientedRules->axis[AXIS_UP], up );
+				left  = &orientedRules->axis[AXIS_RIGHT];
+				up    = &orientedRules->axis[AXIS_UP];
 			} else {
 				color = std::get_if<QuadPoly::ViewAlignedSpriteRules>( &poly->appearanceRules )->color;
-				VectorCopy( &viewAxis[AXIS_RIGHT], left );
-				VectorCopy( &viewAxis[AXIS_UP], up );
+				left  = &viewAxis[AXIS_RIGHT];
+				up    = &viewAxis[AXIS_UP];
 			}
 
-			if( shouldMirrorView ) {
-				VectorInverse( left );
-			}
+			vec4_t positions[4];
+			buildSpritePositions( positions, mirrorSign, poly->halfExtent, poly->origin, left, up );
 
-			vec3_t point;
-			const float radius = poly->halfExtent;
-			VectorMA( poly->origin, -radius, up, point );
-			VectorMA( point, +radius, left, positions[0] );
-			VectorMA( point, -radius, left, positions[3] );
-
-			VectorMA( poly->origin, radius, up, point );
-			VectorMA( point, +radius, left, positions[1] );
-			VectorMA( point, -radius, left, positions[2] );
-
+			vec2_t texCoords[4];
+			// TODO: They differ from kQuadTexCoords
 			Vector2Set( texCoords[0], 0.0f, 0.0f );
 			Vector2Set( texCoords[1], 0.0f, 1.0f );
 			Vector2Set( texCoords[2], 1.0f, 1.0f );
 			Vector2Set( texCoords[3], 1.0f, 0.0f );
 
-			colors[0][0] = ( uint8_t )( color[0] * 255 );
-			colors[0][1] = ( uint8_t )( color[1] * 255 );
-			colors[0][2] = ( uint8_t )( color[2] * 255 );
-			colors[0][3] = ( uint8_t )( color[3] * 255 );
+			byte_vec4_t colors[4];
+			setVertexColorFromFloatColor( colors[0], color );
+			copyFirstVertexColorToOtherQuadColors( colors );
 
-			Vector4Copy( colors[0], colors[1] );
-			Vector4Copy( colors[0], colors[2] );
-			Vector4Copy( colors[0], colors[3] );
-
-			meshBuilder->appendQuad( positions, texCoords, colors, indices );
+			meshBuilder->appendQuad( positions, texCoords, colors, kQuadIndices );
 		}
 	}
 
@@ -1443,7 +1394,8 @@ struct SpriteBuilder {
 		this->numIndicesSoFar  = 0;
 	}
 
-	void appendQuad( const vec4_t positions[4], const vec4_t normals[4], const vec2_t texCoords[4], const byte_vec4_t colors[4], const uint16_t indices[6] ) {
+	void appendQuad( const vec4_t positions[4], const vec4_t normals[4], const vec2_t texCoords[4],
+					 const byte_vec4_t colors[4], const uint16_t indices[6] ) {
 		std::memcpy( meshPositions.get() + numVerticesSoFar, positions, 4 * sizeof( vec4_t ) );
 		std::memcpy( meshNormals.get() + numVerticesSoFar, normals, 4 * sizeof( vec4_t ) );
 		std::memcpy( meshTexCoords.get() + numVerticesSoFar, texCoords, 4 * sizeof( vec2_t ) );
@@ -1477,7 +1429,7 @@ void RendererFrontend::prepareLegacySprites( PrepareSpriteSurfWorkload *workload
 	SpriteBuilder *const spriteBuilder   = &tl_spriteBuilder;
 	StateForCamera *const stateForCamera = workload->stateForCamera;
 	const float *const viewAxis          = stateForCamera->viewAxis;
-	const bool shouldMirrorView          = ( stateForCamera->renderFlags & RF_MIRRORVIEW ) != 0;
+	const float mirrorSign               = ( stateForCamera->renderFlags & RF_MIRRORVIEW ) ? -1.0f : +1.0f;
 
 	spriteBuilder->reserveForNumSpirtes( workload->batchSpan.size() );
 
@@ -1485,43 +1437,30 @@ void RendererFrontend::prepareLegacySprites( PrepareSpriteSurfWorkload *workload
 		const sortedDrawSurf_t &sds = workload->batchSpan.data()[surfInSpan];
 		const auto *const e         = (const entity_t *)sds.drawSurf;
 
-		vec3_t v_left, v_up;
+		vec3_t tmpLeft, tmpUp;
+		const float *left, *up;
 		if( const float rotation = e->rotation; rotation != 0.0f ) {
-			RotatePointAroundVector( v_left, &viewAxis[AXIS_FORWARD], &viewAxis[AXIS_RIGHT], rotation );
-			CrossProduct( &viewAxis[AXIS_FORWARD], v_left, v_up );
+			RotatePointAroundVector( tmpLeft, &viewAxis[AXIS_FORWARD], &viewAxis[AXIS_RIGHT], rotation );
+			CrossProduct( &viewAxis[AXIS_FORWARD], tmpLeft, tmpUp );
+			left = tmpLeft, up = tmpUp;
 		} else {
-			VectorCopy( &viewAxis[AXIS_RIGHT], v_left );
-			VectorCopy( &viewAxis[AXIS_UP], v_up );
+			left = &viewAxis[AXIS_RIGHT];
+			up   = &viewAxis[AXIS_UP];
 		}
 
-		if( shouldMirrorView ) {
-			VectorInverse( v_left );
-		}
+		vec4_t positions[4];
+		buildSpritePositions( positions, e->radius * e->scale, mirrorSign, e->origin, left, up );
 
-		vec4_t xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
-		vec4_t normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
-
-		vec3_t point;
-		const float radius = e->radius * e->scale;
-		VectorMA( e->origin, -radius, v_up, point );
-		VectorMA( point, radius, v_left, xyz[0] );
-		VectorMA( point, -radius, v_left, xyz[3] );
-
-		VectorMA( e->origin, radius, v_up, point );
-		VectorMA( point, radius, v_left, xyz[1] );
-		VectorMA( point, -radius, v_left, xyz[2] );
+		vec4_t normals[4];
+		VectorNegate( &viewAxis[AXIS_FORWARD], normals[0] );
+		Vector4Copy( normals[0], normals[1] ), Vector4Copy( normals[0], normals[2] ), Vector4Copy( normals[0], normals[3] );
 
 		byte_vec4_t colors[4];
-		for( unsigned i = 0; i < 4; i++ ) {
-			VectorNegate( &viewAxis[AXIS_FORWARD], normals[i] );
-			Vector4Copy( e->color, colors[i] );
-		}
-
-		elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
-		vec2_t texcoords[4] = { {0, 1}, {0, 0}, {1,0}, {1,1} };
+		Vector4Copy( e->color, colors[0] );
+		copyFirstVertexColorToOtherQuadColors( colors );
 
 		// TODO: Reduce copying
-		spriteBuilder->appendQuad( xyz, normals, texcoords, colors, elems );
+		spriteBuilder->appendQuad( positions, normals, kQuadTexCoords, colors, kQuadIndices );
 	}
 
 	mesh_t mesh;
@@ -1537,53 +1476,55 @@ void RendererFrontend::prepareLegacySprites( PrepareSpriteSurfWorkload *workload
 void RendererFrontend::submitRotatedStretchPic( SimulatedBackendState *backendState, int x, int y, int w, int h,
 												float s1, float t1, float s2, float t2, float angle,
 												const float *color, const shader_s *material ) {
-	vec4_t pic_xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
-	vec4_t pic_normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
-	vec2_t pic_st[4];
-	byte_vec4_t pic_colors[4];
-	elem_t pic_elems[6] = { 0, 1, 2, 0, 2, 3 };
-	mesh_t pic_mesh = { 4, 6, pic_elems, pic_xyz, pic_normals, nullptr, pic_st, { 0, 0, 0, 0 }, { 0 },
-						{ pic_colors, pic_colors, pic_colors, pic_colors }, nullptr, nullptr };
+	vec4_t positions[4];
+	vec2_t texCoords[4];
 
 	// lower-left
-	Vector2Set( pic_xyz[0], x, y );
-	Vector2Set( pic_st[0], s1, t1 );
-	Vector4Set( pic_colors[0],
-				bound( 0, ( int )( color[0] * 255.0f ), 255 ),
-				bound( 0, ( int )( color[1] * 255.0f ), 255 ),
-				bound( 0, ( int )( color[2] * 255.0f ), 255 ),
-				bound( 0, ( int )( color[3] * 255.0f ), 255 ) );
-	const int bcolor = *(int *)pic_colors[0];
+	Vector4Set( positions[0], x, y, 0.0f, 1.0f );
+	Vector2Set( texCoords[0], s1, t1 );
 
 	// lower-right
-	Vector2Set( pic_xyz[1], x + w, y );
-	Vector2Set( pic_st[1], s2, t1 );
-	*(int *)pic_colors[1] = bcolor;
+	Vector4Set( positions[1], x + w, y, 0.0f, 1.0f );
+	Vector2Set( texCoords[1], s2, t1 );
 
 	// upper-right
-	Vector2Set( pic_xyz[2], x + w, y + h );
-	Vector2Set( pic_st[2], s2, t2 );
-	*(int *)pic_colors[2] = bcolor;
+	Vector4Set( positions[2], x + w, y + h, 0.0f, 1.0f );
+	Vector2Set( texCoords[2], s2, t2 );
 
 	// upper-left
-	Vector2Set( pic_xyz[3], x, y + h );
-	Vector2Set( pic_st[3], s1, t2 );
-	*(int *)pic_colors[3] = bcolor;
+	Vector4Set( positions[3], x, y + h, 0.0f, 1.0f );
+	Vector2Set( texCoords[3], s1, t2 );
 
 	// rotated image
 	if( angle != 0.0f && ( angle = anglemod( angle ) ) != 0.0f ) {
 		angle = DEG2RAD( angle );
-		const float sint = sinf( angle );
-		const float cost = cosf( angle );
+		const float sina = sinf( angle );
+		const float cosa = cosf( angle );
 		for( unsigned j = 0; j < 4; j++ ) {
-			t1 = pic_st[j][0];
-			t2 = pic_st[j][1];
-			pic_st[j][0] = cost * ( t1 - 0.5f ) - sint * ( t2 - 0.5f ) + 0.5f;
-			pic_st[j][1] = cost * ( t2 - 0.5f ) + sint * ( t1 - 0.5f ) + 0.5f;
+			const float s = texCoords[j][0];
+			const float t = texCoords[j][1];
+			texCoords[j][0] = cosa * ( s - 0.5f ) - sina * ( t - 0.5f ) + 0.5f;
+			texCoords[j][1] = cosa * ( t - 0.5f ) + sina * ( s - 0.5f ) + 0.5f;
 		}
 	}
 
-	addAuxiliaryDynamicMesh( UPLOAD_GROUP_2D_MESH, backendState, nullptr, material, nullptr, nullptr, 0, &pic_mesh, GL_TRIANGLES, 0.0f, 0.0f );
+	byte_vec4_t colors[4];
+	setVertexColorFromFloatColorClamping( colors[0], color );
+	copyFirstVertexColorToOtherQuadColors( colors );
+
+	elem_t elems[6] = kQuadIndicesInitializer;
+
+	mesh_t mesh;
+	memset( &mesh, 0, sizeof( mesh_t ) );
+	mesh.numVerts       = 4;
+	mesh.numElems       = 6;
+	mesh.xyzArray       = positions;
+	mesh.stArray        = texCoords;
+	mesh.colorsArray[0] = colors;
+	mesh.elems          = elems;
+
+	addAuxiliaryDynamicMesh( UPLOAD_GROUP_2D_MESH, backendState, nullptr, material,
+							 nullptr, nullptr, 0, &mesh, GL_TRIANGLES, 0.0f, 0.0f );
 }
 
 void RendererFrontend::submitAliasSurfToBackend( SimulatedBackendState *sbs, const FrontendToBackendShared *fsh,

@@ -795,6 +795,11 @@ void R_LatLongToNorm4( const uint8_t latlong[2], vec4_t out );
 #define R_LinearFloatFromsRGB( c ) Image_LinearFloatFromsRGBFloat( ( c ) * ( 1.0f / 255.0f ) )
 #define R_sRGBFloatFromLinear( c ) Image_sRGBFloatFromLinearFloat( ( c ) * ( 1.0f / 255.0f ) )
 
+#define kQuadIndicesInitializer { 0, 1, 2, 0, 2, 3 }
+constexpr const uint16_t kQuadIndices[6] = kQuadIndicesInitializer;
+// TODO: Coords of "QuadPoly" appear to be different
+constexpr const float kQuadTexCoords[4][2] = { { 0.0f, 1.0f }, { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f } };
+
 //
 // r_alias.c
 //

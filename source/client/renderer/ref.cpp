@@ -1026,7 +1026,7 @@ MeshBuffer *R_InitPostProcessingVBO( BufferCache *bufferCache ) {
 	MeshBuffer *const buffer = bufferCache->createMeshBuffer( 4, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
 	if( buffer ) {
 		vec2_t texcoords[4] = { {0,1}, {1,1}, {1,0}, {0,0} };
-		elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
+		elem_t elems[6] = kQuadIndicesInitializer;
 		vec4_t xyz[4] = { {0,0,0,1}, {1,0,0,1}, {1,1,0,1}, {0,1,0,1} };
 
 		mesh_t mesh;

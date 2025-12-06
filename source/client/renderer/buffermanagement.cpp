@@ -366,7 +366,6 @@ static void fillAutosprite2Attribs( const mesh_t *mesh, const VboSpanLayout *lay
 	unsigned numQuads;
 	vec4_t *const verts = mesh->xyzArray;
 	const elem_t *elems = mesh->elems;
-	const elem_t trifanElems[6] { 0, 1, 2, 0, 2, 3 };
 	assert( ( mesh->elems && mesh->numElems ) || ( mesh->numVerts == 4 ) );
 	if( mesh->elems && mesh->numElems ) {
 		numQuads = mesh->numElems / 6;
@@ -378,7 +377,7 @@ static void fillAutosprite2Attribs( const mesh_t *mesh, const VboSpanLayout *lay
 	} else if( mesh->numVerts == 4 ) {
 		// single quad as triangle fan
 		numQuads = 1;
-		elems    = trifanElems;
+		elems    = kQuadIndices;
 	} else {
 		numQuads = 0;
 	}
