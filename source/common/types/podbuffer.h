@@ -101,7 +101,7 @@ public:
 	}
 
 	[[nodiscard]]
-	auto capacity() noexcept -> size_t { return m_capacity; }
+	auto capacity() const noexcept -> size_t { return m_capacity; }
 
 	[[nodiscard]]
 	auto get() noexcept -> T * { return m_data; }

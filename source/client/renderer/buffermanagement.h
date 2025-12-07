@@ -23,13 +23,20 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define WSW_d121e83d_6bbb_4645_847b_7d7ce21ab86a_H
 
 #include "glimp.h"
+#include "vattribs.h"
 
 #include <common/types/podbuffer.h>
 #include <common/helpers/freelistallocator.h>
 
+struct mesh_s;
+
 struct MeshBuffer {
 	GLuint vboId { 0 };
 	GLuint iboId { 0 };
+};
+
+struct UniformBuffer {
+	GLuint id { 0 };
 };
 
 class BufferFactory {
@@ -38,17 +45,25 @@ public:
 	enum class Usage { Static, Dynamic };
 
 	[[nodiscard]]
-	auto createVboAndIbo( size_t vertexDataSizeInBytes, size_t indexDataSizeInBytes, Usage usage )
+	auto createMeshBuffer( size_t vertexDataSizeInBytes, size_t indexDataSizeInBytes, Usage usage )
 		-> std::optional<MeshBuffer>;
-
 	void destroyMeshBuffer( MeshBuffer *buffer );
 
-	void uploadVertexData( MeshBuffer *vbo, const VboSpanLayout *layout, int vertsOffset, vattribmask_t vattribs, const mesh_t *mesh );
-	void uploadIndexData( MeshBuffer *vbo, int vertsOffset, int elemsOffset, const mesh_t *mesh );
-	void uploadInstancesData( MeshBuffer *vbo, const VboSpanLayout *layout, int instOffset, int numInstances, instancePoint_t *instances );
+	[[nodiscard]]
+	auto createUniformBuffer( size_t dataSizeInBytes ) -> std::optional<UniformBuffer>;
+	void destroyUniformBuffer( UniformBuffer *buffer );
+
+	void uploadVertexData( MeshBuffer *buffer, const void *data, size_t dataSize );
+	void uploadIndexData( MeshBuffer *buffer, const void *data, size_t dataSize );
+	void uploadVertexData( MeshBuffer *buffer, const VboSpanLayout *layout, int vertsOffset, vattribmask_t vattribs, const mesh_s *mesh );
+	void uploadIndexData( MeshBuffer *buffer, int vertsOffset, int elemsOffset, const mesh_s *mesh );
+	void uploadInstancesData( MeshBuffer *buffer, const VboSpanLayout *layout, int instOffset, int numInstances, instancePoint_t *instances );
+	void uploadUniformData( UniformBuffer *buffer, const void *data, size_t dataSize );
 private:
 	BufferFactory();
 	~BufferFactory();
+
+	void bindAndUpload( GLenum target, GLuint id, size_t offset, size_t dataSize, const void *data );
 
 	PodBuffer<uint8_t> m_tmpDataBuffer;
 
@@ -102,7 +117,7 @@ auto buildVertexLayoutForVattribs( VboSpanLayout *layout, vattribmask_t vattribs
 
 // TODO: We don't check, should we?
 [[maybe_unused]]
-auto fillMeshVertexData( const VboSpanLayout *layout, vattribmask_t vattribs, const mesh_t *mesh, void *outData ) -> vattribmask_t;
+auto fillMeshVertexData( const VboSpanLayout *layout, vattribmask_t vattribs, const mesh_s *mesh, void *outData ) -> vattribmask_t;
 
 auto getBufferCache() -> BufferCache *;
 

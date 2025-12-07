@@ -52,8 +52,8 @@ static const shaderpass_t kBuiltinOutlinePass {
 	.program_type = GLSL_PROGRAM_TYPE_OUTLINE,
 };
 
-SimulatedBackendState::SimulatedBackendState( BackendActionTape *actionTape, int width, int height )
-	: m_glState( actionTape, width, height ), m_actionTape( actionTape ) {
+SimulatedBackendState::SimulatedBackendState( UploadManager *uploadManager, BackendActionTape *actionTape, int width, int height )
+	: m_glState( actionTape, width, height ), m_uploadManager( uploadManager ), m_actionTape( actionTape ) {
 	std::memset( &m_globalState, 0, sizeof( m_globalState ) );
 	std::memset( &m_drawState, 0, sizeof( m_drawState ) );
 	std::memset( &m_materialState, 0, sizeof( m_materialState ) );

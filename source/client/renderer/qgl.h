@@ -53,6 +53,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     and Zephaniah E. Hull. Adapted by Victor Luchits for qfusion project.
 */
 
+#include <cstddef>
+
 /*
 ** QGL.H
 */

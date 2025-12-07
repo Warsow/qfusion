@@ -42,7 +42,6 @@ typedef struct qbufPipe_s qbufPipe_t;
 
 typedef unsigned short elem_t;
 
-typedef vec_t instancePoint_t[8]; // quaternion for rotation + xyz pos + uniform scale
 
 #define NUM_CUSTOMCOLORS        16
 
@@ -175,50 +174,11 @@ struct portalSurface_s;
 
 class SimulatedBackendState;
 
-// core
-void RB_Init();
-void RB_Shutdown();
-
 void R_SetDefaultGLState();
 void R_BindRenderTarget( RenderTargetComponents *components );
 
-void RB_BeginUsingBackendState( SimulatedBackendState *backendState );
-void RB_EndUsingBackendState( SimulatedBackendState *backendState );
-
-enum : unsigned {
-	UPLOAD_GROUP_DYNAMIC_MESH     = 0,
-	UPLOAD_GROUP_BATCHED_MESH     = 1,
-	// TODO: Redesign the interface of dynamic uploads, use better naming
-	UPLOAD_GROUP_BATCHED_MESH_EXT = 2,
-	// TODO: Use one text group per camera
-	UPLOAD_GROUP_2D_MESH,
-	// TODO: Use one debug group per camera - if we care of debug mesh submission performance
-	UPLOAD_GROUP_DEBUG_MESH,
-};
-
 struct VboSpanLayout;
 struct MeshBuffer;
-
-const MeshBuffer *RB_VBOForFrameUploads( unsigned group );
-const VboSpanLayout *RB_VBOSpanLayoutForFrameUploads( unsigned group );
-unsigned RB_VboCapacityInVertexBytesForFrameUploads( unsigned group );
-unsigned RB_VboCapacityInVerticesForFrameUploads( unsigned group );
-unsigned RB_VboCapacityInIndexElemsForFrameUploads( unsigned group );
-
-void R_BeginMeshUploads( unsigned group );
-void R_SetUploadedSubdataFromMeshUsingOffsets( unsigned group, unsigned baseVertex, unsigned verticesOffsetInBytes,
-											   unsigned indicesOffsetInBytes, const mesh_t *mesh );
-void R_SetUploadedSubdataFromMeshUsingLayout( unsigned group, unsigned baseVertex, const VboSpanLayout *layout,
-											  unsigned indexOfFirstIndex, const mesh_t *mesh );
-void R_EndMeshUploads( unsigned group, unsigned vertexDataSizeInBytes, unsigned indexDataSizeInBytes );
-
-#define MAX_UNIFORM_BINDINGS  ( 17 )
-
-void *RB_GetTmpUniformBlock( SimulatedBackendState *backendState, unsigned binding, size_t requestedBlockSize );
-void RB_CommitUniformBlock( SimulatedBackendState *backendState, unsigned binding, void *blockData, size_t blockSize );
-
-void R_BeginUniformUploads( unsigned binding );
-void R_EndUniformUploads( unsigned binding, unsigned uniformDataSizeInBytes );
 
 struct VertElemSpan {
 	unsigned firstVert;

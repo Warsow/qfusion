@@ -424,8 +424,8 @@ void RendererFrontend::markBuffersOfVariousDynamicsForUpload( std::span<std::pai
 	workloadStorage->selectedParticlesWorkload.clear();
 	workloadStorage->selectedSpriteWorkload.clear();
 
-	const unsigned maxBatchedBufferVertices = RB_VboCapacityInVerticesForFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
-	const unsigned maxBatchedBufferIndices  = RB_VboCapacityInIndexElemsForFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
+	const unsigned maxBatchedBufferVertices = m_uploadManager.getCapacityInVertices( UploadManager::BatchedMesh );
+	const unsigned maxBatchedBufferIndices  = m_uploadManager.getCapacityInIndices( UploadManager::BatchedMesh );
 
 	const auto markAndAdvanceBatchedOffsets = [&, this]( const std::pair<unsigned, unsigned> &storageRequirements,
 														 StateForCamera *stateForCamera,
@@ -489,8 +489,8 @@ void RendererFrontend::markBuffersOfVariousDynamicsForUpload( std::span<std::pai
 		}
 	}
 
-	const unsigned maxSpriteBufferVertexBytes = RB_VboCapacityInVertexBytesForFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT );
-	const unsigned maxSpriteBufferIndices     = RB_VboCapacityInIndexElemsForFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT );
+	const unsigned maxSpriteBufferVertexBytes = m_uploadManager.getCapacityInBytes( UploadManager::BatchedMeshExt );
+	const unsigned maxSpriteBufferIndices     = m_uploadManager.getCapacityInIndices( UploadManager::BatchedMeshExt );
 
 	for( auto [scene, stateForCamera] : scenesAndCameras ) {
 		for( PrepareSpriteSurfWorkload &workload: *stateForCamera->prepareSpritesWorkload ) {
@@ -499,9 +499,10 @@ void RendererFrontend::markBuffersOfVariousDynamicsForUpload( std::span<std::pai
 
 			const vattribmask_t vattribs          = workload.material->vattribs & ~VATTRIB_INSTANCES_BITS;
 			const vattribmask_t halfFloatVattribs = 0;
-			const size_t quadDataSize = buildVertexLayoutForVattribs( &vertSpanAndLayout->second, vattribs, halfFloatVattribs, 4, 0 );
-			const unsigned numQuads   = workload.batchSpan.size();
-			unsigned vertexDataSize = numQuads * quadDataSize;
+			const size_t quadDataSize             = buildVertexLayoutForVattribs( &vertSpanAndLayout->second, vattribs,
+																				  halfFloatVattribs, 4, 0 );
+			const unsigned numQuads               = workload.batchSpan.size();
+			unsigned vertexDataSize               = numQuads * quadDataSize;
 
 			// TODO: Truncate the range in case of overflow, don't reject the full range!
 			// TODO: Take alignment into account? How should we align vertices?
@@ -562,18 +563,18 @@ void RendererFrontend::submitDebugStuffToBackend( SimulatedBackendState *backend
 		mesh.numElems       = 2;
 		mesh.elems          = elems;
 
-		beginAddingAuxiliaryDynamicMeshes( UPLOAD_GROUP_DEBUG_MESH );
+		beginAddingAuxiliaryDynamicMeshes( UploadManager::DebugMesh );
 
 		for( const DebugLine &line: *stateForCamera->debugLines ) {
 			VectorCopy( line.p1, verts[0] );
 			VectorCopy( line.p2, verts[1] );
 			std::memcpy( colors[0], &line.color, 4 );
 			std::memcpy( colors[1], &line.color, 4 );
-			addAuxiliaryDynamicMesh( UPLOAD_GROUP_DEBUG_MESH, backendState, scene->m_worldent, rsh.whiteShader,
+			addAuxiliaryDynamicMesh( UploadManager::DebugMesh, backendState, scene->m_worldent, rsh.whiteShader,
 									 nullptr, nullptr, 0, &mesh, GL_LINES, 0.0f, 0.0f );
 		}
 
-		flushAuxiliaryDynamicMeshes( UPLOAD_GROUP_DEBUG_MESH, backendState );
+		flushAuxiliaryDynamicMeshes( UploadManager::DebugMesh, backendState );
 
 		stateForCamera->debugLines->clear();
 	}
@@ -589,18 +590,18 @@ void RendererFrontend::addDebugLine( StateForCamera *stateForCamera, const float
 	});
 }
 
-auto RendererFrontend::getStreamForUploadGroup( unsigned uploadGroup ) -> AuxiliaryDynamicStream * {
-	assert( uploadGroup == UPLOAD_GROUP_2D_MESH || uploadGroup == UPLOAD_GROUP_DEBUG_MESH );
-	return uploadGroup == UPLOAD_GROUP_2D_MESH ? &m_2DMeshStream : &m_debugMeshStream;
+auto RendererFrontend::getStreamForUploadGroup( UploadManager::UploadGroup uploadGroup ) -> AuxiliaryDynamicStream * {
+	assert( uploadGroup == UploadManager::Mesh2D || uploadGroup == UploadManager::DebugMesh );
+	return uploadGroup == UploadManager::Mesh2D ? &m_2DMeshStream : &m_debugMeshStream;
 }
 
-void RendererFrontend::beginAddingAuxiliaryDynamicMeshes( unsigned uploadGroup ) {
+void RendererFrontend::beginAddingAuxiliaryDynamicMeshes( UploadManager::UploadGroup uploadGroup ) {
 	assert( getStreamForUploadGroup( uploadGroup )->numVertsSoFar == 0 );
 	assert( getStreamForUploadGroup( uploadGroup )->numElemsSoFar == 0 );
-	R_BeginMeshUploads( uploadGroup );
+	m_uploadManager.beginVertexUploads( uploadGroup );
 }
 
-void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, SimulatedBackendState *backendState,
+void RendererFrontend::addAuxiliaryDynamicMesh( UploadManager::UploadGroup uploadGroup, SimulatedBackendState *backendState,
 												const entity_t *entity, const shader_t *shader,
 												const struct mfog_s *fog, const struct portalSurface_s *portalSurface,
 												unsigned shadowBits, const struct mesh_s *mesh, int primitive,
@@ -609,14 +610,14 @@ void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, SimulatedB
 
 	AuxiliaryDynamicStream *const stream = getStreamForUploadGroup( uploadGroup );
 
-	const unsigned numMeshVerts = mesh->numVerts;
-	const unsigned capacityInVerts = RB_VboCapacityInVerticesForFrameUploads( uploadGroup );
+	const unsigned numMeshVerts    = mesh->numVerts;
+	const unsigned capacityInVerts = m_uploadManager.getCapacityInVertices( uploadGroup );
 	if( !numMeshVerts || numMeshVerts + stream->numVertsSoFar > capacityInVerts ) [[unlikely]] {
 		return;
 	}
 
 	const unsigned numMeshElems = mesh->numElems;
-	const unsigned capacityInElems = RB_VboCapacityInIndexElemsForFrameUploads( uploadGroup );
+	const unsigned capacityInElems = m_uploadManager.getCapacityInIndices( uploadGroup );
 	if( !numMeshElems || numMeshElems + stream->numElemsSoFar > capacityInElems ) [[unlikely]] {
 		return;
 	}
@@ -677,23 +678,24 @@ void RendererFrontend::addAuxiliaryDynamicMesh( unsigned uploadGroup, SimulatedB
 	const unsigned baseVertex = stream->numVertsSoFar;
 	// TODO: Do we really need to specify offsets in bytes for non-variable vertex streams?
 	// Otherwise, using the base vertex is sufficient
-	const unsigned verticesOffsetInBytes = RB_VBOSpanLayoutForFrameUploads( uploadGroup )->vertexSize * stream->numVertsSoFar;
+	const unsigned verticesOffsetInBytes = m_uploadManager.getVboSpanLayout( uploadGroup )->vertexSize * stream->numVertsSoFar;
 	const unsigned indicesOffsetInBytes  = sizeof( elem_t ) * stream->numElemsSoFar;
-	R_SetUploadedSubdataFromMeshUsingOffsets( uploadGroup, baseVertex, verticesOffsetInBytes, indicesOffsetInBytes, mesh );
+	m_uploadManager.setUploadedSubdataFromMeshUsingOffsets( uploadGroup, baseVertex, verticesOffsetInBytes,
+															indicesOffsetInBytes, mesh );
 
 	stream->numVertsSoFar += numMeshVerts;
 	stream->numElemsSoFar += numMeshElems;
 }
 
-void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup, SimulatedBackendState *backendState ) {
-	if( AuxiliaryDynamicStream *const stream = getStreamForUploadGroup( uploadGroup ); !stream->draws.empty() ) {
-		const unsigned vertexSize     = RB_VBOSpanLayoutForFrameUploads( uploadGroup )->vertexSize;
-		const unsigned vertexDataSize = vertexSize * stream->numVertsSoFar;
-		const unsigned indexDataSize  = sizeof( elem_t ) * stream->numElemsSoFar;
-		assert( vertexDataSize > 0 && indexDataSize > 0 );
-		// TODO: Ensure that it always gets called for correctness reasons (should not guarded by the enclosing if)
-		R_EndMeshUploads( uploadGroup, vertexDataSize, indexDataSize );
+void RendererFrontend::flushAuxiliaryDynamicMeshes( UploadManager::UploadGroup uploadGroup, SimulatedBackendState *backendState ) {
+	AuxiliaryDynamicStream *const stream = getStreamForUploadGroup( uploadGroup );
+	const VboSpanLayout *const layout    = m_uploadManager.getVboSpanLayout( uploadGroup );
+	const unsigned vertexDataSize        = layout->vertexSize * stream->numVertsSoFar;
+	const unsigned indexDataSize         = sizeof( elem_t ) * stream->numElemsSoFar;
+	// Ensure that it always gets called for consistency/correctness reasons regarless of data size
+	m_uploadManager.endVertexUploads( uploadGroup, vertexDataSize, indexDataSize );
 
+	if( !stream->draws.empty() ) {
 		int sx, sy, sw, sh;
 		backendState->getScissor( &sx, &sy, &sw, &sh );
 
@@ -705,8 +707,7 @@ void RendererFrontend::flushAuxiliaryDynamicMeshes( unsigned uploadGroup, Simula
 
 		float xOffset = 0.0f, yOffset = 0.0f;
 
-		const MeshBuffer *buffer    = RB_VBOForFrameUploads( uploadGroup );
-		const VboSpanLayout *layout = RB_VBOSpanLayoutForFrameUploads( uploadGroup );
+		const MeshBuffer *buffer = m_uploadManager.getMeshBuffer( uploadGroup );
 
 		for( const AuxiliaryDynamicDraw &draw: stream->draws ) {
 			assert( draw.shader );
@@ -834,11 +835,12 @@ void RendererFrontend::prepareDynamicMesh( DynamicMeshFillDataWorkload *workload
 		mesh.colorsArray[0] = meshBuilder->meshColors.get();
 		mesh.elems          = meshBuilder->meshIndices.get();
 
-		const unsigned uploadGroup             = UPLOAD_GROUP_DYNAMIC_MESH;
+		const auto uploadGroup                 = UploadManager::DynamicMesh;
 		const unsigned baseVertex              = workload->drawSurface->verticesOffset;
-		const unsigned vertexDataOffsetInBytes = RB_VBOSpanLayoutForFrameUploads( uploadGroup )->vertexSize * baseVertex;
+		const unsigned vertexDataOffsetInBytes = m_uploadManager.getVboSpanLayout( uploadGroup )->vertexSize * baseVertex;
 		const unsigned indexDataOffsetInBytes  = sizeof( elem_t ) * workload->drawSurface->indicesOffset;
-		R_SetUploadedSubdataFromMeshUsingOffsets( uploadGroup, baseVertex, vertexDataOffsetInBytes, indexDataOffsetInBytes, &mesh );
+		m_uploadManager.setUploadedSubdataFromMeshUsingOffsets( uploadGroup, baseVertex, vertexDataOffsetInBytes,
+																indexDataOffsetInBytes, &mesh );
 	}
 }
 
@@ -860,7 +862,8 @@ static wsw_forceinline void calcAddedParticleLight( const float *__restrict part
 	} while( ++lightNum < affectingLightIndices.size() );
 }
 
-static void uploadBatchedMesh( MeshBuilder *builder, VertElemSpan *inOutSpan ) {
+void RendererFrontend::uploadBatchedMesh( void *opaque, VertElemSpan *inOutSpan ) {
+	auto *builder = (MeshBuilder *)opaque;
 	if( builder->numVerticesSoFar && builder->numIndicesSoFar ) {
 		mesh_t mesh;
 		std::memset( &mesh, 0, sizeof( mesh_t ) );
@@ -872,11 +875,12 @@ static void uploadBatchedMesh( MeshBuilder *builder, VertElemSpan *inOutSpan ) {
 		mesh.colorsArray[0] = builder->meshColors.get();
 		mesh.elems          = builder->meshIndices.get();
 
-		const unsigned uploadGroup             = UPLOAD_GROUP_BATCHED_MESH;
+		const auto uploadGroup                 = UploadManager::BatchedMesh;
 		const unsigned baseVertex              = inOutSpan->firstVert;
-		const unsigned vertexDataOffsetInBytes = RB_VBOSpanLayoutForFrameUploads( uploadGroup )->vertexSize * baseVertex;
+		const unsigned vertexDataOffsetInBytes = m_uploadManager.getVboSpanLayout( uploadGroup )->vertexSize * baseVertex;
 		const unsigned indexDataOffsetInBytes  = sizeof( elem_t ) * inOutSpan->firstElem;
-		R_SetUploadedSubdataFromMeshUsingOffsets( uploadGroup, baseVertex, vertexDataOffsetInBytes, indexDataOffsetInBytes, &mesh );
+		m_uploadManager.setUploadedSubdataFromMeshUsingOffsets( uploadGroup, baseVertex, vertexDataOffsetInBytes,
+																indexDataOffsetInBytes, &mesh );
 
 		// Correct original estimations by final values
 		assert( builder->numVerticesSoFar <= inOutSpan->numVerts );
@@ -1469,8 +1473,8 @@ void RendererFrontend::prepareLegacySprites( PrepareSpriteSurfWorkload *workload
 	std::pair<VertElemSpan, VboSpanLayout> *const vertSpanAndLayout =
 		stateForCamera->preparedSpriteVertElemAndVboSpans->data() + workload->vertAndVboSpanOffset;
 
-	R_SetUploadedSubdataFromMeshUsingLayout( UPLOAD_GROUP_BATCHED_MESH_EXT, 0, &vertSpanAndLayout->second,
-											 workload->indexOfFirstIndex, &mesh );
+	m_uploadManager.setUploadedSubdataFromMeshUsingLayout( UploadManager::BatchedMeshExt, 0, &vertSpanAndLayout->second,
+														   workload->indexOfFirstIndex, &mesh );
 }
 
 void RendererFrontend::submitRotatedStretchPic( SimulatedBackendState *backendState, int x, int y, int w, int h,
@@ -1523,7 +1527,7 @@ void RendererFrontend::submitRotatedStretchPic( SimulatedBackendState *backendSt
 	mesh.colorsArray[0] = colors;
 	mesh.elems          = elems;
 
-	addAuxiliaryDynamicMesh( UPLOAD_GROUP_2D_MESH, backendState, nullptr, material,
+	addAuxiliaryDynamicMesh( UploadManager::Mesh2D, backendState, nullptr, material,
 							 nullptr, nullptr, 0, &mesh, GL_TRIANGLES, 0.0f, 0.0f );
 }
 
@@ -1621,8 +1625,8 @@ void RendererFrontend::submitDynamicMeshToBackend( SimulatedBackendState *sbs, c
 			.numElems  = drawSurface->actualNumIndices,
 		};
 
-		const MeshBuffer *buffer    = RB_VBOForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
-		const VboSpanLayout *layout = RB_VBOSpanLayoutForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
+		const MeshBuffer *buffer    = sbs->getUploadManager()->getMeshBuffer( UploadManager::DynamicMesh );
+		const VboSpanLayout *layout = sbs->getUploadManager()->getVboSpanLayout( UploadManager::DynamicMesh );
 		sbs->drawMesh( fsh, buffer, layout, &drawMeshVertSpan, GL_TRIANGLES );
 	}
 }
@@ -1635,8 +1639,8 @@ void RendererFrontend::submitBatchedSurfsToBackend( SimulatedBackendState *sbs, 
 	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
 		sbs->bindShader( e, overrideParams, paramsTable, shader, fog, nullptr );
 		const DrawMeshVertSpan drawMeshVertSpan = vertElemSpan;
-		const MeshBuffer *buffer    = RB_VBOForFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
-		const VboSpanLayout *layout = RB_VBOSpanLayoutForFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
+		const MeshBuffer *buffer    = sbs->getUploadManager()->getMeshBuffer( UploadManager::BatchedMesh );
+		const VboSpanLayout *layout = sbs->getUploadManager()->getVboSpanLayout( UploadManager::BatchedMesh );
 		sbs->drawMesh( fsh, buffer, layout, &drawMeshVertSpan, GL_TRIANGLES );
 	}
 }
@@ -1650,7 +1654,7 @@ void RendererFrontend::submitBatchedSurfsToBackendExt( SimulatedBackendState *sb
 	if( vertElemSpan.numVerts && vertElemSpan.numElems ) {
 		sbs->bindShader( e, nullptr, paramsTable, shader, fog, nullptr );
 		const DrawMeshVertSpan drawMeshVertSpan = vertElemSpan;
-		const MeshBuffer *buffer = RB_VBOForFrameUploads( UPLOAD_GROUP_BATCHED_MESH_EXT );
+		const MeshBuffer *buffer = sbs->getUploadManager()->getMeshBuffer( UploadManager::BatchedMeshExt );
 		sbs->drawMesh( fsh, buffer, &vboSpanLayout, &drawMeshVertSpan, GL_TRIANGLES );
 	}
 }

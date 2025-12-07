@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/qthreads.h>
 #include <common/facilities/tasksystem.h>
 #include "vattribs.h"
+#include "uploadmanager.h"
 
 struct alignas( 32 )Frustum {
 	alignas( 32 ) float planeX[8];
@@ -625,6 +626,9 @@ private:
 	void processSortList( StateForCamera *stateForCamera, Scene *scene );
 	void submitDrawActionsList( SimulatedBackendState *, StateForCamera *stateForCamera, Scene *scene );
 
+	void beginUsingBackendState( SimulatedBackendState * );
+	void endUsingBackendState( SimulatedBackendState * );
+
 	using SubmitSurfFn = void (*)( SimulatedBackendState *, const FrontendToBackendShared *, const entity_t *,
 								   const struct shader_s *, const struct mfog_s *, const struct portalSurface_s *, const void * );
 
@@ -644,6 +648,9 @@ private:
 	struct DynamicMeshFillDataWorkload;
 	void prepareDynamicMesh( DynamicMeshFillDataWorkload *workload );
 
+	// Passing a private type as an opaque handle here
+	void uploadBatchedMesh( void *builder, VertElemSpan *inOutSpan );
+
 	void prepareBatchedQuadPolys( PrepareBatchedSurfWorkload *workload );
 	void prepareBatchedCoronas( PrepareBatchedSurfWorkload *workload );
 	void prepareBatchedParticles( PrepareBatchedSurfWorkload *workload );
@@ -656,16 +663,16 @@ private:
 	struct AuxiliaryDynamicStream;
 
 	[[nodiscard]]
-	auto getStreamForUploadGroup( unsigned uploadGroup ) -> AuxiliaryDynamicStream *;
+	auto getStreamForUploadGroup( UploadManager::UploadGroup uploadGroup ) -> AuxiliaryDynamicStream *;
 
-	void beginAddingAuxiliaryDynamicMeshes( unsigned uploadGroup );
+	void beginAddingAuxiliaryDynamicMeshes( UploadManager::UploadGroup uploadGroup );
 
-	void addAuxiliaryDynamicMesh( unsigned uploadGroup, SimulatedBackendState *backendState,
+	void addAuxiliaryDynamicMesh( UploadManager::UploadGroup uploadGroup, SimulatedBackendState *backendState,
 								  const entity_t *entity, const shader_t *shader,
 								  const struct mfog_s *fog, const struct portalSurface_s *portalSurface, unsigned shadowBits,
 								  const struct mesh_s *mesh, int primitive, float x_offset, float y_offset );
 
-	void flushAuxiliaryDynamicMeshes( unsigned uploadGroup, SimulatedBackendState *backendState );
+	void flushAuxiliaryDynamicMeshes( UploadManager::UploadGroup uploadGroup, SimulatedBackendState *backendState );
 
 	static void submitAliasSurfToBackend( SimulatedBackendState *, const FrontendToBackendShared *fsh,
 										  const entity_t *e, const shader_t *shader, const mfog_t *fog,
@@ -834,6 +841,8 @@ private:
 
 	AuxiliaryDynamicStream m_2DMeshStream;
 	AuxiliaryDynamicStream m_debugMeshStream;
+
+	UploadManager m_uploadManager;
 
 	// This is not an appropriate place to keep the client-global instance of task system.
 	// However, moving it to the client code is complicated due to lifetime issues related to client global vars.

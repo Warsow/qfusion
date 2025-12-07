@@ -120,4 +120,8 @@ struct VboSpanLayout {
 #define FLOAT_VATTRIB_SIZE( vattrib,halfFloatVattribs ) \
 	( (int)( halfFloatVattribs & vattrib ) == vattrib ? sizeof( GLhalf ) : sizeof( float ) )
 
+#define MAX_UNIFORM_BINDINGS ( 17 )
+
+typedef vec_t instancePoint_t[8]; // quaternion for rotation + xyz pos + uniform scale
+
 #endif // R_VATTRIBS_H

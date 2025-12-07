@@ -591,8 +591,6 @@ void RF_Shutdown( bool verbose ) {
 		instance->releasePrimaryRenderTargetAttachments();
 	}
 
-	RB_Shutdown();
-
 	R_Shutdown_( verbose );
 }
 
@@ -934,9 +932,6 @@ rserr_t R_Init( const char *applicationName, const char *screenshotPrefix, int s
 	R_InitVolatileAssets();
 
 	// TODO: This could fail depending of resolution
-	RB_Init();
-
-	// TODO: This could fail depending of resolution
 	TextureCache::instance()->createPrimaryRenderTargetAttachments();
 
 	return rserr_ok;
@@ -952,8 +947,6 @@ rserr_t R_TrySettingMode( int x, int y, int width, int height, int displayFreque
 
 	TextureCache::instance()->releasePrimaryRenderTargetAttachments();
 
-	RB_Shutdown();
-
 	rserr_t err = GLimp_SetMode( x, y, width, height, displayFrequency, options );
 	if( err != rserr_ok ) {
 		rError() << "Could not GLimp_SetMode()";
@@ -962,8 +955,6 @@ rserr_t R_TrySettingMode( int x, int y, int width, int height, int displayFreque
 	if( err != rserr_ok ) {
 		return err;
 	}
-
-	RB_Init();
 
 	TextureCache::instance()->createPrimaryRenderTargetAttachments();
 

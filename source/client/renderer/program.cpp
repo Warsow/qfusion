@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "local.h"
 #include "program.h"
+#include "backendstate.h"
+#include "uploadmanager.h"
 #include <common/helpers/links.h>
 #include <common/helpers/freelistallocator.h>
 #include <common/helpers/memspecbuilder.h>
@@ -1956,12 +1958,12 @@ struct UniformBlock {
 
 template <typename Block>
 auto allocUniformBlock( SimulatedBackendState *backendState ) -> Block * {
-	return (Block *)RB_GetTmpUniformBlock( backendState, Block::kBinding, sizeof( Block ) );
+	return (Block *)backendState->getUploadManager()->allocUniformBlock( backendState, Block::kBinding, sizeof( Block ) );
 }
 
 template <typename Block>
 void commitUniformBlock( SimulatedBackendState *backendState, Block *block ) {
-	RB_CommitUniformBlock( backendState, Block::kBinding, block, sizeof( Block ) );
+	backendState->getUploadManager()->commitUniformBlock( backendState, Block::kBinding, block, sizeof( Block ) );
 }
 
 static inline void copyMat3ToStd140Layout( const mat3_t from, float *to ) {

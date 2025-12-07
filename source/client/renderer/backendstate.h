@@ -21,17 +21,20 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define R_BACKEND_LOCAL_H
 
 #include "glstateproxy.h"
+#include "local.h"
 
 struct RuntimeBackendState {
 	GLuint programId { 0 };
 };
 
+class UploadManager;
+struct portalSurface_s;
+struct mfog_s;
+struct FrontendToBackendShared;
+
 class SimulatedBackendState {
 public:
-	unsigned m_totalDraws { 0 };
-	unsigned m_fastDraws { 0 };
-
-	SimulatedBackendState( BackendActionTape *actionTape, int width, int height );
+	SimulatedBackendState( UploadManager *uploadManager, BackendActionTape *actionTape, int width, int height );
 
 	void loadCameraMatrix( const mat4_t m );
 	void getObjectMatrix( float *m );
@@ -57,7 +60,7 @@ public:
 	void setZClip( float zNear, float zFar );
 
 	void bindShader( const entity_t *e, const ShaderParams *overrideParams, const ShaderParamsTable *paramsTable,
-					 const shader_s *shader, const mfog_s *fog, const struct portalSurface_s *portalSurface );
+					 const shader_s *shader, const mfog_s *fog, const portalSurface_s *portalSurface );
 	void setLightstyle( const struct superLightStyle_s *lightStyle );
 	void setDlightBits( unsigned dlightBits );
 	void setBonesData( int numBones, const dualquat_t *dualQuats, int maxWeights );
@@ -73,6 +76,9 @@ public:
 	[[nodiscard]]
 	auto getCurrUniformDataSize( unsigned binding ) const -> unsigned;
 	void registerUniformBlockUpdate( unsigned binding, GLuint bufferId, unsigned blockSize );
+
+	[[nodiscard]]
+	auto getUploadManager() -> UploadManager * { return m_uploadManager; }
 
 	void drawMesh( const FrontendToBackendShared *fsh, const MeshBuffer *buffer, const VboSpanLayout *layout, const DrawMeshVertSpan *vertSpan, int primitive );
 private:
@@ -249,6 +255,7 @@ private:
 	} m_uniformState;
 
 	GLStateProxy m_glState;
+	UploadManager *const m_uploadManager;
 	BackendActionTape *const m_actionTape;
 };
 

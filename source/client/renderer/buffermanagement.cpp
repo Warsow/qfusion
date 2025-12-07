@@ -110,8 +110,8 @@ auto BufferCache::createMeshBuffer( unsigned numVerts, unsigned numElems, unsign
 		const unsigned vertexDataSize = buildVertexLayoutForVattribs( &newEntry->layout, vattribs,
 																	  halfFloatVattribs, numVerts, numInstances );
 
-		const auto usage = tag != VBO_TAG_STREAM ? BufferFactory::Usage::Static : BufferFactory::Usage::Dynamic;
-		if( std::optional<MeshBuffer> buffer = m_factory.createVboAndIbo( vertexDataSize, indexDataSize, usage ) ) {
+		if( std::optional<MeshBuffer> buffer = m_factory.createMeshBuffer( vertexDataSize, indexDataSize,
+																		   BufferFactory::Usage::Static ) ) {
 			newEntry->buffer               = *buffer;
 			newEntry->registrationSequence = rsh.registrationSequence;
 			newEntry->tag                  = tag;
@@ -142,7 +142,7 @@ BufferFactory::~BufferFactory() {
 	qglDeleteVertexArrays( 1, &m_globalVao );
 }
 
-auto BufferFactory::createVboAndIbo( size_t vertexDataSizeInBytes, size_t indexDataSizeInBytes, Usage usage )
+auto BufferFactory::createMeshBuffer( size_t vertexDataSizeInBytes, size_t indexDataSizeInBytes, Usage usage )
 	-> std::optional<MeshBuffer> {
 	const GLenum glUsage = ( usage == Usage::Static ) ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW;
 
@@ -161,7 +161,9 @@ auto BufferFactory::createVboAndIbo( size_t vertexDataSizeInBytes, size_t indexD
 	qglBufferData( GL_ELEMENT_ARRAY_BUFFER, indexDataSizeInBytes, nullptr, glUsage );
 
 	if( qglGetError() != GL_NO_ERROR ) {
+		// TODO: Drain all errors
 		qglDeleteBuffers( 2, buffers );
+		return std::nullopt;
 	}
 
 	return std::optional( MeshBuffer { .vboId = buffers[0], .iboId = buffers[1] } );
@@ -181,12 +183,52 @@ void BufferFactory::destroyMeshBuffer( MeshBuffer *buffer ) {
 	qglDeleteBuffers( numBuffers, buffers );
 }
 
+auto BufferFactory::createUniformBuffer( size_t dataSizeInBytes ) -> std::optional<UniformBuffer> {
+	while( qglGetError() != GL_NO_ERROR ) {}
+
+	GLuint buffer = 0;
+	qglGenBuffers( 1, &buffer );
+	if( qglGetError() != GL_NO_ERROR ) {
+		return std::nullopt;
+	}
+
+	qglBindBuffer( GL_UNIFORM_BUFFER, buffer );
+	qglBufferData( GL_UNIFORM_BUFFER, dataSizeInBytes, nullptr, GL_DYNAMIC_DRAW );
+
+	if( qglGetError() != GL_NO_ERROR ) {
+		// TODO: Drain all errors
+		qglDeleteBuffers( 1, &buffer );
+		return std::nullopt;
+	}
+
+	return std::optional( UniformBuffer { .id = buffer } );
+}
+
+void BufferFactory::destroyUniformBuffer( UniformBuffer *buffer ) {
+	if( buffer->id ) {
+		qglDeleteBuffers( 1, &buffer->id );
+		buffer->id = 0;
+	}
+}
+
+void BufferFactory::bindAndUpload( GLenum target, GLuint id, size_t offset, size_t dataSize, const void *data ) {
+	qglBindBuffer( target, id );
+	qglBufferSubData( target, offset, dataSize, data );
+}
+
+void BufferFactory::uploadVertexData( MeshBuffer *buffer, const void *data, size_t dataSize ) {
+	bindAndUpload( GL_ARRAY_BUFFER, buffer->vboId, 0, dataSize, data );
+}
+
+void BufferFactory::uploadIndexData( MeshBuffer *buffer, const void *data, size_t dataSize ) {
+	bindAndUpload( GL_ELEMENT_ARRAY_BUFFER, buffer->iboId, 0, dataSize, data );
+}
+
 void BufferFactory::uploadVertexData( MeshBuffer *vbo, const VboSpanLayout *layout, int vertsOffset, vattribmask_t vattribs, const mesh_t *mesh ) {
 	void *data = m_tmpDataBuffer.reserveAndGet( mesh->numVerts * layout->vertexSize );
 	// TODO: Looks like harmless, check what's up anyway
 	(void)fillMeshVertexData( layout, vattribs, mesh, data );
-	qglBindBuffer( GL_ARRAY_BUFFER, vbo->vboId );
-	qglBufferSubData( GL_ARRAY_BUFFER, vertsOffset * layout->vertexSize, mesh->numVerts * layout->vertexSize, data );
+	bindAndUpload( GL_ARRAY_BUFFER, vbo->vboId, vertsOffset * layout->vertexSize, mesh->numVerts * layout->vertexSize, data );
 }
 
 void BufferFactory::uploadIndexData( MeshBuffer *vbo, int vertsOffset, int elemsOffset, const mesh_t *mesh ) {
@@ -198,19 +240,19 @@ void BufferFactory::uploadIndexData( MeshBuffer *vbo, int vertsOffset, int elems
 		}
 	}
 
-	qglBindBuffer( GL_ELEMENT_ARRAY_BUFFER, vbo->iboId );
-	qglBufferSubData( GL_ELEMENT_ARRAY_BUFFER, elemsOffset * sizeof( elem_t ),
-					  mesh->numElems * sizeof( elem_t ), ielems );
+	bindAndUpload( GL_ELEMENT_ARRAY_BUFFER, vbo->iboId, elemsOffset * sizeof( elem_t ), mesh->numElems * sizeof( elem_t ), ielems );
 }
 
 void BufferFactory::uploadInstancesData( MeshBuffer *vbo, const VboSpanLayout *layout, int instOffset,
 										 int numInstances, instancePoint_t *instances ) {
 	if( layout->instancesOffset ) {
-		qglBindBuffer( GL_ARRAY_BUFFER, vbo->vboId );
-		qglBufferSubData( GL_ARRAY_BUFFER,
-						  layout->instancesOffset + instOffset * sizeof( instancePoint_t ),
-						  numInstances * sizeof( instancePoint_t ), instances );
+		bindAndUpload( GL_ARRAY_BUFFER, vbo->vboId, layout->instancesOffset + instOffset * sizeof( instancePoint_t ),
+					   numInstances * sizeof( instancePoint_t ), instances );
 	}
+}
+
+void BufferFactory::uploadUniformData( UniformBuffer *buffer, const void *data, size_t dataSize ) {
+	bindAndUpload( GL_UNIFORM_BUFFER, buffer->id, 0, dataSize, data );
 }
 
 auto buildVertexLayoutForVattribs( VboSpanLayout *layout, vattribmask_t vattribs, vattribmask_t halfFloatVattribs,

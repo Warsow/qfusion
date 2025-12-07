@@ -652,8 +652,8 @@ void RendererFrontend::addDynamicMeshToSortList( StateForCamera *stateForCamera,
 	if( maybeStorageRequirements ) [[likely]] {
 		const auto [numVertices, numIndices] = *maybeStorageRequirements;
 		assert( numVertices && numIndices );
-		const unsigned maxVertices = RB_VboCapacityInVerticesForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
-		const unsigned maxIndices  = RB_VboCapacityInIndexElemsForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
+		const unsigned maxVertices = m_uploadManager.getCapacityInVertices( UploadManager::DynamicMesh );
+		const unsigned maxIndices  = m_uploadManager.getCapacityInIndices( UploadManager::DynamicMesh );
 		// TODO: Allow more if we draw using base vertex
 		if( countersOfVerticesAndIndices->first + numVertices <= maxVertices &&
 			countersOfVerticesAndIndices->second + numIndices <= maxIndices ) {

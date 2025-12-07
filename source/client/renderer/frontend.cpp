@@ -80,6 +80,22 @@ auto RendererFrontend::getFogForSphere( const StateForCamera *stateForCamera, co
 	return getFogForBounds( stateForCamera, mins, maxs );
 }
 
+void RendererFrontend::beginUsingBackendState( SimulatedBackendState *backendState ) {
+	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
+		m_uploadManager.beginUniformUploads( binding );
+	}
+
+	// start fresh each frame
+	backendState->setShaderStateMask( ~0, 0 );
+	backendState->bindMeshBuffer( nullptr );
+}
+
+void RendererFrontend::endUsingBackendState( SimulatedBackendState *backendState ) {
+	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
+		m_uploadManager.endUniformUploads( binding, backendState->getCurrUniformDataSize( binding ) );
+	}
+}
+
 void RendererFrontend::enter2DMode( SimulatedBackendState *backendState, int width, int height ) {
 	assert( !rf.in2D );
 	assert( width > 0 && height > 0 );
@@ -102,7 +118,7 @@ void RendererFrontend::enter2DMode( SimulatedBackendState *backendState, int wid
 
 	backendState->setRenderFlags( 0 );
 
-	beginAddingAuxiliaryDynamicMeshes( UPLOAD_GROUP_2D_MESH );
+	beginAddingAuxiliaryDynamicMeshes( UploadManager::Mesh2D );
 
 	rf.in2D = true;
 }
@@ -112,7 +128,7 @@ void RendererFrontend::leave2DMode( SimulatedBackendState *backendState ) {
 
 	// render previously batched 2D geometry, if any
 	// TODO: Call this explicitly
-	flushAuxiliaryDynamicMeshes( UPLOAD_GROUP_2D_MESH, backendState );
+	flushAuxiliaryDynamicMeshes( UploadManager::Mesh2D, backendState );
 
 	// TODO: Should we care? Are we going to continue using the backend state this frame?
 	backendState->setShaderStateMask( ~0, 0 );
@@ -243,8 +259,8 @@ void RendererFrontend::commitDraw2DRequest( Draw2DRequest *request ) {
 
 	BackendActionTape actionTape;
 
-	SimulatedBackendState backendState( &actionTape, glConfig.width, glConfig.height );
-	RB_BeginUsingBackendState( &backendState );
+	SimulatedBackendState backendState( &m_uploadManager, &actionTape, glConfig.width, glConfig.height );
+	beginUsingBackendState( &backendState );
 
 	enter2DMode( &backendState, glConfig.width, glConfig.height );
 	set2DScissor( &backendState, 0, 0, glConfig.width, glConfig.height );
@@ -261,7 +277,7 @@ void RendererFrontend::commitDraw2DRequest( Draw2DRequest *request ) {
 	}
 	// TODO .... Flush dynamic meshes explicitly
 	leave2DMode( &backendState );
-	RB_EndUsingBackendState( &backendState );
+	endUsingBackendState( &backendState );
 
 	RuntimeBackendState rbs {};
 	actionTape.exec( &rbs );
@@ -275,8 +291,10 @@ void RendererFrontend::recycleDraw2DRequest( Draw2DRequest *request ) {
 	m_isDraw2DRequestInUse = false;
 }
 
-RendererFrontend::RendererFrontend() : m_taskSystem( { .profilingGroup  = wsw::ProfilingSystem::ClientGroup,
-									   .numExtraThreads = suggestNumExtraWorkerThreads( {} ) } ) {
+RendererFrontend::RendererFrontend()
+	: m_uploadManager( getBufferCache()->getUnderlyingFactory() ),
+	  m_taskSystem( { .profilingGroup  = wsw::ProfilingSystem::ClientGroup,
+					  .numExtraThreads = suggestNumExtraWorkerThreads( {} ) } ) {
 	m_mainThreadChecker.markCurrentThreadForFurtherAccessChecks();
 	const auto features = Sys_GetProcessorFeatures();
 	if( Q_CPU_FEATURE_SSE41 & features ) {
@@ -802,9 +820,9 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 		self->m_spriteSurfOffsetOfVertices = 0;
 		self->m_spriteSurfCounterOfIndices = 0;
 
-		R_BeginMeshUploads( UPLOAD_GROUP_DYNAMIC_MESH );
-		R_BeginMeshUploads( UPLOAD_GROUP_BATCHED_MESH );
-		R_BeginMeshUploads( UPLOAD_GROUP_BATCHED_MESH_EXT );
+		self->m_uploadManager.beginVertexUploads( UploadManager::DynamicMesh );
+		self->m_uploadManager.beginVertexUploads( UploadManager::BatchedMesh );
+		self->m_uploadManager.beginVertexUploads( UploadManager::BatchedMeshExt );
 
 		workloadStorage = &self->m_dynamicStuffWorkloadStorage[0];
 	}
@@ -940,19 +958,19 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 
 	// The primary group of cameras ends uploads
 	if( !areCamerasPortalCameras ) {
-		const VboSpanLayout *dynamicMeshLayout = RB_VBOSpanLayoutForFrameUploads( UPLOAD_GROUP_DYNAMIC_MESH );
+		const VboSpanLayout *dynamicMeshLayout   = self->m_uploadManager.getVboSpanLayout( UploadManager::DynamicMesh );
 		const unsigned dynamicMeshVertexDataSize = dynamicMeshLayout->vertexSize * self->m_dynamicMeshCountersOfVerticesAndIndices.first;
-		const unsigned dynamicMeshIndexDataSize = sizeof( elem_t ) * self->m_dynamicMeshCountersOfVerticesAndIndices.second;
-		R_EndMeshUploads( UPLOAD_GROUP_DYNAMIC_MESH, dynamicMeshVertexDataSize, dynamicMeshIndexDataSize );
+		const unsigned dynamicMeshIndexDataSize  = sizeof( elem_t ) * self->m_dynamicMeshCountersOfVerticesAndIndices.second;
+		self->m_uploadManager.endVertexUploads( UploadManager::DynamicMesh, dynamicMeshVertexDataSize, dynamicMeshIndexDataSize );
 
-		const VboSpanLayout *batchedMeshLayout = RB_VBOSpanLayoutForFrameUploads( UPLOAD_GROUP_BATCHED_MESH );
+		const VboSpanLayout *batchedMeshLayout   = self->m_uploadManager.getVboSpanLayout( UploadManager::BatchedMesh );
 		const unsigned batchedMeshVertexDataSize = batchedMeshLayout->vertexSize * self->m_batchedSurfCountersOfVerticesAndIndices.first;
-		const unsigned batchedMeshIndexDataSize = sizeof( elem_t ) * self->m_batchedSurfCountersOfVerticesAndIndices.second;
-		R_EndMeshUploads( UPLOAD_GROUP_BATCHED_MESH, batchedMeshVertexDataSize, batchedMeshIndexDataSize );
+		const unsigned batchedMeshIndexDataSize  = sizeof( elem_t ) * self->m_batchedSurfCountersOfVerticesAndIndices.second;
+		self->m_uploadManager.endVertexUploads( UploadManager::BatchedMesh, batchedMeshVertexDataSize, batchedMeshIndexDataSize );
 
 		const unsigned spriteVertexDataSize = self->m_spriteSurfOffsetOfVertices;
 		const unsigned spriteIndexDataSize  = sizeof( elem_t ) * self->m_spriteSurfCounterOfIndices;
-		R_EndMeshUploads( UPLOAD_GROUP_BATCHED_MESH_EXT, spriteVertexDataSize, spriteIndexDataSize );
+		self->m_uploadManager.endVertexUploads( UploadManager::BatchedMeshExt, spriteVertexDataSize, spriteIndexDataSize );
 	}
 }
 
@@ -984,8 +1002,8 @@ void RendererFrontend::performPreparedRenderingFromThisCamera( Scene *scene, Sta
 
 	BackendActionTape actionTape;
 
-	SimulatedBackendState backendState( &actionTape, glConfig.width, glConfig.height );
-	RB_BeginUsingBackendState( &backendState );
+	SimulatedBackendState backendState( &m_uploadManager, &actionTape, glConfig.width, glConfig.height );
+	beginUsingBackendState( &backendState );
 
 	backendState.setTime( stateForCamera->refdef.time, rf.frameTime.time );
 
@@ -1069,7 +1087,7 @@ void RendererFrontend::performPreparedRenderingFromThisCamera( Scene *scene, Sta
 
 	backendState.setShaderStateMask( ~0, 0 );
 
-	RB_EndUsingBackendState( &backendState );
+	endUsingBackendState( &backendState );
 
 	RuntimeBackendState rbs {};
 	actionTape.exec( &rbs );
