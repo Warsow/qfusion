@@ -67,19 +67,38 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	/* Note: We assume that signed zeros are negative, this is fine for culling purposes */ \
 	zeroIfFullyInside = _mm256_movemask_ps( ymmDist );
 
+#define COMPUTE_RESULT_OF_FULLY_OUTSIDE_TEST_FOR_8_PLANES( f, nonZeroIfFullyOutside ) \
+    LOAD_COMPONENTS_OF_8_FRUSTUM_PLANES( f ) \
+	SELECT_NEAREST_BOX_CORNER_COMPONENTS() \
+	COMPUTE_BOX_CORNER_DISTANCE_TO_PLANE() \
+	/* Note: We assume that signed zeros are negative, this is fine for culling purposes */ \
+	nonZeroIfFullyOutside = _mm256_movemask_ps( ymmDist );
+
+#define IMPLEMENT_buildBitMasksOfLeafOccluders
 #define IMPLEMENT_cullSurfacesByOccluders
 
 #include "frontendcull.inc"
 
 namespace wsw {
 
+void RendererFrontend::buildBitMasksOfLeafOccludersAvx( StateForCamera *stateForCamera,
+														std::span<const unsigned> indicesOfLeaves,
+														std::span<const Frustum> occluderFrusta,
+														uint64_t *bitMaskOfLeafOccluders ) {
+	_mm256_zeroupper();
+	buildBitMasksOfLeafOccludersArch<Avx>( stateForCamera, indicesOfLeaves, occluderFrusta, bitMaskOfLeafOccluders );
+	_mm256_zeroupper();
+}
+
 void RendererFrontend::cullSurfacesByOccludersAvx( StateForCamera *stateForCamera,
 												   std::span<const unsigned> indicesOfSurfaces,
 												   std::span<const Frustum> occluderFrusta,
+												   const uint64_t *surfBitMaskTable,
 												   MergedSurfSpan *mergedSurfSpans,
 												   uint8_t *surfVisTable ) {
 	_mm256_zeroupper();
-	cullSurfacesByOccludersArch<Avx>( stateForCamera, indicesOfSurfaces, occluderFrusta, mergedSurfSpans, surfVisTable );
+	cullSurfacesByOccludersArch<Avx>( stateForCamera, indicesOfSurfaces, occluderFrusta, surfBitMaskTable,
+									  mergedSurfSpans, surfVisTable );
 	_mm256_zeroupper();
 }
 

@@ -302,9 +302,11 @@ RendererFrontend::RendererFrontend()
 		m_collectVisibleOccludersArchMethod   = &RendererFrontend::collectVisibleOccludersSse41;
 		m_buildFrustaOfOccludersArchMethod    = &RendererFrontend::buildFrustaOfOccludersSse41;
 		if( Q_CPU_FEATURE_AVX & features ) {
-			m_cullSurfacesByOccludersArchMethod = &RendererFrontend::cullSurfacesByOccludersAvx;
+			m_buildBitMasksOfLeafOccludersMethod = &RendererFrontend::buildBitMasksOfLeafOccludersAvx;
+			m_cullSurfacesByOccludersArchMethod  = &RendererFrontend::cullSurfacesByOccludersAvx;
 		} else {
-			m_cullSurfacesByOccludersArchMethod = &RendererFrontend::cullSurfacesByOccludersSse41;
+			m_buildBitMasksOfLeafOccludersMethod = &RendererFrontend::buildBitMasksOfLeafOccludersSse41;
+			m_cullSurfacesByOccludersArchMethod  = &RendererFrontend::cullSurfacesByOccludersSse41;
 		}
 		m_cullEntriesWithBoundsArchMethod   = &RendererFrontend::cullEntriesWithBoundsSse41;
 		m_cullEntryPtrsWithBoundsArchMethod = &RendererFrontend::cullEntryPtrsWithBoundsSse41;
@@ -312,6 +314,7 @@ RendererFrontend::RendererFrontend()
 		m_collectVisibleWorldLeavesArchMethod = &RendererFrontend::collectVisibleWorldLeavesSse2;
 		m_collectVisibleOccludersArchMethod   = &RendererFrontend::collectVisibleOccludersSse2;
 		m_buildFrustaOfOccludersArchMethod    = &RendererFrontend::buildFrustaOfOccludersSse2;
+		m_buildBitMasksOfLeafOccludersMethod  = &RendererFrontend::buildBitMasksOfLeafOccludersSse2;
 		m_cullSurfacesByOccludersArchMethod   = &RendererFrontend::cullSurfacesByOccludersSse2;
 		m_cullEntriesWithBoundsArchMethod     = &RendererFrontend::cullEntriesWithBoundsSse2;
 		m_cullEntryPtrsWithBoundsArchMethod   = &RendererFrontend::cullEntryPtrsWithBoundsSse2;
@@ -396,6 +399,8 @@ auto RendererFrontend::allocStateForCamera() -> StateForCamera * {
 	stateForCamera->sortedOccludersBuffer          = &resultStorage->sortedOccludersBuffer;
 	stateForCamera->leafSurfTableBuffer            = &resultStorage->leafSurfTableBuffer;
 	stateForCamera->leafSurfNumsBuffer             = &resultStorage->leafSurfNumsBuffer;
+	stateForCamera->leafOccluderBitMasksBuffer     = &resultStorage->leafOccluderBitMasksBuffer;
+	stateForCamera->surfOccluderBitMasksBuffer     = &resultStorage->surfOccluderBitMasksBuffer;
 	stateForCamera->drawSurfSurfSpansBuffer        = &resultStorage->drawSurfSurfSpansBuffer;
 	stateForCamera->bspDrawSurfacesBuffer          = &resultStorage->bspDrawSurfacesBuffer;
 	stateForCamera->surfVisTableBuffer             = &resultStorage->bspSurfVisTableBuffer;
@@ -606,11 +611,44 @@ auto RendererFrontend::coExecPassUponPreparingOccluders( CoroTask::StartInfo si,
 		} else {
 			const std::span<const unsigned> surfNums = stateForCamera->surfsInFrustumAndPvs;
 			if( !surfNums.empty() ) {
-				std::span<const Frustum> bestFrusta( occluderFrusta.data(), wsw::min<size_t>( 24, occluderFrusta.size() ) );
+				const std::span<const unsigned> leafNums = stateForCamera->leavesInFrustumAndPvs;
+
+				uint64_t *const __restrict leafBitMasks = stateForCamera->leafOccluderBitMasksBuffer->
+					reserveZeroedAndGet( rsh.worldBrushModel->numvisleafs );
+				uint64_t *const __restrict surfBitMasks = stateForCamera->surfOccluderBitMasksBuffer->
+					reserveZeroedAndGet( rsh.worldBrushModel->numsurfaces );
+
+				auto buildSubrangeMasksFn = [=]( unsigned, unsigned start, unsigned end ) {
+					std::span<const unsigned> workloadSpan { leafNums.data() + start, leafNums.data() + end };
+					self->buildBitMasksOfLeafOccluders( stateForCamera, workloadSpan, occluderFrusta, leafBitMasks );
+				};
+
+				TaskHandle buildMasksTask = si.taskSystem->addForSubrangesInRange( { 0, leafNums.size() }, 48,
+																				   std::span<const TaskHandle> {},
+																				   std::move( buildSubrangeMasksFn ) );
+
+				co_await si.taskSystem->awaiterOf( buildMasksTask );
+
+				// TODO: This can be parallel as well - just write to independent tables/independent offsets
+				// in the same table and join table results on actual use
+
+				const auto leaves = rsh.worldBrushModel->visleafs;
+				for( const unsigned leafNum: stateForCamera->leavesInFrustumAndPvs ) {
+					const auto *const leaf                  = leaves[leafNum];
+					const uint64_t leafMask                 = leafBitMasks[leafNum];
+					const unsigned *__restrict leafSurfaces = leaf->visSurfaces;
+					const unsigned numLeafSurfaces          = leaf->numVisSurfaces;
+					unsigned surfIndex                      = 0;
+					assert( numLeafSurfaces );
+					do {
+						surfBitMasks[leafSurfaces[surfIndex]] |= leafMask;
+					} while( ++surfIndex < numLeafSurfaces );
+				}
 
 				auto cullSubrangeFn = [=]( unsigned, unsigned start, unsigned end ) {
 					std::span<const unsigned> workloadSpan { surfNums.data() + start, surfNums.data() + end };
-					self->cullSurfacesByOccluders( stateForCamera, workloadSpan, bestFrusta, mergedSurfSpans, surfVisTable );
+					self->cullSurfacesByOccluders( stateForCamera, workloadSpan, occluderFrusta, surfBitMasks,
+												   mergedSurfSpans, surfVisTable );
 				};
 
 				TaskHandle cullTask = si.taskSystem->addForSubrangesInRange( { 0, surfNums.size() }, 384,

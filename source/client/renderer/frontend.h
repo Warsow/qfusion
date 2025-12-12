@@ -231,6 +231,9 @@ private:
 		PodBuffer<unsigned> *visibleOccludersBuffer;
 		PodBuffer<SortedOccluder> *sortedOccludersBuffer;
 
+		PodBuffer<uint64_t> *leafOccluderBitMasksBuffer;
+		PodBuffer<uint64_t> *surfOccluderBitMasksBuffer;
+
 		// TODO: Merge these two? Keeping it separate can be more cache-friendly though
 		PodBuffer<drawSurfaceBSP_t> *bspDrawSurfacesBuffer;
 		PodBuffer<MergedSurfSpan> *drawSurfSurfSpansBuffer;
@@ -448,9 +451,14 @@ private:
 		-> std::span<const Frustum>;
 
 	template <unsigned Arch>
+	void buildBitMasksOfLeafOccludersArch( StateForCamera *stateForCamera, std::span<const unsigned> indicesOfLeaves,
+										   std::span<const Frustum> occluderFrusta, uint64_t *bitMaskOfLeafOccluders );
+
+	template <unsigned Arch>
 	void cullSurfacesByOccludersArch( StateForCamera *stateForCamera,
 									  std::span<const unsigned> indicesOfSurfaces,
 									  std::span<const Frustum> occluderFrusta,
+									  const uint64_t *surfOccluderMaskTable,
 									  MergedSurfSpan *mergedSurfSpans,
 									  uint8_t *surfVisTable );
 
@@ -476,9 +484,13 @@ private:
 	auto buildFrustaOfOccludersSse2( StateForCamera *stateForCamera, std::span<const SortedOccluder> sortedOccluders )
 		-> std::span<const Frustum>;
 
+	void buildBitMasksOfLeafOccludersSse2( StateForCamera *stateForCamera, std::span<const unsigned> indicesOfLeaves,
+										   std::span<const Frustum> occluderFrusta, uint64_t *bitMaskOfLeafOccluders );
+
 	void cullSurfacesByOccludersSse2( StateForCamera *stateForCamera,
 									  std::span<const unsigned> indicesOfSurfaces,
 									  std::span<const Frustum> occluderFrusta,
+									  const uint64_t *surfOccluderMaskTable,
 									  MergedSurfSpan *mergedSurfSpans,
 									  uint8_t *surfVisTable );
 
@@ -503,9 +515,13 @@ private:
 	auto buildFrustaOfOccludersSse41( StateForCamera *stateForCamera, std::span<const SortedOccluder> sortedOccluders )
 		-> std::span<const Frustum>;
 
+	void buildBitMasksOfLeafOccludersSse41( StateForCamera *stateForCamera, std::span<const unsigned> indicesOfLeaves,
+											std::span<const Frustum> occluderFrusta, uint64_t *bitMaskOfLeafOccluders );
+
 	void cullSurfacesByOccludersSse41( StateForCamera *stateForCamera,
 									   std::span<const unsigned> indicesOfSurfaces,
 									   std::span<const Frustum> occluderFrusta,
+									   const uint64_t *surfOccluderMaskTable,
 									   MergedSurfSpan *mergedSurfSpans,
 									   uint8_t *surfVisTable );
 
@@ -522,10 +538,13 @@ private:
 									   const Frustum *__restrict primaryFrustum, std::span<const Frustum> occluderFrusta,
 									   uint16_t *tmpIndices ) -> std::span<const uint16_t>;
 
+	void buildBitMasksOfLeafOccludersAvx( StateForCamera *stateForCamera, std::span<const unsigned> indicesOfLeaves,
+										  std::span<const Frustum> occluderFrusta, uint64_t *bitMaskOfLeafOccluders );
 
 	void cullSurfacesByOccludersAvx( StateForCamera *stateForCamera,
 									 std::span<const unsigned> indicesOfSurfaces,
 									 std::span<const Frustum> occluderFrusta,
+									 const uint64_t *surfOccluderMaskTable,
 									 MergedSurfSpan *mergedSurfSpans,
 									 uint8_t *surfVisTable );
 
@@ -556,8 +575,11 @@ private:
 	auto buildFrustaOfOccluders( StateForCamera *stateForCamera, std::span<const SortedOccluder> sortedOccluders )
 		-> std::span<const Frustum>;
 
+	void buildBitMasksOfLeafOccluders( StateForCamera *stateForCamera, std::span<const unsigned> indicesOfLeaves,
+									   std::span<const Frustum> occluderFrusta, uint64_t *bitMaskOfLeafOccluders );
+
 	void cullSurfacesByOccluders( StateForCamera *stateForCamera, std::span<const unsigned> indicesOfSurfaces,
-								  std::span<const Frustum> occluderFrusta,
+								  std::span<const Frustum> occluderFrusta, const uint64_t *surfOccluderMasksTable,
 								  MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable );
 
 	[[nodiscard]]
@@ -702,8 +724,10 @@ private:
 	auto ( RendererFrontend::*m_collectVisibleWorldLeavesArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
 	auto ( RendererFrontend::*m_collectVisibleOccludersArchMethod )( StateForCamera * ) -> std::span<const unsigned>;
 	auto ( RendererFrontend::*m_buildFrustaOfOccludersArchMethod )( StateForCamera *, std::span<const SortedOccluder> ) -> std::span<const Frustum>;
+	void ( RendererFrontend::*m_buildBitMasksOfLeafOccludersMethod )( StateForCamera *, std::span<const unsigned>,
+																	  std::span<const Frustum>, uint64_t * );
 	void ( RendererFrontend::*m_cullSurfacesByOccludersArchMethod )( StateForCamera *, std::span<const unsigned>,
-															 std::span<const Frustum>, MergedSurfSpan *, uint8_t * );
+															 std::span<const Frustum>, const uint64_t *, MergedSurfSpan *, uint8_t * );
 	auto ( RendererFrontend::*m_cullEntriesWithBoundsArchMethod )( StateForCamera *, const void *, unsigned, unsigned, unsigned, const Frustum *,
 														   std::span<const Frustum>, uint16_t * ) -> std::span<const uint16_t>;
 	auto ( RendererFrontend::*m_cullEntryPtrsWithBoundsArchMethod )( StateForCamera *stateForCamera, const void **, unsigned, unsigned, const Frustum *,
@@ -746,6 +770,9 @@ private:
 		PodBuffer<unsigned> visibleLeavesBuffer;
 		PodBuffer<unsigned> visibleOccludersBuffer;
 		PodBuffer<SortedOccluder> sortedOccludersBuffer;
+
+		PodBuffer<uint64_t> leafOccluderBitMasksBuffer;
+		PodBuffer<uint64_t> surfOccluderBitMasksBuffer;
 
 		PodBuffer<uint8_t> leafSurfTableBuffer;
 		PodBuffer<unsigned> leafSurfNumsBuffer;

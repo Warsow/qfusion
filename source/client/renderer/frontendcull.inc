@@ -19,7 +19,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
+#ifdef IMPLEMENT_cullSurfacesByOccluders
 #include <atomic>
+#include <bit>
+#endif
 
 #ifdef DEBUG_OCCLUDERS
 // Share these variables across arch-dependent code
@@ -32,6 +35,36 @@ extern int g_lockedOccluderNum;
 #endif
 
 namespace wsw {
+
+#ifdef IMPLEMENT_buildBitMasksOfLeafOccluders
+
+template <unsigned Arch>
+void RendererFrontend::buildBitMasksOfLeafOccludersArch( StateForCamera *stateForCamera,
+														 std::span<const unsigned> numsOfLeaves,
+														 std::span<const Frustum> occluderFrusta,
+														 uint64_t *bitMaskOfLeafOccluders ) {
+	const auto leaves  = rsh.worldBrushModel->visleafs;
+
+	for( const unsigned leafNum: numsOfLeaves ) {
+		const mleaf_t *__restrict const leaf = leaves[leafNum];
+
+		LOAD_BOX_COMPONENTS( leaf->mins, leaf->maxs );
+
+		uint64_t mask         = 0;
+		unsigned frustumIndex = 0;
+		do {
+			const Frustum *__restrict f = &occluderFrusta[frustumIndex];
+			COMPUTE_RESULT_OF_FULLY_OUTSIDE_TEST_FOR_8_PLANES( f, const int nonZeroIfFullyOutside );
+			if( nonZeroIfFullyOutside == 0 ) {
+				mask |= (uint64_t)1 << ( (uint64_t)frustumIndex );
+			}
+		} while( ++frustumIndex < occluderFrusta.size() );
+
+		bitMaskOfLeafOccluders[leafNum] = mask;
+	}
+}
+
+#endif
 
 #ifdef IMPLEMENT_collectVisisbleWorldLeaves
 
@@ -379,8 +412,10 @@ void RendererFrontend::showOccluderFrustum( StateForCamera *stateForCamera, floa
 
 template <unsigned Arch>
 void RendererFrontend::cullSurfacesByOccludersArch( [[maybe_unused]] StateForCamera *stateForCamera,
-											std::span<const unsigned> surfNums, std::span<const Frustum> occluderFrusta,
-											MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable ) {
+													std::span<const unsigned> surfNums,
+													std::span<const Frustum> occluderFrusta,
+											        const uint64_t *surfOccluderMaskTable,
+													MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable ) {
 	assert( !occluderFrusta.empty() );
 	assert( !surfNums.empty() );
 
@@ -411,34 +446,38 @@ void RendererFrontend::cullSurfacesByOccludersArch( [[maybe_unused]] StateForCam
 	};
 
 	const msurface_t *const surfaces = rsh.worldBrushModel->surfaces;
-	const unsigned numOccluders      = occluderFrusta.size();
 
 	size_t surfIndex = 0;
 	do {
+		bool surfVisible                        = true;
 		const unsigned surfNum                  = surfNums[surfIndex];
+		uint64_t surfOccluderMask               = surfOccluderMaskTable[surfNum];
 		const msurface_t *const __restrict surf = surfaces + surfNum;
 
-		LOAD_BOX_COMPONENTS( surf->mins, surf->maxs );
+		// We can use while loop but this design should eliminate the redundant zero check in countr_zero
+		if( surfOccluderMask ) {
+			LOAD_BOX_COMPONENTS( surf->mins, surf->maxs );
 
-		bool surfVisible      = true;
-		unsigned frustumIndex = 0;
-		do {
-			const Frustum *__restrict f = &occluderFrusta[frustumIndex];
+			do {
+				const uint64_t firstBitIndex = std::countr_zero( surfOccluderMask );
+				const Frustum *__restrict f  = &occluderFrusta[firstBitIndex];
 
-#ifdef DEBUG_OCCLUDERS
-			if( testedOccluderIndex && testedOccluderIndex != (int)( 1 + frustumIndex ) ) {
-				continue;
-			}
-#endif
+	#ifdef DEBUG_OCCLUDERS
+				if( testedOccluderIndex && testedOccluderIndex != (int)( 1 + frustumIndex ) ) {
+					continue;
+				}
+	#endif
 
-			COMPUTE_RESULT_OF_FULLY_INSIDE_TEST_FOR_8_PLANES( f, const int zeroIfFullyInside )
+				COMPUTE_RESULT_OF_FULLY_INSIDE_TEST_FOR_8_PLANES( f, const int zeroIfFullyInside )
 
-			if( zeroIfFullyInside == 0 ) [[unlikely]] {
-				surfVisible = false;
-				SHOW_OCCLUDED( stateForCamera, surf->mins, surf->maxs, COLOR_RGB( 192, 0, 0 ) );
-				break;
-			}
-		} while( ++frustumIndex != numOccluders );
+				if( zeroIfFullyInside == 0 ) [[unlikely]] {
+					surfVisible = false;
+					SHOW_OCCLUDED( stateForCamera, surf->mins, surf->maxs, COLOR_RGB( 192, 0, 0 ) );
+					break;
+				}
+				surfOccluderMask &= ~( ( (uint64_t)1 ) << firstBitIndex );
+			} while( surfOccluderMask );
+		}
 
 		if( surfVisible ) {
 			surfVisTable[surfNum] = 1;

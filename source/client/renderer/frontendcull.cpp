@@ -628,12 +628,20 @@ auto RendererFrontend::buildFrustaOfOccluders( StateForCamera *stateForCamera, s
 	return ( this->*m_buildFrustaOfOccludersArchMethod )( stateForCamera, sortedOccluders );
 }
 
+void RendererFrontend::buildBitMasksOfLeafOccluders( StateForCamera *stateForCamera, std::span<const unsigned> indicesOfLeaves,
+													 std::span<const Frustum> occluderFrusta, uint64_t *bitMaskOfLeafOccluders ) {
+	WSW_PROFILER_SCOPE();
+	return ( this->*m_buildBitMasksOfLeafOccludersMethod )( stateForCamera, indicesOfLeaves,
+															occluderFrusta, bitMaskOfLeafOccluders );
+}
+
+
 void RendererFrontend::cullSurfacesByOccluders( StateForCamera *stateForCamera, std::span<const unsigned> indicesOfSurfaces,
-												std::span<const Frustum> occluderFrusta,
+												std::span<const Frustum> occluderFrusta, const uint64_t *surfBitMaskTable,
 												MergedSurfSpan *mergedSurfSpans, uint8_t *surfVisTable ) {
 	WSW_PROFILER_SCOPE();
 	return ( this->*m_cullSurfacesByOccludersArchMethod )( stateForCamera, indicesOfSurfaces, occluderFrusta,
-														   mergedSurfSpans, surfVisTable );
+														   surfBitMaskTable, mergedSurfSpans, surfVisTable );
 }
 
 auto RendererFrontend::cullEntriesWithBounds( StateForCamera *stateForCamera, const void *entries,

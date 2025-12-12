@@ -93,24 +93,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	/* Note: We assume that signed zeros are negative, this is fine for culling purposes */ \
 	zeroIfFullyInside = _mm_movemask_ps( _mm_or_ps( xmmDist_03_farthest, xmmDist_47_farthest ) );
 
-// Assumes that LOAD_BOX_COMPONENTS was expanded in the scope
-#define COMPUTE_TRISTATE_RESULT_FOR_8_PLANES( f, nonZeroIfFullyOutside, nonZeroIfPartiallyOutside ) \
+#define COMPUTE_RESULT_OF_FULLY_OUTSIDE_TEST_FOR_8_PLANES( f, nonZeroIfFullyOutside ) \
 	LOAD_COMPONENTS_OF_8_FRUSTUM_PLANES( f ) \
-	/* Select mins/maxs using masks for respective plane signbits, planes 0..3 */ \
 	SELECT_NEAREST_BOX_CORNER_COMPONENTS( _03_nearest, _03 ) \
-	/* Select mins/maxs using masks for respective plane signbits, planes 4..7 */ \
 	SELECT_NEAREST_BOX_CORNER_COMPONENTS( _47_nearest, _47 ) \
-	/* The same but for the farthest corner */ \
-	SELECT_FARTHEST_BOX_CORNER_COMPONENTS( _03_farthest, _03 ) \
-	SELECT_FARTHEST_BOX_CORNER_COMPONENTS( _47_farthest, _47 ) \
-	/* Compute dot products of planes and nearest box corners to check whether the box is fully outside */ \
 	COMPUTE_BOX_CORNER_DISTANCE_TO_PLANE( _03_nearest, _03 ) \
 	COMPUTE_BOX_CORNER_DISTANCE_TO_PLANE( _47_nearest, _47 ) \
-	/* Compute dot products of planes and farthest box corners to check whether the box is partially outside */ \
-	COMPUTE_BOX_CORNER_DISTANCE_TO_PLANE( _03_farthest, _03 ) \
-	COMPUTE_BOX_CORNER_DISTANCE_TO_PLANE( _47_farthest, _47 ) \
-	/* We do not need an exact match with masks of AVX version, just checking for non-zero bits is sufficient */ \
-	/* Note: We assume that signed zeros are negative, this is fine for culling purposes */ \
-	nonZeroIfFullyOutside     = _mm_movemask_ps( _mm_or_ps( xmmDist_03_nearest, xmmDist_47_nearest ) ); \
-	nonZeroIfPartiallyOutside = _mm_movemask_ps( _mm_or_ps( xmmDist_03_farthest, xmmDist_47_farthest ) );
-
+	nonZeroIfFullyOutside = _mm_movemask_ps( _mm_or_ps( xmmDist_03_nearest, xmmDist_47_nearest ) );

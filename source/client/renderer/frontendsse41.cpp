@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define IMPLEMENT_collectVisisbleWorldLeaves
 #define IMPLEMENT_collectVisibleOccluders
 #define IMPLEMENT_buildFrustaOfOccluders
+#define IMPLEMENT_buildBitMasksOfLeafOccluders
 #define IMPLEMENT_cullSurfacesByOccluders
 #define IMPLEMENT_cullEntriesWithBounds
 #define IMPLEMENT_cullEntryPtrsWithBounds
@@ -50,12 +51,22 @@ auto RendererFrontend::buildFrustaOfOccludersSse41( StateForCamera *stateForCame
 	return buildFrustaOfOccludersArch<Sse41>( stateForCamera, sortedOccluders );
 }
 
+void RendererFrontend::buildBitMasksOfLeafOccludersSse41( StateForCamera *stateForCamera,
+														  std::span<const unsigned int> indicesOfLeaves,
+														  std::span<const Frustum> occluderFrusta,
+														  uint64_t *bitMaskOfLeafOccluders ) {
+	return buildBitMasksOfLeafOccludersArch<Sse41>( stateForCamera, indicesOfLeaves, occluderFrusta, bitMaskOfLeafOccluders );
+}
+
+
 void RendererFrontend::cullSurfacesByOccludersSse41( StateForCamera *stateForCamera,
 													 std::span<const unsigned> indicesOfSurfaces,
 													 std::span<const Frustum> occluderFrusta,
+													 const uint64_t *surfOccluderMaskTable,
 													 MergedSurfSpan *mergedSurfSpans,
 													 uint8_t *surfVisTable ) {
-	return cullSurfacesByOccludersArch<Sse41>( stateForCamera, indicesOfSurfaces, occluderFrusta, mergedSurfSpans, surfVisTable );
+	return cullSurfacesByOccludersArch<Sse41>( stateForCamera, indicesOfSurfaces, occluderFrusta, surfOccluderMaskTable,
+											   mergedSurfSpans, surfVisTable );
 }
 
 auto RendererFrontend::cullEntriesWithBoundsSse41( StateForCamera *stateForCamera, const void *entries,
