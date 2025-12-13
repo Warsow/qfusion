@@ -18,13 +18,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
+#include "backendrhistate.h"
 #include "backendactiontape.h"
 #include "buffermanagement.h"
 #include "texturemanagement.h"
-#include "glstateproxy.h"
 #include "local.h"
 
-GLStateProxy::GLStateProxy( BackendActionTape *actionTape, int width, int height )
+SimulatedRhiState::SimulatedRhiState( BackendActionTape *actionTape, int width, int height )
 	: m_actionTape( actionTape ) {
 	assert( m_scissor[0] == 0 && m_scissor[1] == 0 );
 	m_scissor[2]     = width;
@@ -35,20 +35,20 @@ GLStateProxy::GLStateProxy( BackendActionTape *actionTape, int width, int height
 	std::memset( m_currentTextures, 0, sizeof( m_currentTextures ) );
 }
 
-void GLStateProxy::setViewport( int x, int y, int w, int h ) {
+void SimulatedRhiState::setViewport( int x, int y, int w, int h ) {
 	Vector4Set( m_viewport, x, y, w, h );
 	assert( m_fbWidth > 0 && m_fbHeight > 0 );
 	m_actionTape->viewport( x, m_fbHeight - h - y, w, h );
 }
 
-void GLStateProxy::setScissor( int x, int y, int w, int h ) {
+void SimulatedRhiState::setScissor( int x, int y, int w, int h ) {
 	if( m_scissor[0] != x || m_scissor[1] != y || m_scissor[2] != w || m_scissor[3] != h ) {
 		Vector4Set( m_scissor, x, y, w, h );
 		m_scissorChanged = true;
 	}
 }
 
-void GLStateProxy::getScissor( int *x, int *y, int *w, int *h ) {
+void SimulatedRhiState::getScissor( int *x, int *y, int *w, int *h ) {
 	if( x ) {
 		*x = m_scissor[0];
 	}
@@ -63,7 +63,7 @@ void GLStateProxy::getScissor( int *x, int *y, int *w, int *h ) {
 	}
 }
 
-void GLStateProxy::applyScissor() {
+void SimulatedRhiState::applyScissor() {
 	if( m_scissorChanged ) {
 		m_scissorChanged = false;
 		const int h = m_scissor[3];
@@ -72,7 +72,7 @@ void GLStateProxy::applyScissor() {
 	}
 }
 
-void GLStateProxy::setCull( int cull ) {
+void SimulatedRhiState::setCull( int cull ) {
 	if( m_faceCull != cull ) {
 		if( cull ) {
 			if( !m_faceCull ) {
@@ -87,12 +87,12 @@ void GLStateProxy::setCull( int cull ) {
 	}
 }
 
-void GLStateProxy::flipFrontFace() {
+void SimulatedRhiState::flipFrontFace() {
 	m_frontFace = !m_frontFace;
 	m_actionTape->frontFace( m_frontFace ? GL_CW : GL_CCW );
 }
 
-void GLStateProxy::setDepthRange( float depthMin, float depthMax ) {
+void SimulatedRhiState::setDepthRange( float depthMin, float depthMax ) {
 	depthMin = wsw::clamp( depthMin, 0.0f, 1.0f );
 	depthMax = wsw::clamp( depthMax, 0.0f, 1.0f );
 	m_depthMin = depthMin;
@@ -104,25 +104,25 @@ void GLStateProxy::setDepthRange( float depthMin, float depthMax ) {
 	m_actionTape->depthRange( depthMin, depthMax );
 }
 
-void GLStateProxy::getDepthRange( float *depthMin, float *depthMax ) {
+void SimulatedRhiState::getDepthRange( float *depthMin, float *depthMax ) {
 	*depthMin = m_depthMin;
 	*depthMax = m_depthMax;
 }
 
-void GLStateProxy::saveDepthRange() {
+void SimulatedRhiState::saveDepthRange() {
 	assert( !m_hasSavedDepth );
 	m_savedDepthMin = m_depthMin;
 	m_savedDepthMax = m_depthMax;
 	m_hasSavedDepth = true;
 }
 
-void GLStateProxy::restoreDepthRange() {
+void SimulatedRhiState::restoreDepthRange() {
 	assert( m_hasSavedDepth );
 	m_hasSavedDepth = false;
 	setDepthRange( m_savedDepthMin, m_savedDepthMax );
 }
 
-void GLStateProxy::setDepthOffsetEnabled( bool enabled ) {
+void SimulatedRhiState::setDepthOffsetEnabled( bool enabled ) {
 	float depthMin = m_depthMin;
 	float depthMax = m_depthMax;
 	m_depthOffset = enabled;
@@ -134,7 +134,7 @@ void GLStateProxy::setDepthOffsetEnabled( bool enabled ) {
 	}
 }
 
-void GLStateProxy::bindTexture( int multitextureNumber, const Texture *texture ) {
+void SimulatedRhiState::bindTexture( int multitextureNumber, const Texture *texture ) {
 	assert( texture );
 	assert( texture->texnum != 0 );
 
@@ -146,14 +146,14 @@ void GLStateProxy::bindTexture( int multitextureNumber, const Texture *texture )
 	}
 }
 
-void GLStateProxy::selectActiveMultitexture( int multitextureNumber ) {
+void SimulatedRhiState::selectActiveMultitexture( int multitextureNumber ) {
 	if( m_currentTMU != multitextureNumber ) {
 		m_currentTMU = multitextureNumber;
 		m_actionTape->activeTexture( GL_TEXTURE0 + multitextureNumber );
 	}
 }
 
-void GLStateProxy::bindVertexBuffer( GLuint buffer ) {
+void SimulatedRhiState::bindVertexBuffer( GLuint buffer ) {
 	if( m_currentVertexBuffer != buffer ) {
 		m_actionTape->bindBuffer( GL_ARRAY_BUFFER, buffer );
 		m_currentVertexBuffer = buffer;
@@ -161,21 +161,21 @@ void GLStateProxy::bindVertexBuffer( GLuint buffer ) {
 	}
 }
 
-void GLStateProxy::bindIndexBuffer( GLuint buffer ) {
+void SimulatedRhiState::bindIndexBuffer( GLuint buffer ) {
 	if( m_currentIndexBuffer != buffer ) {
 		m_actionTape->bindBuffer( GL_ELEMENT_ARRAY_BUFFER, buffer );
 		m_currentIndexBuffer = buffer;
 	}
 }
 
-bool GLStateProxy::isAlphaBlendingEnabled() const {
+bool SimulatedRhiState::isAlphaBlendingEnabled() const {
 	const auto src = m_state & GLSTATE_SRCBLEND_MASK;
 	const auto dst = m_state & GLSTATE_DSTBLEND_MASK;
 	return src == GLSTATE_SRCBLEND_SRC_ALPHA || dst == GLSTATE_DSTBLEND_SRC_ALPHA ||
 	       src == GLSTATE_SRCBLEND_ONE_MINUS_SRC_ALPHA || dst == GLSTATE_DSTBLEND_ONE_MINUS_SRC_ALPHA;
 }
 
-void GLStateProxy::setState( unsigned state ) {
+void SimulatedRhiState::setState( unsigned state ) {
 	const unsigned diff = m_state ^ state;
 	if( !diff ) {
 		return;
@@ -318,7 +318,7 @@ void GLStateProxy::setState( unsigned state ) {
 	m_state = state;
 }
 
-void GLStateProxy::enableVertexAttrib( int index, bool enable ) {
+void SimulatedRhiState::enableVertexAttrib( int index, bool enable ) {
 	const unsigned bit = 1 << index;
 	const unsigned diff = ( m_vertexAttribEnabled & bit ) ^ ( enable ? bit : 0 );
 	if( diff ) {
@@ -332,7 +332,7 @@ void GLStateProxy::enableVertexAttrib( int index, bool enable ) {
 	}
 }
 
-void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLayout *layout ) {
+void SimulatedRhiState::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLayout *layout ) {
 	assert( vattribs & VATTRIB_POSITION_BIT );
 	const vattribmask_t hfa = layout->halfFloatAttribs;
 	if( vattribs == m_lastVAttribs && hfa == m_lastHalfFloatVAttribs && layout->baseOffset == m_lastVboSpanOffset ) {
@@ -455,15 +455,17 @@ void GLStateProxy::enableVertexAttribs( vattribmask_t vattribs, const VboSpanLay
 	}
 }
 
-void GLStateProxy::drawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const void *indices ) {
+void SimulatedRhiState::drawRangeElements( GLenum mode, GLuint start, GLuint end, GLsizei count,
+										   GLenum type, const void *indices ) {
 	m_actionTape->drawRangeElements( mode, start, end, count, type, indices );
 }
 
-void GLStateProxy::multiDrawElements( GLenum mode, const GLsizei *count, GLenum type, const void *const *indices, GLsizei drawcount ) {
+void SimulatedRhiState::multiDrawElements( GLenum mode, const GLsizei *count, GLenum type,
+										   const void *const *indices, GLsizei drawcount ) {
 	m_actionTape->multiDrawElements( mode, count, type, indices, drawcount );
 }
 
-void GLStateProxy::bindRenderTarget( RenderTargetComponents *components ) {
+void SimulatedRhiState::bindRenderTarget( RenderTargetComponents *components ) {
 	const int width  = components ? components->texture->width : glConfig.width;
 	const int height = components ? components->texture->height : glConfig.height;
 

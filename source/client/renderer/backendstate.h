@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef R_BACKEND_LOCAL_H
 #define R_BACKEND_LOCAL_H
 
-#include "glstateproxy.h"
+#include "backendrhistate.h"
 #include "local.h"
 
 struct RuntimeBackendState {
@@ -254,7 +254,7 @@ private:
 		} blockState[MAX_UNIFORM_BINDINGS];
 	} m_uniformState;
 
-	GLStateProxy m_glState;
+	SimulatedRhiState m_rhiState;
 	UploadManager *const m_uploadManager;
 	BackendActionTape *const m_actionTape;
 };

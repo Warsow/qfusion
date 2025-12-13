@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "backendactiontape.h"
 #include "backendstate.h"
 #include "buffermanagement.h"
-#include "glstateproxy.h"
 #include "texturemanagement.h"
 
 #include <common/helpers/noise.h>
@@ -53,7 +52,7 @@ static const shaderpass_t kBuiltinOutlinePass {
 };
 
 SimulatedBackendState::SimulatedBackendState( UploadManager *uploadManager, BackendActionTape *actionTape, int width, int height )
-	: m_glState( actionTape, width, height ), m_uploadManager( uploadManager ), m_actionTape( actionTape ) {
+	: m_rhiState( actionTape, width, height ), m_uploadManager( uploadManager ), m_actionTape( actionTape ) {
 	std::memset( &m_globalState, 0, sizeof( m_globalState ) );
 	std::memset( &m_drawState, 0, sizeof( m_drawState ) );
 	std::memset( &m_materialState, 0, sizeof( m_materialState ) );
@@ -73,19 +72,19 @@ void SimulatedBackendState::setTime( int64_t requestTime, int64_t globalTime ) {
 }
 
 void SimulatedBackendState::setDepthRange( float depthmin, float depthmax ) {
-	m_glState.setDepthRange( depthmin, depthmax );
+	m_rhiState.setDepthRange( depthmin, depthmax );
 }
 
 void SimulatedBackendState::getDepthRange( float *depthmin, float *depthmax ) {
-	m_glState.getDepthRange( depthmin, depthmax );
+	m_rhiState.getDepthRange( depthmin, depthmax );
 }
 
 void SimulatedBackendState::saveDepthRange() {
-	m_glState.saveDepthRange();
+	m_rhiState.saveDepthRange();
 }
 
 void SimulatedBackendState::restoreDepthRange() {
-	m_glState.restoreDepthRange();
+	m_rhiState.restoreDepthRange();
 }
 
 void SimulatedBackendState::loadCameraMatrix( const mat4_t m ) {
@@ -165,23 +164,23 @@ void SimulatedBackendState::transformForEntity( const entity_t *e ) {
 }
 
 void SimulatedBackendState::flipFrontFace() {
-	m_glState.flipFrontFace();
+	m_rhiState.flipFrontFace();
 }
 
 void SimulatedBackendState::setScissor( int x, int y, int w, int h ) {
-	m_glState.setScissor( x, y, w, h );
+	m_rhiState.setScissor( x, y, w, h );
 }
 
 void SimulatedBackendState::getScissor( int *x, int *y, int *w, int *h ) {
-	m_glState.getScissor( x, y, w, h );
+	m_rhiState.getScissor( x, y, w, h );
 }
 
 void SimulatedBackendState::setViewport( int x, int y, int w, int h ) {
-	m_glState.setViewport( x, y, w, h );
+	m_rhiState.setViewport( x, y, w, h );
 }
 
 void SimulatedBackendState::clear( int bits, float r, float g, float b, float a ) {
-	unsigned state = m_glState.getState();
+	unsigned state = m_rhiState.getState();
 
 	if( bits & GL_DEPTH_BUFFER_BIT ) {
 		state |= GLSTATE_DEPTHWRITE;
@@ -196,13 +195,13 @@ void SimulatedBackendState::clear( int bits, float r, float g, float b, float a 
 		m_actionTape->clearColor( r, g, b, a );
 	}
 
-	m_glState.setState( state );
+	m_rhiState.setState( state );
 
-	m_glState.applyScissor();
+	m_rhiState.applyScissor();
 
 	m_actionTape->clear( bits );
 
-	m_glState.setDepthRange( 0.0f, 1.0f );
+	m_rhiState.setDepthRange( 0.0f, 1.0f );
 }
 
 void SimulatedBackendState::setCamera( const vec3_t cameraOrigin, const mat3_t cameraAxis ) {
@@ -386,18 +385,18 @@ void SimulatedBackendState::setShaderStateMask( unsigned ANDmask, unsigned ORmas
 }
 
 void SimulatedBackendState::drawMeshVerts( const DrawMeshVertSpan *vertSpan, int primitive ) {
-	m_glState.applyScissor();
+	m_rhiState.applyScissor();
 
 	if( const auto *mdSpan = std::get_if<MultiDrawElemSpan>( vertSpan ) ) {
-		m_glState.multiDrawElements( primitive, mdSpan->counts, GL_UNSIGNED_SHORT, mdSpan->indices, mdSpan->numDraws );
+		m_rhiState.multiDrawElements( primitive, mdSpan->counts, GL_UNSIGNED_SHORT, mdSpan->indices, mdSpan->numDraws );
 	} else if( const auto *vertElemSpan = std::get_if<VertElemSpan>( vertSpan ) ) {
 		const unsigned numVerts  = vertElemSpan->numVerts;
 		const unsigned numElems  = vertElemSpan->numElems;
 		const unsigned firstVert = vertElemSpan->firstVert;
 		const unsigned firstElem = vertElemSpan->firstElem;
 
-		m_glState.drawRangeElements( primitive, firstVert, firstVert + numVerts - 1, (int)numElems,
-									 GL_UNSIGNED_SHORT, (GLvoid *)( firstElem * sizeof( elem_t ) ) );
+		m_rhiState.drawRangeElements( primitive, firstVert, firstVert + numVerts - 1, (int)numElems,
+									  GL_UNSIGNED_SHORT, (GLvoid *)( firstElem * sizeof( elem_t ) ) );
 	} else {
 		assert( false );
 	}
@@ -405,16 +404,16 @@ void SimulatedBackendState::drawMeshVerts( const DrawMeshVertSpan *vertSpan, int
 
 void SimulatedBackendState::bindMeshBuffer( const MeshBuffer *buffer ) {
 	if( buffer ) {
-		m_glState.bindVertexBuffer( buffer->vboId );
-		m_glState.bindIndexBuffer( buffer->iboId );
+		m_rhiState.bindVertexBuffer( buffer->vboId );
+		m_rhiState.bindIndexBuffer( buffer->iboId );
 	} else {
-		m_glState.bindVertexBuffer( 0 );
-		m_glState.bindIndexBuffer( 0 );
+		m_rhiState.bindVertexBuffer( 0 );
+		m_rhiState.bindIndexBuffer( 0 );
 	}
 }
 
 void SimulatedBackendState::bindRenderTarget( RenderTargetComponents *components ) {
-	m_glState.bindRenderTarget( components );
+	m_rhiState.bindRenderTarget( components );
 }
 
 void SimulatedBackendState::bindExistingProgram( int program ) {
@@ -1031,10 +1030,10 @@ void SimulatedBackendState::updateCommonUniforms( const shaderpass_t *pass, mat4
 	RP_UpdateViewUniforms( this, m_globalState.modelviewMatrix,
 						   m_globalState.modelviewProjectionMatrix,
 						   m_globalState.cameraOrigin, m_globalState.cameraAxis, mirrorSide,
-						   m_glState.getViewport(), m_globalState.zNear, m_globalState.zFar );
+						   m_rhiState.getViewport(), m_globalState.zNear, m_globalState.zFar );
 
 	vec2_t blendMix { 0, 0 };
-	if( m_glState.isAlphaBlendingEnabled() ) {
+	if( m_rhiState.isAlphaBlendingEnabled() ) {
 		blendMix[1] = 1;
 		if( m_materialState.alphaHack ) {
 			constColor[3] *= m_materialState.hackedAlpha;
@@ -1171,7 +1170,7 @@ void SimulatedBackendState::renderMeshUsingQ3AProgram( const FrontendToBackendSh
 		programFeatures |= GLSL_SHADER_Q3_ALPHA_MASK;
 	}
 
-	m_glState.bindTexture( 0, texture );
+	m_rhiState.bindTexture( 0, texture );
 
 	programFeatures |= getProgramFeaturesForRgbaGen( &pass->rgbgen, &pass->alphagen );
 
@@ -1197,7 +1196,7 @@ void SimulatedBackendState::renderMeshUsingQ3AProgram( const FrontendToBackendSh
 		int i = 0;
 		// bind lightmap textures and set program's features for lightstyles
 		while( i < MAX_LIGHTMAPS && lightStyle->lightmapStyles[i] != 255 ) {
-			m_glState.bindTexture( i + 4, rsh.worldBrushModel->lightmapImages[lightStyle->lightmapNum[i]] );
+			m_rhiState.bindTexture( i + 4, rsh.worldBrushModel->lightmapImages[lightStyle->lightmapNum[i]] );
 			++i;
 		}
 		programFeatures |= ( i * GLSL_SHADER_Q3_LIGHTSTYLE0 );
@@ -1330,7 +1329,7 @@ void SimulatedBackendState::renderMeshUsingMaterialProgram( const FrontendToBack
 	mat4_t texMatrix;
 	Matrix4_Identity( texMatrix );
 
-	m_glState.bindTexture( 0, baseTexture );
+	m_rhiState.bindTexture( 0, baseTexture );
 
 	programFeatures |= getProgramFeaturesForRgbaGen( &pass->rgbgen, &pass->alphagen );
 
@@ -1338,11 +1337,11 @@ void SimulatedBackendState::renderMeshUsingMaterialProgram( const FrontendToBack
 
 	// we only send S-vectors to GPU and recalc T-vectors as cross product
 	// in vertex shader
-	m_glState.bindTexture( 1, normalMapTexture );
+	m_rhiState.bindTexture( 1, normalMapTexture );
 
 	if( glossMapTexture && glossIntensity > 0.0f ) {
 		programFeatures |= GLSL_SHADER_MATERIAL_SPECULAR;
-		m_glState.bindTexture( 2, glossMapTexture );
+		m_rhiState.bindTexture( 2, glossMapTexture );
 	}
 
 	if( applyDecal ) {
@@ -1358,7 +1357,7 @@ void SimulatedBackendState::renderMeshUsingMaterialProgram( const FrontendToBack
 			}
 		}
 
-		m_glState.bindTexture( 3, decalMapTexture );
+		m_rhiState.bindTexture( 3, decalMapTexture );
 	}
 
 	if( entityDecalMapTexture ) {
@@ -1369,7 +1368,7 @@ void SimulatedBackendState::renderMeshUsingMaterialProgram( const FrontendToBack
 			programFeatures |= GLSL_SHADER_MATERIAL_ENTITY_DECAL_ADD;
 		}
 
-		m_glState.bindTexture( 4, entityDecalMapTexture );
+		m_rhiState.bindTexture( 4, entityDecalMapTexture );
 	}
 
 	if( offsetmappingScale > 0 ) {
@@ -1389,7 +1388,7 @@ void SimulatedBackendState::renderMeshUsingMaterialProgram( const FrontendToBack
 			int i = 0;
 			// bind lightmap textures and set program's features for lightstyles
 			while( i < MAX_LIGHTMAPS && lightStyle->lightmapStyles[i] != 255 ) {
-				m_glState.bindTexture( i + 4, rsh.worldBrushModel->lightmapImages[lightStyle->lightmapNum[i]] );
+				m_rhiState.bindTexture( i + 4, rsh.worldBrushModel->lightmapImages[lightStyle->lightmapNum[i]] );
 				++i;
 			}
 
@@ -1549,7 +1548,7 @@ void SimulatedBackendState::renderMeshUsingDistortionProgram( const FrontendToBa
 	mat4_t texMatrix;
 	Matrix4_Identity( texMatrix );
 
-	m_glState.bindTexture( 0, dudvMapTexture );
+	m_rhiState.bindTexture( 0, dudvMapTexture );
 
 	programFeatures |= getProgramFeaturesForRgbaGen( &pass->rgbgen, &pass->alphagen );
 	programFeatures |= getProgramFeaturesForFog( pass, m_materialState.fog );
@@ -1559,11 +1558,11 @@ void SimulatedBackendState::renderMeshUsingDistortionProgram( const FrontendToBa
 	if( normalMapTexture != blankNormalMapTexture ) {
 		// eyeDot
 		programFeatures |= GLSL_SHADER_DISTORTION_EYEDOT;
-		m_glState.bindTexture( 1, normalMapTexture );
+		m_rhiState.bindTexture( 1, normalMapTexture );
 	}
 
-	m_glState.bindTexture( 2, portalTextures[0] );           // reflection
-	m_glState.bindTexture( 3, portalTextures[1] );           // refraction
+	m_rhiState.bindTexture( 2, portalTextures[0] );           // reflection
+	m_rhiState.bindTexture( 3, portalTextures[1] );           // refraction
 
 	setupProgram( GLSL_PROGRAM_TYPE_DISTORTION, programFeatures );
 
@@ -1589,8 +1588,8 @@ void SimulatedBackendState::renderMeshUsingOutlineProgram( const FrontendToBacke
 	mat4_t texMatrix;
 	Matrix4_Identity( texMatrix );
 
-	const auto faceCull = m_glState.getCull();
-	m_glState.setCull( GL_BACK );
+	const auto faceCull = m_rhiState.getCull();
+	m_rhiState.setCull( GL_BACK );
 
 	setPassStateFlags( pass->flags );
 
@@ -1608,7 +1607,7 @@ void SimulatedBackendState::renderMeshUsingOutlineProgram( const FrontendToBacke
 
 	drawMeshVerts( vertSpan, primitive );
 
-	m_glState.setCull( faceCull );
+	m_rhiState.setCull( faceCull );
 }
 
 auto SimulatedBackendState::bindCelshadeTexture( int tmu, const Texture *texture, uint64_t feature,
@@ -1634,7 +1633,7 @@ auto SimulatedBackendState::bindCelshadeTexture( int tmu, const Texture *texture
 	}
 
 	if( textureToUse ) {
-		m_glState.bindTexture( tmu, textureToUse );
+		m_rhiState.bindTexture( tmu, textureToUse );
 	}
 
 	return resultFeatures;
@@ -1653,7 +1652,7 @@ void SimulatedBackendState::renderMeshUsingCelshadeProgram( const FrontendToBack
 	const Texture *const stripesTexture     = pass->images[5];
 	const Texture *const lightTexture       = pass->images[6];
 
-	m_glState.bindTexture( 0, baseTexture );
+	m_rhiState.bindTexture( 0, baseTexture );
 
 	const mfog_t *fog = m_materialState.fog;
 	// possibly apply the "texture" fog inline
@@ -1735,7 +1734,7 @@ void SimulatedBackendState::renderMeshUsingFxaaProgram( const FrontendToBackendS
 	setPassStateFlags( pass->flags );
 
 	const Texture *image = pass->images[0];
-	m_glState.bindTexture( 0, image );
+	m_rhiState.bindTexture( 0, image );
 
 	if( glConfig.ext.gpu_shader5 ) {
 		programFeatures |= GLSL_SHADER_FXAA_FXAA3;
@@ -1757,9 +1756,9 @@ void SimulatedBackendState::renderMeshUsingYuvProgram( const FrontendToBackendSh
 													   const shaderpass_t *pass, uint64_t programFeatures ) {
 	setPassStateFlags( pass->flags );
 
-	m_glState.bindTexture( 0, pass->images[0] );
-	m_glState.bindTexture( 1, pass->images[1] );
-	m_glState.bindTexture( 2, pass->images[2] );
+	m_rhiState.bindTexture( 0, pass->images[0] );
+	m_rhiState.bindTexture( 1, pass->images[1] );
+	m_rhiState.bindTexture( 2, pass->images[2] );
 
 	setupProgram( GLSL_PROGRAM_TYPE_YUV, programFeatures );
 
@@ -1795,13 +1794,13 @@ void SimulatedBackendState::renderMeshUsingColorCorrectionProgram( const Fronten
 
 	setPassStateFlags( pass->flags );
 
-	m_glState.bindTexture( 0, pass->images[0] );
+	m_rhiState.bindTexture( 0, pass->images[0] );
 	if( pass->images[1] ) {
-		m_glState.bindTexture( 1, pass->images[1] );
+		m_rhiState.bindTexture( 1, pass->images[1] );
 	}
 	for( int i = 0; i < NUM_BLOOM_LODS; i++ ) {
 		if( pass->images[3 + i] ) {
-			m_glState.bindTexture( 2 + i, pass->images[3 + i] );
+			m_rhiState.bindTexture( 2 + i, pass->images[3 + i] );
 		}
 	}
 
@@ -1821,7 +1820,7 @@ void SimulatedBackendState::renderMeshUsingKawaseProgram( const FrontendToBacken
 														  const shaderpass_t *pass, uint64_t programFeatures ) {
 	setPassStateFlags( pass->flags );
 
-	m_glState.bindTexture( 0, pass->images[0] );
+	m_rhiState.bindTexture( 0, pass->images[0] );
 
 	setupProgram( GLSL_PROGRAM_TYPE_KAWASE_BLUR, programFeatures );
 
@@ -1892,7 +1891,7 @@ void SimulatedBackendState::renderPass( const FrontendToBackendShared *fsh, cons
 			m_drawState.dirtyUniformState = false;
 		}
 
-		if( m_glState.getState() & GLSTATE_DEPTHWRITE ) {
+		if( m_rhiState.getState() & GLSTATE_DEPTHWRITE ) {
 			m_drawState.doneDepthPass = true;
 		}
 
@@ -1905,13 +1904,13 @@ void SimulatedBackendState::updateCurrentShaderState() {
 
 	// Face culling
 	if( m_materialState.currentEntity->rtype == RT_SPRITE ) {
-		m_glState.setCull( 0 );
+		m_rhiState.setCull( 0 );
 	} else if( shaderFlags & SHADER_CULL_FRONT ) {
-		m_glState.setCull( GL_FRONT );
+		m_rhiState.setCull( GL_FRONT );
 	} else if( shaderFlags & SHADER_CULL_BACK ) {
-		m_glState.setCull( GL_BACK );
+		m_rhiState.setCull( GL_BACK );
 	} else {
-		m_glState.setCull( 0 );
+		m_rhiState.setCull( 0 );
 	}
 
 	unsigned stateFlags = 0;
@@ -1945,7 +1944,7 @@ void SimulatedBackendState::setPassStateFlags( unsigned passStateFlags ) {
 		passStateFlags |= GLSTATE_DEPTHFUNC_EQ;
 	}
 
-	m_glState.setState( passStateFlags );
+	m_rhiState.setState( passStateFlags );
 }
 
 bool SimulatedBackendState::tryExecutingSinglePassReusingBoundState( const DrawMeshVertSpan *vertSpan, int primitive ) {
@@ -2072,7 +2071,7 @@ void SimulatedBackendState::drawMesh( const FrontendToBackendShared *fsh, const 
 
 	assert( m_materialState.currentShader );
 
-	m_glState.enableVertexAttribs( m_drawState.currentVAttribs, layout );
+	m_rhiState.enableVertexAttribs( m_drawState.currentVAttribs, layout );
 
 	if( m_globalState.wireframe ) {
 		drawWireframeMesh( fsh, drawMeshVertSpan, primitive );

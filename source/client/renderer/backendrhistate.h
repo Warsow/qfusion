@@ -31,9 +31,9 @@ class RenderTargetComponents;
 class BackendActionTape;
 class Texture;
 
-class GLStateProxy {
+class SimulatedRhiState {
 public:
-	GLStateProxy( BackendActionTape *actionTape, int width, int height );
+	SimulatedRhiState( BackendActionTape *actionTape, int width, int height );
 
 	[[nodiscard]]
 	auto getState() const -> unsigned { return m_state; }
