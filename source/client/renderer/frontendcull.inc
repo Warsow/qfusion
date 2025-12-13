@@ -104,7 +104,6 @@ auto RendererFrontend::collectVisibleOccludersArch( StateForCamera *stateForCame
 	unsigned *const visibleOccluders      = stateForCamera->visibleOccludersBuffer->get();
 	unsigned numVisibleOccluders          = 0;
 
-	const OccluderDataEntry *const occluderDataEntries     = rsh.worldBrushModel->occluderDataEntries;
 	const OccluderBoundsEntry *const occluderBoundsEntries = rsh.worldBrushModel->occluderBoundsEntries;
 
 #ifdef DEBUG_OCCLUDERS
@@ -135,44 +134,7 @@ auto RendererFrontend::collectVisibleOccludersArch( StateForCamera *stateForCame
 		numVisibleOccluders += ( nonZeroIfFullyOutside == 0 );
 	}
 
-	const float *__restrict viewOrigin = stateForCamera->viewOrigin;
-	const float *__restrict viewAxis   = stateForCamera->viewAxis;
-
-	// Prune bogus occluders
-	unsigned numKeptOccluders = 0;
-	for( unsigned i = 0; i < numVisibleOccluders; ++i ) {
-		const unsigned occluderNum                   = visibleOccluders[i];
-		const OccluderDataEntry &__restrict occluder = occluderDataEntries[occluderNum];
-
-		const float absViewDot = std::abs( DotProduct( viewAxis, occluder.plane ) );
-		if( absViewDot < 0.05f ) {
-			continue;
-		}
-
-		if( std::fabs( DotProduct( viewOrigin, occluder.plane ) - occluder.plane[3] ) < 16.0f ) {
-			continue;
-		}
-
-		vec3_t toOccluderVec;
-		// Hacks, hacks, hacks: reject occluders behind the viewer
-		// TODO: Add and use the nearest primary frustum plane?
-		VectorSubtract( occluder.innerPolyPoint, viewOrigin, toOccluderVec );
-
-		if( DotProduct( viewAxis, toOccluderVec ) <= 0 ) {
-			continue;
-		}
-
-		VectorNormalizeFast( toOccluderVec );
-		// Note that this condition is perfectly meaningful (bogus frusta often get built without it),
-		// but it is poorely defined and is way too restrictive TODO: Clarify it, discover more permissive condition.
-		if( std::fabs( DotProduct( toOccluderVec, occluder.plane ) ) < 0.1f ) {
-			continue;
-		}
-
-		visibleOccluders[numKeptOccluders++] = occluderNum;
-	}
-
-	return { visibleOccluders, numKeptOccluders };
+	return { visibleOccluders, numVisibleOccluders };
 }
 
 #endif
