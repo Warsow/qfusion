@@ -251,8 +251,8 @@ void BufferFactory::uploadInstancesData( MeshBuffer *vbo, const VboSpanLayout *l
 	}
 }
 
-void BufferFactory::uploadUniformData( UniformBuffer *buffer, const void *data, size_t dataSize ) {
-	bindAndUpload( GL_UNIFORM_BUFFER, buffer->id, 0, dataSize, data );
+void BufferFactory::uploadUniformData( UniformBuffer *buffer, const void *data, int offset, size_t dataSize ) {
+	bindAndUpload( GL_UNIFORM_BUFFER, buffer->id, offset, dataSize, data );
 }
 
 auto buildVertexLayoutForVattribs( VboSpanLayout *layout, vattribmask_t vattribs, vattribmask_t halfFloatVattribs,

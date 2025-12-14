@@ -24,8 +24,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "buffermanagement.h"
 #include "vattribs.h"
+#include "local.h"
 
 struct SimulatedBackendState;
+struct UniformBlockOffsets;
 struct mesh_s;
 
 class UploadManager {
@@ -65,8 +67,26 @@ public:
 	auto allocUniformBlock( SimulatedBackendState *backendState, unsigned binding, size_t requestedBlockSize ) -> void *;
 	void commitUniformBlock( SimulatedBackendState *backendState, unsigned binding, void *blockData, size_t blockSize );
 
-	void beginUniformUploads( unsigned binding );
-	void endUniformUploads( unsigned binding, unsigned uniformDataSizeInBytes );
+	enum UniformUploadCategory : unsigned {
+		CameraUniforms,
+		AuxDrawUniforms,
+	};
+
+	[[nodiscard]]
+	auto beginUniformUploads( UniformBlockOffsets *initialOffsetsToPrepare, unsigned category ) -> unsigned;
+	void endUniformUploads( unsigned uniformSliceId, const UniformBlockOffsets &currentOffsets );
+
+	[[nodiscard]]
+	auto getBufferIdForBinding( unsigned binding ) const -> GLuint {
+		assert( binding < MAX_UNIFORM_BINDINGS );
+		return m_uniformStreams[binding].buffer.id;
+	}
+	[[nodiscard]]
+	auto getBlockSizeForBinding( unsigned binding ) const -> unsigned {
+		assert( binding < MAX_UNIFORM_BINDINGS );
+		return m_uniformStreams[binding].blockSize;
+	}
+
 private:
 	void destroy();
 
@@ -82,14 +102,20 @@ private:
 
 	VertexStream m_vertexStreams[5];
 
+	static constexpr unsigned kMaxCameraSlices  = MAX_REF_CAMERAS;
+	static constexpr unsigned kMaxAuxDrawSlices = 16;
+	static constexpr unsigned kMaxUniformSlices = kMaxCameraSlices + kMaxAuxDrawSlices;
+
 	struct UniformStream {
 		UniformBuffer buffer;
 		PodBuffer<uint8_t> data;
-		// Initialized on demand, so it's does not normally perform allocations.
-		// Keeping it separate allows for more convenient use of data.capacity()
-		PodBuffer<uint8_t> lastResortScratchpad;
+		unsigned offsetsOfSlicesInBytes[kMaxUniformSlices] {};
+		unsigned capacityOfSlicesInBytes[kMaxUniformSlices] {};
 		unsigned blockSize { 0 };
 	};
+
+	unsigned m_totalCameraUniformRequests { 0 };
+	unsigned m_totalAuxDrawUniformRequests { 0 };
 
 	UniformStream m_uniformStreams[MAX_UNIFORM_BINDINGS];
 };

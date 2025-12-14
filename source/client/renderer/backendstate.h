@@ -32,9 +32,14 @@ struct portalSurface_s;
 struct mfog_s;
 struct FrontendToBackendShared;
 
+struct UniformBlockOffsets {
+	unsigned values[MAX_UNIFORM_BINDINGS] {};
+};
+
 class SimulatedBackendState {
 public:
-	SimulatedBackendState( UploadManager *uploadManager, BackendActionTape *actionTape, int width, int height );
+	SimulatedBackendState( UploadManager *uploadManager, unsigned uniformUploadCategory,
+						   BackendActionTape *actionTape, int width, int height );
 
 	void loadCameraMatrix( const mat4_t m );
 	void getObjectMatrix( float *m );
@@ -73,12 +78,16 @@ public:
 	void bindMeshBuffer( const MeshBuffer *buffer );
 	void bindRenderTarget( RenderTargetComponents *components );
 
-	[[nodiscard]]
-	auto getCurrUniformDataSize( unsigned binding ) const -> unsigned;
+	void setUniformBlockBaseline( unsigned binding, GLuint bufferId, unsigned baselineOffset );
 	void registerUniformBlockUpdate( unsigned binding, GLuint bufferId, unsigned blockSize );
 
 	[[nodiscard]]
 	auto getUploadManager() -> UploadManager * { return m_uploadManager; }
+
+	[[nodiscard]]
+	auto getUniformSliceId() const -> unsigned { return m_uniformState.sliceId; };
+	[[nodiscard]]
+	auto getCurrentUniformOffsets() const -> const UniformBlockOffsets & { return m_uniformState.currentOffsets; }
 
 	void drawMesh( const FrontendToBackendShared *fsh, const MeshBuffer *buffer, const VboSpanLayout *layout, const DrawMeshVertSpan *vertSpan, int primitive );
 private:
@@ -249,9 +258,9 @@ private:
 	} m_programState;
 
 	struct {
-		struct {
-			unsigned sizeSoFar { 0 };
-		} blockState[MAX_UNIFORM_BINDINGS];
+		unsigned sliceId;
+		UniformBlockOffsets initialOffsets;
+		UniformBlockOffsets currentOffsets;
 	} m_uniformState;
 
 	SimulatedRhiState m_rhiState;

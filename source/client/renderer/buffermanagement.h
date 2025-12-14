@@ -58,7 +58,7 @@ public:
 	void uploadVertexData( MeshBuffer *buffer, const VboSpanLayout *layout, int vertsOffset, vattribmask_t vattribs, const mesh_s *mesh );
 	void uploadIndexData( MeshBuffer *buffer, int vertsOffset, int elemsOffset, const mesh_s *mesh );
 	void uploadInstancesData( MeshBuffer *buffer, const VboSpanLayout *layout, int instOffset, int numInstances, instancePoint_t *instances );
-	void uploadUniformData( UniformBuffer *buffer, const void *data, size_t dataSize );
+	void uploadUniformData( UniformBuffer *buffer, const void *data, int offset, size_t dataSize );
 private:
 	BufferFactory();
 	~BufferFactory();
