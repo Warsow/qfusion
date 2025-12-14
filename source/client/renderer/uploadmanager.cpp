@@ -62,16 +62,25 @@ UploadManager::UploadManager( BufferFactory *bufferFactory ) : m_bufferFactory( 
 	RP_GetSizeOfUniformBlocks( sizeOfBlocks );
 
 	// TODO: Vary it depending of actual kind of data
-	constexpr unsigned kMaxBlocksForBinding = 1 << 14;
+	constexpr unsigned kMaxBlocksForBinding = 1 << 12;
 
 	assert( std::size( m_uniformStreams ) == MAX_UNIFORM_BINDINGS );
-	for( unsigned i = 0; i < MAX_UNIFORM_BINDINGS; ++i ) {
-		const unsigned uniformDataSize = sizeOfBlocks[i] * kMaxBlocksForBinding;
+	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
+		const unsigned blockDataSize   = sizeOfBlocks[binding];
+		const unsigned sliceDataSize   = blockDataSize * ( kMaxBlocksForBinding + 1 );
+		const unsigned uniformDataSize = sliceDataSize * kMaxUniformSlices;
 		assert( uniformDataSize > 0 );
 
-		UniformStream &stream = m_uniformStreams[i];
+		UniformStream &stream = m_uniformStreams[binding];
 		stream.data.reserve( uniformDataSize );
-		stream.blockSize = sizeOfBlocks[i];
+		stream.blockSize = sizeOfBlocks[binding];
+
+		for( unsigned sliceId = 0; sliceId < kMaxUniformSlices; ++sliceId ) {
+			stream.offsetsOfSlicesInBytes[sliceId]  = sliceId * sliceDataSize;
+			// We exclude the last resort scratchpad from capacity
+			// Note: The capacity could vary if we decide to reduce it for aux draws
+			stream.capacityOfSlicesInBytes[sliceId] = sliceDataSize - blockDataSize;
+		}
 
 		if( std::optional<UniformBuffer> buffer = m_bufferFactory->createUniformBuffer( uniformDataSize ) ) {
 			stream.buffer = *buffer;
@@ -172,19 +181,39 @@ void UploadManager::endVertexUploads( UploadGroup group, unsigned vertexDataSize
 	}
 }
 
-void UploadManager::beginUniformUploads( unsigned binding ) {
-	assert( binding < std::size( m_uniformStreams ) );
+auto UploadManager::beginUniformUploads( UniformBlockOffsets *initialOffsetsToPrepare, unsigned category ) -> unsigned {
+	unsigned sliceId;
+	if( category == CameraUniforms ) {
+		// TODO: Atomic get and increment
+		sliceId = m_totalCameraUniformRequests % kMaxCameraSlices;
+		m_totalCameraUniformRequests++;
+	} else {
+		sliceId = kMaxCameraSlices + m_totalAuxDrawUniformRequests % kMaxAuxDrawSlices;
+		// TODO: Atomic get and increment
+		m_totalAuxDrawUniformRequests++;
+	}
+	assert( sliceId < kMaxUniformSlices );
+
+	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
+		initialOffsetsToPrepare->values[binding] = m_uniformStreams[binding].offsetsOfSlicesInBytes[sliceId];
+	}
+
+	return sliceId;
 }
 
-void UploadManager::endUniformUploads( unsigned binding, unsigned sizeInBytes ) {
-	assert( binding < std::size( m_uniformStreams ) );
-
-	if( sizeInBytes > 0 ) {
-		UniformStream &streamState = m_uniformStreams[binding];
-		assert( sizeInBytes <= streamState.data.capacity() );
-		assert( ( sizeInBytes % streamState.blockSize ) == 0 );
-
-		m_bufferFactory->uploadUniformData( &streamState.buffer, streamState.data.get(), sizeInBytes );
+void UploadManager::endUniformUploads( unsigned uniformSliceId, const UniformBlockOffsets &currentOffsets ) {
+	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
+		UniformStream &streamState   = m_uniformStreams[binding];
+		const unsigned currentOffset = currentOffsets.values[binding];
+		const unsigned initialOffset = streamState.offsetsOfSlicesInBytes[uniformSliceId];
+		if( currentOffset != initialOffset ) {
+			assert( currentOffset > initialOffset );
+			const unsigned sizeInBytes = currentOffset - initialOffset;
+			assert( ( sizeInBytes % streamState.blockSize ) == 0 );
+			assert( sizeInBytes <= streamState.capacityOfSlicesInBytes[uniformSliceId] );
+			m_bufferFactory->uploadUniformData( &streamState.buffer, streamState.data.get() + initialOffset,
+												initialOffset, sizeInBytes );
+		}
 	}
 }
 
@@ -194,16 +223,19 @@ auto UploadManager::allocUniformBlock( SimulatedBackendState *backendState, unsi
 	UniformStream *const streamState = &m_uniformStreams[binding];
 	assert( std::abs( (int)requestedBlockSize - (int)streamState->blockSize ) < 16 );
 
-	const unsigned sizeSoFar = backendState->getCurrUniformDataSize( binding );
+	const unsigned sliceId = backendState->getUniformSliceId();
+	assert( sliceId < kMaxUniformSlices );
+
+	const unsigned initialOffset = m_uniformStreams[binding].offsetsOfSlicesInBytes[sliceId];
+	const unsigned currentOffset = backendState->getCurrentUniformOffsets().values[binding];
+	const unsigned sizeSoFar     = currentOffset - initialOffset;
 	assert( ( sizeSoFar % streamState->blockSize ) == 0 );
+	assert( ( sizeSoFar <= m_uniformStreams[binding].capacityOfSlicesInBytes[sliceId] ) );
+	(void)sizeSoFar;
 
-	void *result;
-	if( sizeSoFar + streamState->blockSize <= streamState->data.capacity() ) [[likely]] {
-		result = streamState->data.get() + sizeSoFar;
-	} else {
-		result = streamState->lastResortScratchpad.reserveAndGet( streamState->blockSize );
-	}
-
+	// Assume that the last resort scratchpad is located after just after the maximal valid block.
+	// Note: It is not very good if we consider (persistent) data mapping, not copying
+	void *result = streamState->data.get() + currentOffset;
 	std::memset( result, 0, requestedBlockSize );
 	return result;
 }
@@ -214,19 +246,28 @@ void UploadManager::commitUniformBlock( SimulatedBackendState *backendState, uns
 	const UniformStream *const streamState = &m_uniformStreams[binding];
 	assert( std::abs( (int)submittedBlockSize - (int)streamState->blockSize ) < 16 );
 
-	const unsigned sizeSoFar = backendState->getCurrUniformDataSize( binding );
-	assert( ( sizeSoFar % streamState->blockSize ) == 0 );
+	const unsigned sliceId = backendState->getUniformSliceId();
+	assert( sliceId < kMaxUniformSlices );
 
-	// TODO: The initial offset is going to be > 0 if mulitple uploads are performed in parallel (and we use slices)
+	const unsigned initialOffset = m_uniformStreams[binding].offsetsOfSlicesInBytes[sliceId];
+	const unsigned sliceCapacity = m_uniformStreams[binding].capacityOfSlicesInBytes[sliceId];
+	const unsigned currentOffset = backendState->getCurrentUniformOffsets().values[binding];
+	const unsigned sizeSoFar     = currentOffset - initialOffset;
+	assert( ( initialOffset % streamState->blockSize ) == 0 );
+	assert( ( sizeSoFar % streamState->blockSize ) == 0 );
+	assert( ( sizeSoFar <= sliceCapacity ) );
+
+	assert( blockData == streamState->data.get() + currentOffset );
 	if( sizeSoFar > 0 ) [[likely]] {
-		assert( sizeSoFar >= streamState->blockSize );
-		const uint8_t *prevData = streamState->data.get() + ( sizeSoFar - streamState->blockSize );
+		const uint8_t *prevData = streamState->data.get() + currentOffset - streamState->blockSize;
 		if( std::memcmp( prevData, blockData, submittedBlockSize ) != 0 ) {
-			if( sizeSoFar + streamState->blockSize <= streamState->data.capacity() ) {
+			if( sizeSoFar + streamState->blockSize <= sliceCapacity ) {
 				backendState->registerUniformBlockUpdate( binding, streamState->buffer.id, streamState->blockSize );
+				assert( backendState->getCurrentUniformOffsets().values[binding] == currentOffset + streamState->blockSize );
 			}
 		}
 	} else {
 		backendState->registerUniformBlockUpdate( binding, streamState->buffer.id, streamState->blockSize );
+		assert( backendState->getCurrentUniformOffsets().values[binding] == currentOffset + streamState->blockSize );
 	}
 }

@@ -81,19 +81,19 @@ auto RendererFrontend::getFogForSphere( const StateForCamera *stateForCamera, co
 }
 
 void RendererFrontend::beginUsingBackendState( SimulatedBackendState *backendState ) {
-	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
-		m_uploadManager.beginUniformUploads( binding );
-	}
-
 	// start fresh each frame
 	backendState->setShaderStateMask( ~0, 0 );
 	backendState->bindMeshBuffer( nullptr );
+
+	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
+		const GLuint bufferId    = m_uploadManager.getBufferIdForBinding( binding );
+		const unsigned blockSize = m_uploadManager.getBlockSizeForBinding( binding );
+		backendState->setUniformBlockBaseline( binding, bufferId, blockSize );
+	}
 }
 
 void RendererFrontend::endUsingBackendState( SimulatedBackendState *backendState ) {
-	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
-		m_uploadManager.endUniformUploads( binding, backendState->getCurrUniformDataSize( binding ) );
-	}
+	m_uploadManager.endUniformUploads( backendState->getUniformSliceId(), backendState->getCurrentUniformOffsets() );
 }
 
 void RendererFrontend::enter2DMode( SimulatedBackendState *backendState, int width, int height ) {
@@ -259,7 +259,7 @@ void RendererFrontend::commitDraw2DRequest( Draw2DRequest *request ) {
 
 	BackendActionTape actionTape;
 
-	SimulatedBackendState backendState( &m_uploadManager, &actionTape, glConfig.width, glConfig.height );
+	SimulatedBackendState backendState( &m_uploadManager, UploadManager::AuxDrawUniforms, &actionTape, glConfig.width, glConfig.height );
 	beginUsingBackendState( &backendState );
 
 	enter2DMode( &backendState, glConfig.width, glConfig.height );
@@ -1040,7 +1040,7 @@ void RendererFrontend::performPreparedRenderingFromThisCamera( Scene *scene, Sta
 
 	BackendActionTape actionTape;
 
-	SimulatedBackendState backendState( &m_uploadManager, &actionTape, glConfig.width, glConfig.height );
+	SimulatedBackendState backendState( &m_uploadManager, UploadManager::CameraUniforms, &actionTape, glConfig.width, glConfig.height );
 	beginUsingBackendState( &backendState );
 
 	backendState.setTime( stateForCamera->refdef.time, rf.frameTime.time );
