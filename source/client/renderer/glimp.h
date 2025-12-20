@@ -186,7 +186,9 @@ typedef struct {
 	,maxFragmentUniformComponents
 	,maxFramebufferSamples
 	;
+
 	unsigned maxObjectLabelLen;
+	unsigned maxUniformBlockSize;
 
 	bool sSRGB;
 

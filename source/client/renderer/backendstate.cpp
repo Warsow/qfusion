@@ -480,19 +480,8 @@ void SimulatedBackendState::setupProgram( int type, uint64_t features ) {
 	}
 }
 
-void SimulatedBackendState::setUniformBlockBaseline( unsigned binding, GLuint bufferId, unsigned blockSize ) {
-	assert( memcmp( &m_uniformState.currentOffsets, &m_uniformState.initialOffsets, sizeof( UniformBlockOffsets ) ) == 0 );
-	assert( binding <= std::size( m_uniformState.currentOffsets.values ) );
-	const unsigned baselineOffset = m_uniformState.currentOffsets.values[binding];
-	assert( ( baselineOffset % blockSize ) == 0 );
-	m_actionTape->bindBufferRange( GL_UNIFORM_BUFFER, binding, bufferId, baselineOffset, blockSize );
-}
-
-void SimulatedBackendState::registerUniformBlockUpdate( unsigned binding, GLuint bufferId, unsigned blockSize ) {
-	assert( binding < std::size( m_uniformState.currentOffsets.values ) );
-	unsigned *const offset = &m_uniformState.currentOffsets.values[binding];
-	m_actionTape->bindBufferRange( GL_UNIFORM_BUFFER, binding, bufferId, *offset, blockSize );
-	*offset += blockSize;
+void SimulatedBackendState::bindUniformBufferRange( unsigned binding, GLuint bufferId, unsigned offset, unsigned size ) {
+	m_actionTape->bindBufferRange( GL_UNIFORM_BUFFER, binding, bufferId, offset, size );
 }
 
 static inline float RB_FastSin( float t ) {

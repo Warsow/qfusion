@@ -525,6 +525,8 @@ const char              *qglGetGLWExtensionsString();
 #define GL_UNIFORM_BUFFER                 0x8A11
 #define GL_INVALID_INDEX                  0xFFFFFFFFu
 
+#define GL_MAX_UNIFORM_BLOCK_SIZE         0x8A30
+
 #endif // QGL_H
 
 #ifndef APIENTRY

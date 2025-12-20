@@ -730,9 +730,11 @@ static bool R_RegisterGLExtensions( void ) {
 
 	glConfig.maxObjectLabelLen = 0;
 	if( qglObjectLabel ) {
-		static_assert( sizeof( int ) == sizeof( glConfig.maxObjectLabelLen ) );
-		qglGetIntegerv( GL_MAX_LABEL_LENGTH, (int *)&glConfig.maxObjectLabelLen );
+		static_assert( sizeof( GLint ) == sizeof( glConfig.maxObjectLabelLen ) );
+		qglGetIntegerv( GL_MAX_LABEL_LENGTH, (GLint *)&glConfig.maxObjectLabelLen );
 	}
+	static_assert( sizeof( GLint ) == sizeof( glConfig.maxUniformBlockSize ) );
+	qglGetIntegerv( GL_MAX_UNIFORM_BLOCK_SIZE, (GLint *)&glConfig.maxUniformBlockSize );
 
 	Cvar_Get( "r_anisolevel_max", "0", CVAR_READONLY );
 	Cvar_ForceSet( "r_anisolevel_max", va_r( tmp, sizeof( tmp ), "%i", glConfig.maxTextureFilterAnisotropic ) );

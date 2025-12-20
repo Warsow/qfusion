@@ -67,25 +67,44 @@ UploadManager::UploadManager( BufferFactory *bufferFactory ) : m_bufferFactory( 
 	assert( std::size( m_uniformStreams ) == MAX_UNIFORM_BINDINGS );
 	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
 		const unsigned blockDataSize   = sizeOfBlocks[binding];
-		const unsigned sliceDataSize   = blockDataSize * ( kMaxBlocksForBinding + 1 );
-		const unsigned uniformDataSize = sliceDataSize * kMaxUniformSlices;
-		assert( uniformDataSize > 0 );
+		const unsigned cpuSideDataSize = blockDataSize * ( kMaxBlocksForBinding + 1 ) * kMaxUniformSlices;
 
 		UniformStream &stream = m_uniformStreams[binding];
-		stream.data.reserve( uniformDataSize );
+		stream.cpuSideBuffer.reserve( cpuSideDataSize );
 		stream.blockSize = sizeOfBlocks[binding];
 
-		for( unsigned sliceId = 0; sliceId < kMaxUniformSlices; ++sliceId ) {
-			stream.offsetsOfSlicesInBytes[sliceId]  = sliceId * sliceDataSize;
-			// We exclude the last resort scratchpad from capacity
-			// Note: The capacity could vary if we decide to reduce it for aux draws
-			stream.capacityOfSlicesInBytes[sliceId] = sliceDataSize - blockDataSize;
-		}
+		unsigned cpuOffset   = 0;
+		unsigned gpuOffset   = glConfig.maxUniformBlockSize + 1;
+		unsigned gpuCapacity = 0;
+		for( unsigned sliceNum = 0; sliceNum < kMaxUniformSlices; ++sliceNum ) {
+			unsigned sliceGpuSizeToFullfill = blockDataSize * kMaxBlocksForBinding;
+			do {
+				// Allocate a new gpu buffer
+				if( gpuOffset + sliceGpuSizeToFullfill > gpuCapacity ) {
+					// TODO: Ensure that the maxUniformBlockSize is rounded to blockSize
+					const unsigned gpuSizeToAllocate = wsw::min( glConfig.maxUniformBlockSize, sliceGpuSizeToFullfill );
+					std::optional<UniformBuffer> newBuffer = m_bufferFactory->createUniformBuffer( gpuSizeToAllocate );
+					if( !newBuffer ) {
+						wsw::failWithRuntimeError( "Failed to allocate a uniform buffer" );
+					}
+					gpuOffset   = 0;
+					gpuCapacity = gpuSizeToAllocate;
+					static_assert( std::is_trivially_move_constructible_v<UniformBuffer> );
+					static_assert( std::is_trivially_move_assignable_v<UniformBuffer> );
+					stream.allGpuBuffers.append( UniformStream::GpuBufferEntry {
+						.gpuBuffer       = *newBuffer,
+						.offsetInCpuData = cpuOffset,
+						.capacity        = gpuSizeToAllocate,
+					});
+					cpuOffset += gpuSizeToAllocate;
+					assert( sliceGpuSizeToFullfill >= gpuSizeToAllocate );
+					sliceGpuSizeToFullfill -= gpuSizeToAllocate;
+				}
+			} while( sliceGpuSizeToFullfill != 0 );
 
-		if( std::optional<UniformBuffer> buffer = m_bufferFactory->createUniformBuffer( uniformDataSize ) ) {
-			stream.buffer = *buffer;
-		} else {
-			wsw::failWithRuntimeError( "Failed to create a uniform buffer" );
+			// Mark the last region
+			stream.lastResportScratchpadOffsetsForSlice[sliceNum] = cpuOffset;
+			cpuOffset += blockDataSize;
 		}
 	}
 

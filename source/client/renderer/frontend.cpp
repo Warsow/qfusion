@@ -86,14 +86,17 @@ void RendererFrontend::beginUsingBackendState( SimulatedBackendState *backendSta
 	backendState->bindMeshBuffer( nullptr );
 
 	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
+		// TODO: Get by slice set handle
+		// TODO: Get by slice set handle
 		const GLuint bufferId    = m_uploadManager.getBufferIdForBinding( binding );
 		const unsigned blockSize = m_uploadManager.getBlockSizeForBinding( binding );
 		backendState->setUniformBlockBaseline( binding, bufferId, blockSize );
+		backendState->bindUniformBufferRange( binding, bufferId, offset, blockSize );
 	}
 }
 
 void RendererFrontend::endUsingBackendState( SimulatedBackendState *backendState ) {
-	m_uploadManager.endUniformUploads( backendState->getUniformSliceId(), backendState->getCurrentUniformOffsets() );
+	m_uploadManager.commitUniformSliceSet( backendState->getUniformSliceSetHandle() );
 }
 
 void RendererFrontend::enter2DMode( SimulatedBackendState *backendState, int width, int height ) {

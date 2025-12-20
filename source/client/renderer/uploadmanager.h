@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "local.h"
 
 struct SimulatedBackendState;
-struct UniformBlockOffsets;
+struct UniformSliceSetHandle;
 struct mesh_s;
 
 class UploadManager {
@@ -73,19 +73,15 @@ public:
 	};
 
 	[[nodiscard]]
-	auto beginUniformUploads( UniformBlockOffsets *initialOffsetsToPrepare, unsigned category ) -> unsigned;
-	void endUniformUploads( unsigned uniformSliceId, const UniformBlockOffsets &currentOffsets );
+	auto acquireUniformSliceSet( unsigned category ) -> UniformSliceSetHandle *;
+	void commitUniformSliceSet( UniformSliceSetHandle * );
 
 	[[nodiscard]]
-	auto getBufferIdForBinding( unsigned binding ) const -> GLuint {
-		assert( binding < MAX_UNIFORM_BINDINGS );
-		return m_uniformStreams[binding].buffer.id;
-	}
+	auto getBufferIdForBinding( UniformSliceSetHandle *, unsigned binding ) const -> GLuint;
 	[[nodiscard]]
-	auto getBlockSizeForBinding( unsigned binding ) const -> unsigned {
-		assert( binding < MAX_UNIFORM_BINDINGS );
-		return m_uniformStreams[binding].blockSize;
-	}
+	auto getBufferOffsetForBinding( UniformSliceSetHandle *, unsigned binding ) const -> unsigned;
+	[[nodiscard]]
+	auto getBlockSizeForBinding( UniformSliceSetHandle *, unsigned binding ) const -> unsigned;
 
 private:
 	void destroy();
@@ -107,11 +103,15 @@ private:
 	static constexpr unsigned kMaxUniformSlices = kMaxCameraSlices + kMaxAuxDrawSlices;
 
 	struct UniformStream {
-		UniformBuffer buffer;
-		PodBuffer<uint8_t> data;
-		unsigned offsetsOfSlicesInBytes[kMaxUniformSlices] {};
-		unsigned capacityOfSlicesInBytes[kMaxUniformSlices] {};
+		struct GpuBufferEntry {
+			UniformBuffer gpuBuffer;
+			unsigned offsetInCpuData;
+			unsigned capacity;
+		};
+		wsw::PodVector<GpuBufferEntry> allGpuBuffers;
+		PodBuffer<uint8_t> cpuSideBuffer;
 		unsigned blockSize { 0 };
+		unsigned lastResportScratchpadOffsetsForSlice[kMaxUniformSlices];
 	};
 
 	unsigned m_totalCameraUniformRequests { 0 };
