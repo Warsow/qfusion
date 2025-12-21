@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include <common/helpers/scopeexitaction.h>
+#include <atomic>
 #include <utility>
 
 #include "uploadmanager.h"
@@ -71,19 +72,20 @@ UploadManager::UploadManager( BufferFactory *bufferFactory ) : m_bufferFactory( 
 		const unsigned uniformDataSize = sliceDataSize * kMaxUniformSlices;
 		assert( uniformDataSize > 0 );
 
-		UniformStream &stream = m_uniformStreams[binding];
-		stream.data.reserve( uniformDataSize );
-		stream.blockSize = sizeOfBlocks[binding];
+		UniformStream *stream = &m_uniformStreams[binding];
+		stream->data.reserve( uniformDataSize );
+		stream->blockSize = sizeOfBlocks[binding];
 
 		for( unsigned sliceId = 0; sliceId < kMaxUniformSlices; ++sliceId ) {
-			stream.offsetsOfSlicesInBytes[sliceId]  = sliceId * sliceDataSize;
+			stream->sliceLayoutsAndStates[sliceId].initialOffset = sliceId * sliceDataSize;
+			stream->sliceLayoutsAndStates[sliceId].currentOffset = sliceId * sliceDataSize;
 			// We exclude the last resort scratchpad from capacity
 			// Note: The capacity could vary if we decide to reduce it for aux draws
-			stream.capacityOfSlicesInBytes[sliceId] = sliceDataSize - blockDataSize;
+			stream->sliceLayoutsAndStates[sliceId].capacity = sliceDataSize - blockDataSize;
 		}
 
 		if( std::optional<UniformBuffer> buffer = m_bufferFactory->createUniformBuffer( uniformDataSize ) ) {
-			stream.buffer = *buffer;
+			stream->buffer = *buffer;
 		} else {
 			wsw::failWithRuntimeError( "Failed to create a uniform buffer" );
 		}
@@ -181,40 +183,54 @@ void UploadManager::endVertexUploads( UploadGroup group, unsigned vertexDataSize
 	}
 }
 
-auto UploadManager::beginUniformUploads( UniformBlockOffsets *initialOffsetsToPrepare, unsigned category ) -> unsigned {
+auto UploadManager::acquireUniformSlice( unsigned category ) -> unsigned {
+	// There should not be noticeable contention/effects of false sharing of the two counters
+	const auto getAndIncrement = []( unsigned *const value ) -> unsigned {
+		assert( ( (uintptr_t)value % alignof( std::atomic<unsigned> ) ) == 0 );
+		return ( ( std::atomic<unsigned> *)value )->fetch_add( 1 );
+	};
+
 	unsigned sliceId;
 	if( category == CameraUniforms ) {
-		// TODO: Atomic get and increment
-		sliceId = m_totalCameraUniformRequests % kMaxCameraSlices;
-		m_totalCameraUniformRequests++;
+		sliceId = getAndIncrement( &m_totalCameraUniformRequests ) % kMaxCameraSlices;
 	} else {
-		sliceId = kMaxCameraSlices + m_totalAuxDrawUniformRequests % kMaxAuxDrawSlices;
-		// TODO: Atomic get and increment
-		m_totalAuxDrawUniformRequests++;
+		sliceId = kMaxCameraSlices + getAndIncrement( &m_totalAuxDrawUniformRequests ) % kMaxAuxDrawSlices;
 	}
 	assert( sliceId < kMaxUniformSlices );
 
-	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
-		initialOffsetsToPrepare->values[binding] = m_uniformStreams[binding].offsetsOfSlicesInBytes[sliceId];
+	// TODO: Some streams are really unused for aux draws
+	for( UniformStream &stream: m_uniformStreams ) {
+		UniformStream::SliceLayoutAndState *layoutAndState = &stream.sliceLayoutsAndStates[sliceId];
+		layoutAndState->currentOffset = layoutAndState->initialOffset;
 	}
 
 	return sliceId;
 }
 
-void UploadManager::endUniformUploads( unsigned uniformSliceId, const UniformBlockOffsets &currentOffsets ) {
-	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
-		UniformStream &streamState   = m_uniformStreams[binding];
-		const unsigned currentOffset = currentOffsets.values[binding];
-		const unsigned initialOffset = streamState.offsetsOfSlicesInBytes[uniformSliceId];
-		if( currentOffset != initialOffset ) {
-			assert( currentOffset > initialOffset );
-			const unsigned sizeInBytes = currentOffset - initialOffset;
-			assert( ( sizeInBytes % streamState.blockSize ) == 0 );
-			assert( sizeInBytes <= streamState.capacityOfSlicesInBytes[uniformSliceId] );
-			m_bufferFactory->uploadUniformData( &streamState.buffer, streamState.data.get() + initialOffset,
-												initialOffset, sizeInBytes );
+void UploadManager::commitUniformSlice( unsigned sliceId ) {
+	assert( sliceId < kMaxUniformSlices );
+	for( UniformStream &stream: m_uniformStreams ) {
+		const UniformStream::SliceLayoutAndState &layoutAndState = stream.sliceLayoutsAndStates[sliceId];
+		if( layoutAndState.currentOffset != layoutAndState.initialOffset ) {
+			assert( layoutAndState.currentOffset > layoutAndState.initialOffset );
+			const unsigned sizeInBytes = layoutAndState.currentOffset - layoutAndState.initialOffset;
+			assert( ( sizeInBytes % stream.blockSize ) == 0 );
+			assert( sizeInBytes <= layoutAndState.capacity );
+			m_bufferFactory->uploadUniformData( &stream.buffer, stream.data.get() + layoutAndState.initialOffset,
+												layoutAndState.initialOffset, sizeInBytes );
 		}
 	}
+}
+
+void UploadManager::getBufferAndRangeForBindingAndSlice( unsigned binding, unsigned sliceId, GLuint *bufferId,
+														 unsigned *offset, unsigned *size ) const {
+	assert( binding < MAX_UNIFORM_BINDINGS );
+	assert( sliceId < kMaxUniformSlices );
+	const UniformStream &stream = m_uniformStreams[binding];
+
+	*bufferId = stream.buffer.id;
+	*offset   = stream.sliceLayoutsAndStates[sliceId].initialOffset;
+	*size     = stream.blockSize;
 }
 
 auto UploadManager::allocUniformBlock( SimulatedBackendState *backendState, unsigned binding, size_t requestedBlockSize ) -> void * {
@@ -226,11 +242,13 @@ auto UploadManager::allocUniformBlock( SimulatedBackendState *backendState, unsi
 	const unsigned sliceId = backendState->getUniformSliceId();
 	assert( sliceId < kMaxUniformSlices );
 
-	const unsigned initialOffset = m_uniformStreams[binding].offsetsOfSlicesInBytes[sliceId];
-	const unsigned currentOffset = backendState->getCurrentUniformOffsets().values[binding];
+	const UniformStream::SliceLayoutAndState &sliceLayoutAndState = m_uniformStreams[binding].sliceLayoutsAndStates[sliceId];
+
+	const unsigned initialOffset = sliceLayoutAndState.initialOffset;
+	const unsigned currentOffset = sliceLayoutAndState.currentOffset;
 	const unsigned sizeSoFar     = currentOffset - initialOffset;
 	assert( ( sizeSoFar % streamState->blockSize ) == 0 );
-	assert( ( sizeSoFar <= m_uniformStreams[binding].capacityOfSlicesInBytes[sliceId] ) );
+	assert( ( sizeSoFar <= sliceLayoutAndState.capacity ) );
 	(void)sizeSoFar;
 
 	// Assume that the last resort scratchpad is located after just after the maximal valid block.
@@ -249,25 +267,27 @@ void UploadManager::commitUniformBlock( SimulatedBackendState *backendState, uns
 	const unsigned sliceId = backendState->getUniformSliceId();
 	assert( sliceId < kMaxUniformSlices );
 
-	const unsigned initialOffset = m_uniformStreams[binding].offsetsOfSlicesInBytes[sliceId];
-	const unsigned sliceCapacity = m_uniformStreams[binding].capacityOfSlicesInBytes[sliceId];
-	const unsigned currentOffset = backendState->getCurrentUniformOffsets().values[binding];
-	const unsigned sizeSoFar     = currentOffset - initialOffset;
+	UniformStream::SliceLayoutAndState *sliceLayoutAndState = &m_uniformStreams[binding].sliceLayoutsAndStates[sliceId];
+
+	const unsigned initialOffset  = sliceLayoutAndState->initialOffset;
+	const unsigned sliceCapacity  = sliceLayoutAndState->capacity;
+	unsigned *const currentOffset = &sliceLayoutAndState->currentOffset;
+	const unsigned sizeSoFar      = *currentOffset - initialOffset;
 	assert( ( initialOffset % streamState->blockSize ) == 0 );
 	assert( ( sizeSoFar % streamState->blockSize ) == 0 );
 	assert( ( sizeSoFar <= sliceCapacity ) );
 
-	assert( blockData == streamState->data.get() + currentOffset );
+	assert( blockData == streamState->data.get() + *currentOffset );
 	if( sizeSoFar > 0 ) [[likely]] {
-		const uint8_t *prevData = streamState->data.get() + currentOffset - streamState->blockSize;
+		const uint8_t *prevData = streamState->data.get() + *currentOffset - streamState->blockSize;
 		if( std::memcmp( prevData, blockData, submittedBlockSize ) != 0 ) {
 			if( sizeSoFar + streamState->blockSize <= sliceCapacity ) {
-				backendState->registerUniformBlockUpdate( binding, streamState->buffer.id, streamState->blockSize );
-				assert( backendState->getCurrentUniformOffsets().values[binding] == currentOffset + streamState->blockSize );
+				backendState->bindUniformBlock( binding, streamState->buffer.id, *currentOffset, streamState->blockSize );
+				*currentOffset += streamState->blockSize;
 			}
 		}
 	} else {
-		backendState->registerUniformBlockUpdate( binding, streamState->buffer.id, streamState->blockSize );
-		assert( backendState->getCurrentUniformOffsets().values[binding] == currentOffset + streamState->blockSize );
+		backendState->bindUniformBlock( binding, streamState->buffer.id, *currentOffset, streamState->blockSize );
+		*currentOffset += streamState->blockSize;
 	}
 }

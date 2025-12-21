@@ -73,19 +73,13 @@ public:
 	};
 
 	[[nodiscard]]
-	auto beginUniformUploads( UniformBlockOffsets *initialOffsetsToPrepare, unsigned category ) -> unsigned;
-	void endUniformUploads( unsigned uniformSliceId, const UniformBlockOffsets &currentOffsets );
+	auto acquireUniformSlice( unsigned category ) -> unsigned;
+	// TODO: Don't commit individually but specify a span of slices in order to
+	// reduce buffer rebinding and, possibly, consolidate uploads
+	void commitUniformSlice( unsigned sliceId );
 
-	[[nodiscard]]
-	auto getBufferIdForBinding( unsigned binding ) const -> GLuint {
-		assert( binding < MAX_UNIFORM_BINDINGS );
-		return m_uniformStreams[binding].buffer.id;
-	}
-	[[nodiscard]]
-	auto getBlockSizeForBinding( unsigned binding ) const -> unsigned {
-		assert( binding < MAX_UNIFORM_BINDINGS );
-		return m_uniformStreams[binding].blockSize;
-	}
+	void getBufferAndRangeForBindingAndSlice( unsigned binding, unsigned sliceId, GLuint *bufferId,
+											  unsigned *offset, unsigned *size ) const;
 
 private:
 	void destroy();
@@ -109,8 +103,12 @@ private:
 	struct UniformStream {
 		UniformBuffer buffer;
 		PodBuffer<uint8_t> data;
-		unsigned offsetsOfSlicesInBytes[kMaxUniformSlices] {};
-		unsigned capacityOfSlicesInBytes[kMaxUniformSlices] {};
+		struct SliceLayoutAndState {
+			unsigned initialOffset { 0 };
+			unsigned currentOffset { 0 };
+			unsigned capacity { 0 };
+		};
+		SliceLayoutAndState sliceLayoutsAndStates[kMaxUniformSlices];
 		unsigned blockSize { 0 };
 	};
 
