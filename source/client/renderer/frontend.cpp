@@ -85,15 +85,16 @@ void RendererFrontend::beginUsingBackendState( SimulatedBackendState *backendSta
 	backendState->setShaderStateMask( ~0, 0 );
 	backendState->bindMeshBuffer( nullptr );
 
+	const unsigned sliceId = backendState->getUniformSliceId();
 	for( unsigned binding = 0; binding < MAX_UNIFORM_BINDINGS; ++binding ) {
-		const GLuint bufferId    = m_uploadManager.getBufferIdForBinding( binding );
-		const unsigned blockSize = m_uploadManager.getBlockSizeForBinding( binding );
-		backendState->setUniformBlockBaseline( binding, bufferId, blockSize );
+		GLuint bufferId = 0;
+		unsigned blockOffset = 0, blockSize = 0;
+		m_uploadManager.getBufferAndRangeForBindingAndSlice( binding, sliceId, &bufferId, &blockOffset, &blockSize );
+		backendState->bindUniformBlock( binding, bufferId, blockOffset, blockSize );
 	}
 }
 
-void RendererFrontend::endUsingBackendState( SimulatedBackendState *backendState ) {
-	m_uploadManager.endUniformUploads( backendState->getUniformSliceId(), backendState->getCurrentUniformOffsets() );
+void RendererFrontend::endUsingBackendState( SimulatedBackendState * ) {
 }
 
 void RendererFrontend::enter2DMode( SimulatedBackendState *backendState, int width, int height ) {
@@ -213,9 +214,9 @@ auto RendererFrontend::coEndProcessingDrawSceneRequests( CoroTask::StartInfo si,
 		}
 	}
 
+	const std::span<std::pair<Scene *, StateForCamera *>> spanOfScenesAndCameras { scenesAndCameras, numScenesAndCameras };
 	// Note: Supplied dependencies are empty as they are taken in account during spawning of the coro instead
-	co_await si.taskSystem->awaiterOf( self->endPreparingRenderingFromTheseCameras(
-		{ scenesAndCameras, scenesAndCameras + numScenesAndCameras }, {}, false ) );
+	co_await si.taskSystem->awaiterOf( self->endPreparingRenderingFromTheseCameras( spanOfScenesAndCameras, {}, false ) );
 }
 
 auto RendererFrontend::beginProcessingDrawSceneRequests( std::span<DrawSceneRequest *> requests ) -> TaskHandle {
@@ -278,6 +279,8 @@ void RendererFrontend::commitDraw2DRequest( Draw2DRequest *request ) {
 	// TODO .... Flush dynamic meshes explicitly
 	leave2DMode( &backendState );
 	endUsingBackendState( &backendState );
+
+	m_uploadManager.commitUniformSlice( backendState.getUniformSliceId() );
 
 	RuntimeBackendState rbs {};
 	actionTape.exec( &rbs );
@@ -383,8 +386,9 @@ auto RendererFrontend::allocStateForCamera() -> StateForCamera * {
 	stateForCamera->shaderParamsStorage->clear();
 	stateForCamera->materialParamsStorage->clear();
 
-	stateForCamera->sortList       = &resultStorage->meshSortList;
-	stateForCamera->drawActionTape = &resultStorage->drawActionTape;
+	stateForCamera->sortList          = &resultStorage->meshSortList;
+	stateForCamera->drawActionTape    = &resultStorage->drawActionTape;
+	stateForCamera->backendActionTape = &resultStorage->backendActionTape;
 
 	stateForCamera->preparePolysWorkload     = &resultStorage->preparePolysWorkloadBuffer;
 	stateForCamera->prepareCoronasWorkload   = &resultStorage->prepareCoronasWorkloadBuffer;
@@ -808,7 +812,10 @@ auto RendererFrontend::coBeginPreparingRenderingFromTheseCameras( CoroTask::Star
 		});
 	}
 
-	co_await si.taskSystem->awaiterOf( { processWorldPortalSurfacesTasks, statesForValidCameras.size() } );
+	// A workaround for a GCC bug
+	std::span<const TaskHandle> awaitedSpanOfTasks { processWorldPortalSurfacesTasks, statesForValidCameras.size() };
+	TaskAwaiter taskAwaiter = si.taskSystem->awaiterOf( awaitedSpanOfTasks );
+	co_await taskAwaiter;
 
 	if( !areCamerasPortalCameras ) {
 		self->m_tmpPortalScenesAndStates.clear();
@@ -842,8 +849,12 @@ auto RendererFrontend::endPreparingRenderingFromTheseCameras( std::span<std::pai
 }
 
 auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartInfo si, RendererFrontend *self,
-														std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
+														std::span<std::pair<Scene *, StateForCamera *>> spanOfScenesAndCameras,
 														bool areCamerasPortalCameras ) -> CoroTask {
+	// A workaround for GCC-specific bugs
+	std::pair<Scene *, StateForCamera *> *const scenesAndCameras = spanOfScenesAndCameras.data();
+	const unsigned numScenesAndCameras                           = spanOfScenesAndCameras.size();
+
 	DynamicStuffWorkloadStorage *workloadStorage;
 	if( areCamerasPortalCameras ) [[unlikely]] {
 		workloadStorage = &self->m_dynamicStuffWorkloadStorage[1];
@@ -867,7 +878,9 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 
 	workloadStorage->dynamicMeshFillDataWorkload.clear();
 	if( v_drawEntities.get() ) {
-		for( auto [scene, stateForCamera] : scenesAndCameras ) {
+		for( unsigned cameraIndex = 0; cameraIndex < numScenesAndCameras; ++cameraIndex ) {
+			Scene *const scene                   = scenesAndCameras[cameraIndex].first;
+			StateForCamera *const stateForCamera = scenesAndCameras[cameraIndex].second;
 			const std::span<const Frustum> occluderFrusta { stateForCamera->occluderFrusta, stateForCamera->numOccluderFrusta };
 			self->collectVisibleDynamicMeshes( stateForCamera, scene, occluderFrusta, &self->m_dynamicMeshCountersOfVerticesAndIndices );
 
@@ -887,8 +900,10 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 	std::span<const uint16_t> visibleProgramLightIndices[MAX_REF_CAMERAS];
 	std::span<const uint16_t> visibleCoronaLightIndices[MAX_REF_CAMERAS];
 	if( v_dynamicLight.get() ) {
-		for( unsigned cameraIndex = 0; cameraIndex < scenesAndCameras.size(); ++cameraIndex ) {
-			auto [scene, stateForCamera] = scenesAndCameras[cameraIndex];
+		for( unsigned cameraIndex = 0; cameraIndex < numScenesAndCameras; ++cameraIndex ) {
+			// Workarounds for GCC bugs
+			Scene *const scene                   = scenesAndCameras[cameraIndex].first;
+			StateForCamera *const stateForCamera = scenesAndCameras[cameraIndex].second;
 			const std::span<const Frustum> occluderFrusta { stateForCamera->occluderFrusta, stateForCamera->numOccluderFrusta };
 			std::tie( visibleProgramLightIndices[cameraIndex], visibleCoronaLightIndices[cameraIndex] ) =
 				self->collectVisibleLights( stateForCamera, scene, occluderFrusta );
@@ -928,8 +943,9 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 		fillMeshBuffersTask = si.taskSystem->addForIndicesInRange( rangeOfIndices, std::span<const TaskHandle> {}, std::move( fn ) );
 	}
 
-	for( unsigned i = 0; i < scenesAndCameras.size(); ++i ) {
-		auto [scene, stateForCamera] = scenesAndCameras[i];
+	for( unsigned cameraIndex = 0; cameraIndex < numScenesAndCameras; ++cameraIndex ) {
+		Scene *const scene                   = scenesAndCameras[cameraIndex].first;
+		StateForCamera *const stateForCamera = scenesAndCameras[cameraIndex].second;
 
 		const std::span<const Frustum> occluderFrusta { stateForCamera->occluderFrusta, stateForCamera->numOccluderFrusta };
 
@@ -937,12 +953,13 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 
 		if( const int dynamicLightValue = v_dynamicLight.get() ) {
 			if( dynamicLightValue & 2 ) {
-				self->addCoronaLightsToSortList( stateForCamera, scene->m_polyent, scene->m_dynamicLights.data(), visibleCoronaLightIndices[i] );
+				self->addCoronaLightsToSortList( stateForCamera, scene->m_polyent, scene->m_dynamicLights.data(),
+												 visibleCoronaLightIndices[cameraIndex] );
 			}
 			if( dynamicLightValue & 1 ) {
 				std::span<const unsigned> spansStorage[1] { stateForCamera->leavesInFrustumAndPvs };
 				std::span<std::span<const unsigned>> spansOfLeaves = { spansStorage, 1 };
-				self->markLightsOfSurfaces( stateForCamera, scene, spansOfLeaves, visibleProgramLightIndices[i] );
+				self->markLightsOfSurfaces( stateForCamera, scene, spansOfLeaves, visibleProgramLightIndices[cameraIndex] );
 			}
 		}
 
@@ -966,11 +983,11 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 	}
 
 	// TODO: Can be run earlier in parallel with portal surface processing
-	for( auto [scene, stateForCamera] : scenesAndCameras ) {
-		self->processSortList( stateForCamera, scene );
+	for( unsigned cameraIndex = 0; cameraIndex < numScenesAndCameras; ++cameraIndex ) {
+		self->processSortList( scenesAndCameras[cameraIndex].second, scenesAndCameras[cameraIndex].first );
 	}
 
-	self->markBuffersOfVariousDynamicsForUpload( scenesAndCameras, workloadStorage );
+	self->markBuffersOfVariousDynamicsForUpload( spanOfScenesAndCameras, workloadStorage );
 
 	for( PrepareBatchedSurfWorkload *workload: workloadStorage->selectedPolysWorkload ) {
 		self->prepareBatchedQuadPolys( workload );
@@ -1010,37 +1027,83 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 		const unsigned spriteIndexDataSize  = sizeof( elem_t ) * self->m_spriteSurfCounterOfIndices;
 		self->m_uploadManager.endVertexUploads( UploadManager::BatchedMeshExt, spriteVertexDataSize, spriteIndexDataSize );
 	}
-}
 
-void RendererFrontend::performPreparedRenderingFromThisCamera( Scene *scene, StateForCamera *stateForCamera ) {
+	wsw::StaticVector<TaskHandle, MAX_REF_CAMERAS> prepareActionTapeTasks;
 
-	if( stateForCamera->stateForSkyPortalCamera ) {
-		performPreparedRenderingFromThisCamera( scene, stateForCamera->stateForSkyPortalCamera );
+	const auto mkBuildActionTapeTask = [&]( Scene *scene, StateForCamera *stateForCamera ) -> TaskHandle {
+		const std::span<const TaskHandle> noDeps {};
+		auto buildTapeFn = [=]( [[maybe_unused]] unsigned workerIndex ) {
+			self->buildBackendActionTape( scene, stateForCamera );
+		};
+		return si.taskSystem->add( noDeps, std::move( buildTapeFn ), TaskSystem::AnyThread );
+	};
+
+	for( unsigned cameraIndex = 0; cameraIndex < numScenesAndCameras; ++cameraIndex ) {
+		Scene *const scene                   = scenesAndCameras[cameraIndex].first;
+		StateForCamera *const stateForCamera = scenesAndCameras[cameraIndex].second;
+		if( stateForCamera->stateForSkyPortalCamera ) {
+			prepareActionTapeTasks.push_back( mkBuildActionTapeTask( scene, stateForCamera->stateForSkyPortalCamera ) );
+		}
+
+		for( unsigned i = 0; i < stateForCamera->numPortalSurfaces; ++i ) {
+			for( void *stateForPortalCamera : stateForCamera->portalSurfaces[i].statesForCamera ) {
+				if( stateForPortalCamera ) {
+					prepareActionTapeTasks.push_back( mkBuildActionTapeTask( scene, (StateForCamera *)stateForPortalCamera ) );
+				}
+			}
+		}
+		if( !v_portalOnly.get() ) {
+			prepareActionTapeTasks.push_back( mkBuildActionTapeTask( scene, stateForCamera ) );
+		}
 	}
 
-	const unsigned renderFlags = stateForCamera->renderFlags;
-	for( unsigned i = 0; i < stateForCamera->numPortalSurfaces; ++i ) {
-		for( void *stateForPortalCamera : stateForCamera->portalSurfaces[i].statesForCamera ) {
-			if( stateForPortalCamera ) {
-				performPreparedRenderingFromThisCamera( scene, (StateForCamera *)stateForPortalCamera );
+	if( !prepareActionTapeTasks.empty() ) {
+		// A workaround for a GCC bug
+		TaskAwaiter prepareActionTapeAwaiter = si.taskSystem->awaiterOf( prepareActionTapeTasks );
+		co_await prepareActionTapeAwaiter;
+
+		if( !areCamerasPortalCameras ) {
+			wsw::StaticVector<unsigned, MAX_REF_CAMERAS> uniformSliceIds;
+			for( unsigned cameraIndex = 0; cameraIndex < numScenesAndCameras; ++cameraIndex ) {
+				StateForCamera *const stateForCamera = scenesAndCameras[cameraIndex].second;
+				if( stateForCamera->stateForSkyPortalCamera ) {
+					uniformSliceIds.push_back( stateForCamera->stateForSkyPortalCamera->uniformSliceId );
+				}
+				for( unsigned i = 0; i < stateForCamera->numPortalSurfaces; ++i ) {
+					for( void *stateForPortalCamera : stateForCamera->portalSurfaces[i].statesForCamera ) {
+						if( stateForPortalCamera ) {
+							uniformSliceIds.push_back( ( (StateForCamera *)stateForPortalCamera )->uniformSliceId );
+						}
+					}
+				}
+				if( !v_portalOnly.get() ) {
+					uniformSliceIds.push_back( stateForCamera->uniformSliceId );
+				}
+			}
+			for( const unsigned sliceId: uniformSliceIds ) {
+				self->m_uploadManager.commitUniformSlice( sliceId );
 			}
 		}
 	}
-	if( v_portalOnly.get() ) {
-		return;
-	}
+}
+
+void RendererFrontend::buildBackendActionTape( Scene *scene, StateForCamera *stateForCamera ) {
+	WSW_PROFILER_SCOPE();
+
+	// TODO ->typename ?
+	( ( BaseActionTape *)stateForCamera->backendActionTape )->clear();
+
+	const unsigned renderFlags = stateForCamera->renderFlags;
 
 	bool drawWorld = false;
-
 	if( !( stateForCamera->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 		if( v_drawWorld.get() && rsh.worldModel ) {
 			drawWorld = true;
 		}
 	}
 
-	BackendActionTape actionTape;
-
-	SimulatedBackendState backendState( &m_uploadManager, UploadManager::CameraUniforms, &actionTape, glConfig.width, glConfig.height );
+	SimulatedBackendState backendState( &m_uploadManager, UploadManager::CameraUniforms,
+										stateForCamera->backendActionTape, glConfig.width, glConfig.height );
 	beginUsingBackendState( &backendState );
 
 	backendState.setTime( stateForCamera->refdef.time, rf.frameTime.time );
@@ -1127,10 +1190,29 @@ void RendererFrontend::performPreparedRenderingFromThisCamera( Scene *scene, Sta
 
 	endUsingBackendState( &backendState );
 
-	RuntimeBackendState rbs {};
-	actionTape.exec( &rbs );
+	stateForCamera->uniformSliceId = backendState.getUniformSliceId();
 }
 
+void RendererFrontend::performPreparedRenderingFromThisCamera( Scene *scene, StateForCamera *stateForCamera ) {
+	if( stateForCamera ) {
+		if( stateForCamera->stateForSkyPortalCamera ) {
+			performPreparedRenderingFromThisCamera( scene, stateForCamera->stateForSkyPortalCamera );
+		}
+		for( StateForCamera *stateForPortalCamera: stateForCamera->portalCameraStates ) {
+			performPreparedRenderingFromThisCamera( scene, stateForPortalCamera );
+		}
+		// This call deserves to be a separate profiler scope
+		submitCameraBackendActionTape( stateForCamera );
+	}
+}
+
+void RendererFrontend::submitCameraBackendActionTape( StateForCamera *stateForCamera ) {
+	WSW_PROFILER_SCOPE();
+
+	RuntimeBackendState rbs {};
+	stateForCamera->backendActionTape->exec( &rbs );
+	( ( BaseActionTape * )stateForCamera->backendActionTape )->clear();
+}
 
 void RendererFrontend::dynLightDirForOrigin( const vec_t *origin, float radius, vec3_t dir, vec3_t diffuseLocal, vec3_t ambientLocal ) {
 }

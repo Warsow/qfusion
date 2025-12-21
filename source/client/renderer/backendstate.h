@@ -32,10 +32,6 @@ struct portalSurface_s;
 struct mfog_s;
 struct FrontendToBackendShared;
 
-struct UniformBlockOffsets {
-	unsigned values[MAX_UNIFORM_BINDINGS] {};
-};
-
 class SimulatedBackendState {
 public:
 	SimulatedBackendState( UploadManager *uploadManager, unsigned uniformUploadCategory,
@@ -78,16 +74,13 @@ public:
 	void bindMeshBuffer( const MeshBuffer *buffer );
 	void bindRenderTarget( RenderTargetComponents *components );
 
-	void setUniformBlockBaseline( unsigned binding, GLuint bufferId, unsigned baselineOffset );
-	void registerUniformBlockUpdate( unsigned binding, GLuint bufferId, unsigned blockSize );
+	void bindUniformBlock( unsigned binding, GLuint bufferId, unsigned offset, unsigned size );
 
 	[[nodiscard]]
 	auto getUploadManager() -> UploadManager * { return m_uploadManager; }
 
 	[[nodiscard]]
-	auto getUniformSliceId() const -> unsigned { return m_uniformState.sliceId; };
-	[[nodiscard]]
-	auto getCurrentUniformOffsets() const -> const UniformBlockOffsets & { return m_uniformState.currentOffsets; }
+	auto getUniformSliceId() const -> unsigned { return m_uniformSliceId; };
 
 	void drawMesh( const FrontendToBackendShared *fsh, const MeshBuffer *buffer, const VboSpanLayout *layout, const DrawMeshVertSpan *vertSpan, int primitive );
 private:
@@ -257,11 +250,7 @@ private:
 		uint64_t cachedFastLookupProgramFeatures;
 	} m_programState;
 
-	struct {
-		unsigned sliceId;
-		UniformBlockOffsets initialOffsets;
-		UniformBlockOffsets currentOffsets;
-	} m_uniformState;
+	unsigned m_uniformSliceId { ~0u };
 
 	SimulatedRhiState m_rhiState;
 	UploadManager *const m_uploadManager;

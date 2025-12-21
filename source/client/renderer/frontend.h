@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/qthreads.h>
 #include <common/facilities/tasksystem.h>
 #include "vattribs.h"
+#include "backendactiontape.h"
 #include "uploadmanager.h"
 
 struct alignas( 32 )Frustum {
@@ -216,6 +217,7 @@ private:
 		wsw::PodVector<sortedDrawSurf_t> *sortList;
 
 		wsw::ActionTape<SimulatedBackendState *, FrontendToBackendShared *> *drawActionTape;
+		BackendActionTape *backendActionTape;
 
 		wsw::PodVector<PrepareBatchedSurfWorkload> *preparePolysWorkload;
 		wsw::PodVector<PrepareBatchedSurfWorkload> *prepareCoronasWorkload;
@@ -261,6 +263,8 @@ private:
 		PodBuffer<uint16_t> *lightIndicesForParticleAggregates;
 
 		wsw::PodVector<DebugLine> *debugLines;
+
+		unsigned uniformSliceId { ~0u };
 
 		unsigned numDynamicMeshDrawSurfaces { 0 };
 
@@ -323,7 +327,10 @@ private:
 														 std::span<std::pair<Scene *, StateForCamera *>> scenesAndCameras,
 														 bool areCamerasPortalCameras ) -> CoroTask;
 
+	void buildBackendActionTape( Scene *scene, StateForCamera *stateForCamera );
+
 	void performPreparedRenderingFromThisCamera( Scene *scene, StateForCamera *stateForCamera );
+	void submitCameraBackendActionTape( StateForCamera *stateForCamera );
 
 	[[nodiscard]]
 	bool updatePortalSurfaceUsingMesh( StateForCamera *stateForCamera, portalSurface_t *portalSurface, const mesh_t *mesh,
@@ -758,6 +765,7 @@ private:
 
 		wsw::PodVector<sortedDrawSurf_t> meshSortList;
 		wsw::ActionTape<SimulatedBackendState *, FrontendToBackendShared *> drawActionTape;
+		BackendActionTape backendActionTape;
 
 		wsw::PodVector<PrepareBatchedSurfWorkload> preparePolysWorkloadBuffer;
 		wsw::PodVector<PrepareBatchedSurfWorkload> prepareCoronasWorkloadBuffer;
