@@ -56,7 +56,7 @@ protected:
 
 	void SetupCommonBunnyHopInput( PredictionContext *context );
 	// TODO: Mark as virtual in base class and mark as final here to avoid a warning about hiding parent member?
-	bool GenericCheckIsActionEnabled( PredictionContext *context, BaseAction *suggestedAction );
+	bool GenericCheckIsActionEnabled( PredictionContext *context );
 	bool CheckCommonBunnyHopPreconditions( PredictionContext *context );
 	bool SetupBunnyHopping( const Vec3 &intendedLookVec, PredictionContext *context );
 	bool CanFlyAboveGroundRelaxed( const PredictionContext *context ) const;

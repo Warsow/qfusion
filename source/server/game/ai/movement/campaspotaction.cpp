@@ -44,15 +44,13 @@ Vec3 CampASpotMovementAction::GetUpdatedPendingLookDir( PredictionContext *conte
 }
 
 void CampASpotMovementAction::PlanPredictionStep( PredictionContext *context ) {
-	auto *const defaultAction = context->SuggestDefaultAction();
-	if( !GenericCheckIsActionEnabled( context, defaultAction ) ) {
+	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
 	}
 
 	if( this->disabledForApplicationFrameIndex == context->topOfStackIndex ) {
 		context->sequenceStopReason = DISABLED;
 		context->cannotApplyAction = true;
-		context->actionSuggestedByAction = defaultAction;
 		return;
 	}
 

@@ -14,7 +14,7 @@ const float BunnyTestingMultipleTurnsAction::kAngularSpeed[kMaxAngles] = {
 void BunnyTestingMultipleTurnsAction::PlanPredictionStep( PredictionContext *context ) {
 	// This action is the first applied action as it is specialized
 	// and falls back to other bunnying actions if it cannot be applied.
-	if( !GenericCheckIsActionEnabled( context, &m_subsystem->fallbackMovementAction ) ) {
+	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
 	}
 
@@ -88,6 +88,4 @@ void BunnyTestingMultipleTurnsAction::OnApplicationSequenceStopped( PredictionCo
 
 	// Allow the action application after the context rollback to savepoint
 	disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
-	// Ensure this action will be used after rollback
-	context->SaveSuggestedActionForNextFrame( this );
 }

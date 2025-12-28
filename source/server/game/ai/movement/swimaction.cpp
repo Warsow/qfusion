@@ -3,14 +3,13 @@
 
 void SwimMovementAction::PlanPredictionStep( PredictionContext *context ) {
 	if( !GenericCheckIsActionEnabled( context ) ) {
-		context->actionSuggestedByAction = &m_subsystem->fallbackMovementAction;
+		assert( context->cannotApplyAction );
 		return;
 	}
 
 	int nextReachNum = context->NextReachNum();
 	if( !nextReachNum ) {
 		context->cannotApplyAction = true;
-		context->actionSuggestedByAction = &m_subsystem->fallbackMovementAction;
 		Debug( "Cannot apply action: next reachability is undefined in the given context state\n" );
 		return;
 	}

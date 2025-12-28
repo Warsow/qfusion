@@ -167,7 +167,7 @@ bool LandOnSavedAreasAction::TryLandingStepOnArea( int areaNum, PredictionContex
 }
 
 void LandOnSavedAreasAction::PlanPredictionStep( PredictionContext *context ) {
-	if( !GenericCheckIsActionEnabled( context, &DummyAction() ) ) {
+	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
 	}
 
@@ -176,7 +176,6 @@ void LandOnSavedAreasAction::PlanPredictionStep( PredictionContext *context ) {
 		Debug( "Cannot apply action: the saved landing areas list is empty\n" );
 		this->isDisabledForPlanning = true;
 		context->cannotApplyAction = true;
-		context->actionSuggestedByAction = &DummyAction();
 		return;
 	}
 
@@ -185,7 +184,6 @@ void LandOnSavedAreasAction::PlanPredictionStep( PredictionContext *context ) {
 		Assert( (int)savedLandingAreas.size() > currAreaIndex );
 		// Continue testing this area
 		if( TryLandingStepOnArea( savedLandingAreas[currAreaIndex], context ) ) {
-			context->SaveSuggestedActionForNextFrame( this );
 			return;
 		}
 
@@ -210,7 +208,6 @@ void LandOnSavedAreasAction::PlanPredictionStep( PredictionContext *context ) {
 			context->savepointTopOfStackIndex = context->topOfStackIndex;
 			// (the method execution will be implicitly continue on the code inside the condition above on next call)
 			Debug( "Area %d/%d has been chosen for landing tests\n", currAreaIndex, savedLandingAreas.size() );
-			context->SaveSuggestedActionForNextFrame( this );
 			return;
 		}
 	}

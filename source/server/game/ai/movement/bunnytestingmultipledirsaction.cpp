@@ -40,7 +40,6 @@ void BunnyTestingSavedLookDirsAction::OnApplicationSequenceFailed( PredictionCon
 	// Allow the action application after the context rollback to savepoint
 	disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
 	// Ensure this action will be used after rollback
-	context->SaveSuggestedActionForNextFrame( this );
 }
 
 void BunnyTestingMultipleLookDirsAction::OnApplicationSequenceStopped( PredictionContext *context,
@@ -63,7 +62,7 @@ inline float SuggestObstacleAvoidanceCorrectionFraction( const PredictionContext
 }
 
 void BunnyTestingMultipleLookDirsAction::PlanPredictionStep( PredictionContext *context ) {
-	if( !GenericCheckIsActionEnabled( context, suggestedAction ) ) {
+	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
 	}
 
