@@ -34,6 +34,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/helpers/stringsplitter.h>
 #include <common/helpers/textstreamwriterextras.h>
 
+#include <bit>
 #include <cctype>
 
 using wsw::operator""_asView;
@@ -2196,21 +2197,20 @@ void RP_UpdateDynamicLightsUniforms( SimulatedBackendState *backendState, const 
 
 		auto *const __restrict block = allocUniformBlock<UniformBlock::DynamicLight>( backendState );
 
-		vec4_t shaderColor[4];
-		memset( shaderColor, 0, sizeof( vec4_t ) * 3 );
-		Vector4Set( shaderColor[3], 1.0f, 1.0f, 1.0f, 1.0f );
-		int numAddedLights = 0;
-		unsigned offsetInFloadElems = 0;
+		vec4_t accumData[4];
+		// Zero the color part
+		memset( accumData, 0, sizeof( vec4_t ) * 3 );
+		// Set the reciprocal radius to 1
+		Vector4Set( accumData[3], 1.0f, 1.0f, 1.0f, 1.0f );
 
-		for( unsigned i = 0; i < fsh->visibleProgramLightIndices.size(); ++i ) {
-			const unsigned lightBit = 1 << i;
-			if( !( dlightbits & lightBit ) ) {
-				continue;
-			}
+		unsigned numAddedLights     = 0;
+		unsigned offsetInFloatElems = 0;
 
-			dlightbits &= ~lightBit;
+		do {
+			const int currLightIndex = std::countr_zero( dlightbits );
+			assert( (unsigned)currLightIndex < 32 );
 
-			const auto *const light = fsh->dynamicLights + fsh->visibleProgramLightIndices[i];
+			const auto *const light = fsh->dynamicLights + fsh->visibleProgramLightIndices[currLightIndex];
 			assert( light->hasProgramLight && light->programRadius >= 1.0f );
 
 			vec3_t dlorigin;
@@ -2222,49 +2222,33 @@ void RP_UpdateDynamicLightsUniforms( SimulatedBackendState *backendState, const 
 			}
 
 			// Each origin element is laid out as vec4
-			VectorCopy( dlorigin, &block->dynamicLightsPosition[4 * i] );
-			//qglUniform3fv( program->loc.DynamicLightsPosition[n], 1, dlorigin );
+			VectorCopy( dlorigin, &block->dynamicLightsPosition[4 * numAddedLights] );
 
-			const int component       = numAddedLights & 3;
-			shaderColor[0][component] = light->color[0];
-			shaderColor[1][component] = light->color[1];
-			shaderColor[2][component] = light->color[2];
-			shaderColor[3][component] = Q_Rcp( light->programRadius );
+			const unsigned component = numAddedLights % 4;
+			accumData[0][component]  = light->color[0];
+			accumData[1][component]  = light->color[1];
+			accumData[2][component]  = light->color[2];
+			accumData[3][component]  = Q_Rcp( light->programRadius );
 
 			// DynamicLightsDiffuseAndInvRadius is transposed for SIMD, but it's still 4x4
 			if( component == 3 ) {
-				memcpy( block->dynamicLightsDiffuseAndInvRadius + offsetInFloadElems, shaderColor, 4 * sizeof( vec4_t ) );
-				//qglUniform4fv( program->loc.DynamicLightsDiffuseAndInvRadius[n >> 2], 4, shaderColor[0] );
-				memset( shaderColor, 0, sizeof( vec4_t ) * 3 );
-				Vector4Set( shaderColor[3], 1.0f, 1.0f, 1.0f, 1.0f );
+				memcpy( block->dynamicLightsDiffuseAndInvRadius + offsetInFloatElems, accumData, 4 * sizeof( vec4_t ) );
+				memset( accumData, 0, sizeof( vec4_t ) * 3 );
+				Vector4Set( accumData[3], 1.0f, 1.0f, 1.0f, 1.0f );
 				// We've copied 16 float values
-				offsetInFloadElems += 16;
+				offsetInFloatElems += 16;
 			}
 
 			numAddedLights++;
 
-			dlightbits &= ~lightBit;
-			if( !dlightbits ) {
-				break;
-			}
+			dlightbits &= ~( 1u << (unsigned)currLightIndex );
+		} while( dlightbits );
+
+		if( numAddedLights % 4 ) {
+			memcpy( block->dynamicLightsDiffuseAndInvRadius + offsetInFloatElems, accumData, 4 * sizeof( vec4_t ) );
 		}
 
-		if( numAddedLights & 3 ) {
-			memcpy( block->dynamicLightsDiffuseAndInvRadius + offsetInFloadElems, shaderColor, 4 * sizeof( vec4_t ) );
-			//qglUniform4fv( program->loc.DynamicLightsDiffuseAndInvRadius[n >> 2], 4, shaderColor[0] );
-			memset( shaderColor, 0, sizeof( vec4_t ) * 3 ); // to set to zero for the remaining lights
-			Vector4Set( shaderColor[3], 1.0f, 1.0f, 1.0f, 1.0f );
-			numAddedLights = ALIGN( numAddedLights, 4 );
-			// We've copied 16 float values
-			offsetInFloadElems += 16;
-		}
-
-		for( ; numAddedLights < MAX_DLIGHTS; numAddedLights += 4 ) {
-			memcpy( block->dynamicLightsDiffuseAndInvRadius + offsetInFloadElems, shaderColor, 4 * sizeof( vec4_t ) );
-			offsetInFloadElems += 16;
-		}
-
-		block->numDynamicLights = numAddedLights;
+		block->numDynamicLights = (int)numAddedLights;
 
 		commitUniformBlock( backendState, block );
 	}
