@@ -2432,11 +2432,12 @@ void RP_GetSizeOfUniformBlocks( unsigned *sizeOfBlocks ) {
 	sizeOfBlocks[UniformBlock::Distortion::kBinding]      = sizeof( UniformBlock::Distortion );
 	sizeOfBlocks[UniformBlock::Bones::kBinding]           = sizeof( UniformBlock::Bones );
 
+	assert( glConfig.uboOffsetAlignment > 0 );
 	for( unsigned i = 0; i < MAX_UNIFORM_BINDINGS; ++i ) {
 		assert( sizeOfBlocks[i] );
 		// TODO: Use generic alignment facilities
-		if( const auto rem = sizeOfBlocks[i] % 16 ) {
-			sizeOfBlocks[i] += 16 - rem;
+		if( const auto rem = sizeOfBlocks[i] % glConfig.uboOffsetAlignment ) {
+			sizeOfBlocks[i] += glConfig.uboOffsetAlignment - rem;
 		}
 	}
 }

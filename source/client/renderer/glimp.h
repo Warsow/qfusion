@@ -187,6 +187,7 @@ typedef struct {
 	,maxFramebufferSamples
 	;
 	unsigned maxObjectLabelLen;
+	unsigned uboOffsetAlignment;
 
 	bool sSRGB;
 

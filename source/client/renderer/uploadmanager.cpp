@@ -237,7 +237,7 @@ auto UploadManager::allocUniformBlock( SimulatedBackendState *backendState, unsi
 	assert( binding < std::size( m_uniformStreams ) );
 
 	UniformStream *const streamState = &m_uniformStreams[binding];
-	assert( std::abs( (int)requestedBlockSize - (int)streamState->blockSize ) < 16 );
+	assert( std::abs( (int)requestedBlockSize - (int)streamState->blockSize ) < (int)glConfig.uboOffsetAlignment );
 
 	const unsigned sliceId = backendState->getUniformSliceId();
 	assert( sliceId < kMaxUniformSlices );
@@ -262,7 +262,7 @@ void UploadManager::commitUniformBlock( SimulatedBackendState *backendState, uns
 	assert( binding < std::size( m_uniformStreams ) );
 
 	const UniformStream *const streamState = &m_uniformStreams[binding];
-	assert( std::abs( (int)submittedBlockSize - (int)streamState->blockSize ) < 16 );
+	assert( std::abs( (int)submittedBlockSize - (int)streamState->blockSize ) < (int)glConfig.uboOffsetAlignment );
 
 	const unsigned sliceId = backendState->getUniformSliceId();
 	assert( sliceId < kMaxUniformSlices );

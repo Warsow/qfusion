@@ -728,10 +728,18 @@ static bool R_RegisterGLExtensions( void ) {
 
 	qglGetIntegerv( GL_MAX_SAMPLES, &glConfig.maxFramebufferSamples );
 
+	static_assert( sizeof( int ) == sizeof( glConfig.maxObjectLabelLen ) );
+
 	glConfig.maxObjectLabelLen = 0;
 	if( qglObjectLabel ) {
-		static_assert( sizeof( int ) == sizeof( glConfig.maxObjectLabelLen ) );
-		qglGetIntegerv( GL_MAX_LABEL_LENGTH, (int *)&glConfig.maxObjectLabelLen );
+		qglGetIntegerv( GL_MAX_LABEL_LENGTH, (GLint *)&glConfig.maxObjectLabelLen );
+	}
+
+	qglGetIntegerv( GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, (GLint *)&glConfig.uboOffsetAlignment );
+	// Bump it at least to the SIMD-compatible aligment.
+	// It's going to simplify the code if we think of doing persistent mapping/optimizing the code that fills blocks.
+	if( glConfig.uboOffsetAlignment < 16 ) {
+		glConfig.uboOffsetAlignment = 16;
 	}
 
 	Cvar_Get( "r_anisolevel_max", "0", CVAR_READONLY );

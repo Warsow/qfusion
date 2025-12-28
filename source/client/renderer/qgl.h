@@ -522,8 +522,9 @@ const char              *qglGetGLWExtensionsString();
 
 #define GL_MAX_LABEL_LENGTH               0x82E8
 
-#define GL_UNIFORM_BUFFER                 0x8A11
-#define GL_INVALID_INDEX                  0xFFFFFFFFu
+#define GL_UNIFORM_BUFFER                  0x8A11
+#define GL_INVALID_INDEX                   0xFFFFFFFFu
+#define GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT 0x8A34
 
 #endif // QGL_H
 
