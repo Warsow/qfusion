@@ -74,9 +74,7 @@ public:
 
 	[[nodiscard]]
 	auto acquireUniformSlice( unsigned category ) -> unsigned;
-	// TODO: Don't commit individually but specify a span of slices in order to
-	// reduce buffer rebinding and, possibly, consolidate uploads
-	void commitUniformSlice( unsigned sliceId );
+	void commitUniformSlices( std::span<const unsigned> sliceIds );
 
 	void getBufferAndRangeForBindingAndSlice( unsigned binding, unsigned sliceId, GLuint *bufferId,
 											  unsigned *offset, unsigned *size ) const;

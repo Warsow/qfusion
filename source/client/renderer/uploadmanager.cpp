@@ -207,17 +207,19 @@ auto UploadManager::acquireUniformSlice( unsigned category ) -> unsigned {
 	return sliceId;
 }
 
-void UploadManager::commitUniformSlice( unsigned sliceId ) {
-	assert( sliceId < kMaxUniformSlices );
+void UploadManager::commitUniformSlices( std::span<const unsigned> sliceIds ) {
 	for( UniformStream &stream: m_uniformStreams ) {
-		const UniformStream::SliceLayoutAndState &layoutAndState = stream.sliceLayoutsAndStates[sliceId];
-		if( layoutAndState.currentOffset != layoutAndState.initialOffset ) {
-			assert( layoutAndState.currentOffset > layoutAndState.initialOffset );
-			const unsigned sizeInBytes = layoutAndState.currentOffset - layoutAndState.initialOffset;
-			assert( ( sizeInBytes % stream.blockSize ) == 0 );
-			assert( sizeInBytes <= layoutAndState.capacity );
-			m_bufferFactory->uploadUniformData( &stream.buffer, stream.data.get() + layoutAndState.initialOffset,
-												layoutAndState.initialOffset, sizeInBytes );
+		for( const unsigned sliceId: sliceIds ) {
+			assert( sliceId < kMaxUniformSlices );
+			const UniformStream::SliceLayoutAndState &layoutAndState = stream.sliceLayoutsAndStates[sliceId];
+			if( layoutAndState.currentOffset != layoutAndState.initialOffset ) {
+				assert( layoutAndState.currentOffset > layoutAndState.initialOffset );
+				const unsigned sizeInBytes = layoutAndState.currentOffset - layoutAndState.initialOffset;
+				assert( ( sizeInBytes % stream.blockSize ) == 0 );
+				assert( sizeInBytes <= layoutAndState.capacity );
+				m_bufferFactory->uploadUniformData( &stream.buffer, stream.data.get() + layoutAndState.initialOffset,
+													layoutAndState.initialOffset, sizeInBytes );
+			}
 		}
 	}
 }

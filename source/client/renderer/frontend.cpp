@@ -280,7 +280,8 @@ void RendererFrontend::commitDraw2DRequest( Draw2DRequest *request ) {
 	leave2DMode( &backendState );
 	endUsingBackendState( &backendState );
 
-	m_uploadManager.commitUniformSlice( backendState.getUniformSliceId() );
+	const unsigned sliceIds[1] { backendState.getUniformSliceId() };
+	m_uploadManager.commitUniformSlices( sliceIds );
 
 	RuntimeBackendState rbs {};
 	actionTape.exec( &rbs );
@@ -1080,9 +1081,7 @@ auto RendererFrontend::coEndPreparingRenderingFromTheseCameras( CoroTask::StartI
 					uniformSliceIds.push_back( stateForCamera->uniformSliceId );
 				}
 			}
-			for( const unsigned sliceId: uniformSliceIds ) {
-				self->m_uploadManager.commitUniformSlice( sliceId );
-			}
+			self->m_uploadManager.commitUniformSlices( uniformSliceIds );
 		}
 	}
 }
