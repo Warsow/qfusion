@@ -540,251 +540,70 @@ void PredictionContext::SetupStackForStep() {
 	topOfStack->movementStatesMask = this->movementState->GetContainedStatesMask();
 }
 
-inline BaseAction *PredictionContext::SuggestAnyAction() {
-	if( BaseAction *action = this->SuggestSuitableAction() ) {
-		return action;
-	}
-
-	auto *const combatDodgeAction = &m_subsystem->combatDodgeSemiRandomlyToTargetAction;
-
-	// If no action has been suggested, use a default/dummy one.
-	// We have to check the combat action since it might be disabled due to planning stack overflow.
-	if( bot->ShouldKeepXhairOnEnemy() ) {
-		const std::optional<SelectedEnemy> &selectedEnemy = bot->GetSelectedEnemy();
-		if( selectedEnemy && selectedEnemy->IsPotentiallyHittable() ) {
-			if( !combatDodgeAction->IsDisabledForPlanning() ) {
-				return combatDodgeAction;
-			}
-		}
-	}
-	if( bot->GetKeptInFovPoint() && !bot->ShouldRushHeadless() && bot->NavTargetAasAreaNum() ) {
-		if( !combatDodgeAction->IsDisabledForPlanning() ) {
-			// The fallback movement action produces fairly reliable results.
-			// However the fallback movement looks poor.
-			// Try using this "combat dodge action" using the "kept in fov" point as an enemy
-			// and apply stricter success/termination checks.
-			// If this combat action fails, the fallback action gets control.
-			combatDodgeAction->allowFailureUsingThatAsNextAction = &m_subsystem->fallbackMovementAction;
-			return combatDodgeAction;
-		}
-	}
-
-	return &m_subsystem->fallbackMovementAction;
+void PredictionContext::ExecuteAppropriateActions() {
+	TryBuildingPlanUsingAction( &m_subsystem->bunnyToStairsOrRampExitAction );
+	if( isCompleted ) return;
+	TryBuildingPlanUsingAction( &m_subsystem->bunnyToBestVisibleReachAction );
+	if( isCompleted ) return;
+	TryBuildingPlanUsingAction( &m_subsystem->bunnyFollowingReachChainAction );
+	if( isCompleted ) return;
+	TryBuildingPlanUsingAction( &m_subsystem->bunnyToBestFloorClusterPointAction );
+	if( isCompleted ) return;
+	TryBuildingPlanUsingAction( &m_subsystem->bunnyTestingNextReachDirsAction );
+	if( isCompleted ) return;
+	TryBuildingPlanUsingAction( &m_subsystem->bunnyTestingMultipleTurnsAction );
+	if( isCompleted ) return;
+	TryBuildingPlanUsingAction( &m_subsystem->fallbackMovementAction );
+	assert( isCompleted );
 }
 
-BaseAction *PredictionContext::SuggestDefaultAction() {
-	// Do not even try using (accelerated) bunnying for easy bots.
-	// They however will still still perform various jumps,
-	// even during regular roaming on plain surfaces (thats what movement fallbacks do).
-	// Ramp/stairs areas and areas not in floor clusters are exceptions
-	// (these kinds of areas are still troublesome for bot movement).
-	auto *const defaultBunnyHopAction = &m_subsystem->bunnyToStairsOrRampExitAction;
-	auto *const combatMovementAction = &m_subsystem->combatDodgeSemiRandomlyToTargetAction;
-	BaseAction *suggestedAction = defaultBunnyHopAction;
-	if( bot->ShouldSkinBunnyInFavorOfCombatMovement() ) {
-		// Do not try bunnying first and start from this combat action directly
-		if( !combatMovementAction->IsDisabledForPlanning() ) {
-			combatMovementAction->allowFailureUsingThatAsNextAction = defaultBunnyHopAction;
-			suggestedAction = combatMovementAction;
-		}
-	} else if( bot->Skill() < 0.33f ) {
-		const auto *aasWorld = AiAasWorld::instance();
-		const int currGroundedAreaNum = CurrGroundedAasAreaNum();
-		// If the current area is not a ramp-like area
-		if( !( aasWorld->getAreaSettings()[currGroundedAreaNum].areaflags & AREA_INCLINED_FLOOR ) ) {
-			// If the current area is not in a stairs cluster
-			if( !( aasWorld->areaStairsClusterNums()[currGroundedAreaNum] ) ) {
-				// If the current area is in a floor cluster
-				if( aasWorld->areaFloorClusterNums()[currGroundedAreaNum ] ) {
-					// Use a basic movement for easy bots
-					suggestedAction = &m_subsystem->fallbackMovementAction;
-				}
-			}
-		}
-	}
-	return suggestedAction;
-}
-
-BaseAction *PredictionContext::SuggestSuitableAction() {
-	Assert( !this->actionSuggestedByAction );
-
-	const auto &entityPhysicsState = this->movementState->entityPhysicsState;
-
-	if( entityPhysicsState.waterLevel > 1 ) {
-		return &m_subsystem->swimMovementAction;
-	}
-
-	if( movementState->weaponJumpMovementState.IsActive() ) {
-		if( movementState->weaponJumpMovementState.hasCorrectedWeaponJump ) {
-			if( movementState->flyUntilLandingMovementState.IsActive() ) {
-				return &m_subsystem->flyUntilLandingAction;
-			}
-			return &m_subsystem->landOnSavedAreasAction;
-		}
-		if( movementState->weaponJumpMovementState.hasTriggeredWeaponJump ) {
-			return &m_subsystem->correctWeaponJumpAction;
-		}
-		return &m_subsystem->tryTriggerWeaponJumpAction;
-	}
-
-	if( movementState->jumppadMovementState.hasTouchedJumppad ) {
-		if( movementState->jumppadMovementState.hasEnteredJumppad ) {
-			if( movementState->flyUntilLandingMovementState.IsActive() ) {
-				if( movementState->flyUntilLandingMovementState.CheckForLanding( this ) ) {
-					return &m_subsystem->landOnSavedAreasAction;
-				}
-
-				return &m_subsystem->flyUntilLandingAction;
-			}
-			// Fly until landing movement state has been deactivate,
-			// switch to bunnying (and, implicitly, to a dummy action if it fails)
-			return SuggestDefaultAction();
-		}
-		return &m_subsystem->handleTriggeredJumppadAction;
-	}
-
-	if( const edict_t *groundEntity = entityPhysicsState.GroundEntity() ) {
-		if( groundEntity->use == Use_Plat ) {
-			return &m_subsystem->ridePlatformAction;
-		}
-	}
-
-	if( movementState->campingSpotState.IsActive() ) {
-		return &m_subsystem->campASpotMovementAction;
-	}
-
-	// The dummy movement action handles escaping using the movement fallback
-	if( m_subsystem->activeMovementScript ) {
-		return &m_subsystem->fallbackMovementAction;
-	}
-
-	if( topOfStackIndex > 0 ) {
-		return SuggestDefaultAction();
-	}
-
-	return &m_subsystem->scheduleWeaponJumpAction;
-}
-
-bool PredictionContext::NextPredictionStep() {
+bool PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStartedSequence ) {
 	SetupStackForStep();
 
 	// Reset prediction step millis time.
 	// Actions might set their custom step value (otherwise it will be set to a default one).
 	this->predictionStepMillis = 0;
-#ifdef CHECK_ACTION_SUGGESTION_LOOPS
-	Assert( m_subsystem->movementActions.size() < 32 );
-	uint32_t testedActionsMask = 0;
-	wsw::StaticVector<BaseAction *, 32> testedActionsList;
-#endif
-
-	// Get an initial suggested a-priori action
-	BaseAction *action;
-	if( this->actionSuggestedByAction ) {
-		action = this->actionSuggestedByAction;
-		this->actionSuggestedByAction = nullptr;
-	} else {
-		action = this->SuggestSuitableAction();
-	}
-
-#ifdef CHECK_ACTION_SUGGESTION_LOOPS
-	testedActionsMask |= ( 1 << action->ActionNum() );
-	testedActionsList.push_back( action );
-#endif
-
 	this->sequenceStopReason = UNSPECIFIED;
-	for(;; ) {
-		this->cannotApplyAction = false;
-		// Prevent reusing record from the switched on the current frame action
-		this->record->Clear();
-		if( this->activeAction != action ) {
-			// If there was an active previous action, stop its application sequence.
-			if( this->activeAction ) {
-				unsigned stoppedAtFrameIndex = topOfStackIndex;
+	this->cannotApplyAction = false;
+	// Prevent reusing record from the switched on the current frame action
+	this->record->Clear();
 
-				// Never pass the UNSPECIFIED reason to the OnApplicationSequenceStopped() call
-				if( sequenceStopReason == UNSPECIFIED ) {
-					sequenceStopReason = SWITCHED;
-				}
-
-				this->activeAction->OnApplicationSequenceStopped( this, sequenceStopReason, stoppedAtFrameIndex );
-			}
-
-			sequenceStopReason = UNSPECIFIED;
-
-			this->activeAction = action;
-			// Start the action application sequence
-			this->activeAction->OnApplicationSequenceStarted( this );
-		}
-
-		Debug( "About to call action->PlanPredictionStep() for %s at ToS frame %d\n", action->Name(), topOfStackIndex );
-		action->PlanPredictionStep( this );
-		// Check for rolling back necessity (an action application chain has lead to an illegal state)
-		if( this->shouldRollback ) {
-			// Stop an action application sequence manually with a failure.
-			this->activeAction->OnApplicationSequenceStopped( this, BaseAction::FAILED, (unsigned)-1 );
-			// An action can be suggested again after rolling back on the next prediction step.
-			// Force calling action->OnApplicationSequenceStarted() on the next prediction step.
-			this->activeAction = nullptr;
-			Debug( "Prediction step failed after action->PlanPredictionStep() call for %s\n", action->Name() );
-			this->RollbackToSavepoint();
-			// Continue planning by returning true (the stack will be restored to a savepoint index)
-			return true;
-		}
-
-		if( this->cannotApplyAction ) {
-			// If current action suggested an alternative, use it
-			// Otherwise use the generic suggestion algorithm
-			if( this->actionSuggestedByAction ) {
-				Debug( "Cannot apply %s, but it has suggested %s\n", action->Name(), this->actionSuggestedByAction->Name() );
-				action = this->actionSuggestedByAction;
-				this->actionSuggestedByAction = nullptr;
-			} else {
-				auto *rejectedAction = action;
-				action = this->SuggestAnyAction();
-				Debug( "Cannot apply %s, using %s suggested by SuggestSuitableAction()\n", rejectedAction->Name(), action->Name() );
-			}
-
-#ifdef CHECK_ACTION_SUGGESTION_LOOPS
-			if( testedActionsMask & ( 1 << action->ActionNum() ) ) {
-				Debug( "List of actions suggested (and tested) this frame #%d:\n", this->topOfStackIndex );
-				for( unsigned i = 0; i < testedActionsList.size(); ++i ) {
-					if( Q_stricmp( testedActionsList[i]->Name(), action->Name() ) ) {
-						Debug( "  %02d: %s\n", i, testedActionsList[i]->Name() );
-					} else {
-						Debug( ">>%02d: %s\n", i, testedActionsList[i]->Name() );
-					}
-				}
-
-				AI_FailWith( __FUNCTION__, "An infinite action application loop has been detected\n" );
-			}
-			testedActionsMask |= ( 1 << action->ActionNum() );
-			testedActionsList.push_back( action );
-#endif
-			// Test next action. Action switch will be handled by the logic above before calling action->PlanPredictionStep().
-			continue;
-		}
-
-		// Movement prediction is completed
-		if( this->isCompleted ) {
-			constexpr const char *format = "Movement prediction is completed on %s, ToS frame %d, %d millis ahead\n";
-			Debug( format, action->Name(), this->topOfStackIndex, this->totalMillisAhead );
-			// Stop an action application sequence manually with a success.
-			action->OnApplicationSequenceStopped( this, BaseAction::SUCCEEDED, this->topOfStackIndex );
-			// Save the predicted movement action
-			// Note: this condition is put outside since it is valid only once per a BuildPlan() call
-			// and the method is called every prediction frame (up to hundreds of times per a bot per a game frame)
-			if( !this->isTruncated ) {
-				this->SaveActionOnStack( action );
-			}
-			// Stop planning by returning false
-			return false;
-		}
-
-		// An action can be applied, stop testing suitable actions
-		break;
+	if( !*hasStartedSequence ) {
+		*hasStartedSequence = true;
+		action->OnApplicationSequenceStarted( this );
 	}
 
-	Assert( action == this->activeAction );
+	Debug( "About to call action->PlanPredictionStep() for %s at ToS frame %d\n", action->Name(), topOfStackIndex );
+	action->PlanPredictionStep( this );
+
+	// Check for rolling back necessity (an action application chain has lead to an illegal state)
+	//if( this->shouldRollback ) {
+	if( this->shouldRollback || this->cannotApplyAction ) {
+		// Stop an action application sequence manually with a failure.
+		action->OnApplicationSequenceStopped( this, BaseAction::FAILED, (unsigned)-1 );
+		*hasStartedSequence = false;
+		Debug( "Prediction step failed after action->PlanPredictionStep() call for %s\n", action->Name() );
+		this->RollbackToSavepoint();
+		// Continue planning by returning true (the stack will be restored to a savepoint index)
+		return true;
+	}
+
+	// Movement prediction is completed
+	// TODO: Are we going to allow early completion?
+	if( this->isCompleted ) {
+		constexpr const char *format = "Movement prediction is completed on %s, ToS frame %d, %d millis ahead\n";
+		Debug( format, action->Name(), this->topOfStackIndex, this->totalMillisAhead );
+		// Stop an action application sequence manually with a success.
+		action->OnApplicationSequenceStopped( this, BaseAction::SUCCEEDED, this->topOfStackIndex );
+		// Save the predicted movement action
+		// Note: this condition is put outside since it is valid only once per a BuildPlan() call
+		// and the method is called every prediction frame (up to hundreds of times per a bot per a game frame)
+		if( !this->isTruncated ) {
+			this->SaveActionOnStack( action );
+		}
+		// Stop planning by returning false
+		return false;
+	}
 
 	// If prediction step millis time has not been set, set it to a default value
 	if( !this->predictionStepMillis ) {
@@ -794,11 +613,11 @@ bool PredictionContext::NextPredictionStep() {
 		}
 	}
 
-	NextMovementStep();
+	NextMovementStep( action );
 
 	action->CheckPredictionStepResults( this );
 	// If results check has been passed
-	if( !this->shouldRollback ) {
+	if( !( this->cannotApplyAction || this->shouldRollback ) ) {
 		// If movement planning is completed, there is no need to do a next step
 		if( this->isCompleted ) {
 			constexpr const char *format = "Movement prediction is completed on %s, ToS frame %d, %d millis ahead\n";
@@ -809,9 +628,8 @@ bool PredictionContext::NextPredictionStep() {
 			// Stop action application sequence manually with a success.
 			// Prevent duplicated OnApplicationSequenceStopped() call
 			// (it might have been done in action->CheckPredictionStepResults() for this->activeAction)
-			if( this->activeAction ) {
-				this->activeAction->OnApplicationSequenceStopped( this, BaseAction::SUCCEEDED, topOfStackIndex );
-			}
+			action->OnApplicationSequenceStopped( this, BaseAction::SUCCEEDED, topOfStackIndex );
+			*hasStartedSequence = false;
 			// Stop planning by returning false
 			return false;
 		}
@@ -832,14 +650,8 @@ bool PredictionContext::NextPredictionStep() {
 	constexpr const char *format = "Prediction step failed for %s after calling action->CheckPredictionStepResults()\n";
 	Debug( format, action->Name() );
 
-	// An active action might have been already reset in action->CheckPredictionStepResults()
-	if( this->activeAction ) {
-		// Stop action application sequence with a failure manually.
-		this->activeAction->OnApplicationSequenceStopped( this, BaseAction::FAILED, (unsigned)-1 );
-	}
-	// An action can be suggested again after rolling back on the next prediction step.
-	// Force calling action->OnApplicationSequenceStarted() on the next prediction step.
-	this->activeAction = nullptr;
+	action->OnApplicationSequenceStopped( this, BaseAction::FAILED, (unsigned)-1 );
+	*hasStartedSequence = false;
 
 	this->RollbackToSavepoint();
 	// Continue planning by returning true
@@ -970,9 +782,6 @@ void PredictionContext::SaveNearbyEntities() {
 }
 
 void PredictionContext::BuildPlan() {
-	for( auto *movementAction: m_subsystem->movementActions )
-		movementAction->BeforePlanning();
-
 	// Intercept these calls implicitly performed by PMove()
 	const auto general_PMoveTouchTriggers = ggs->PMoveTouchTriggers;
 	const auto general_PredictedEvent = ggs->PredictedEvent;
@@ -1015,8 +824,6 @@ void PredictionContext::BuildPlan() {
 	this->totalMillisAhead = 0;
 	this->savepointTopOfStackIndex = 0;
 	this->topOfStackIndex = 0;
-	this->activeAction = nullptr;
-	this->actionSuggestedByAction = nullptr;
 	this->sequenceStopReason = UNSPECIFIED;
 	this->isCompleted = false;
 	this->isTruncated = false;
@@ -1032,33 +839,7 @@ void PredictionContext::BuildPlan() {
 	SavePathTriggerNums();
 	SaveNearbyEntities();
 
-#ifndef CHECK_INFINITE_NEXT_STEP_LOOPS
-	for(;; ) {
-		if( !NextPredictionStep() ) {
-			break;
-		}
-	}
-#else
-	::nextStepIterationsCounter = 0;
-	for(;; ) {
-		if( !NextPredictionStep() ) {
-			break;
-		}
-		++nextStepIterationsCounter;
-		if( nextStepIterationsCounter < NEXT_STEP_INFINITE_LOOP_THRESHOLD ) {
-			continue;
-		}
-		// An verbose output has been enabled at this stage
-		if( nextStepIterationsCounter < NEXT_STEP_INFINITE_LOOP_THRESHOLD + 200 ) {
-			continue;
-		}
-		constexpr const char *message =
-			"PredictionContext::BuildPlan(): "
-			"an infinite NextPredictionStep() loop has been detected. "
-			"Check the server console output of last 200 steps\n";
-		G_Error( "%s", message );
-	}
-#endif
+	ExecuteAppropriateActions();
 
 	// Ensure that the entity state is not modified by any remnants of old code that used to do that
 	Assert( VectorCompare( origin.Data(),  self->s.origin ) );
@@ -1090,9 +871,6 @@ void PredictionContext::BuildPlan() {
 	ggs->PMoveTouchTriggers = general_PMoveTouchTriggers;
 	ggs->PredictedEvent = general_PredictedEvent;
 
-	for( auto *movementAction: m_subsystem->movementActions )
-		movementAction->AfterPlanning();
-
 	// We must have at least a single predicted action (maybe dummy one)
 	assert( !predictedMovementActions.empty() );
 	// The first predicted action should not have any offset from the current time
@@ -1105,7 +883,48 @@ void PredictionContext::BuildPlan() {
 	}
 }
 
-void PredictionContext::NextMovementStep() {
+void PredictionContext::TryBuildingPlanUsingAction( BaseAction *action ) {
+	action->BeforePlanning();
+
+	bool hasStartedSequence = false;
+#ifndef CHECK_INFINITE_NEXT_STEP_LOOPS
+	for(;; ) {
+		if( !NextPredictionStep( action, &hasStartedSequence ) ) {
+			break;
+		}
+		if( cannotApplyAction || shouldRollback ) {
+			break;
+		}
+	}
+#else
+	::nextStepIterationsCounter = 0;
+	for(;; ) {
+		if( !NextPredictionStep( action, &hasStartedSequence ) ) {
+			break;
+		}
+		if( cannotApplyAction || shouldRollback ) {
+			break;
+		}
+		++nextStepIterationsCounter;
+		if( nextStepIterationsCounter < NEXT_STEP_INFINITE_LOOP_THRESHOLD ) {
+			continue;
+		}
+		// An verbose output has been enabled at this stage
+		if( nextStepIterationsCounter < NEXT_STEP_INFINITE_LOOP_THRESHOLD + 200 ) {
+			continue;
+		}
+		constexpr const char *message =
+			"PredictionContext::BuildPlan(): "
+			"an infinite NextPredictionStep() loop has been detected. "
+			"Check the server console output of last 200 steps\n";
+		G_Error( "%s", message );
+	}
+#endif
+
+	action->AfterPlanning();
+}
+
+void PredictionContext::NextMovementStep( BaseAction *action ) {
 	auto *botInput = &this->record->botInput;
 	auto *entityPhysicsState = &movementState->entityPhysicsState;
 
@@ -1114,7 +933,7 @@ void PredictionContext::NextMovementStep() {
 	// Corresponds to Bot::Think();
 	m_subsystem->ApplyPendingTurnToLookAtPoint( botInput, this );
 	// Corresponds to m_subsystem->Frame();
-	this->activeAction->ExecActionRecord( this->record, botInput, this );
+	action->ExecActionRecord( this->record, botInput, this );
 	// Corresponds to Bot::Think();
 	m_subsystem->ApplyInput( botInput, this );
 
@@ -1175,10 +994,10 @@ void PredictionContext::NextMovementStep() {
 
 	// Try using an already retrieved list if possible
 	// (this saves some excessive bounds comparison)
-	if( auto *shapeList = activeAction->thisFrameCMShapeList ) {
+	if( auto *shapeList = action->thisFrameCMShapeList ) {
 		pmoveShapeList = shapeList;
 		// Prevent further reuse
-		activeAction->thisFrameCMShapeList = nullptr;
+		action->thisFrameCMShapeList = nullptr;
 	} else {
 		pmoveShapeList = TraceCache().getShapeListForPMoveCollision( this );
 	}

@@ -2,9 +2,7 @@
 #include "bunnytostairsorrampexitaction.h"
 
 void BunnyToStairsOrRampExitAction::PlanPredictionStep( PredictionContext *context ) {
-	// This action is the first applied action as it is specialized
-	// and falls back to other bunnying actions if it cannot be applied.
-	if( !GenericCheckIsActionEnabled( context, &m_subsystem->bunnyFollowingReachChainAction ) ) {
+	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
 	}
 

@@ -179,8 +179,8 @@ public:
 	MinimalSavedPlayerState *oldMinimalPlayerState { nullptr };
 	MinimalSavedPlayerState *currMinimalPlayerState { nullptr };
 
-	BaseAction *actionSuggestedByAction;
-	BaseAction *activeAction;
+	//BaseAction *actionSuggestedByAction;
+	//BaseAction *activeAction;
 
 	unsigned totalMillisAhead;
 	unsigned predictionStepMillis;
@@ -250,9 +250,8 @@ public:
 	wsw::StaticVector<uint16_t, 12> m_platformTriggerEntNumsToUseDuringPrediction;
 	wsw::StaticVector<uint16_t, 32> m_otherTriggerEntNumsToUseDuringPrediction;
 
-	class BaseAction *SuggestSuitableAction();
-	class BaseAction *SuggestDefaultAction();
-	class BaseAction *SuggestAnyAction();
+	//class BaseAction *SuggestSuitableAction();
+	//class BaseAction *SuggestDefaultAction();
 
 	Vec3 NavTargetOrigin() const;
 	float NavTargetRadius() const;
@@ -286,10 +285,12 @@ public:
 	explicit PredictionContext( MovementSubsystem *m_subsystem );
 
 	void BuildPlan();
-	bool NextPredictionStep();
+	void ExecuteAppropriateActions();
+	void TryBuildingPlanUsingAction( BaseAction *action );
+	bool NextPredictionStep( BaseAction *action, bool *hasStartedSequence );
 	void SetupStackForStep();
 
-	void NextMovementStep();
+	void NextMovementStep( BaseAction *action );
 
 	void SavePathTriggerNums();
 	void SaveNearbyEntities();
@@ -312,7 +313,7 @@ public:
 
 	void SetPendingRollback();
 	void RollbackToSavepoint();
-	void SaveSuggestedActionForNextFrame( BaseAction *action );
+	//void SaveSuggestedActionForNextFrame( BaseAction *action );
 	unsigned MillisAheadForFrameStart( unsigned frameIndex ) const;
 
 	void SaveGoodEnoughPath( unsigned advancement, unsigned penaltyMillis );

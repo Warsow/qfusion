@@ -12,7 +12,6 @@
 #endif
 
 #if !defined( PUBLIC_BUILD )
-#define CHECK_ACTION_SUGGESTION_LOOPS
 #define CHECK_INFINITE_NEXT_STEP_LOOPS
 extern int nextStepIterationsCounter;
 static constexpr int NEXT_STEP_INFINITE_LOOP_THRESHOLD = 10000;
@@ -185,7 +184,8 @@ inline void PredictionContext::SaveActionOnStack( BaseAction *action ) {
 }
 
 inline const char *PredictionContext::ActiveActionName() const {
-	return activeAction ? activeAction->Name() : nullptr;
+	//return activeAction ? activeAction->Name() : nullptr;
+	return "<unspecified>";
 }
 
 inline void PredictionContext::MarkSavepoint( BaseAction *markedBy, unsigned frameIndex ) {
@@ -238,7 +238,7 @@ inline void PredictionContext::RollbackToSavepoint() {
 		constexpr auto *format = "%s: Attempt to rollback while the context is in completed state\n";
 		AI_FailWith( tag, format, activeActionName );
 	}
-	if( !this->shouldRollback ) {
+	if( false && !this->shouldRollback ) {
 		constexpr auto *format = "%s: Attempt to rollback while `shouldRollback` context flag is not set\n";
 		AI_FailWith( tag, format, activeActionName );
 	}
@@ -257,10 +257,11 @@ inline void PredictionContext::RollbackToSavepoint() {
 	this->topOfStackIndex = this->savepointTopOfStackIndex;
 }
 
+/*
 inline void PredictionContext::SaveSuggestedActionForNextFrame( BaseAction *action ) {
 	//Assert(!this->actionSuggestedByAction);
 	this->actionSuggestedByAction = action;
-}
+}*/
 
 inline unsigned PredictionContext::MillisAheadForFrameStart( unsigned frameIndex ) const {
 #ifdef ENABLE_MOVEMENT_ASSERTIONS
@@ -276,17 +277,6 @@ inline unsigned PredictionContext::MillisAheadForFrameStart( unsigned frameIndex
 	return totalMillisAhead;
 }
 
-inline BaseAction &BaseAction::DummyAction() {
-	// We have to check the combat action since it might be disabled due to planning stack overflow.
-	if( bot->ShouldKeepXhairOnEnemy() && bot->GetSelectedEnemy() != std::nullopt ) {
-		if( !m_subsystem->combatDodgeSemiRandomlyToTargetAction.IsDisabledForPlanning() ) {
-			return m_subsystem->combatDodgeSemiRandomlyToTargetAction;
-		}
-	}
-
-	return m_subsystem->fallbackMovementAction;
-}
-
 inline FlyUntilLandingAction &BaseAction::FlyUntilLandingAction() {
 	return m_subsystem->flyUntilLandingAction;
 }
@@ -295,8 +285,7 @@ inline LandOnSavedAreasAction &BaseAction::LandOnSavedAreasAction() {
 	return m_subsystem->landOnSavedAreasAction;
 }
 
-inline bool BaseAction::GenericCheckIsActionEnabled( PredictionContext *context,
-															 BaseAction *suggestedAction ) const {
+inline bool BaseAction::GenericCheckIsActionEnabled( PredictionContext *context ) const {
 	// Put likely case first
 	if( !isDisabledForPlanning ) {
 		return true;
@@ -304,7 +293,6 @@ inline bool BaseAction::GenericCheckIsActionEnabled( PredictionContext *context,
 
 	context->sequenceStopReason = DISABLED;
 	context->cannotApplyAction = true;
-	context->actionSuggestedByAction = suggestedAction;
 	Debug( "The action has been completely disabled for further planning\n" );
 	return false;
 }
@@ -326,15 +314,14 @@ inline void BaseAction::CheckDisableOrSwitchPreconditions( PredictionContext *co
 #endif
 }
 
-inline void BaseAction::DisableWithAlternative( PredictionContext *context, BaseAction *suggestedAction ) {
+inline void BaseAction::DisableWithAlternative( PredictionContext *context ) {
 	CheckDisableOrSwitchPreconditions( context, "DisableWithAlternative" );
 
 	context->cannotApplyAction = true;
-	context->actionSuggestedByAction = suggestedAction;
 	this->isDisabledForPlanning = true;
 }
 
-inline void BaseAction::SwitchOrStop( PredictionContext *context, BaseAction *suggestedAction ) {
+inline void BaseAction::SwitchOrStop( PredictionContext *context ) {
 	CheckDisableOrSwitchPreconditions( context, "SwitchOrStop" );
 
 	// Few predicted frames are enough if the action cannot be longer applied (but have not caused rollback)
@@ -344,10 +331,10 @@ inline void BaseAction::SwitchOrStop( PredictionContext *context, BaseAction *su
 		return;
 	}
 
-	DisableWithAlternative( context, suggestedAction );
+	DisableWithAlternative( context );
 }
 
-inline void BaseAction::SwitchOrRollback( PredictionContext *context, BaseAction *suggestedAction ) {
+inline void BaseAction::SwitchOrRollback( PredictionContext *context ) {
 	CheckDisableOrSwitchPreconditions( context, "SwitchOrRollback" );
 
 	if( context->topOfStackIndex > 0 ) {
@@ -357,7 +344,7 @@ inline void BaseAction::SwitchOrRollback( PredictionContext *context, BaseAction
 		return;
 	}
 
-	DisableWithAlternative( context, suggestedAction );
+	DisableWithAlternative( context );
 }
 
 inline float Distance2DSquared( const vec3_t a, const vec3_t b ) {

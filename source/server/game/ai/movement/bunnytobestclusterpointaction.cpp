@@ -46,5 +46,4 @@ void BunnyToBestFloorClusterPointAction::OnApplicationSequenceFailed( Prediction
 	// Make sure we can restart this action after rolling back
 	disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
 	// Force this action to be applied next frame (regardless of rolling back)
-	context->SaveSuggestedActionForNextFrame( this );
 }

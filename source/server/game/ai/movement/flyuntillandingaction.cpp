@@ -9,7 +9,6 @@ void FlyUntilLandingAction::PlanPredictionStep( PredictionContext *context ) {
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	if( entityPhysicsState.GroundEntity() ) {
 		context->cannotApplyAction = true;
-		context->actionSuggestedByAction = &DummyAction();
 		Debug( "A bot has landed on a ground in the given context state\n" );
 		return;
 	}
@@ -17,7 +16,6 @@ void FlyUntilLandingAction::PlanPredictionStep( PredictionContext *context ) {
 	auto *flyUntilLandingMovementState = &context->movementState->flyUntilLandingMovementState;
 	if( flyUntilLandingMovementState->CheckForLanding( context ) ) {
 		context->cannotApplyAction = true;
-		context->actionSuggestedByAction = &LandOnSavedAreasAction();
 		Debug( "Bot should perform landing in the given context state\n" );
 		return;
 	}

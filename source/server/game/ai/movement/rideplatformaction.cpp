@@ -12,8 +12,7 @@ void RidePlatformAction::BeforePlanning() {
 }
 
 void RidePlatformAction::PlanPredictionStep( PredictionContext *context ) {
-	auto *const defaultAction = context->SuggestDefaultAction();
-	if( !GenericCheckIsActionEnabled( context, defaultAction ) ) {
+	if( !GenericCheckIsActionEnabled( context ) ) {
 		return;
 	}
 
@@ -21,13 +20,11 @@ void RidePlatformAction::PlanPredictionStep( PredictionContext *context ) {
 		const edict_t *platform = GetPlatform( context );
 		if( !platform ) {
 			context->cannotApplyAction = true;
-			context->actionSuggestedByAction = defaultAction;
 			Debug( "Cannot apply the action (cannot find a platform below)\n" );
 			return;
 		}
 		if( !DetermineStageAndProperties( context, platform ) ) {
 			context->cannotApplyAction = true;
-			context->actionSuggestedByAction = defaultAction;
 			Debug( "Cannot determine what to do (enter, ride or exit)\n" );
 			return;
 		}
@@ -84,7 +81,6 @@ void RidePlatformAction::CheckPredictionStepResults( PredictionContext *context 
 
 	const unsigned sequenceDuration = SequenceDuration( context );
 	if( sequenceDuration < 500 ) {
-		context->SaveSuggestedActionForNextFrame( this );
 		return;
 	}
 
@@ -99,8 +95,6 @@ void RidePlatformAction::CheckPredictionStepResults( PredictionContext *context 
 		context->SetPendingRollback();
 		return;
 	}
-
-	context->SaveSuggestedActionForNextFrame( this );
 }
 
 void RidePlatformAction::OnApplicationSequenceStopped( PredictionContext *context,

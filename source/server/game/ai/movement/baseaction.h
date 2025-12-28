@@ -44,7 +44,6 @@ protected:
 	bool stopPredictionOnEnteringWater { true };
 	bool failPredictionOnEnteringHazardImpactZone { true };
 
-	BaseAction &DummyAction();
 	class FlyUntilLandingAction &FlyUntilLandingAction();
 	class LandOnSavedAreasAction &LandOnSavedAreasAction();
 
@@ -56,13 +55,13 @@ protected:
 		Assert( conditionLikeValue != 0, message );
 	}
 
-	bool GenericCheckIsActionEnabled( PredictionContext *context, BaseAction *suggestedAction = nullptr ) const;
+	bool GenericCheckIsActionEnabled( PredictionContext *context ) const;
 
 	void CheckDisableOrSwitchPreconditions( PredictionContext *context, const char *methodTag );
 
-	void DisableWithAlternative( PredictionContext *context, BaseAction *suggestedAction );
-	void SwitchOrStop( PredictionContext *context, BaseAction *suggestedAction );
-	void SwitchOrRollback( PredictionContext *context, BaseAction *suggestedAction );
+	void DisableWithAlternative( PredictionContext *context );
+	void SwitchOrStop( PredictionContext *context );
+	void SwitchOrRollback( PredictionContext *context );
 
 	bool HasTouchedNavEntityThisFrame( PredictionContext *context );
 public:

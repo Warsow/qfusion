@@ -156,7 +156,7 @@ void CombatDodgeSemiRandomlyToTargetAction::PlanPredictionStep( PredictionContex
 			Debug( "All attempts have failed. Switching to the fallback/dummy action\n" );
 			Assert( this->allowFailureUsingThatAsNextAction );
 			Assert( this->allowFailureUsingThatAsNextAction != this );
-			this->DisableWithAlternative( context, this->allowFailureUsingThatAsNextAction );
+			this->DisableWithAlternative( context );
 			return;
 		}
 		Debug( "Attempts count has reached its limit. Should stop planning\n" );
@@ -293,7 +293,6 @@ void CombatDodgeSemiRandomlyToTargetAction::CheckPredictionStepResults( Predicti
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	// Check for prediction termination...
 	if( !entityPhysicsState.GroundEntity() || this->SequenceDuration( context ) < dirsTimeout ) {
-		context->SaveSuggestedActionForNextFrame( this );
 		return;
 	}
 

@@ -1,8 +1,8 @@
 #include "bunnyhopaction.h"
 #include "movementlocal.h"
 
-bool BunnyHopAction::GenericCheckIsActionEnabled( PredictionContext *context, BaseAction *suggestedAction ) {
-	if( !BaseAction::GenericCheckIsActionEnabled( context, suggestedAction ) ) {
+bool BunnyHopAction::GenericCheckIsActionEnabled( PredictionContext *context ) {
+	if( !BaseAction::GenericCheckIsActionEnabled( context ) ) {
 		return false;
 	}
 
@@ -13,7 +13,6 @@ bool BunnyHopAction::GenericCheckIsActionEnabled( PredictionContext *context, Ba
 	Debug( "Cannot apply action: the action has been disabled for application on frame %d\n", context->topOfStackIndex );
 	context->sequenceStopReason = DISABLED;
 	context->cannotApplyAction = true;
-	context->actionSuggestedByAction = suggestedAction;
 	return false;
 }
 
@@ -418,7 +417,6 @@ bool BunnyHopAction::CheckDirectReachWalkingOrFallingShort( int fromAreaNum, int
 bool BunnyHopAction::TryHandlingUnreachableTarget( PredictionContext *context ) {
 	currentUnreachableTargetSequentialMillis += context->predictionStepMillis;
 	if( currentUnreachableTargetSequentialMillis < tolerableUnreachableTargetSequentialMillis ) {
-		context->SaveSuggestedActionForNextFrame( this );
 		return true;
 	}
 
@@ -583,7 +581,6 @@ void BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) {
 
 	if( squareDistanceFromStart < wsw::square( 64 ) ) {
 		if( SequenceDuration( context ) < 384 ) {
-			context->SaveSuggestedActionForNextFrame( this );
 			return;
 		}
 
@@ -653,7 +650,6 @@ void BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) {
 		stackGrowthLimit = ( 3 * naturalLimit ) / 4;
 	}
 	if( context->topOfStackIndex < stackGrowthLimit ) {
-		context->SaveSuggestedActionForNextFrame( this );
 		return;
 	}
 
