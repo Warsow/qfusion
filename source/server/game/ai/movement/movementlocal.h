@@ -277,14 +277,6 @@ inline unsigned PredictionContext::MillisAheadForFrameStart( unsigned frameIndex
 	return totalMillisAhead;
 }
 
-inline FlyUntilLandingAction &BaseAction::FlyUntilLandingAction() {
-	return m_subsystem->flyUntilLandingAction;
-}
-
-inline LandOnSavedAreasAction &BaseAction::LandOnSavedAreasAction() {
-	return m_subsystem->landOnSavedAreasAction;
-}
-
 inline bool BaseAction::GenericCheckIsActionEnabled( PredictionContext *context ) const {
 	// Put likely case first
 	if( !isDisabledForPlanning ) {

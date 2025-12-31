@@ -94,7 +94,6 @@ void BaseAction::CheckPredictionStepResults( PredictionContext *context ) {
 	}
 
 	if( stopPredictionOnEnteringWater && newEntityPhysicsState.waterLevel > 1 ) {
-		Assert( this != &m_subsystem->swimMovementAction );
 		Debug( "A prediction step has lead to entering water, should stop planning\n" );
 		context->isCompleted = true;
 		return;

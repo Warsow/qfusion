@@ -44,9 +44,6 @@ protected:
 	bool stopPredictionOnEnteringWater { true };
 	bool failPredictionOnEnteringHazardImpactZone { true };
 
-	class FlyUntilLandingAction &FlyUntilLandingAction();
-	class LandOnSavedAreasAction &LandOnSavedAreasAction();
-
 	void Debug( const char *format, ... ) const;
 	// We want to have a full control over movement code assertions, so use custom ones for this class
 	void Assert( bool condition, const char *message = nullptr ) const;
@@ -101,32 +98,6 @@ public:
 	int DebugColor() const { return debugColor; }
 	unsigned ActionNum() const { return actionNum; }
 	bool IsDisabledForPlanning() const { return isDisabledForPlanning; }
-};
-
-// Lets not create excessive headers for these dummy action declarations
-
-class HandleTriggeredJumppadAction : public BaseAction {
-public:
-	explicit HandleTriggeredJumppadAction( MovementSubsystem *subsystem )
-		: BaseAction( subsystem, "HandleTriggeredJumppadAction", COLOR_RGB( 0, 128, 128 ) ) {}
-	void PlanPredictionStep( PredictionContext *context ) override;
-};
-
-class SwimMovementAction : public BaseAction {
-public:
-	explicit SwimMovementAction( MovementSubsystem *subsystem )
-		: BaseAction( subsystem, "SwimMovementAction", COLOR_RGB( 0, 0, 255 ) ) {
-		this->stopPredictionOnEnteringWater = false;
-	}
-	void PlanPredictionStep( PredictionContext *context ) override;
-	void CheckPredictionStepResults( PredictionContext *context ) override;
-};
-
-class FlyUntilLandingAction : public BaseAction {
-public:
-	explicit FlyUntilLandingAction( MovementSubsystem *subsystem )
-		: BaseAction( subsystem, "FlyUntilLandingAction", COLOR_RGB( 0, 255, 0 ) ) {}
-	void PlanPredictionStep( PredictionContext *context ) override;
 };
 
 #endif

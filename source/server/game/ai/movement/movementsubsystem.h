@@ -7,18 +7,13 @@
 
 #include "predictioncontext.h"
 
-#include "landonsavedareasaction.h"
-#include "rideplatformaction.h"
 #include "bunnytostairsorrampexitaction.h"
 #include "bunnyfollowingreachchainaction.h"
 #include "bunnytestingnextreachdirsaction.h"
 #include "bunnytestingmultipleturnsaction.h"
 #include "bunnytobestvisiblereachaction.h"
 #include "bunnytobestclusterpointaction.h"
-#include "campaspotaction.h"
-#include "combatdodgetotargetaction.h"
 #include "fallbackaction.h"
-#include "weaponjumpactions.h"
 
 #include "falldownscript.h"
 #include "jumpoverbarrierscript.h"
@@ -93,8 +88,6 @@ class MovementSubsystem {
 	friend class BaseAction;
 	friend class FallbackAction;
 	friend class HandleTriggeredJumppadAction;
-	friend class LandOnSavedAreasAction;
-	friend class RidePlatformAction;
 	friend class SwimMovementAction;
 	friend class FlyUntilLandingAction;
 	friend class CampASpotMovementAction;
@@ -104,10 +97,6 @@ class MovementSubsystem {
 	friend class BunnyToBestVisibleReachAction;
 	friend class BunnyToBestFloorClusterPointAction;
 	friend class BunnyTestingMultipleTurnsAction;
-	friend class CombatDodgeSemiRandomlyToTargetAction;
-	friend class ScheduleWeaponJumpAction;
-	friend class TryTriggerWeaponJumpAction;
-	friend class CorrectWeaponJumpAction;
 
 	friend class GenericGroundMovementScript;
 	friend class UseWalkableNodeScript;
@@ -133,22 +122,12 @@ class MovementSubsystem {
 	wsw::StaticVector<BaseAction *, 20> movementActions;
 
 	FallbackAction fallbackMovementAction;
-	HandleTriggeredJumppadAction handleTriggeredJumppadAction;
-	LandOnSavedAreasAction landOnSavedAreasAction;
-	RidePlatformAction ridePlatformAction;
-	SwimMovementAction swimMovementAction;
-	FlyUntilLandingAction flyUntilLandingAction;
-	CampASpotMovementAction campASpotMovementAction;
 	BunnyToStairsOrRampExitAction bunnyToStairsOrRampExitAction;
 	BunnyFollowingReachChainAction bunnyFollowingReachChainAction;
 	BunnyTestingNextReachDirsAction bunnyTestingNextReachDirsAction;
 	BunnyToBestVisibleReachAction bunnyToBestVisibleReachAction;
 	BunnyToBestFloorClusterPointAction bunnyToBestFloorClusterPointAction;
 	BunnyTestingMultipleTurnsAction bunnyTestingMultipleTurnsAction;
-	CombatDodgeSemiRandomlyToTargetAction combatDodgeSemiRandomlyToTargetAction;
-	ScheduleWeaponJumpAction scheduleWeaponJumpAction;
-	TryTriggerWeaponJumpAction tryTriggerWeaponJumpAction;
-	CorrectWeaponJumpAction correctWeaponJumpAction;
 
 	MovementState movementState;
 
