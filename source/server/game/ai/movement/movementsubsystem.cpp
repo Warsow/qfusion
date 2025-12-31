@@ -3,26 +3,17 @@
 #include "movementlocal.h"
 #include "environmenttracecache.h"
 #include "bestjumpablespotdetector.h"
-#include "movementscript.h"
 
 MovementSubsystem::MovementSubsystem( Bot *bot_ )
 	: bot( bot_ )
 	, weaponJumpAttemptsRateLimiter( 2 )
-	, fallbackMovementAction( this )
 	, bunnyToStairsOrRampExitAction( this )
 	, bunnyFollowingReachChainAction( this )
 	, bunnyTestingNextReachDirsAction( this )
 	, bunnyToBestVisibleReachAction( this )
 	, bunnyToBestFloorClusterPointAction( this )
 	, bunnyTestingMultipleTurnsAction( this )
-	, predictionContext( this )
-	, useWalkableNodeScript( bot_, this )
-	, useRampExitScript( bot_, this )
-	, useStairsExitScript( bot_, this )
-	, useWalkableTriggerScript( bot_, this )
-	, jumpToSpotScript( bot_, this )
-	, fallDownScript( bot_, this )
-	, jumpOverBarrierScript( bot_, this ) {
+	, predictionContext( this ) {
 	movementState.Reset();
 }
 
@@ -67,10 +58,6 @@ void MovementSubsystem::Frame( BotInput *input ) {
 
 	const edict_t *self = game.edicts + bot->EntNum();
 	movementState.TryDeactivateContainedStates( self, nullptr );
-
-	if( activeMovementScript && activeMovementScript->TryDeactivate( nullptr ) ) {
-		activeMovementScript = nullptr;
-	}
 
 	MovementActionRecord movementActionRecord;
 	BaseAction *movementAction = predictionContext.GetActionAndRecordForCurrTime( &movementActionRecord );

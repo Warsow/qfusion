@@ -13,15 +13,6 @@
 #include "bunnytestingmultipleturnsaction.h"
 #include "bunnytobestvisiblereachaction.h"
 #include "bunnytobestclusterpointaction.h"
-#include "fallbackaction.h"
-
-#include "falldownscript.h"
-#include "jumpoverbarrierscript.h"
-#include "jumptospotscript.h"
-#include "usewalkablenodescript.h"
-#include "usewalkabletriggerscript.h"
-#include "usestairsexitscript.h"
-#include "userampexitscript.h"
 
 class Bot;
 
@@ -86,25 +77,12 @@ class MovementSubsystem {
 	friend struct MovementState;
 	friend class PredictionContext;
 	friend class BaseAction;
-	friend class FallbackAction;
-	friend class HandleTriggeredJumppadAction;
-	friend class SwimMovementAction;
-	friend class FlyUntilLandingAction;
-	friend class CampASpotMovementAction;
 	friend class BunnyToStairsOrRampExitAction;
 	friend class BunnyFollowingReachChainAction;
 	friend class BunnyTestingNextReachDirsAction;
 	friend class BunnyToBestVisibleReachAction;
 	friend class BunnyToBestFloorClusterPointAction;
 	friend class BunnyTestingMultipleTurnsAction;
-
-	friend class GenericGroundMovementScript;
-	friend class UseWalkableNodeScript;
-	friend class UseRampExitScript;
-	friend class UseStairsExitScript;
-	friend class UseWalkableTriggerScript;
-	friend class FallDownScript;
-	friend class JumpOverBarrierScript;
 
 	Bot *const bot;
 
@@ -121,7 +99,6 @@ class MovementSubsystem {
 	// Must be initialized before any of movement actions constructors is called
 	wsw::StaticVector<BaseAction *, 20> movementActions;
 
-	FallbackAction fallbackMovementAction;
 	BunnyToStairsOrRampExitAction bunnyToStairsOrRampExitAction;
 	BunnyFollowingReachChainAction bunnyFollowingReachChainAction;
 	BunnyTestingNextReachDirsAction bunnyTestingNextReachDirsAction;
@@ -132,17 +109,6 @@ class MovementSubsystem {
 	MovementState movementState;
 
 	PredictionContext predictionContext;
-
-	UseWalkableNodeScript useWalkableNodeScript;
-	UseRampExitScript useRampExitScript;
-	UseStairsExitScript useStairsExitScript;
-	UseWalkableTriggerScript useWalkableTriggerScript;
-
-	JumpToSpotScript jumpToSpotScript;
-	FallDownScript fallDownScript;
-	JumpOverBarrierScript jumpOverBarrierScript;
-
-	MovementScript *activeMovementScript { nullptr };
 
 	int64_t nextRotateInputAttemptAt { 0 };
 	int64_t inputRotationBlockingTimer { 0 };
@@ -202,7 +168,6 @@ public:
 
 	void Reset() {
 		movementState.Reset();
-		activeMovementScript = nullptr;
 	}
 
 	bool CanInterruptMovement() const;

@@ -285,7 +285,7 @@ public:
 	explicit PredictionContext( MovementSubsystem *m_subsystem );
 
 	void BuildPlan();
-	void ExecuteAppropriateActions();
+	void ExecuteAppropriateActions( const AiEntityPhysicsState &initialPhysicsState );
 	void TryBuildingPlanUsingAction( BaseAction *action );
 	bool NextPredictionStep( BaseAction *action, bool *hasStartedSequence );
 	void SetupStackForStep();

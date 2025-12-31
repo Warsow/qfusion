@@ -146,6 +146,145 @@ bool ReachChainWalker::Exec() {
 	return true;
 }
 
+const int *TryFindBestInclinedFloorExitArea( PredictionContext *context, int rampAreaNum, int forbiddenAreaNum ) {
+	const auto *aasWorld = AiAasWorld::instance();
+	const auto aasAreas = aasWorld->getAreas();
+	const auto aasAreaSettings = aasWorld->getAreaSettings();
+	const auto aasReach = aasWorld->getReaches();
+
+	// Find ramp start and end flat grounded areas
+
+	int lowestAreaNum = 0;
+	int lowestReachNum = 0;
+	float lowestAreaHeight = std::numeric_limits<float>::max();
+	int highestAreaNum = 0;
+	int highestReachNum = 0;
+	float highestAreaHeight = std::numeric_limits<float>::lowest();
+
+	const auto &rampAreaSettings = aasAreaSettings[rampAreaNum];
+	int reachNum = rampAreaSettings.firstreachablearea;
+	const int endReachNum = reachNum + rampAreaSettings.numreachableareas;
+	for(; reachNum != endReachNum; ++reachNum) {
+		const auto &reach = aasReach[reachNum];
+		if( reach.traveltype != TRAVEL_WALK ) {
+			continue;
+		}
+		const int reachAreaNum = reach.areanum;
+		if( reach.areanum == forbiddenAreaNum ) {
+			continue;
+		}
+
+		const auto &reachAreaFlags = aasAreaSettings[reachAreaNum].areaflags;
+		if( !( reachAreaFlags & AREA_GROUNDED ) ) {
+			continue;
+		}
+
+		const auto &reachArea = aasAreas[reachAreaNum];
+		if( reachArea.mins[2] < lowestAreaHeight ) {
+			lowestAreaHeight = reachArea.mins[2];
+			lowestAreaNum = reachAreaNum;
+			lowestReachNum = reachNum;
+		}
+		if( reachArea.mins[2] > highestAreaHeight ) {
+			highestAreaHeight = reachArea.mins[2];
+			highestAreaNum = reachAreaNum;
+			highestReachNum = reachNum;
+		}
+	}
+
+	if( !lowestAreaNum || !highestAreaNum ) {
+		return nullptr;
+	}
+
+	// Note: The comparison operator has been changed from >= to >
+	// since adjacent ramp areas are likely to have the same bounding box height dimensions
+	if( lowestAreaHeight > highestAreaHeight ) {
+		return nullptr;
+	}
+
+	const int travelTimeToTarget = context->TravelTimeToNavTarget();
+	if( !travelTimeToTarget ) {
+		return nullptr;
+	}
+
+	// Find what area is closer to the nav target
+	int fromAreaNums[2] = { lowestAreaNum, highestAreaNum };
+	int fromReachNums[2] = { lowestReachNum, highestReachNum };
+	int toAreaNum = context->NavTargetAasAreaNum();
+	int bestIndex = -1;
+	int bestTravelTime = std::numeric_limits<int>::max();
+	const auto *routeCache = context->RouteCache();
+	const int travelFlags = context->TravelFlags();
+	for( int i = 0; i < 2; ++i ) {
+		int travelTime = routeCache->FindRoute( fromAreaNums[i], toAreaNum, travelFlags );
+		if( travelTime && travelTime < travelTimeToTarget && travelTime < bestTravelTime ) {
+			bestIndex = i;
+			bestTravelTime = travelTime;
+		}
+	}
+
+	if( bestIndex < 0 ) {
+		return nullptr;
+	}
+
+	// Return a pointer to a persistent during the match memory
+	return &aasReach[fromReachNums[bestIndex]].areanum;
+}
+
+const uint16_t *TryFindBestStairsExitArea( PredictionContext *context, int stairsClusterNum ) {
+	const int toAreaNum = context->NavTargetAasAreaNum();
+	if( !toAreaNum ) {
+		return nullptr;
+	}
+
+	const int currTravelTimeToTarget = context->TravelTimeToNavTarget();
+	if( !currTravelTimeToTarget ) {
+		return nullptr;
+	}
+
+	const auto *aasWorld = AiAasWorld::instance();
+	const auto *routeCache = context->RouteCache();
+
+	const std::span<const uint16_t> stairsClusterAreaNums = aasWorld->stairsClusterData( stairsClusterNum );
+
+	// TODO: Support curved stairs, here and from StairsClusterBuilder side
+
+	// Determine whether highest or lowest area is closer to the nav target
+	const uint16_t *stairsBoundaryAreas[2];
+	stairsBoundaryAreas[0] = std::addressof( stairsClusterAreaNums.front() );
+	stairsBoundaryAreas[1] = std::addressof( stairsClusterAreaNums.back() );
+
+	int bestStairsAreaIndex = -1;
+	int bestTravelTimeOfStairsAreas = std::numeric_limits<int>::max();
+	for( int i = 0; i < 2; ++i ) {
+		// TODO: Eliminate the intermediate bestAreaTravelTime variable (this is a result of unrelated refactoring)
+		int bestAreaTravelTime = std::numeric_limits<int>::max();
+		int travelTime = routeCache->FindRoute( *stairsBoundaryAreas[i], toAreaNum, context->TravelFlags() );
+		if( travelTime && travelTime < bestAreaTravelTime ) {
+			bestAreaTravelTime = travelTime;
+		}
+		// The stairs boundary area is not reachable
+		if( bestAreaTravelTime == std::numeric_limits<int>::max() ) {
+			return nullptr;
+		}
+		// Make sure a stairs area is closer to the nav target than the current one
+		if( bestAreaTravelTime < currTravelTimeToTarget ) {
+			if( bestAreaTravelTime < bestTravelTimeOfStairsAreas ) {
+				bestTravelTimeOfStairsAreas = bestAreaTravelTime;
+				bestStairsAreaIndex = i;
+			}
+		}
+	}
+
+	if( bestStairsAreaIndex < 0 ) {
+		return nullptr;
+	}
+
+	// The value points to the cluster data that is persistent in memory
+	// during the entire match, so returning this address is legal.
+	return stairsBoundaryAreas[bestStairsAreaIndex];
+}
+
 bool TraceArcInSolidWorld( const vec3_t from, const vec3_t to ) {
 	const auto brushMask = MASK_WATER | MASK_SOLID;
 	trace_t trace;

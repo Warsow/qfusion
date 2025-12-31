@@ -540,7 +540,7 @@ void PredictionContext::SetupStackForStep() {
 	topOfStack->movementStatesMask = this->movementState->GetContainedStatesMask();
 }
 
-void PredictionContext::ExecuteAppropriateActions() {
+void PredictionContext::ExecuteAppropriateActions( const AiEntityPhysicsState &initialPhysicsState ) {
 	TryBuildingPlanUsingAction( &m_subsystem->bunnyToStairsOrRampExitAction );
 	if( isCompleted ) return;
 	TryBuildingPlanUsingAction( &m_subsystem->bunnyToBestVisibleReachAction );
@@ -553,8 +553,38 @@ void PredictionContext::ExecuteAppropriateActions() {
 	if( isCompleted ) return;
 	TryBuildingPlanUsingAction( &m_subsystem->bunnyTestingMultipleTurnsAction );
 	if( isCompleted ) return;
-	TryBuildingPlanUsingAction( &m_subsystem->fallbackMovementAction );
-	assert( isCompleted );
+
+	const char *fallbackDesc = nullptr;
+	PredictionContext::PredictedPath *fallbackPath = nullptr;
+	if( !goodEnoughPath.empty() ) {
+		fallbackPath = &goodEnoughPath;
+		fallbackDesc = "good enough";
+	} else if( !lastResortPath.empty() ) {
+		fallbackPath = &lastResortPath;
+		fallbackDesc = "last resort";
+	}
+
+	if( fallbackPath ) {
+		Debug( "Using a %s as a fallback\n", fallbackDesc );
+		predictedMovementActions.clear();
+		for( const auto &pathElem : *fallbackPath ) {
+			predictedMovementActions.push_back( pathElem );
+		}
+		goodEnoughPath.clear();
+		lastResortPath.clear();
+	} else {
+		PredictedMovementAction predictedMovementAction;
+		predictedMovementAction.action = &m_subsystem->bunnyFollowingReachChainAction;
+		predictedMovementAction.timestamp = 0;
+		predictedMovementAction.entityPhysicsState = initialPhysicsState;
+		predictedMovementAction.record = {};
+		predictedMovementAction.record.botInput.SetIntendedLookDir( &axis_identity[AXIS_FORWARD ] );
+		predictedMovementAction.record.botInput.SetForwardMovement( 1 );
+		predictedMovementAction.record.botInput.isLookDirSet = true;
+		predictedMovementAction.record.botInput.isUcmdSet = true;
+		predictedMovementActions.clear();
+		predictedMovementActions.push_back( predictedMovementAction );
+	}
 }
 
 bool PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStartedSequence ) {
@@ -839,7 +869,7 @@ void PredictionContext::BuildPlan() {
 	SavePathTriggerNums();
 	SaveNearbyEntities();
 
-	ExecuteAppropriateActions();
+	ExecuteAppropriateActions( currEntityPhysicsState );
 
 	// Ensure that the entity state is not modified by any remnants of old code that used to do that
 	Assert( VectorCompare( origin.Data(),  self->s.origin ) );
