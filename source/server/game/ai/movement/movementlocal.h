@@ -153,7 +153,7 @@ inline EnvironmentTraceCache &PredictionContext::TraceCache() {
 }
 
 inline void PredictionContext::SaveActionOnStack( BaseAction *action ) {
-	auto *topOfStack = &this->predictedMovementActions[this->topOfStackIndex];
+	auto *topOfStack = &( *predictedMovementActions )[this->topOfStackIndex];
 	// This was a source of an annoying bug! movement state has been modified during a prediction step!
 	// We expect that record state is a saved state BEFORE the step!
 	//topOfStack->entityPhysicsState = this->movementState->entityPhysicsState;
@@ -272,7 +272,7 @@ inline unsigned PredictionContext::MillisAheadForFrameStart( unsigned frameIndex
 	}
 #endif
 	if( frameIndex < topOfStackIndex ) {
-		return (unsigned)( predictedMovementActions[frameIndex].timestamp );
+		return (unsigned)( ( *predictedMovementActions )[frameIndex].timestamp );
 	}
 	return totalMillisAhead;
 }

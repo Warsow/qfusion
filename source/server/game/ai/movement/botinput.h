@@ -14,6 +14,7 @@ enum class InputRotation : uint8_t {
 
 class alignas ( 4 )BotInput {
 	friend class PredictionContext;
+	friend class PredictingAndCachingMovementScript;
 	// Todo: Pack since it is required to be normalized now?
 	Vec3 intendedLookDir { 0, 0, 0 };
 	// A copy of self->s.angles for modification

@@ -6,7 +6,6 @@ void BunnyTestingMultipleLookDirsAction::BeforePlanning() {
 	BunnyHopAction::BeforePlanning();
 
 	// Ensure the suggested action has been set in subtype constructor
-	Assert( suggestedAction );
 	currDir = nullptr;
 }
 

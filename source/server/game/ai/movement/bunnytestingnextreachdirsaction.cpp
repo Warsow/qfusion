@@ -6,8 +6,6 @@
 
 BunnyTestingNextReachDirsAction::BunnyTestingNextReachDirsAction( MovementSubsystem *subsystem )
 	: BunnyTestingSavedLookDirsAction( subsystem, NAME, COLOR_RGB( 0, 192, 0 ) ) {
-	// The constructor cannot be defined in the header due to this bot member access
-	suggestedAction = &m_subsystem->bunnyToBestVisibleReachAction;
 	maxSuggestedLookDirs = kMaxSuggestedLookDirs;
 }
 

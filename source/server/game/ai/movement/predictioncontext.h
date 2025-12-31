@@ -9,62 +9,7 @@ class AiAasRouteCache;
 #include "floorclusterareascache.h"
 #include "environmenttracecache.h"
 #include "nearbytriggerscache.h"
-
-struct MovementActionRecord {
-	BotInput botInput;
-
-private:
-	int16_t modifiedVelocity[3];
-
-public:
-	int8_t pendingWeapon : 7;
-	bool hasModifiedVelocity : 1;
-
-	MovementActionRecord()
-		: pendingWeapon( -1 ),
-		  hasModifiedVelocity( false ) {}
-
-	void Clear() {
-		botInput.Clear();
-		pendingWeapon = -1;
-		hasModifiedVelocity = false;
-	}
-
-	void SetModifiedVelocity( const Vec3 &velocity ) {
-		SetModifiedVelocity( velocity.Data() );
-	}
-
-	void SetModifiedVelocity( const vec3_t velocity ) {
-		for( int i = 0; i < 3; ++i ) {
-			int snappedVelocityComponent = (int)( velocity[i] * 16.0f );
-			if( snappedVelocityComponent > std::numeric_limits<signed short>::max() ) {
-				snappedVelocityComponent = std::numeric_limits<signed short>::max();
-			} else if( snappedVelocityComponent < std::numeric_limits<signed short>::min() ) {
-				snappedVelocityComponent = std::numeric_limits<signed short>::min();
-			}
-			modifiedVelocity[i] = (signed short)snappedVelocityComponent;
-		}
-		hasModifiedVelocity = true;
-	}
-
-	Vec3 ModifiedVelocity() const {
-		assert( hasModifiedVelocity );
-		float scale = 1.0f / 16.0f;
-		return Vec3( scale * modifiedVelocity[0], scale * modifiedVelocity[1], scale * modifiedVelocity[2] );
-	}
-};
-
-struct MovementPredictionConstants {
-	enum SequenceStopReason : uint8_t {
-		UNSPECIFIED, // An empty initial value, should be replaced by SWITCHED on actual use
-		SUCCEEDED,   // The sequence has been completed successfully
-		SWITCHED,    // The action cannot be applied in the current environment, another action is suggested
-		DISABLED,    // The action is disabled for application, another action is suggested
-		FAILED       // A prediction step has lead to a failure
-	};
-
-	static constexpr unsigned MAX_SAVED_LANDING_AREAS = 16;
-};
+#include "movementscript.h"
 
 class Bot;
 class MovementSubsystem;
@@ -76,27 +21,8 @@ class PredictionContext : public MovementPredictionConstants {
 	Bot *const bot;
 	MovementSubsystem *const m_subsystem;
 public:
-	// Note: We have deliberately lowered this value
-	// to prevent fruitless prediction frames that lead to an overflow anyway
-	// once much more stricter bunnying checks are implemented
-	static constexpr unsigned MAX_PREDICTED_STATES = 32;
 
-	SameFloorClusterAreasCache sameFloorClusterAreasCache;
-	NextFloorClusterAreasCache nextFloorClusterAreasCache;
 private:
-	struct PredictedMovementAction {
-		AiEntityPhysicsState entityPhysicsState;
-		MovementActionRecord record;
-		BaseAction *action;
-		int64_t timestamp;
-		unsigned stepMillis;
-
-		PredictedMovementAction()
-			: action(nullptr),
-			  timestamp( 0 ),
-			  stepMillis( 0 ) {}
-	};
-
 	using PredictedPath = wsw::StaticVector<PredictedMovementAction, MAX_PREDICTED_STATES>;
 
 	struct MinimalSavedPlayerState {
@@ -104,7 +30,7 @@ private:
 		float viewheight;
 	};
 
-	PredictedPath predictedMovementActions;
+	PredictedPath *const predictedMovementActions;
 	wsw::StaticVector<MovementState, MAX_PREDICTED_STATES> botMovementStatesStack;
 	wsw::StaticVector<MinimalSavedPlayerState, MAX_PREDICTED_STATES> playerStatesStack;
 
@@ -280,10 +206,9 @@ public:
 	const AiAasRouteCache *RouteCache() const;
 	int TravelFlags() const;
 
-	explicit PredictionContext( MovementSubsystem *m_subsystem );
+	explicit PredictionContext( MovementSubsystem *subsystem, PredictedPath *_predictedMovementActions );
 
-	void BuildPlan();
-	void ExecuteAppropriateActions( const AiEntityPhysicsState &initialPhysicsState );
+	bool BuildPlan( std::span<BaseAction *> actionsToUse );
 	void TryBuildingPlanUsingAction( BaseAction *action );
 	bool NextPredictionStep( BaseAction *action, bool *hasStartedSequence );
 	void SetupStackForStep();
@@ -294,7 +219,7 @@ public:
 	void SaveNearbyEntities();
 
 	const AiEntityPhysicsState &PhysicsStateBeforeStep() const {
-		return predictedMovementActions[topOfStackIndex].entityPhysicsState;
+		return ( *predictedMovementActions )[topOfStackIndex].entityPhysicsState;
 	}
 
 	bool CanGrowStackForNextStep() const {
@@ -316,22 +241,6 @@ public:
 
 	void SaveGoodEnoughPath( unsigned advancement, unsigned penaltyMillis );
 	void SaveLastResortPath( unsigned penaltyMillis );
-
-	class BaseAction *GetCachedActionAndRecordForCurrTime( MovementActionRecord *record_ );
-
-	class BaseAction *TryCheckAndLerpActions( PredictedMovementAction *prevAction,
-													  PredictedMovementAction *nextAction,
-													  MovementActionRecord *record_ );
-
-	class BaseAction *LerpActionRecords( PredictedMovementAction *prevAction,
-		                                         PredictedMovementAction *nextAction,
-		                                         MovementActionRecord *record_ );
-
-	bool CheckPredictedOrigin( PredictedMovementAction *prevAction, PredictedMovementAction *nextAction, float frac );
-	bool CheckPredictedVelocity( PredictedMovementAction *prevAction, PredictedMovementAction *nextAction, float frac );
-	bool CheckPredictedAngles( PredictedMovementAction *prevAction, PredictedMovementAction *nextAction, float frac );
-
-	void SetDefaultBotInput();
 
 	void Debug( const char *format, ... ) const;
 	// We want to have a full control over movement code assertions, so use custom ones for this class
@@ -356,8 +265,6 @@ public:
 
 	void OnInterceptedPredictedEvent( int ev, int parm );
 	void OnInterceptedPMoveTouchTriggers( pmove_t *pm, vec3_t const previousOrigin );
-
-	class BaseAction *GetActionAndRecordForCurrTime( MovementActionRecord *record_ );
 
 	// Might be called for failed attempts too
 	void ShowBuiltPlanPath( bool useActionsColor = false ) const;

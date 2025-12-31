@@ -7,13 +7,8 @@
 MovementSubsystem::MovementSubsystem( Bot *bot_ )
 	: bot( bot_ )
 	, weaponJumpAttemptsRateLimiter( 2 )
-	, bunnyToStairsOrRampExitAction( this )
-	, bunnyFollowingReachChainAction( this )
-	, bunnyTestingNextReachDirsAction( this )
-	, bunnyToBestVisibleReachAction( this )
-	, bunnyToBestFloorClusterPointAction( this )
-	, bunnyTestingMultipleTurnsAction( this )
-	, predictionContext( this ) {
+	, sameFloorClusterAreasCache( bot_ )
+	, nextFloorClusterAreasCache( bot_ ) {
 	//movementState.Reset();
 }
 
@@ -54,12 +49,33 @@ bool MovementSubsystem::CanInterruptMovement() const {
 void MovementSubsystem::Frame( BotInput *input ) {
 	CheckBlockingDueToInputRotation();
 
-	ApplyPendingTurnToLookAtPoint( input );
+	// TODO:!!!!!!!!!!!!
+	// ApplyPendingTurnToLookAtPoint( input );
 
-	MovementActionRecord movementActionRecord;
-	BaseAction *movementAction = predictionContext.GetActionAndRecordForCurrTime( &movementActionRecord );
+	if( activeScript ) {
+		if( activeScript->getTimeoutAt() <= level.time ) {
+			activeScript = nullptr;
+		}
+	}
 
-	movementAction->ExecActionRecord( &movementActionRecord, input, nullptr );
+	if( activeScript ) {
+		if( !activeScript->produceBotInput( input ) ) {
+			activeScript = nullptr;
+		}
+	}
+
+	const bool shouldSelectNewScript = !activeScript;
+	if( shouldSelectNewScript ) {
+		activeScript = &bunnyHopScript;
+		if( !activeScript->produceBotInput( input ) ) {
+			activeScript = nullptr;
+		}
+	}
+
+	if( shouldSelectNewScript && activeScript ) {
+		// TODO: ->activate() ?
+		activeScript->bumpTimeout();
+	}
 }
 
 void MovementSubsystem::CheckBlockingDueToInputRotation() {
@@ -337,11 +353,10 @@ void MovementSubsystem::TurnInputToSide( vec3_t sideDir, int sign, BotInput *inp
 	SetupInputForTransition( input, groundEntity, sideDir );
 }
 
-PredictionContext::PredictionContext( MovementSubsystem *subsystem )
+PredictionContext::PredictionContext( MovementSubsystem *subsystem, PredictedPath *predictedMovementActions_ )
 	: bot( subsystem->bot )
 	, m_subsystem( subsystem )
-	, sameFloorClusterAreasCache( m_subsystem->bot )
-	, nextFloorClusterAreasCache( m_subsystem->bot )
+	, predictedMovementActions( predictedMovementActions_ )
 	, movementState( nullptr )
 	, record( nullptr )
 	, totalMillisAhead( 0 )

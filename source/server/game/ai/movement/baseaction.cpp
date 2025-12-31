@@ -1,12 +1,6 @@
 #include "baseaction.h"
 #include "movementlocal.h"
 
-void BaseAction::RegisterSelf() {
-	bot = m_subsystem->bot;
-	this->actionNum = m_subsystem->movementActions.size();
-	m_subsystem->movementActions.push_back( this );
-}
-
 void BaseAction::Debug( const char *format, ... ) const {
 #if ( defined( ENABLE_MOVEMENT_DEBUG_OUTPUT ) || defined( CHECK_INFINITE_NEXT_STEP_LOOPS ) )
 	// Check if there is an already detected error in this case and perform output only it the condition passes
@@ -212,6 +206,7 @@ bool BaseAction::HasTouchedNavEntityThisFrame( PredictionContext *context ) {
 }
 
 void BaseAction::BeforePlanning() {
+	bot = m_subsystem->bot;
 	isDisabledForPlanning = false;
 	sequenceStartFrameIndex = std::numeric_limits<unsigned>::max();
 	sequenceEndFrameIndex = std::numeric_limits<unsigned>::max();

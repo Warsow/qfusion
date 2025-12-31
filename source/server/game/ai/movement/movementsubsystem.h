@@ -77,12 +77,9 @@ class MovementSubsystem {
 	friend struct MovementState;
 	friend class PredictionContext;
 	friend class BaseAction;
-	friend class BunnyToStairsOrRampExitAction;
-	friend class BunnyFollowingReachChainAction;
-	friend class BunnyTestingNextReachDirsAction;
-	friend class BunnyToBestVisibleReachAction;
+	friend class MovementScript;
 	friend class BunnyToBestFloorClusterPointAction;
-	friend class BunnyTestingMultipleTurnsAction;
+	friend class PredictingAndCachingMovementScript;
 
 	Bot *const bot;
 
@@ -96,19 +93,39 @@ class MovementSubsystem {
 	// Is not for rate limiting but for preventing instant weapon switch for shooting after a failed attempt
 	Int64Align4 lastWeaponJumpTriggeringFailedAt { 0 };
 
-	// Must be initialized before any of movement actions constructors is called
-	wsw::StaticVector<BaseAction *, 20> movementActions;
-
-	BunnyToStairsOrRampExitAction bunnyToStairsOrRampExitAction;
-	BunnyFollowingReachChainAction bunnyFollowingReachChainAction;
-	BunnyTestingNextReachDirsAction bunnyTestingNextReachDirsAction;
-	BunnyToBestVisibleReachAction bunnyToBestVisibleReachAction;
-	BunnyToBestFloorClusterPointAction bunnyToBestFloorClusterPointAction;
-	BunnyTestingMultipleTurnsAction bunnyTestingMultipleTurnsAction;
+	class BunnyHopScript : public PredictingAndCachingMovementScript {
+	public:
+		explicit BunnyHopScript( MovementSubsystem *movementSubsystem )
+			: PredictingAndCachingMovementScript( movementSubsystem )
+			, m_bunnyToStairsOrRampExitAction( movementSubsystem )
+			, m_bunnyToBestFloorClusterPointAction( movementSubsystem )
+			, m_bunnyFollowingReachChainAction( movementSubsystem )
+			, m_bunnyTestingNextReachDirsAction( movementSubsystem )
+			, m_bunnyToBestVisibleReachAction( movementSubsystem )
+			, m_bunnyTestingMultipleTurnsAction( movementSubsystem ) {
+			m_timeoutAt              = std::numeric_limits<int64_t>::max();
+			m_storageOfActionPtrs[0] = &m_bunnyToStairsOrRampExitAction;
+			m_storageOfActionPtrs[1] = &m_bunnyToBestFloorClusterPointAction;
+			m_storageOfActionPtrs[2] = &m_bunnyFollowingReachChainAction;
+			m_storageOfActionPtrs[3] = &m_bunnyTestingNextReachDirsAction;
+			m_storageOfActionPtrs[4] = &m_bunnyToBestVisibleReachAction;
+			m_storageOfActionPtrs[5] = &m_bunnyTestingMultipleTurnsAction;
+			m_movementActions        = m_storageOfActionPtrs;
+		}
+	private:
+		BunnyToStairsOrRampExitAction m_bunnyToStairsOrRampExitAction;
+		BunnyToBestFloorClusterPointAction m_bunnyToBestFloorClusterPointAction;
+		BunnyFollowingReachChainAction m_bunnyFollowingReachChainAction;
+		BunnyTestingNextReachDirsAction m_bunnyTestingNextReachDirsAction;
+		BunnyToBestVisibleReachAction m_bunnyToBestVisibleReachAction;
+		BunnyTestingMultipleTurnsAction m_bunnyTestingMultipleTurnsAction;
+		BaseAction *m_storageOfActionPtrs[6] {};
+	};
 
 	MovementState movementState;
 
-	PredictionContext predictionContext;
+	SameFloorClusterAreasCache sameFloorClusterAreasCache;
+	NextFloorClusterAreasCache nextFloorClusterAreasCache;
 
 	int64_t nextRotateInputAttemptAt { 0 };
 	int64_t inputRotationBlockingTimer { 0 };
@@ -124,15 +141,19 @@ class MovementSubsystem {
 		AiPendingLookAtPoint pendingLookAtPoint;
 		int64_t timeoutAt { 0 };
 	} pendingLookAtPointState;
+
+	MovementScript *activeScript { nullptr };
+
+	BunnyHopScript bunnyHopScript { this };
 public:
 	explicit MovementSubsystem( Bot *bot_ );
 
 	void OnInterceptedPredictedEvent( int ev, int parm ) {
-		predictionContext.OnInterceptedPredictedEvent( ev, parm );
+		static_cast<PredictingMovementScript *>( activeScript )->onInterceptedPredictedEvent( ev, parm );
 	}
 
 	void OnInterceptedPMoveTouchTriggers( pmove_t *pm, const vec3_t previousOrigin ) {
-		predictionContext.OnInterceptedPMoveTouchTriggers( pm, previousOrigin );
+		static_cast<PredictingMovementScript *>( activeScript )->onInterceptedPMoveTouchTriggers( pm, previousOrigin );
 	}
 
 	void SetCampingSpot( const AiCampingSpot &campingSpot ) {

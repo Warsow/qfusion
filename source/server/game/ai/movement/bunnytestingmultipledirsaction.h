@@ -8,7 +8,6 @@ class BunnyTestingMultipleLookDirsAction : public BunnyHopAction {
 	friend class BunnyToBestShortcutAreaAction;
 	friend class BunnyInterpolatingChainAtStartAction;
 protected:
-	BaseAction *suggestedAction { nullptr };
 	const float *currDir {nullptr };
 
 	virtual void OnApplicationSequenceFailed( PredictionContext *context, unsigned stoppedAtFrameIndex ) {};

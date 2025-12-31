@@ -8,7 +8,6 @@ class MovementSubsystem;
 
 class BaseAction : public MovementPredictionConstants {
 	friend class PredictionContext;
-	void RegisterSelf();
 
 protected:
 	// Must be set by RegisterSelf() call. We have to break a circular dependency.
@@ -63,9 +62,7 @@ protected:
 	bool HasTouchedNavEntityThisFrame( PredictionContext *context );
 public:
 	inline BaseAction( MovementSubsystem *subsystem, const char *name_, int debugColor_ = 0 )
-		: m_subsystem( subsystem ), name( name_ ), debugColor( debugColor_ ) {
-		RegisterSelf();
-	}
+		: m_subsystem( subsystem ), name( name_ ), debugColor( debugColor_ ) {}
 	virtual void PlanPredictionStep( PredictionContext *context ) = 0;
 	virtual void ExecActionRecord( const MovementActionRecord *record,
 								   BotInput *inputWillBeUsed,
@@ -96,7 +93,6 @@ public:
 
 	const char *Name() const { return name; }
 	int DebugColor() const { return debugColor; }
-	unsigned ActionNum() const { return actionNum; }
 	bool IsDisabledForPlanning() const { return isDisabledForPlanning; }
 };
 

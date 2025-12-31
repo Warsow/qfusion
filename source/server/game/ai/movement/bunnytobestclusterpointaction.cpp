@@ -3,15 +3,14 @@
 
 BunnyToBestFloorClusterPointAction::BunnyToBestFloorClusterPointAction( MovementSubsystem *subsystem )
 	: BunnyTestingMultipleLookDirsAction( subsystem, NAME, COLOR_RGB( 255, 0, 255 ) ) {
-	suggestedAction = &m_subsystem->bunnyTestingNextReachDirsAction;
 }
 
 void BunnyToBestFloorClusterPointAction::OnApplicationSequenceStarted( PredictionContext *context ) {
 	Super::OnApplicationSequenceStarted( context );
 
 	FloorClusterAreasCache *const caches[2] = {
-		&m_subsystem->predictionContext.sameFloorClusterAreasCache,
-		&m_subsystem->predictionContext.nextFloorClusterAreasCache
+		&m_subsystem->sameFloorClusterAreasCache,
+		&m_subsystem->nextFloorClusterAreasCache
 	};
 
 	bool *const testedFlags[2] = { &this->hasTestedSameCluster, &this->hasTestedNextCluster };
