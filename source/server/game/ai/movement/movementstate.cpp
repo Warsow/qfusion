@@ -1,150 +1,153 @@
 #include "movementstate.h"
 #include "movementlocal.h"
 
-bool AerialMovementState::ShouldDeactivate( const edict_t *self, const PredictionContext *context ) const {
-	const edict_t *groundEntity;
-	if( context ) {
-		groundEntity = context->movementState->entityPhysicsState.GroundEntity();
+void AiEntityPhysicsState::UpdateAreaNums() {
+	const AiAasWorld *const __restrict aasWorld = AiAasWorld::instance();
+	this->currAasAreaNum = (uint16_t)aasWorld->findAreaNum( Origin() );
+	// Use a computation shortcut when entity is on ground
+	if( this->groundEntNum >= 0 ) {
+		SetHeightOverGround( 0 );
+		const Vec3 droppedOrigin( origin[0], origin[1], origin[2] + playerbox_stand_mins[2] + 8.0f );
+		if( !( this->droppedToFloorAasAreaNum = (uint16_t)aasWorld->findAreaNum( droppedOrigin ) ) ) {
+			this->droppedToFloorAasAreaNum = this->currAasAreaNum;
+		}
+	} else if( aasWorld->isAreaGrounded( this->currAasAreaNum ) ) {
+		const float areaMinsZ = aasWorld->getAreas()[this->currAasAreaNum].mins[2];
+		const float selfZ = Self()->s.origin[2];
+		SetHeightOverGround( ( selfZ - areaMinsZ ) + playerbox_stand_mins[2] );
+		this->droppedToFloorAasAreaNum = this->currAasAreaNum;
 	} else {
-		groundEntity = self->groundentity;
-	}
-
-	if( !groundEntity ) {
-		return false;
-	}
-
-	// TODO: Discover why general solid checks fail for world entity
-	if( groundEntity == world ) {
-		return true;
-	}
-
-	if( groundEntity->s.solid == SOLID_YES || groundEntity->s.solid == SOLID_BMODEL ) {
-		return true;
-	}
-
-	return false;
-}
-
-bool FlyUntilLandingMovementState::CheckForLanding( const PredictionContext *context ) {
-	if( isLanding ) {
-		return true;
-	}
-
-	const float *botOrigin = context->movementState->entityPhysicsState.Origin();
-
-	// Put the likely case first
-	if( !this->usesDistanceThreshold ) {
-		if( threshold < botOrigin[2] + playerbox_stand_mins[2] ) {
-			isLanding = true;
-			return true;
+		// Try dropping the origin to floor
+		const edict_t *ent = Self();
+		const Vec3 traceEnd( origin[0], origin[1], origin[2] - GROUND_TRACE_DEPTH );
+		// TODO: We can replace this inefficient G_Trace() call
+		// by clipping against nearby solid entities which could be cached
+		trace_t trace;
+		G_Trace( &trace, this->origin, ent->r.mins, ent->r.maxs, traceEnd.Data(), ent, MASK_PLAYERSOLID );
+		// Check not only whether there is a hit but test whether is it really a ground (and not a wall or obstacle)
+		if( ( trace.fraction != 1.0f ) && ( origin[2] - trace.endpos[2] ) > -playerbox_stand_mins[2] ) {
+			SetHeightOverGround( ( trace.fraction * GROUND_TRACE_DEPTH ) + playerbox_stand_mins[2] );
+			const Vec3 droppedOrigin( trace.endpos[0], trace.endpos[1], trace.endpos[2] + 8.0f );
+			if( !( this->droppedToFloorAasAreaNum = (uint16_t)aasWorld->findAreaNum( droppedOrigin ) ) ) {
+				this->droppedToFloorAasAreaNum = this->currAasAreaNum;
+			}
+		} else {
+			SetHeightOverGround( std::numeric_limits<float>::infinity() );
+			this->droppedToFloorAasAreaNum = this->currAasAreaNum;
 		}
-		return false;
-	}
-
-	Vec3 unpackedTarget( GetUnpacked4uVec( target ) );
-	if( unpackedTarget.SquareDistanceTo( botOrigin ) > threshold * threshold ) {
-		return false;
-	}
-
-	isLanding = true;
-	return true;
-}
-
-void WeaponJumpMovementState::TryDeactivate( const edict_t *self, const PredictionContext *context ) {
-	// If a bot has activated a trigger, give its movement state a priority
-	if( level.time - self->bot->LastTriggerTouchTime() < 64 ) {
-		Deactivate();
-	}
-
-	if( !hasTriggeredWeaponJump ) {
-		// If we have still not managed to trigger the jump
-		if( !millisToTriggerJumpLeft ) {
-			Deactivate();
-		}
-		return;
-	}
-
-	if( !hasCorrectedWeaponJump ) {
-		return;
-	}
-
-	if( context ) {
-		if( context->movementState->entityPhysicsState.GroundEntity() ) {
-			Deactivate();
-		}
-		return;
-	}
-
-	if( self->groundentity ) {
-		Deactivate();
 	}
 }
 
-void CampingSpotState::TryDeactivate( const edict_t *self, const PredictionContext *context ) {
-	const float *botOrigin = context ? context->movementState->entityPhysicsState.Origin() : self->s.origin;
-	const float distanceThreshold = 1.5f * campingSpot.Radius();
-	if( this->Origin().SquareDistance2DTo( botOrigin ) > distanceThreshold * distanceThreshold ) {
-		Deactivate();
+void AiEntityPhysicsState::UpdateFromEntity( const edict_t *ent ) {
+	VectorCopy( ent->s.origin, this->origin );
+	SetVelocity( ent->velocity );
+	this->waterType = ent->watertype;
+	this->waterLevel = ( decltype( this->waterLevel ) )ent->waterlevel;
+	// TODO: Get rid of packing
+	this->angles[0] = ANGLE2SHORT( ent->s.angles[0] );
+	this->angles[1] = ANGLE2SHORT( ent->s.angles[1] );
+	this->angles[2] = ANGLE2SHORT( ent->s.angles[2] );
+	vec3_t forward, right;
+	AngleVectors( ent->s.angles, forward, right, nullptr );
+	SetPackedDir( forward, this->forwardDir );
+	SetPackedDir( right, this->rightDir );
+	this->groundEntNum = -1;
+	if( ent->groundentity ) {
+		this->groundEntNum = ( decltype( this->groundEntNum ) )( ENTNUM( ent->groundentity ) );
 	}
+	this->selfEntNum = ( decltype( this->selfEntNum ) )ENTNUM( ent );
+	// Compute lazily on demand in this case
+	SetGroundNormalZ( 0 );
+
+	UpdateAreaNums();
 }
 
-AiPendingLookAtPoint CampingSpotState::GetOrUpdateRandomLookAtPoint() const {
-	float turnSpeedMultiplier = 0.75f + 1.0f * campingSpot.Alertness();
-	if( campingSpot.hasLookAtPoint ) {
-		return AiPendingLookAtPoint( campingSpot.LookAtPoint(), turnSpeedMultiplier );
-	}
-	if( lookAtPointTimeLeft ) {
-		return AiPendingLookAtPoint( campingSpot.LookAtPoint(), turnSpeedMultiplier );
-	}
-
-	// TODO: Pick it properly using UV selection
-	Vec3 lookAtPoint( -0.5f + random(), -0.5f + random(), -0.25f + 0.5f * random() );
-	lookAtPoint.normalizeFastOrThrow();
-
-	// The magnitude does not actually mattter.
-	// Just make sure we don't end with denormalized direction later.
-	lookAtPoint *= 1000.0f;
-	lookAtPoint += campingSpot.Origin();
-	campingSpot.SetLookAtPoint( lookAtPoint );
-	this->lookAtPointTimeLeft = ( decltype( this->lookAtPointTimeLeft ) )LookAtPointTimeout();
-	return AiPendingLookAtPoint( lookAtPoint, turnSpeedMultiplier );
-}
-
-#define CHECK_STATE_FLAG( state, bit )                                                                 \
-	if( ( expectedStatesMask & ( 1 << bit ) ) != ( ( (unsigned)state.IsActive() ) << ( 1 << bit ) ) )  \
-	{                                                                                                  \
-		result = false;                                                                                \
-		if( logFunc ) {                                                                                \
-			const edict_t *owner = game.edicts + bot->EntNum();                                        \
-			logFunc( format, Nick( owner ), #state ".IsActive()", (unsigned)state.IsActive() );        \
-		}     																						   \
-	}
-
-bool MovementState::TestActualStatesForExpectedMask( unsigned expectedStatesMask, const Bot *bot ) const {
-	// Might be set to null if verbose logging is not needed
-#ifdef ENABLE_MOVEMENT_DEBUG_OUTPUT
-	void ( *logFunc )( const char *format, ... ) = G_Printf;
-#elif defined( CHECK_INFINITE_NEXT_STEP_LOOPS )
-	void ( *logFunc )( const char *format, ... );
-	// Suppress output if the iterations counter is within a feasible range
-	if( ::nextStepIterationsCounter < NEXT_STEP_INFINITE_LOOP_THRESHOLD ) {
-		logFunc = nullptr;
-	} else {
-		logFunc = G_Printf;
-	}
-#else
-	void ( *logFunc )( const char *format, ... ) = nullptr;
+void AiEntityPhysicsState::UpdateFromPMove( const pmove_t *pmove ) {
+	VectorCopy( pmove->playerState->pmove.origin, this->origin );
+	SetVelocity( pmove->playerState->pmove.velocity );
+	this->waterType = pmove->watertype;
+	this->waterLevel = ( decltype( this->waterLevel ) )pmove->waterlevel;
+	// TODO: Get rid of packing
+	this->angles[0] = ANGLE2SHORT( pmove->playerState->viewangles[0] );
+	this->angles[1] = ANGLE2SHORT( pmove->playerState->viewangles[1] );
+	this->angles[2] = ANGLE2SHORT( pmove->playerState->viewangles[2] );
+	SetPackedDir( pmove->forward, this->forwardDir );
+	SetPackedDir( pmove->right, this->rightDir );
+#if 0
+	[[maybe_unused]] vec3_t forward, right;
+		AngleVectors( pmove->playerState->viewangles, forward, right, nullptr );
+		assert( DotProduct( pmove->forward, forward ) > 0.999f );
+		assert( DotProduct( pmove->right, right ) > 0.999f );
 #endif
-	constexpr const char *format = "MovementState(%s): %s %d has mismatch with the mask value\n";
+	this->groundEntNum = ( decltype( this->groundEntNum ) )pmove->groundentity;
+	this->selfEntNum = ( decltype( this->selfEntNum ) )( pmove->playerState->playerNum + 1 );
+	SetGroundNormalZ( pmove->groundentity >= 0 ? pmove->groundplane.normal[2] : 0 );
 
-	bool result = true;
-	CHECK_STATE_FLAG( jumppadMovementState, 0 );
-	CHECK_STATE_FLAG( weaponJumpMovementState, 1 );
-	CHECK_STATE_FLAG( pendingLookAtPointState, 2 );
-	CHECK_STATE_FLAG( campingSpotState, 3 );
-	// Skip keyMoveDirsState.
-	// It either should not affect movement at all if regular movement is chosen,
-	// or should be handled solely by the combat movement code.
-	CHECK_STATE_FLAG( flyUntilLandingMovementState, 4 );
-	return result;
+	UpdateAreaNums();
+}
+
+void AiEntityPhysicsState::SetSpeed( const vec3_t velocity_ ) {
+	float squareSpeed2D = velocity_[0] * velocity_[0] + velocity_[1] * velocity_[1];
+	float squareSpeed   = squareSpeed2D + velocity_[2] * velocity_[2];
+	this->speed         = Q_Sqrt( squareSpeed );
+	this->speed2D       = Q_Sqrt( squareSpeed2D );
+}
+
+// Returns number of start areas to use in routing
+int AiEntityPhysicsState::PrepareRoutingStartAreas( int *areaNums ) const {
+	areaNums[0] = areaNums[1] = 0;
+
+	int numAreas = 0;
+
+	if( int areaNum = CurrAasAreaNum() ) {
+		areaNums[numAreas++] = areaNum;
+	}
+
+	if( int areaNum = DroppedToFloorAasAreaNum() ) {
+		if( numAreas ) {
+			if( areaNums[0] != areaNum ) {
+				areaNums[numAreas++] = areaNum;
+			}
+		} else {
+			areaNums[numAreas++] = areaNum;
+		}
+	}
+
+	return numAreas;
+}
+
+void AiEntityPhysicsState::SetHeightOverGround( float heightOverGround_ ) {
+	if( heightOverGround_ >= 0.0f ) {
+		if( heightOverGround_ <= GROUND_TRACE_DEPTH ) {
+			this->heightOverGround = ( uint16_t )( heightOverGround_ * 256 );
+		} else {
+			this->heightOverGround = ( uint16_t )( ( GROUND_TRACE_DEPTH + 1 ) * 256 + 1 );
+		}
+	} else {
+		this->heightOverGround = 0;
+	}
+}
+
+float AiEntityPhysicsState::GetGroundNormalZ() const {
+	if( groundNormalZ != 0 ) {
+		return groundNormalZ / std::numeric_limits<int16_t>::max();
+	}
+	if( groundEntNum < 0 ) {
+		return 0;
+	}
+
+	// In worst case that is rarely gets triggered the bot is on ground
+	// but the ground normal has not been computed yet, and was not initially available.
+	// Compute it right now following PMove() implementation.
+	// This lazy approach really helps reducing amount of expensive trace calls.
+	trace_t trace;
+	auto *start = const_cast<float *>( Origin() );
+	Vec3 end( Origin() );
+	end.Z() -= 0.25f;
+	edict_t *self = game.edicts + selfEntNum;
+	G_Trace( &trace, start, playerbox_stand_mins, playerbox_stand_maxs, end.Data(), self, MASK_PLAYERSOLID );
+	if( trace.fraction != 1.0f ) {
+		groundNormalZ = (int16_t)( trace.plane.normal[2] / std::numeric_limits<int16_t>::max() );
+	}
+	return groundNormalZ;
 }

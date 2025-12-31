@@ -120,11 +120,10 @@ class MovementSubsystem {
 	inline bool TryRotateInput( BotInput *input, PredictionContext *context = nullptr );
 	void CheckBlockingDueToInputRotation();
 
-	void ResetFailedWeaponJumpAttempt( PredictionContext *context ) {
-		assert( context->movementState->weaponJumpMovementState.IsActive() );
-		context->movementState->weaponJumpMovementState.Deactivate();
-		this->lastWeaponJumpTriggeringFailedAt = level.time;
-	}
+	struct PendingLookAtPointState {
+		AiPendingLookAtPoint pendingLookAtPoint;
+		int64_t timeoutAt { 0 };
+	} pendingLookAtPointState;
 public:
 	explicit MovementSubsystem( Bot *bot_ );
 
@@ -137,37 +136,39 @@ public:
 	}
 
 	void SetCampingSpot( const AiCampingSpot &campingSpot ) {
-		movementState.campingSpotState.Activate( campingSpot );
+		//movementState.campingSpotState.Activate( campingSpot );
 	}
 
 	void ResetCampingSpot() {
-		movementState.campingSpotState.Deactivate();
+		//movementState.campingSpotState.Deactivate();
 	}
 
 	bool HasActiveCampingSpot() const {
-		return movementState.campingSpotState.IsActive();
+		return false;
+		//return movementState.campingSpotState.IsActive();
 	}
 
 	void SetPendingLookAtPoint( const AiPendingLookAtPoint &lookAtPoint, unsigned timeoutPeriod ) {
-		movementState.pendingLookAtPointState.Activate( lookAtPoint, timeoutPeriod );
+		pendingLookAtPointState.pendingLookAtPoint = lookAtPoint;
+		pendingLookAtPointState.timeoutAt          = level.time + timeoutPeriod;
 	}
 
 	void ResetPendingLookAtPoint() {
-		movementState.pendingLookAtPointState.Deactivate();
+		pendingLookAtPointState.timeoutAt = 0;
 	}
 
 	bool HasPendingLookAtPoint() const {
-		return movementState.pendingLookAtPointState.IsActive();
+		return pendingLookAtPointState.timeoutAt > level.time;
 	}
 
 	void ActivateJumppadState( const edict_t *jumppadEnt ) {
-		movementState.jumppadMovementState.Activate( jumppadEnt );
+		//movementState.jumppadMovementState.Activate( jumppadEnt );
 	}
 
 	bool CanChangeWeapons() const;
 
 	void Reset() {
-		movementState.Reset();
+		ResetPendingLookAtPoint();
 	}
 
 	bool CanInterruptMovement() const;

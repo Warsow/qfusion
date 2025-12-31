@@ -57,14 +57,6 @@ BaseAction *PredictionContext::GetCachedActionAndRecordForCurrTime( MovementActi
 
 	Assert( prevPredictedAction->timestamp + prevPredictedAction->stepMillis == nextPredictedAction->timestamp );
 
-	// Fail prediction if both previous and next predicted movement states mask mismatch the current movement state
-	const auto &actualMovementState = m_subsystem->movementState;
-	if( !actualMovementState.TestActualStatesForExpectedMask( prevPredictedAction->movementStatesMask, bot ) ) {
-		if( !actualMovementState.TestActualStatesForExpectedMask( nextPredictedAction->movementStatesMask, bot ) ) {
-			return nullptr;
-		}
-	}
-
 	return TryCheckAndLerpActions( prevPredictedAction, nextPredictedAction, record_ );
 }
 
@@ -537,7 +529,6 @@ void PredictionContext::SetupStackForStep() {
 
 	// Save a movement state BEFORE movement step
 	topOfStack->entityPhysicsState = this->movementState->entityPhysicsState;
-	topOfStack->movementStatesMask = this->movementState->GetContainedStatesMask();
 }
 
 void PredictionContext::ExecuteAppropriateActions( const AiEntityPhysicsState &initialPhysicsState ) {
@@ -1076,9 +1067,6 @@ void PredictionContext::NextMovementStep( BaseAction *action ) {
 
 	// Update the entity physics state that is going to be used in the next prediction frame
 	entityPhysicsState->UpdateFromPMove( &pm );
-	// Update the entire movement state that is going to be used in the next prediction frame
-	this->movementState->Frame( this->predictionStepMillis );
-	this->movementState->TryDeactivateContainedStates( self, this );
 }
 
 #ifdef CHECK_INFINITE_NEXT_STEP_LOOPS

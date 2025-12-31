@@ -90,13 +90,11 @@ private:
 		BaseAction *action;
 		int64_t timestamp;
 		unsigned stepMillis;
-		unsigned movementStatesMask;
 
 		PredictedMovementAction()
 			: action(nullptr),
 			  timestamp( 0 ),
-			  stepMillis( 0 ),
-			  movementStatesMask( 0 ) {}
+			  stepMillis( 0 ) {}
 	};
 
 	using PredictedPath = wsw::StaticVector<PredictedMovementAction, MAX_PREDICTED_STATES>;

@@ -14,14 +14,15 @@ MovementSubsystem::MovementSubsystem( Bot *bot_ )
 	, bunnyToBestFloorClusterPointAction( this )
 	, bunnyTestingMultipleTurnsAction( this )
 	, predictionContext( this ) {
-	movementState.Reset();
+	//movementState.Reset();
 }
 
 bool MovementSubsystem::CanChangeWeapons() const {
+	/*
 	auto &weaponJumpState = movementState.weaponJumpMovementState;
 	if( weaponJumpState.IsActive() ) {
 		return weaponJumpState.hasTriggeredWeaponJump;
-	}
+	}*/
 	const int64_t levelTime = level.time;
 	// If there were no recent failed weapon jump attempts
 	if( levelTime - lastWeaponJumpTriggeringFailedAt > 512 ) {
@@ -34,6 +35,7 @@ bool MovementSubsystem::CanChangeWeapons() const {
 }
 
 bool MovementSubsystem::CanInterruptMovement() const {
+	/*
 	if( movementState.jumppadMovementState.IsActive() ) {
 		return false;
 	}
@@ -42,7 +44,7 @@ bool MovementSubsystem::CanInterruptMovement() const {
 	}
 	if( movementState.weaponJumpMovementState.IsActive() ) {
 		return false;
-	}
+	}*/
 
 	const edict_t *self = game.edicts + bot->EntNum();
 	// False if the bot is standing on a platform and it has not switched to the TOP state
@@ -54,11 +56,6 @@ void MovementSubsystem::Frame( BotInput *input ) {
 
 	ApplyPendingTurnToLookAtPoint( input );
 
-	movementState.Frame( game.frametime );
-
-	const edict_t *self = game.edicts + bot->EntNum();
-	movementState.TryDeactivateContainedStates( self, nullptr );
-
 	MovementActionRecord movementActionRecord;
 	BaseAction *movementAction = predictionContext.GetActionAndRecordForCurrTime( &movementActionRecord );
 
@@ -66,9 +63,10 @@ void MovementSubsystem::Frame( BotInput *input ) {
 }
 
 void MovementSubsystem::CheckBlockingDueToInputRotation() {
+	/*
 	if( movementState.campingSpotState.IsActive() ) {
 		return;
-	}
+	}*/
 	if( movementState.inputRotation == InputRotation::NONE ) {
 		return;
 	}
@@ -108,24 +106,22 @@ void MovementSubsystem::CheckBlockingDueToInputRotation() {
 }
 
 void MovementSubsystem::ApplyPendingTurnToLookAtPoint( BotInput *botInput, PredictionContext *context ) {
-	PendingLookAtPointState *pendingLookAtPointState;
+	if( pendingLookAtPointState.timeoutAt < level.time ) {
+		return;
+	}
+
 	AiEntityPhysicsState *entityPhysicsState_;
 	unsigned frameTime;
 	if( context ) {
-		pendingLookAtPointState = &context->movementState->pendingLookAtPointState;
 		entityPhysicsState_ = &context->movementState->entityPhysicsState;
 		frameTime = context->predictionStepMillis;
 	} else {
-		pendingLookAtPointState = &movementState.pendingLookAtPointState;
 		entityPhysicsState_ = &movementState.entityPhysicsState;
 		frameTime = game.frametime;
 	}
 
-	if( !pendingLookAtPointState->IsActive() ) {
-		return;
-	}
 
-	const AiPendingLookAtPoint &pendingLookAtPoint = pendingLookAtPointState->pendingLookAtPoint;
+	const AiPendingLookAtPoint &pendingLookAtPoint = pendingLookAtPointState.pendingLookAtPoint;
 	Vec3 toPointDir( pendingLookAtPoint.Origin() );
 	toPointDir -= entityPhysicsState_->Origin();
 	if( !toPointDir.normalizeFast() ) {
