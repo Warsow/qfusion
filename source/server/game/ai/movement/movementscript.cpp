@@ -44,7 +44,7 @@ void PredictingAndCachingMovementScript::Debug( const char *format, ... ) const 
 bool PredictingAndCachingMovementScript::produceBotInput( BotInput *input ) {
 	MovementActionRecord movementActionRecord;
 	if( BaseAction *action = getCachedActionAndRecordForCurrTime( &movementActionRecord ) ) {
-		action->ExecActionRecord( &movementActionRecord, input );
+		action->execActionRecord( &movementActionRecord, input );
 		return true;
 	}
 
@@ -60,7 +60,7 @@ bool PredictingAndCachingMovementScript::produceBotInput( BotInput *input ) {
 		assert( !m_predictedMovementActions.empty() );
 		BaseAction *action = getCachedActionAndRecordForCurrTime( &movementActionRecord );
 		assert( action );
-		action->ExecActionRecord( &movementActionRecord, input );
+		action->execActionRecord( &movementActionRecord, input );
 		return true;
 	}
 
@@ -93,7 +93,7 @@ auto PredictingAndCachingMovementScript::getCachedActionAndRecordForCurrTime( Mo
 		Assert( VectorCompare( nextPredictedAction->entityPhysicsState.Velocity(), self->velocity ) );
 		// If there is a modified velocity, it will be copied with this record and then applied
 		*record_ = nextPredictedAction->record;
-		Debug( "Using just computed predicted movement action %s\n", nextPredictedAction->action->Name() );
+		Debug( "Using just computed predicted movement action %s\n", nextPredictedAction->action->getName() );
 		return nextPredictedAction->action;
 	}
 

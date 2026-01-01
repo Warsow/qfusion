@@ -20,12 +20,12 @@ struct Walker : public ReachChainWalker {
 	bool Exec() override;
 };
 
-auto BunnyToBestVisibleReachAction::PlanPredictionStep( PredictionContext *context ) -> PredictionResult {
-	if( const auto result = GenericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
+auto BunnyToBestVisibleReachAction::planPredictionStep( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = genericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
 		return result;
 	}
 
-	if( const auto result = CheckCommonBunnyHopPreconditions( context ); result != PredictionResult::Continue ) {
+	if( const auto result = checkCommonBunnyHopPreconditions( context ); result != PredictionResult::Continue ) {
 		return result;
 	}
 
@@ -37,7 +37,7 @@ auto BunnyToBestVisibleReachAction::PlanPredictionStep( PredictionContext *conte
     	walker.result.CopyTo( intendedLookDir );
     }
 
-    if( !SetupBunnyHopping( intendedLookDir, context ) ) {
+    if( !setupBunnyHopping( intendedLookDir, context ) ) {
 		return PredictionResult::Abort;
     }
 

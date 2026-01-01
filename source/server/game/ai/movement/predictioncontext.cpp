@@ -30,7 +30,7 @@ void PredictionContext::ShowBuiltPlanPath( bool useActionsColor ) const {
 
 		int color = 0;
 		if( useActionsColor ) {
-			color = ( *predictedMovementActions )[i].action->DebugColor();
+			color = ( *predictedMovementActions )[i].action->getDebugColor();
 		} else {
 			switch( i % 3 ) {
 				case 0: color = COLOR_RGB( 192, 0, 0 ); break;
@@ -316,24 +316,24 @@ auto PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStarted
 
 	if( !*hasStartedSequence ) {
 		*hasStartedSequence = true;
-		action->OnApplicationSequenceStarted( this );
+		action->onApplicationSequenceStarted( this );
 	}
 
-	Debug( "About to call action->PlanPredictionStep() for %s at ToS frame %d\n", action->Name(), topOfStackIndex );
-	if( const auto result = action->PlanPredictionStep( this ); result != PredictionResult::Continue ) {
+	Debug( "About to call action->PlanPredictionStep() for %s at ToS frame %d\n", action->getName(), topOfStackIndex );
+	if( const auto result = action->planPredictionStep( this ); result != PredictionResult::Continue ) {
 		if( result == PredictionResult::Complete ) {
 			SaveActionOnStack( action );
 			constexpr const char *format = "Movement prediction is completed on %s, ToS frame %d, %d millis ahead\n";
-			Debug( format, action->Name(), this->topOfStackIndex, this->totalMillisAhead );
+			Debug( format, action->getName(), this->topOfStackIndex, this->totalMillisAhead );
 			// Stop an action application sequence manually with a success.
-			action->OnApplicationSequenceStopped( this, BaseAction::SUCCEEDED, this->topOfStackIndex );
+			action->onApplicationSequenceStopped( this, BaseAction::SUCCEEDED, this->topOfStackIndex );
 			return PredictionResult::Complete;
 		}
 
 		// Stop an action application sequence manually with a failure.
-		action->OnApplicationSequenceStopped( this, BaseAction::FAILED, (unsigned)-1 );
+		action->onApplicationSequenceStopped( this, BaseAction::FAILED, (unsigned)-1 );
 		*hasStartedSequence = false;
-		Debug( "Prediction step failed after action->PlanPredictionStep() call for %s\n", action->Name() );
+		Debug( "Prediction step failed after action->PlanPredictionStep() call for %s\n", action->getName() );
 		return result;
 	}
 
@@ -347,23 +347,23 @@ auto PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStarted
 
 	NextMovementStep( action );
 
-	if( const auto result = action->CheckPredictionStepResults( this ); result != PredictionResult::Continue ) {
+	if( const auto result = action->checkPredictionStepResults( this ); result != PredictionResult::Continue ) {
 		if( result == PredictionResult::Complete ) {
 			constexpr const char *format = "Movement prediction is completed on %s, ToS frame %d, %d millis ahead\n";
-			Debug( format, action->Name(), this->topOfStackIndex, this->totalMillisAhead );
+			Debug( format, action->getName(), this->topOfStackIndex, this->totalMillisAhead );
 			SaveActionOnStack( action );
 			// Stop action application sequence manually with a success.
 			// Prevent duplicated OnApplicationSequenceStopped() call
 			// (it might have been done in action->CheckPredictionStepResults() for this->activeAction)
-			action->OnApplicationSequenceStopped( this, BaseAction::SUCCEEDED, topOfStackIndex );
+			action->onApplicationSequenceStopped( this, BaseAction::SUCCEEDED, topOfStackIndex );
 			*hasStartedSequence = false;
 			return PredictionResult::Complete;
 		}
 
 		constexpr const char *format = "Prediction step failed for %s after calling action->CheckPredictionStepResults()\n";
-		Debug( format, action->Name() );
+		Debug( format, action->getName() );
 
-		action->OnApplicationSequenceStopped( this, BaseAction::FAILED, (unsigned)-1 );
+		action->onApplicationSequenceStopped( this, BaseAction::FAILED, (unsigned)-1 );
 		*hasStartedSequence = false;
 
 		return result;
@@ -375,8 +375,8 @@ auto PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStarted
 		} else {
 			// Disable this action for further planning (it has lead to stack overflow)
 			// TODO: It can perfectly be recoverable
-			action->isDisabledForPlanning = true;
-			Debug( "Stack overflow on action %s, this action will be disabled for further planning\n", action->Name() );
+			action->m_isDisabledForPlanning = true;
+			Debug( "Stack overflow on action %s, this action will be disabled for further planning\n", action->getName() );
 			return PredictionResult::Abort;
 		}
 	}
@@ -642,7 +642,7 @@ bool PredictionContext::BuildPlan( std::span<BaseAction *> actionsToUse ) {
 }
 
 auto PredictionContext::TryBuildingPlanUsingAction( BaseAction *action ) -> PredictionResult {
-	action->BeforePlanning();
+	action->beforePlanning();
 
 #ifdef CHECK_INFINITE_NEXT_STEP_LOOPS
 	::nextStepIterationsCounter = 0;
@@ -678,7 +678,7 @@ auto PredictionContext::TryBuildingPlanUsingAction( BaseAction *action ) -> Pred
 	}
 #endif
 
-	action->AfterPlanning();
+	action->afterPlanning();
 	assert( result == PredictionResult::Complete || result == PredictionResult::Abort );
 	return result;
 }
@@ -692,7 +692,7 @@ void PredictionContext::NextMovementStep( BaseAction *action ) {
 	// Corresponds to Bot::Think();
 	m_subsystem->ApplyPendingTurnToLookAtPoint( botInput, this );
 	// Corresponds to m_subsystem->Frame();
-	action->ExecActionRecord( this->record, botInput, this );
+	action->execActionRecord( this->record, botInput, this );
 	// Corresponds to Bot::Think();
 	m_subsystem->ApplyInput( botInput, this );
 
@@ -747,10 +747,10 @@ void PredictionContext::NextMovementStep( BaseAction *action ) {
 
 	// Try using an already retrieved list if possible
 	// (this saves some excessive bounds comparison)
-	if( auto *shapeList = action->thisFrameCMShapeList ) {
+	if( auto *shapeList = action->m_thisFrameCMShapeList ) {
 		pmoveShapeList = shapeList;
 		// Prevent further reuse
-		action->thisFrameCMShapeList = nullptr;
+		action->m_thisFrameCMShapeList = nullptr;
 	} else {
 		pmoveShapeList = TraceCache().getShapeListForPMoveCollision( this );
 	}

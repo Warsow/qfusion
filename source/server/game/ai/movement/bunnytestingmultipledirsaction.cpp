@@ -2,52 +2,52 @@
 #include "movementlocal.h"
 #include <common/helpers/algorithm.h>
 
-void BunnyTestingMultipleLookDirsAction::BeforePlanning() {
-	BunnyHopAction::BeforePlanning();
+void BunnyTestingMultipleLookDirsAction::beforePlanning() {
+	BunnyHopAction::beforePlanning();
 
 	// Ensure the suggested action has been set in subtype constructor
-	currDir = nullptr;
+	m_currDir = nullptr;
 }
 
-void BunnyTestingSavedLookDirsAction::OnApplicationSequenceStarted( PredictionContext *context ) {
-	BunnyTestingMultipleLookDirsAction::OnApplicationSequenceStarted( context );
-	if( !currSuggestedLookDirNum ) {
-		suggestedLookDirs.clear();
-		SaveSuggestedLookDirs( context );
+void BunnyTestingSavedLookDirsAction::onApplicationSequenceStarted( PredictionContext *context ) {
+	BunnyTestingMultipleLookDirsAction::onApplicationSequenceStarted( context );
+	if( !m_currSuggestedLookDirNum ) {
+		m_suggestedLookDirs.clear();
+		saveSuggestedLookDirs( context );
 		// TODO: Could be better if this gets implemented individually by each descendant.
 		// The generic version is used now just to provide a generic solution quickly at cost of being suboptimal.
-		DeriveMoreDirsFromSavedDirs();
+		deriveMoreDirsFromSavedDirs();
 	}
-	if( currSuggestedLookDirNum >= suggestedLookDirs.size() ) {
+	if( m_currSuggestedLookDirNum >= m_suggestedLookDirs.size() ) {
 		return;
 	}
 
-	const SuggestedDir &suggestedDir = suggestedLookDirs[currSuggestedLookDirNum];
-	currDir = suggestedDir.dir.Data();
+	const SuggestedDir &suggestedDir = m_suggestedLookDirs[m_currSuggestedLookDirNum];
+	m_currDir = suggestedDir.dir.Data();
 	if( unsigned penalty = suggestedDir.pathPenalty ) {
-		EnsurePathPenalty( penalty );
+		ensurePathPenalty( penalty );
 	}
 }
 
-void BunnyTestingSavedLookDirsAction::OnApplicationSequenceFailed( PredictionContext *context, unsigned ) {
+void BunnyTestingSavedLookDirsAction::onApplicationSequenceFailed( PredictionContext *context, unsigned ) {
 	// If another suggested look dir does not exist
-	if( currSuggestedLookDirNum + 1 >= suggestedLookDirs.size() ) {
+	if( m_currSuggestedLookDirNum + 1 >= m_suggestedLookDirs.size() ) {
 		return;
 	}
 
-	currSuggestedLookDirNum++;
+	m_currSuggestedLookDirNum++;
 	// Allow the action application after the context rollback to savepoint
-	disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
+	m_disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
 	// Ensure this action will be used after rollback
 }
 
-void BunnyTestingMultipleLookDirsAction::OnApplicationSequenceStopped( PredictionContext *context,
+void BunnyTestingMultipleLookDirsAction::onApplicationSequenceStopped( PredictionContext *context,
 																	   SequenceStopReason stopReason,
 																	   unsigned stoppedAtFrameIndex ) {
-	BunnyHopAction::OnApplicationSequenceStopped( context, stopReason, stoppedAtFrameIndex );
+	BunnyHopAction::onApplicationSequenceStopped( context, stopReason, stoppedAtFrameIndex );
 
 	if( stopReason == FAILED ) {
-		OnApplicationSequenceFailed( context, stoppedAtFrameIndex );
+		onApplicationSequenceFailed( context, stoppedAtFrameIndex );
 	}
 }
 
@@ -60,24 +60,24 @@ inline float SuggestObstacleAvoidanceCorrectionFraction( const PredictionContext
 	return 0.35f - 0.20f * speedOverRunSpeed / 500.0f;
 }
 
-auto BunnyTestingMultipleLookDirsAction::PlanPredictionStep( PredictionContext *context ) -> PredictionResult {
-	if( const auto result = GenericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
+auto BunnyTestingMultipleLookDirsAction::planPredictionStep( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = genericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
 		return result;
 	}
 
-	if( !currDir ) {
+	if( !m_currDir ) {
 		Debug( "There is no suggested look dirs yet/left\n" );
 		return PredictionResult::Abort;
 	}
 
 	// Do this test after GenericCheckIsActionEnabled(), otherwise disabledForApplicationFrameIndex does not get tested
-	if( const auto result = CheckCommonBunnyHopPreconditions( context ); result != PredictionResult::Continue ) {
+	if( const auto result = checkCommonBunnyHopPreconditions( context ); result != PredictionResult::Continue ) {
 		return result;
 	}
 
-	context->record->botInput.SetIntendedLookDir( currDir, true );
+	context->record->botInput.SetIntendedLookDir( m_currDir, true );
 
-	if( !SetupBunnyHopping( context->record->botInput.IntendedLookDir(), context ) ) {
+	if( !setupBunnyHopping( context->record->botInput.IntendedLookDir(), context ) ) {
 		return PredictionResult::Restart;
 	}
 
@@ -167,51 +167,51 @@ static inline bool areDirsSimilar( const Vec3 &__restrict a, const Vec3 &__restr
 	return a.Dot( b ) > 0.998f;
 }
 
-void BunnyTestingSavedLookDirsAction::DeriveMoreDirsFromSavedDirs() {
+void BunnyTestingSavedLookDirsAction::deriveMoreDirsFromSavedDirs() {
 	// TODO: See notes in the method javadoc about this very basic approach
 
-	if( suggestedLookDirs.empty() ) {
+	if( m_suggestedLookDirs.empty() ) {
 		return;
 	}
 
 	// First prune similar suggested areas.
 	// (a caller code that supplies suggested areas may test similarity
 	// for its own optimization purposes but it is not mandatory).
-	for( size_t baseDirIndex = 0; baseDirIndex < suggestedLookDirs.size() - 1u; ++baseDirIndex ) {
-		const Vec3 &__restrict baseTestedDir = suggestedLookDirs[baseDirIndex].dir;
+	for( size_t baseDirIndex = 0; baseDirIndex < m_suggestedLookDirs.size() - 1u; ++baseDirIndex ) {
+		const Vec3 &__restrict baseTestedDir = m_suggestedLookDirs[baseDirIndex].dir;
 		size_t nextDirIndex = baseDirIndex + 1;
-		while( nextDirIndex < suggestedLookDirs.size() ) {
-			const Vec3 &__restrict nextTestedDir = suggestedLookDirs[nextDirIndex].dir;
+		while( nextDirIndex < m_suggestedLookDirs.size() ) {
+			const Vec3 &__restrict nextTestedDir = m_suggestedLookDirs[nextDirIndex].dir;
 			if( areDirsSimilar( baseTestedDir, nextTestedDir ) ) {
 				// This base dir was OK, move to the next one
 				nextDirIndex++;
 			} else {
 				// Prune the similar next dir. Replace by the last dir, then shrink the container.
-				suggestedLookDirs[nextDirIndex] = suggestedLookDirs.back();
-				suggestedLookDirs.pop_back();
+				m_suggestedLookDirs[nextDirIndex] = m_suggestedLookDirs.back();
+				m_suggestedLookDirs.pop_back();
 			}
 		}
 	}
 
 	// Ensure we can assume at least one free array cell in the loop below.
-	if( suggestedLookDirs.full() ) {
+	if( m_suggestedLookDirs.full() ) {
 		return;
 	}
 
 	// Actually, derive more dirs from saved dirs
 
-	assert( !suggestedLookDirs.empty() );
+	assert( !m_suggestedLookDirs.empty() );
 	// Save this fixed value (as the dirs array is going to grow)
-	const size_t lastBaseDirIndex = suggestedLookDirs.size() - 1u;
+	const size_t lastBaseDirIndex = m_suggestedLookDirs.size() - 1u;
 	// For every base dir from kept given ones
 	for( size_t baseDirIndex = 0; baseDirIndex <= lastBaseDirIndex; ++baseDirIndex ) {
-		const auto &__restrict base = suggestedLookDirs[baseDirIndex];
+		const auto &__restrict base = m_suggestedLookDirs[baseDirIndex];
 		// Produce a rotated dir for every possible rotation
 		for( const auto &rotator: dirRotatorsCache ) {
 			const Vec3 rotated( rotator.rotate( base.dir ) );
 			// Check whether there is a similar dir
 			bool hasASimilarDir = false;
-			for( const auto &__restrict existing: suggestedLookDirs ) {
+			for( const auto &__restrict existing: m_suggestedLookDirs ) {
 				if( areDirsSimilar( rotated, existing.dir ) ) {
 					hasASimilarDir = true;
 					break;
@@ -219,8 +219,8 @@ void BunnyTestingSavedLookDirsAction::DeriveMoreDirsFromSavedDirs() {
 			}
 			if( !hasASimilarDir ) {
 				// Save the rotated dir as a suggested one
-				suggestedLookDirs.emplace_back( SuggestedDir( rotated, base.area, rotator.pathPenalty ) );
-				if( suggestedLookDirs.full() ) {
+				m_suggestedLookDirs.emplace_back( SuggestedDir( rotated, base.area, rotator.pathPenalty ) );
+				if( m_suggestedLookDirs.full() ) {
 					return;
 				}
 			}
@@ -228,9 +228,9 @@ void BunnyTestingSavedLookDirsAction::DeriveMoreDirsFromSavedDirs() {
 	}
 }
 
-AreaAndScore *BunnyTestingSavedLookDirsAction::TakeBestCandidateAreas( AreaAndScore *inputBegin,
-																	   AreaAndScore *inputEnd,
-																	   unsigned maxAreas ) {
+auto BunnyTestingSavedLookDirsAction::takeBestCandidateAreas( AreaAndScore *inputBegin,
+															  AreaAndScore *inputEnd,
+															  unsigned maxAreas ) -> AreaAndScore * {
 	assert( inputEnd >= inputBegin );
 	const uintptr_t numAreas = inputEnd - inputBegin;
 	const uintptr_t numResultAreas = numAreas < maxAreas ? numAreas : maxAreas;
@@ -250,7 +250,7 @@ AreaAndScore *BunnyTestingSavedLookDirsAction::TakeBestCandidateAreas( AreaAndSc
 	return inputBegin + numResultAreas;
 }
 
-void BunnyTestingSavedLookDirsAction::SaveCandidateAreaDirs( PredictionContext *context,
+void BunnyTestingSavedLookDirsAction::saveCandidateAreaDirs( PredictionContext *context,
 															 AreaAndScore *candidateAreasBegin,
 															 AreaAndScore *candidateAreasEnd ) {
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
@@ -258,11 +258,11 @@ void BunnyTestingSavedLookDirsAction::SaveCandidateAreaDirs( PredictionContext *
 	const auto aasAreas = AiAasWorld::instance()->getAreas();
 
 	AreaAndScore *takenAreasBegin = candidateAreasBegin;
-	assert( maxSuggestedLookDirs <= suggestedLookDirs.capacity() );
-	const unsigned maxAreas = maxSuggestedLookDirs;
-	AreaAndScore *takenAreasEnd = TakeBestCandidateAreas( candidateAreasBegin, candidateAreasEnd, maxAreas );
+	assert( m_maxSuggestedLookDirs <= m_suggestedLookDirs.capacity() );
+	const unsigned maxAreas = m_maxSuggestedLookDirs;
+	AreaAndScore *takenAreasEnd = takeBestCandidateAreas( candidateAreasBegin, candidateAreasEnd, maxAreas );
 
-	suggestedLookDirs.clear();
+	m_suggestedLookDirs.clear();
 	for( auto iter = takenAreasBegin; iter < takenAreasEnd; ++iter ) {
 		const int areaNum = ( *iter ).areaNum;
 		Vec3 target( 0, 0, 0 );
@@ -276,7 +276,7 @@ void BunnyTestingSavedLookDirsAction::SaveCandidateAreaDirs( PredictionContext *
 		if( target.SquareDistance2DTo( entityPhysicsState.Origin() ) > wsw::square( 24.0f ) ) {
 			Vec3 dir( target - entityPhysicsState.Origin() );
 			dir *= Q_RSqrt( dir.SquaredLength() );
-			suggestedLookDirs.emplace_back( SuggestedDir { dir, areaNum } );
+			m_suggestedLookDirs.emplace_back( SuggestedDir { dir, areaNum } );
 		}
 	}
 }

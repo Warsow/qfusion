@@ -28,12 +28,12 @@ static auto classifyTravelType( const aas_reachability_t &reach ) -> TravelTypeC
 	return TravelTypeClass::Incompatible;
 }
 
-auto BunnyFollowingReachChainAction::PlanPredictionStep( PredictionContext *context ) -> PredictionResult {
-	if( const auto result = GenericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
+auto BunnyFollowingReachChainAction::planPredictionStep( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = genericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
 		return result;
 	}
 
-	if( const auto result = CheckCommonBunnyHopPreconditions( context ); result != PredictionResult::Continue ) {
+	if( const auto result = checkCommonBunnyHopPreconditions( context ); result != PredictionResult::Continue ) {
 		return result;
 	}
 
@@ -56,7 +56,7 @@ auto BunnyFollowingReachChainAction::PlanPredictionStep( PredictionContext *cont
 			}
 			const int targetAreaNum = context->NavTargetAasAreaNum();
 			if( const int nextAreaNum = reach.areanum; nextAreaNum != targetAreaNum ) {
-				if( !bot->RouteCache()->FindRoute( nextAreaNum, targetAreaNum, bot->TravelFlags(), &m_cachedNextReachNum ) ) {
+				if( !m_bot->RouteCache()->FindRoute( nextAreaNum, targetAreaNum, m_bot->TravelFlags(), &m_cachedNextReachNum ) ) {
 					return PredictionResult::Abort;
 				}
 				if( classifyTravelType( aasReaches[m_cachedNextReachNum] ) == TravelTypeClass::Incompatible ) {
@@ -112,7 +112,7 @@ auto BunnyFollowingReachChainAction::PlanPredictionStep( PredictionContext *cont
 		}
 	}
 
-	if( !SetupBunnyHopping( lookVec, context ) ) {
+	if( !setupBunnyHopping( lookVec, context ) ) {
 		return PredictionResult::Abort;
 	}
 

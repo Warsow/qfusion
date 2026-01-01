@@ -8,68 +8,21 @@ class MovementSubsystem;
 
 class BaseAction : public MovementPredictionConstants {
 	friend class PredictionContext;
-
-protected:
-	// Must be set by RegisterSelf() call. We have to break a circular dependency.
-	Bot *bot { nullptr };
-	MovementSubsystem *const m_subsystem;
-	const char *name;
-
-	// An action could set this field in PlanPredictionStep()
-	// to avoid further redundant list lookup in PredictionContext::NextMovementStep().
-	// The latter method gets and resets this field.
-	const CMShapeList *thisFrameCMShapeList { nullptr };
-
-	int debugColor;
-
-	// Used to establish a direct mapping between integers and actions.
-	// It is very useful for algorithms that involve lookup tables addressed by this field.
-	// Must be set by RegisterSelf() call.
-	unsigned actionNum { std::numeric_limits<unsigned>::max() };
-
-	Vec3 originAtSequenceStart { 0, 0, 0 };
-
-	unsigned sequenceStartFrameIndex { std::numeric_limits<unsigned>::max() };
-	unsigned sequenceEndFrameIndex { std::numeric_limits<unsigned>::max() };
-
-	// Has the action been completely disabled in current planning session for further planning
-	bool isDisabledForPlanning { false };
-	// These flags are used by default CheckPredictionStepResults() implementation.
-	// Set these flags in child class to tweak the mentioned method behaviour.
-	bool stopPredictionOnTouchingJumppad { true };
-	bool stopPredictionOnTouchingTeleporter { true };
-	bool stopPredictionOnTouchingPlatform { true };
-	bool stopPredictionOnTouchingNavEntity { true };
-	bool stopPredictionOnEnteringWater { true };
-	bool failPredictionOnEnteringHazardImpactZone { true };
-
-	void Debug( const char *format, ... ) const;
-	// We want to have a full control over movement code assertions, so use custom ones for this class
-	void Assert( bool condition, const char *message = nullptr ) const;
-	template <typename T>
-	void Assert( T conditionLikeValue, const char *message = nullptr ) const {
-		Assert( conditionLikeValue != 0, message );
-	}
-
-	auto GenericCheckIsActionEnabled( PredictionContext *context ) const -> PredictionResult;
-
-	void CheckDisableOrSwitchPreconditions( PredictionContext *context, const char *methodTag );
-
-	void DisableWithAlternative( PredictionContext *context );
-
-	bool HasTouchedNavEntityThisFrame( PredictionContext *context );
 public:
-	inline BaseAction( MovementSubsystem *subsystem, const char *name_, int debugColor_ = 0 )
-		: m_subsystem( subsystem ), name( name_ ), debugColor( debugColor_ ) {}
-	virtual auto PlanPredictionStep( PredictionContext *context ) -> PredictionResult = 0;
-	virtual void ExecActionRecord( const MovementActionRecord *record,
+	BaseAction( MovementSubsystem *subsystem, const char *name, int debugColor )
+		: m_subsystem( subsystem ), m_name( name ), m_debugColor( debugColor ) {}
+
+	virtual auto planPredictionStep( PredictionContext *context ) -> PredictionResult = 0;
+
+	virtual void execActionRecord( const MovementActionRecord *record,
 								   BotInput *inputWillBeUsed,
 								   PredictionContext *context = nullptr );
 
-	virtual auto CheckPredictionStepResults( PredictionContext *context ) -> PredictionResult;
+	[[nodiscard]]
+	virtual auto checkPredictionStepResults( PredictionContext *context ) -> PredictionResult;
 
-	virtual void BeforePlanning();
-	virtual void AfterPlanning() {}
+	virtual void beforePlanning();
+	virtual void afterPlanning() {}
 
 	// If an action has been applied consequently in N frames, these frames are called an application sequence.
 	// Usually an action is valid and can be applied in all application sequence frames except these cases:
@@ -79,19 +32,63 @@ public:
 	// related to the frame for further checks during the entire application sequence.
 	// The second callback is provided for symmetry reasons
 	// (e.g. any resources that are allocated in the first callback might need cleanup).
-	virtual void OnApplicationSequenceStarted( PredictionContext *context );
+	virtual void onApplicationSequenceStarted( PredictionContext *context );
 
 	// Might be called in a next frame, thats what stoppedAtFrameIndex is.
 	// If application sequence has failed, stoppedAtFrameIndex is ignored.
-	virtual void OnApplicationSequenceStopped( PredictionContext *context,
+	virtual void onApplicationSequenceStopped( PredictionContext *context,
 											   SequenceStopReason reason,
 											   unsigned stoppedAtFrameIndex );
 
-	unsigned SequenceDuration( const PredictionContext *context ) const;
+	[[nodiscard]]
+	auto getSequenceDuration( const PredictionContext *context ) const -> unsigned;
 
-	const char *Name() const { return name; }
-	int DebugColor() const { return debugColor; }
-	bool IsDisabledForPlanning() const { return isDisabledForPlanning; }
+	[[nodiscard]]
+	auto getName() const -> const char * { return m_name; }
+	[[nodiscard]]
+	auto getDebugColor() const -> int { return m_debugColor; }
+
+protected:
+	Bot *m_bot { nullptr };
+	MovementSubsystem *const m_subsystem;
+	const char *m_name;
+
+	// An action could set this field in PlanPredictionStep()
+	// to avoid further redundant list lookup in PredictionContext::NextMovementStep().
+	// The latter method gets and resets this field.
+	const CMShapeList *m_thisFrameCMShapeList { nullptr };
+
+	const int m_debugColor;
+
+	Vec3 m_originAtSequenceStart { 0, 0, 0 };
+
+	unsigned m_sequenceStartFrameIndex { std::numeric_limits<unsigned>::max() };
+	unsigned m_sequenceEndFrameIndex { std::numeric_limits<unsigned>::max() };
+
+	// Has the action been completely disabled in current planning session for further planning
+	bool m_isDisabledForPlanning { false };
+	// These flags are used by default CheckPredictionStepResults() implementation.
+	// Set these flags in child class to tweak the mentioned method behaviour.
+	bool m_stopPredictionOnTouchingJumppad { true };
+	bool m_stopPredictionOnTouchingTeleporter { true };
+	bool m_stopPredictionOnTouchingPlatform { true };
+	bool m_stopPredictionOnTouchingNavEntity { true };
+	bool m_stopPredictionOnEnteringWater { true };
+	bool m_failPredictionOnEnteringHazardImpactZone { true };
+
+	void Debug( const char *format, ... ) const;
+	// We want to have a full control over movement code assertions, so use custom ones for this class
+	void Assert( bool condition, const char *message = nullptr ) const;
+	template <typename T>
+	void Assert( T conditionLikeValue, const char *message = nullptr ) const {
+		Assert( conditionLikeValue != 0, message );
+	}
+
+	[[nodiscard]]
+	auto genericCheckIsActionEnabled( PredictionContext *context ) const -> PredictionResult;
+
+	[[nodiscard]]
+	bool hasTouchedNavEntityThisFrame( PredictionContext *context );
 };
 
 #endif

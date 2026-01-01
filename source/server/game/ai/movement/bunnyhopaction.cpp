@@ -1,23 +1,23 @@
 #include "bunnyhopaction.h"
 #include "movementlocal.h"
 
-auto BunnyHopAction::GenericCheckIsActionEnabled( PredictionContext *context ) -> PredictionResult {
-	if( const auto result = BaseAction::GenericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
+auto BunnyHopAction::genericCheckIsActionEnabled( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = BaseAction::genericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
 		return result;
 	}
 
 	// TODO: Get rid of disabledForApplicationFrameIndex
-	if( this->disabledForApplicationFrameIndex != context->topOfStackIndex ) {
+	if( this->m_disabledForApplicationFrameIndex != context->topOfStackIndex ) {
 		return PredictionResult::Continue;
 	}
 
 	assert( context->topOfStackIndex == 0 );
 	Debug( "Cannot apply action: the action has been disabled for application on frame %d\n", context->topOfStackIndex );
-	this->isDisabledForPlanning = true;
+	this->m_isDisabledForPlanning = true;
 	return PredictionResult::Abort;
 }
 
-auto BunnyHopAction::CheckCommonBunnyHopPreconditions( PredictionContext *context ) -> PredictionResult {
+auto BunnyHopAction::checkCommonBunnyHopPreconditions( PredictionContext *context ) -> PredictionResult {
 	int currAasAreaNum = context->CurrAasAreaNum();
 	if( !currAasAreaNum ) {
 		Debug( "Cannot apply action: curr AAS area num is undefined\n" );
@@ -36,8 +36,8 @@ auto BunnyHopAction::CheckCommonBunnyHopPreconditions( PredictionContext *contex
 		Debug( "Cannot apply action: next reachability is undefined and bot is not in the nav target area\n" );
 		// This might be another router woe as many rejected trajectories seem legit.
 		// We have decided to save the trajectory if there was an advancement applying a huge penalty.
-		if( minTravelTimeToNavTargetSoFar && minTravelTimeToNavTargetSoFar < travelTimeAtSequenceStart ) {
-			context->SaveLastResortPath( sequencePathPenalty );
+		if( m_minTravelTimeToNavTargetSoFar && m_minTravelTimeToNavTargetSoFar < m_travelTimeAtSequenceStart ) {
+			context->SaveLastResortPath( m_sequencePathPenalty );
 		}
 		return PredictionResult::Restart;
 	}
@@ -49,7 +49,7 @@ auto BunnyHopAction::CheckCommonBunnyHopPreconditions( PredictionContext *contex
 	}
 
 	// Same here
-	if( bot->ShouldBeSilent() ) {
+	if( m_bot->ShouldBeSilent() ) {
 		Debug( "Cannot apply action: bot should be silent\n" );
 		return PredictionResult::Abort;
 	}
@@ -57,7 +57,7 @@ auto BunnyHopAction::CheckCommonBunnyHopPreconditions( PredictionContext *contex
 	return PredictionResult::Continue;
 }
 
-void BunnyHopAction::SetupCommonBunnyHopInput( PredictionContext *context ) {
+void BunnyHopAction::setupCommonBunnyHopInput( PredictionContext *context ) {
 	const auto *pmoveStats = context->currMinimalPlayerState->pmove.stats;
 
 	auto *botInput = &context->record->botInput;
@@ -96,7 +96,7 @@ void BunnyHopAction::SetupCommonBunnyHopInput( PredictionContext *context ) {
 	}
 }
 
-bool BunnyHopAction::SetupBunnyHopping( const Vec3 &intendedLookVec, PredictionContext *context ) {
+bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookVec, PredictionContext *context ) {
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	auto *botInput = &context->record->botInput;
 
@@ -112,7 +112,7 @@ bool BunnyHopAction::SetupBunnyHopping( const Vec3 &intendedLookVec, PredictionC
 	float toTargetDir2DSqLen = toTargetDir2D.SquaredLength();
 
 	if( squareSpeed2D > 1.0f ) {
-		SetupCommonBunnyHopInput( context );
+		setupCommonBunnyHopInput( context );
 
 		velocityDir2D *= 1.0f / entityPhysicsState.Speed2D();
 
@@ -135,7 +135,7 @@ bool BunnyHopAction::SetupBunnyHopping( const Vec3 &intendedLookVec, PredictionC
 			if( velocityDir2DDotToTargetDir2D < STRAIGHT_MOVEMENT_DOT_THRESHOLD ) {
 				// Apply a path penalty for aircontrol abuse
 				if( velocityDir2DDotToTargetDir2D < 0 ) {
-					EnsurePathPenalty( 1000 );
+					ensurePathPenalty( 1000 );
 				}
 				context->CheatingCorrectVelocity( velocityDir2DDotToTargetDir2D, toTargetDir2D );
 			}
@@ -144,17 +144,17 @@ bool BunnyHopAction::SetupBunnyHopping( const Vec3 &intendedLookVec, PredictionC
 	// Looks like the bot is in air falling vertically
 	else if( !entityPhysicsState.GroundEntity() ) {
 		// Release keys to allow full control over view in air without affecting movement
-		if( bot->ShouldAttack() && CanFlyAboveGroundRelaxed( context ) ) {
+		if( m_bot->ShouldAttack() && canFlyAboveGroundRelaxed( context ) ) {
 			botInput->ClearMovementDirections();
 			botInput->canOverrideLookVec = true;
 		}
 		return true;
 	} else {
-		SetupCommonBunnyHopInput( context );
+		setupCommonBunnyHopInput( context );
 		return true;
 	}
 
-	if( bot->ShouldAttack() && CanFlyAboveGroundRelaxed( context ) ) {
+	if( m_bot->ShouldAttack() && canFlyAboveGroundRelaxed( context ) ) {
 		botInput->ClearMovementDirections();
 		botInput->canOverrideLookVec = true;
 	}
@@ -194,11 +194,11 @@ bool BunnyHopAction::SetupBunnyHopping( const Vec3 &intendedLookVec, PredictionC
 		context->predictionStepMillis = context->DefaultFrameTime();
 	}
 
-	TrySetWalljump( context, velocityDir2D, toTargetDir2D );
+	trySettingWalljump( context, velocityDir2D, toTargetDir2D );
 	return true;
 }
 
-bool BunnyHopAction::CanFlyAboveGroundRelaxed( const PredictionContext *context ) const {
+bool BunnyHopAction::canFlyAboveGroundRelaxed( const PredictionContext *context ) const {
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	if( entityPhysicsState.GroundEntity() ) {
 		return false;
@@ -208,8 +208,8 @@ bool BunnyHopAction::CanFlyAboveGroundRelaxed( const PredictionContext *context 
 	return entityPhysicsState.HeightOverGround() >= desiredHeightOverGround;
 }
 
-void BunnyHopAction::TrySetWalljump( PredictionContext *context, const Vec3 &velocity2DDir, const Vec3 &intendedLookDir2D ) {
-	if( !CanSetWalljump( context, velocity2DDir, intendedLookDir2D ) ) {
+void BunnyHopAction::trySettingWalljump( PredictionContext *context, const Vec3 &velocity2DDir, const Vec3 &intendedLookDir2D ) {
+	if( !canSetWalljump( context, velocity2DDir, intendedLookDir2D ) ) {
 		return;
 	}
 
@@ -220,7 +220,7 @@ void BunnyHopAction::TrySetWalljump( PredictionContext *context, const Vec3 &vel
 	context->predictionStepMillis = context->DefaultFrameTime();
 }
 
-bool BunnyHopAction::CanSetWalljump( PredictionContext *context, const Vec3 &velocity2DDir, const Vec3 &intended2DLookDir ) const {
+bool BunnyHopAction::canSetWalljump( PredictionContext *context, const Vec3 &velocity2DDir, const Vec3 &intended2DLookDir ) const {
 	const short *pmoveStats = context->currMinimalPlayerState->pmove.stats;
 	if( !( pmoveStats[PM_STAT_FEATURES] & PMFEAT_WALLJUMP ) ) {
 		return false;
@@ -251,7 +251,7 @@ bool BunnyHopAction::CanSetWalljump( PredictionContext *context, const Vec3 &vel
 	return velocity2DDir.Dot( entityPhysicsState.ForwardDir() ) > 0.7f && velocity2DDir.Dot( intended2DLookDir ) > 0.7f;
 }
 
-bool BunnyHopAction::CheckStepSpeedGainOrLoss( PredictionContext *context ) {
+bool BunnyHopAction::checkStepSpeedGainOrLoss( PredictionContext *context ) {
 	const auto &newEntityPhysicsState = context->movementState->entityPhysicsState;
 	const auto &oldEntityPhysicsState = context->PhysicsStateBeforeStep();
 
@@ -285,18 +285,18 @@ bool BunnyHopAction::CheckStepSpeedGainOrLoss( PredictionContext *context ) {
 
 	Assert( context->predictionStepMillis );
 	float actualSpeedGainPerSecond = ( newSpeed - oldSpeed ) / ( 0.001f * context->predictionStepMillis );
-	if( actualSpeedGainPerSecond >= minDesiredSpeedGainPerSecond || context->IsInNavTargetArea() ) {
+	if( actualSpeedGainPerSecond >= m_minDesiredSpeedGainPerSecond || context->IsInNavTargetArea() ) {
 		// Reset speed loss timer
-		currentSpeedLossSequentialMillis = 0;
+		m_currentSpeedLossSequentialMillis = 0;
 		return true;
 	}
 
 	const char *format = "Actual speed gain per second %.3f is lower than the desired one %.3f\n";
 	Debug( "oldSpeed: %.1f, newSpeed: %1.f, speed gain per second: %.1f\n", oldSpeed, newSpeed, actualSpeedGainPerSecond );
-	Debug( format, actualSpeedGainPerSecond, minDesiredSpeedGainPerSecond );
+	Debug( format, actualSpeedGainPerSecond, m_minDesiredSpeedGainPerSecond );
 
-	currentSpeedLossSequentialMillis += context->predictionStepMillis;
-	if( tolerableSpeedLossSequentialMillis > currentSpeedLossSequentialMillis ) {
+	m_currentSpeedLossSequentialMillis += context->predictionStepMillis;
+	if( m_tolerableSpeedLossSequentialMillis > m_currentSpeedLossSequentialMillis ) {
 		return true;
 	}
 
@@ -313,23 +313,23 @@ bool BunnyHopAction::CheckStepSpeedGainOrLoss( PredictionContext *context ) {
 	// If the area is not a "skip collision" area
 	if( !( AiAasWorld::instance()->getAreaSettings()[context->CurrAasAreaNum()].areaflags & AREA_SKIP_COLLISION_MASK ) ) {
 		const float frac = ( threshold - speed2D ) * Q_Rcp( threshold );
-		EnsurePathPenalty( (unsigned)( 100 + 3000 * Q_Sqrt( frac ) ) );
+		ensurePathPenalty( (unsigned)( 100 + 3000 * Q_Sqrt( frac ) ) );
 	}
 
 	return true;
 }
 
-bool BunnyHopAction::WasOnGroundThisFrame( const PredictionContext *context ) const {
+bool BunnyHopAction::wasOnGroundThisFrame( const PredictionContext *context ) const {
 	return context->movementState->entityPhysicsState.GroundEntity() || context->frameEvents.hasJumped;
 }
 
-bool BunnyHopAction::TryHandlingWorseTravelTimeToTarget( PredictionContext *context,
+bool BunnyHopAction::tryHandlingWorseTravelTimeToTarget( PredictionContext *context,
 														 int currTravelTimeToTarget,
 														 int groundedAreaNum ) {
 	constexpr const char *format = "A prediction step has lead to increased travel time to nav target\n";
 	// Convert minTravelTimeToNavTargetSoFar to millis to have the same units for comparison
-	int maxTolerableTravelTimeMillis = 10 * minTravelTimeToNavTargetSoFar;
-	maxTolerableTravelTimeMillis += tolerableWalkableIncreasedTravelTimeMillis;
+	int maxTolerableTravelTimeMillis = 10 * m_minTravelTimeToNavTargetSoFar;
+	maxTolerableTravelTimeMillis += m_tolerableWalkableIncreasedTravelTimeMillis;
 
 	// Convert currTravelTime from seconds^-2 to millis to have the same units for comparison
 	if( 10 * currTravelTimeToTarget > maxTolerableTravelTimeMillis ) {
@@ -337,17 +337,17 @@ bool BunnyHopAction::TryHandlingWorseTravelTimeToTarget( PredictionContext *cont
 		return false;
 	}
 
-	EnsurePathPenalty( 200 );
+	ensurePathPenalty( 200 );
 
 	// Can't say much in this case. Continue prediction.
-	if( !groundedAreaNum || !minTravelTimeAreaNumSoFar ) {
+	if( !groundedAreaNum || !m_minTravelTimeAreaNumSoFar ) {
 		return true;
 	}
 
 	const auto *aasWorld = AiAasWorld::instance();
 
 	// Allow further prediction if we're still in the same floor cluster
-	if( const int clusterNum = aasWorld->floorClusterNum( minTravelTimeAreaNumSoFar ) ) {
+	if( const int clusterNum = aasWorld->floorClusterNum( m_minTravelTimeAreaNumSoFar ) ) {
 		if( clusterNum == aasWorld->floorClusterNum( groundedAreaNum ) ) {
 			return true;
 		}
@@ -357,28 +357,28 @@ bool BunnyHopAction::TryHandlingWorseTravelTimeToTarget( PredictionContext *cont
 	if( aasWorld->getAreaSettings()[groundedAreaNum].areaflags & AREA_NOFALL ) {
 		const auto aasAreas = aasWorld->getAreas();
 		// Delta Z relative to the best area so far must be positive
-		if( aasAreas[groundedAreaNum].mins[2] > aasAreas[minTravelTimeAreaNumSoFar].mins[2] ) {
-			EnsurePathPenalty( 250 );
+		if( aasAreas[groundedAreaNum].mins[2] > aasAreas[m_minTravelTimeAreaNumSoFar].mins[2] ) {
+			ensurePathPenalty( 250 );
 			return true;
 		}
 		// Allow negative Z while being in a stairs cluster
 		if( aasWorld->stairsClusterNum( groundedAreaNum ) ) {
-			EnsurePathPenalty( 350 );
+			ensurePathPenalty( 350 );
 			return true;
 		}
 	}
 
 	// Disallow moving into an area if the min travel time area cannot be reached by walking from the area.
 	// Use a simple reverse reach. test instead of router calls (that turned out to be expensive/non-scalable).
-	if( CheckDirectReachWalkingOrFallingShort( groundedAreaNum, minTravelTimeAreaNumSoFar ) ) {
+	if( checkDirectReachWalkingOrFallingShort( groundedAreaNum, m_minTravelTimeAreaNumSoFar ) ) {
 		return true;
 	}
 
-	EnsurePathPenalty( 3000 );
+	ensurePathPenalty( 3000 );
 	return true;
 }
 
-bool BunnyHopAction::CheckDirectReachWalkingOrFallingShort( int fromAreaNum, int toAreaNum ) {
+bool BunnyHopAction::checkDirectReachWalkingOrFallingShort( int fromAreaNum, int toAreaNum ) {
 	const auto *aasWorld = AiAasWorld::instance();
 	const auto aasReaches = aasWorld->getReaches();
 	const auto &areaSettings = aasWorld->getAreaSettings()[fromAreaNum];
@@ -393,13 +393,13 @@ bool BunnyHopAction::CheckDirectReachWalkingOrFallingShort( int fromAreaNum, int
 		}
 		const auto travelType = reach.traveltype & TRAVELTYPE_MASK;
 		if( travelType == TRAVEL_WALK ) {
-			EnsurePathPenalty( 300 );
+			ensurePathPenalty( 300 );
 			return true;
 		}
 		if( travelType == TRAVEL_WALKOFFLEDGE ) {
 			// Make sure the fall distance is insufficient
 			if( reach.start[2] - reach.end[2] < 64.0f ) {
-				EnsurePathPenalty( 400 );
+				ensurePathPenalty( 400 );
 				return true;
 			}
 		}
@@ -410,9 +410,9 @@ bool BunnyHopAction::CheckDirectReachWalkingOrFallingShort( int fromAreaNum, int
 	return false;
 }
 
-bool BunnyHopAction::TryHandlingUnreachableTarget( PredictionContext *context ) {
-	currentUnreachableTargetSequentialMillis += context->predictionStepMillis;
-	if( currentUnreachableTargetSequentialMillis < tolerableUnreachableTargetSequentialMillis ) {
+bool BunnyHopAction::tryHandlingUnreachableTarget( PredictionContext *context ) {
+	m_currentUnreachableTargetSequentialMillis += context->predictionStepMillis;
+	if( m_currentUnreachableTargetSequentialMillis < m_tolerableUnreachableTargetSequentialMillis ) {
 		return true;
 	}
 
@@ -420,11 +420,11 @@ bool BunnyHopAction::TryHandlingUnreachableTarget( PredictionContext *context ) 
 	return false;
 }
 
-bool BunnyHopAction::CheckNavTargetAreaTransition( PredictionContext *context ) {
+bool BunnyHopAction::checkNavTargetAreaTransition( PredictionContext *context ) {
 	if( !context->IsInNavTargetArea() ) {
 		// If the bot has left the nav target area
-		if( hasEnteredNavTargetArea ) {
-			if( !hasTouchedNavTarget ) {
+		if( m_hasEnteredNavTargetArea ) {
+			if( !m_hasTouchedNavTarget ) {
 				Debug( "The bot has left the nav target area without touching the nav target\n" );
 				return false;
 			}
@@ -434,12 +434,12 @@ bool BunnyHopAction::CheckNavTargetAreaTransition( PredictionContext *context ) 
 		return true;
 	}
 
-	hasEnteredNavTargetArea = true;
-	if( HasTouchedNavEntityThisFrame( context ) ) {
-		hasTouchedNavTarget = true;
+	m_hasEnteredNavTargetArea = true;
+	if( hasTouchedNavEntityThisFrame( context ) ) {
+		m_hasTouchedNavTarget = true;
 	}
 
-	if( hasTouchedNavTarget ) {
+	if( m_hasTouchedNavTarget ) {
 		return true;
 	}
 
@@ -461,34 +461,34 @@ bool BunnyHopAction::CheckNavTargetAreaTransition( PredictionContext *context ) 
 	return false;
 }
 
-bool BunnyHopAction::HasMadeAnAdvancementPriorToLanding( PredictionContext *context, int currTravelTimeToTarget ) {
+bool BunnyHopAction::hasMadeAnAdvancementPriorToLanding( PredictionContext *context, int currTravelTimeToTarget ) {
 	assert( currTravelTimeToTarget );
 
 	// If there was a definite advancement from the initial position
-	if( currTravelTimeToTarget < travelTimeAtSequenceStart ) {
+	if( currTravelTimeToTarget < m_travelTimeAtSequenceStart ) {
 		return true;
 	}
 
 	// Any feasible travel time would be an advancement in this case
-	if( !travelTimeAtSequenceStart ) {
+	if( !m_travelTimeAtSequenceStart ) {
 		return true;
 	}
 
-	if( currTravelTimeToTarget > travelTimeAtSequenceStart ) {
+	if( currTravelTimeToTarget > m_travelTimeAtSequenceStart ) {
 		return false;
 	}
 
 	// Try finding a target point in the same area
 	Vec3 targetPoint( 0, 0, 0 );
 	std::optional<float> initial2DDistance;
-	if( reachAtSequenceStart ) {
-		if( const auto reachNum = context->NextReachNum(); reachNum == reachAtSequenceStart ) {
+	if( m_reachAtSequenceStart ) {
+		if( const auto reachNum = context->NextReachNum(); reachNum == m_reachAtSequenceStart ) {
 			targetPoint.Set( AiAasWorld::instance()->getReaches()[reachNum].start );
-			initial2DDistance = distanceToReachAtStart;
+			initial2DDistance = m_distanceToReachAtStart;
 		}
 	} else if( context->IsInNavTargetArea() ) {
 		targetPoint = context->NavTargetOrigin();
-		initial2DDistance = distanceInNavTargetAreaAtStart;
+		initial2DDistance = m_distanceInNavTargetAreaAtStart;
 	}
 
 	if( initial2DDistance == std::nullopt ) {
@@ -533,16 +533,16 @@ bool BunnyHopAction::HasMadeAnAdvancementPriorToLanding( PredictionContext *cont
 	return false;
 }
 
-auto BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) -> PredictionResult {
-	if( const auto result = BaseAction::CheckPredictionStepResults( context ); result != PredictionResult::Continue ) {
+auto BunnyHopAction::checkPredictionStepResults( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = BaseAction::checkPredictionStepResults( context ); result != PredictionResult::Continue ) {
 		return result;
 	}
 
-	if( !CheckStepSpeedGainOrLoss( context ) ) {
+	if( !checkStepSpeedGainOrLoss( context ) ) {
 		return PredictionResult::Restart;
 	}
 
-	if( !CheckNavTargetAreaTransition( context ) ) {
+	if( !checkNavTargetAreaTransition( context ) ) {
 		return PredictionResult::Restart;
 	}
 
@@ -551,28 +551,28 @@ auto BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) ->
 
 	const int currTravelTimeToTarget = context->TravelTimeToNavTarget();
 	if( !currTravelTimeToTarget ) {
-		if( !TryHandlingUnreachableTarget( context ) ) {
+		if( !tryHandlingUnreachableTarget( context ) ) {
 			return PredictionResult::Restart;
 		}
 		return PredictionResult::Continue;
 	}
 
 	// Reset unreachable target timer
-	currentUnreachableTargetSequentialMillis = 0;
+	m_currentUnreachableTargetSequentialMillis = 0;
 
-	const float squareDistanceFromStart = originAtSequenceStart.SquareDistanceTo( newEntityPhysicsState.Origin() );
+	const float squareDistanceFromStart = m_originAtSequenceStart.SquareDistanceTo( newEntityPhysicsState.Origin() );
 	const int groundedAreaNum = context->CurrGroundedAasAreaNum();
-	if( currTravelTimeToTarget <= minTravelTimeToNavTargetSoFar ) {
-		minTravelTimeToNavTargetSoFar = currTravelTimeToTarget;
-		minTravelTimeAreaNumSoFar = context->CurrAasAreaNum();
+	if( currTravelTimeToTarget <= m_minTravelTimeToNavTargetSoFar ) {
+		m_minTravelTimeToNavTargetSoFar = currTravelTimeToTarget;
+		m_minTravelTimeAreaNumSoFar     = context->CurrAasAreaNum();
 	} else {
-		if( !TryHandlingWorseTravelTimeToTarget( context, currTravelTimeToTarget, groundedAreaNum ) ) {
+		if( !tryHandlingWorseTravelTimeToTarget( context, currTravelTimeToTarget, groundedAreaNum ) ) {
 			return PredictionResult::Restart;
 		}
 	}
 
 	if( squareDistanceFromStart < wsw::square( 64 ) ) {
-		if( SequenceDuration( context ) < 384 ) {
+		if( getSequenceDuration( context ) < 384 ) {
 			return PredictionResult::Continue;
 		}
 
@@ -581,48 +581,48 @@ auto BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) ->
 		return PredictionResult::Restart;
 	}
 
-	if( WasOnGroundThisFrame( context ) ) {
-		if( HasMadeAnAdvancementPriorToLanding( context, currTravelTimeToTarget ) ) {
+	if( wasOnGroundThisFrame( context ) ) {
+		if( hasMadeAnAdvancementPriorToLanding( context, currTravelTimeToTarget ) ) {
 			// If we're currently at the best position
-			if( currTravelTimeToTarget == minTravelTimeToNavTargetSoFar ) {
+			if( currTravelTimeToTarget == m_minTravelTimeToNavTargetSoFar ) {
 				// Check for completion if we have already made a hop before
-				if( hopsCounter ) {
+				if( m_hopCounter ) {
 					// Try a "direct" completion if we've landed some sufficient units ahead of the last hop origin
-					if( latchedHopOrigin.SquareDistance2DTo( newEntityPhysicsState.Origin() ) > wsw::square( 72 ) ) {
-						if( !sequencePathPenalty && hopsCounter == 2 ) {
+					if( m_latchedHopOrigin.SquareDistance2DTo( newEntityPhysicsState.Origin() ) > wsw::square( 72 ) ) {
+						if( m_sequencePathPenalty == 0 && m_hopCounter == 2 ) {
 							return PredictionResult::Complete;
 						}
 					}
 				} else {
 					// Set the latched hop state if it's needed
-					if( !hasALatchedHop ) {
-						hasALatchedHop = true;
-						latchedHopOrigin.Set( newEntityPhysicsState.Origin() );
+					if( !m_hasALatchedHop ) {
+						m_hasALatchedHop = true;
+						m_latchedHopOrigin.Set( newEntityPhysicsState.Origin() );
 						// Save an "good enough" path that is going to be used if the direct completion fails
 						unsigned advancement = 0;
-						if( travelTimeAtSequenceStart ) {
-							advancement = travelTimeAtSequenceStart - currTravelTimeToTarget;
+						if( m_travelTimeAtSequenceStart ) {
+							advancement = m_travelTimeAtSequenceStart - currTravelTimeToTarget;
 						}
-						if( hopsCounter == 0 ) {
+						if( m_hopCounter == 0 ) {
 							// Save a "last resort" path if we are about to mark the first hop
-							context->SaveLastResortPath( sequencePathPenalty );
+							context->SaveLastResortPath( m_sequencePathPenalty );
 						} else {
 							// Save a "good enough" path if we are about to mark the second hop
-							context->SaveGoodEnoughPath( advancement, sequencePathPenalty );
+							context->SaveGoodEnoughPath( advancement, m_sequencePathPenalty );
 						}
 					}
 				}
 			}
 		}
 	} else {
-		if( !didTheLatchedHop ) {
-			if( hasALatchedHop ) {
-				didTheLatchedHop = true;
-				hopsCounter++;
+		if( !m_didTheLatchedHop ) {
+			if( m_hasALatchedHop ) {
+				m_didTheLatchedHop = true;
+				m_hopCounter++;
 			}
 		} else {
 			// Don't waste further cycles (the completion condition won't hold).
-			if( hopsCounter && sequencePathPenalty ) {
+			if( m_hopCounter && m_sequencePathPenalty ) {
 				return PredictionResult::Restart;
 			}
 		}
@@ -631,9 +631,9 @@ auto BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) ->
 	// Check whether to continue prediction still makes sense
 	constexpr unsigned naturalLimit = PredictionContext::MAX_PREDICTED_STATES;
 	unsigned stackGrowthLimit;
-	if( hopsCounter > 1 ) {
+	if( m_hopCounter > 1 ) {
 		stackGrowthLimit = ( 7 * naturalLimit ) / 8;
-	} else if( hopsCounter ) {
+	} else if( m_hopCounter ) {
 		stackGrowthLimit = ( 5 * naturalLimit ) / 6;
 	} else {
 		stackGrowthLimit = ( 3 * naturalLimit ) / 4;
@@ -647,74 +647,74 @@ auto BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) ->
 	return PredictionResult::Restart;
 }
 
-void BunnyHopAction::OnApplicationSequenceStarted( PredictionContext *context ) {
-	BaseAction::OnApplicationSequenceStarted( context );
+void BunnyHopAction::onApplicationSequenceStarted( PredictionContext *context ) {
+	BaseAction::onApplicationSequenceStarted( context );
 
-	minTravelTimeToNavTargetSoFar = std::numeric_limits<int>::max();
-	minTravelTimeAreaNumSoFar = 0;
+	m_minTravelTimeToNavTargetSoFar = std::numeric_limits<int>::max();
+	m_minTravelTimeAreaNumSoFar     = 0;
 
-	travelTimeAtSequenceStart = 0;
-	reachAtSequenceStart = 0;
+	m_travelTimeAtSequenceStart = 0;
+	m_reachAtSequenceStart      = 0;
 
-	latchedHopOrigin.Set( 0, 0, 0 );
+	m_latchedHopOrigin.Set( 0, 0, 0 );
 
-	sequencePathPenalty = 0;
+	m_sequencePathPenalty = 0;
 
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
-	originAtSequenceStart.Set( entityPhysicsState.Origin() );
+	m_originAtSequenceStart.Set( entityPhysicsState.Origin() );
 
-	distanceToReachAtStart = std::numeric_limits<float>::infinity();
-	distanceInNavTargetAreaAtStart = std::numeric_limits<float>::infinity();
+	m_distanceToReachAtStart = std::numeric_limits<float>::infinity();
+	m_distanceInNavTargetAreaAtStart = std::numeric_limits<float>::infinity();
 
 	if( context->NavTargetAasAreaNum() ) {
 		int reachNum, travelTime;
 		context->NextReachNumAndTravelTimeToNavTarget( &reachNum, &travelTime );
 		if( travelTime ) {
-			minTravelTimeToNavTargetSoFar = travelTime;
-			travelTimeAtSequenceStart = travelTime;
-			reachAtSequenceStart = reachNum;
+			m_minTravelTimeToNavTargetSoFar = travelTime;
+			m_travelTimeAtSequenceStart     = travelTime;
+			m_reachAtSequenceStart          = reachNum;
 			if( reachNum ) {
 				const auto &reach = AiAasWorld::instance()->getReaches()[reachNum];
-				distanceToReachAtStart = originAtSequenceStart.Distance2DTo( reach.start );
+				m_distanceToReachAtStart = m_originAtSequenceStart.Distance2DTo( reach.start );
 			} else {
-				distanceInNavTargetAreaAtStart = originAtSequenceStart.Distance2DTo( context->NavTargetOrigin() );
+				m_distanceInNavTargetAreaAtStart = m_originAtSequenceStart.Distance2DTo( context->NavTargetOrigin() );
 			}
 		}
 	}
 
-	currentSpeedLossSequentialMillis = 0;
-	currentUnreachableTargetSequentialMillis = 0;
+	m_currentSpeedLossSequentialMillis         = 0;
+	m_currentUnreachableTargetSequentialMillis = 0;
 
-	hasEnteredNavTargetArea = false;
-	hasTouchedNavTarget = false;
+	m_hasEnteredNavTargetArea = false;
+	m_hasTouchedNavTarget     = false;
 
-	hasALatchedHop = false;
-	didTheLatchedHop = false;
-	hopsCounter = 0;
+	m_hasALatchedHop   = false;
+	m_didTheLatchedHop = false;
+	m_hopCounter       = 0;
 }
 
-void BunnyHopAction::OnApplicationSequenceStopped( PredictionContext *context,
+void BunnyHopAction::onApplicationSequenceStopped( PredictionContext *context,
 												   SequenceStopReason reason,
 												   unsigned stoppedAtFrameIndex ) {
-	BaseAction::OnApplicationSequenceStopped( context, reason, stoppedAtFrameIndex );
+	BaseAction::onApplicationSequenceStopped( context, reason, stoppedAtFrameIndex );
 
 	if( reason != FAILED ) {
 		if( reason != DISABLED ) {
-			this->disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
+			this->m_disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
 		}
 		return;
 	}
 
 	// If the action has been disabled due to prediction stack overflow
-	if( this->isDisabledForPlanning ) {
+	if( this->m_isDisabledForPlanning ) {
 		return;
 	}
 
 	// Disable applying this action after rolling back to the savepoint
-	this->disabledForApplicationFrameIndex = 0;
+	this->m_disabledForApplicationFrameIndex = 0;
 }
 
-void BunnyHopAction::BeforePlanning() {
-	BaseAction::BeforePlanning();
-	this->disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
+void BunnyHopAction::beforePlanning() {
+	BaseAction::beforePlanning();
+	this->m_disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
 }

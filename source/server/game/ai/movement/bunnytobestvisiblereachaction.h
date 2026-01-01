@@ -8,7 +8,8 @@ public:
 	explicit BunnyToBestVisibleReachAction( MovementSubsystem *subsystem )
 		: BunnyHopAction( subsystem, "BunnyToStairsOrRampExitAction", COLOR_RGB( 96, 0, 255 ) ) {}
 
-	auto PlanPredictionStep( PredictionContext *context ) -> PredictionResult override;
+	[[nodiscard]]
+	auto planPredictionStep( PredictionContext *context ) -> PredictionResult override;
 };
 
 #endif

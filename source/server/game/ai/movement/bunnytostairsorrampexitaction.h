@@ -4,24 +4,26 @@
 #include "bunnyhopaction.h"
 
 class BunnyToStairsOrRampExitAction: public BunnyHopAction {
-	float *intendedLookDir { nullptr };
-	Vec3 lookDirStorage { vec3_origin };
-	int targetFloorCluster { 0 };
+	float *m_intendedLookDir { nullptr };
+	Vec3 m_lookDirStorage { vec3_origin };
+	int m_targetFloorCluster { 0 };
 
-	bool TryFindAndSaveLookDir( PredictionContext *context );
-	void TrySaveExitFloorCluster( PredictionContext *context, int exitAreaNum );
+	bool tryFindingAndSavingLookDir( PredictionContext *context );
+	void trySavingExitFloorCluster( PredictionContext *context, int exitAreaNum );
 public:
 	explicit BunnyToStairsOrRampExitAction( MovementSubsystem *subsystem ):
 		BunnyHopAction( subsystem, "BunnyToStairsOrRampExitAction", COLOR_RGB( 0, 255, 255 ) ) {}
 
-	void BeforePlanning() override {
-		BunnyHopAction::BeforePlanning();
-		targetFloorCluster = 0;
-		intendedLookDir = nullptr;
+	void beforePlanning() override {
+		BunnyHopAction::beforePlanning();
+		m_targetFloorCluster = 0;
+		m_intendedLookDir = nullptr;
 	}
 
-	auto PlanPredictionStep( PredictionContext *context ) -> PredictionResult override;
-	auto CheckPredictionStepResults( PredictionContext *context ) -> PredictionResult override;
+	[[nodiscard]]
+	auto planPredictionStep( PredictionContext *context ) -> PredictionResult override;
+	[[nodiscard]]
+	auto checkPredictionStepResults( PredictionContext *context ) -> PredictionResult override;
 };
 
 #endif

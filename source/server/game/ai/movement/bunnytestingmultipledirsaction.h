@@ -4,22 +4,20 @@
 #include "bunnyhopaction.h"
 
 class BunnyTestingMultipleLookDirsAction : public BunnyHopAction {
-	friend class BunnyStraighteningReachChainAction;
-	friend class BunnyToBestShortcutAreaAction;
-	friend class BunnyInterpolatingChainAtStartAction;
 protected:
-	const float *currDir {nullptr };
+	const float *m_currDir {nullptr };
 
-	virtual void OnApplicationSequenceFailed( PredictionContext *context, unsigned stoppedAtFrameIndex ) {};
+	virtual void onApplicationSequenceFailed( PredictionContext *context, unsigned stoppedAtFrameIndex ) {};
 public:
-	BunnyTestingMultipleLookDirsAction( MovementSubsystem *subsystem, const char *name_, int debugColor_ )
-		: BunnyHopAction( subsystem, name_, debugColor_ ) {}
+	BunnyTestingMultipleLookDirsAction( MovementSubsystem *subsystem, const char *name, int debugColor )
+		: BunnyHopAction( subsystem, name, debugColor ) {}
 
-	void BeforePlanning() override;
-	void OnApplicationSequenceStopped( PredictionContext *context,
+	void beforePlanning() override;
+	void onApplicationSequenceStopped( PredictionContext *context,
 									   SequenceStopReason stopReason,
 									   unsigned stoppedAtFrameIndex ) override;
-	auto PlanPredictionStep( PredictionContext *context ) -> PredictionResult override;
+	[[nodiscard]]
+	auto planPredictionStep( PredictionContext *context ) -> PredictionResult override;
 };
 
 class BunnyTestingSavedLookDirsAction : public BunnyTestingMultipleLookDirsAction {
@@ -38,22 +36,22 @@ protected:
 			: dir( dir_ ), area( area_ ), pathPenalty( pathPenalty_ ) {}
 	};
 
-	wsw::StaticVector<SuggestedDir, kMaxSuggestedLookDirs> suggestedLookDirs;
+	wsw::StaticVector<SuggestedDir, kMaxSuggestedLookDirs> m_suggestedLookDirs;
 
-	unsigned maxSuggestedLookDirs {kMaxSuggestedLookDirs };
-	unsigned currSuggestedLookDirNum { 0 };
+	unsigned m_maxSuggestedLookDirs { kMaxSuggestedLookDirs };
+	unsigned m_currSuggestedLookDirNum { 0 };
 
-	void BeforePlanning() override {
-		BunnyTestingMultipleLookDirsAction::BeforePlanning();
-		currSuggestedLookDirNum = 0;
-		suggestedLookDirs.clear();
+	void beforePlanning() override {
+		BunnyTestingMultipleLookDirsAction::beforePlanning();
+		m_currSuggestedLookDirNum = 0;
+		m_suggestedLookDirs.clear();
 	}
 
-	void OnApplicationSequenceStarted( PredictionContext *context ) final;
+	void onApplicationSequenceStarted( PredictionContext *context ) final;
 
-	void OnApplicationSequenceFailed( PredictionContext *context, unsigned stoppedAtFrameIndex ) final;
+	void onApplicationSequenceFailed( PredictionContext *context, unsigned stoppedAtFrameIndex ) final;
 
-	virtual void SaveSuggestedLookDirs( PredictionContext *context ) = 0;
+	virtual void saveSuggestedLookDirs( PredictionContext *context ) = 0;
 
 	/**
 	 * Assuming that look dirs and areas have been just saved, derives additional ones
@@ -63,7 +61,7 @@ protected:
 	 * @todo this works good but the used algorithm is very basic
 	 * and this should really be implemented by descendants in their specific ways.
 	 */
-	void DeriveMoreDirsFromSavedDirs();
+	void deriveMoreDirsFromSavedDirs();
 
 	/**
 	 * A helper method to select best N areas that is optimized for small areas count.
@@ -71,9 +69,10 @@ protected:
 	 * Returns the new end iterator for the selected areas range.
 	 * The begin iterator is assumed to remain the same.
 	 */
-	AreaAndScore *TakeBestCandidateAreas( AreaAndScore *inputBegin, AreaAndScore *inputEnd, unsigned maxAreas );
+	[[nodiscard]]
+	auto takeBestCandidateAreas( AreaAndScore *inputBegin, AreaAndScore *inputEnd, unsigned maxAreas ) -> AreaAndScore *;
 
-	void SaveCandidateAreaDirs( PredictionContext *context,
+	void saveCandidateAreaDirs( PredictionContext *context,
 								AreaAndScore *candidateAreasBegin,
 								AreaAndScore *candidateAreasEnd );
 

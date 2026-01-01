@@ -171,11 +171,11 @@ inline void PredictionContext::SaveActionOnStack( BaseAction *action ) {
 		const char *format =
 			"%s: The prediction step millis value %u is way too large. "
 			"Is it a result of wrapping of negative values in unsigned context?\n";
-		AI_FailWith( tag, format, action->Name() );
+		AI_FailWith( tag, format, action->getName() );
 	}
 	if( this->predictionStepMillis % DefaultFrameTime() ) {
 		const char *format = "%s: The prediction step millis value %u is no a multiple of %u\n";
-		AI_FailWith( tag, format, action->Name(), this->predictionStepMillis, DefaultFrameTime() );
+		AI_FailWith( tag, format, action->getName(), this->predictionStepMillis, DefaultFrameTime() );
 	}
 #endif
 
@@ -202,9 +202,9 @@ inline unsigned PredictionContext::MillisAheadForFrameStart( unsigned frameIndex
 	return totalMillisAhead;
 }
 
-inline auto BaseAction::GenericCheckIsActionEnabled( PredictionContext *context ) const -> PredictionResult {
+inline auto BaseAction::genericCheckIsActionEnabled( PredictionContext *context ) const -> PredictionResult {
 	// Put likely case first
-	if( !isDisabledForPlanning ) {
+	if( !m_isDisabledForPlanning ) {
 		return PredictionResult::Continue;
 	}
 

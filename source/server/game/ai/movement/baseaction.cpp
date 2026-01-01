@@ -11,7 +11,7 @@ void BaseAction::Debug( const char *format, ... ) const {
 #endif
 
 	char tag[128];
-	Q_snprintfz( tag, 128, "^5%s(%s)", this->Name(), Nick( game.edicts + bot->EntNum() ) );
+	Q_snprintfz( tag, 128, "^5%s(%s)", this->getName(), Nick( game.edicts + m_bot->EntNum() ) );
 
 	va_list va;
 	va_start( va, format );
@@ -20,7 +20,7 @@ void BaseAction::Debug( const char *format, ... ) const {
 #endif
 }
 
-void BaseAction::ExecActionRecord( const MovementActionRecord *record, BotInput *inputWillBeUsed, PredictionContext *context ) {
+void BaseAction::execActionRecord( const MovementActionRecord *record, BotInput *inputWillBeUsed, PredictionContext *context ) {
 	Assert( inputWillBeUsed );
 	// TODO: Discover why we still need to do that for pending look at points
 	// while the pending look at points seemingly gets applied in SimulateMockBotFrame()
@@ -45,7 +45,7 @@ void BaseAction::ExecActionRecord( const MovementActionRecord *record, BotInput 
 		return;
 	}
 
-	edict_t *const self = game.edicts + bot->EntNum();
+	edict_t *const self = game.edicts + m_bot->EntNum();
 
 	if( record->hasModifiedVelocity ) {
 		record->ModifiedVelocity().CopyTo( self->velocity );
@@ -56,7 +56,7 @@ void BaseAction::ExecActionRecord( const MovementActionRecord *record, BotInput 
 	}
 }
 
-auto BaseAction::CheckPredictionStepResults( PredictionContext *context ) -> PredictionResult {
+auto BaseAction::checkPredictionStepResults( PredictionContext *context ) -> PredictionResult {
 	const auto &newEntityPhysicsState = context->movementState->entityPhysicsState;
 	const auto &oldEntityPhysicsState = context->PhysicsStateBeforeStep();
 
@@ -81,7 +81,7 @@ auto BaseAction::CheckPredictionStepResults( PredictionContext *context ) -> Pre
 		}
 	}
 
-	if( stopPredictionOnEnteringWater && newEntityPhysicsState.waterLevel > 1 ) {
+	if( m_stopPredictionOnEnteringWater && newEntityPhysicsState.waterLevel > 1 ) {
 		Debug( "A prediction step has lead to entering water, should stop planning\n" );
 		return PredictionResult::Complete;
 	}
@@ -109,7 +109,7 @@ auto BaseAction::CheckPredictionStepResults( PredictionContext *context ) -> Pre
 		}
 	}
 
-	if( this->stopPredictionOnTouchingJumppad ) {
+	if( this->m_stopPredictionOnTouchingJumppad ) {
 		if( const uint16_t touchedTriggerNum = context->frameEvents.touchedJumppadEntNum ) {
 			if( touchedTriggerNum == context->m_jumppadPathTriggerNum ) {
 				Debug( "A prediction step has lead to touching the jumppad, should stop planning\n" );
@@ -120,7 +120,7 @@ auto BaseAction::CheckPredictionStepResults( PredictionContext *context ) -> Pre
 			}
 		}
 	}
-	if( this->stopPredictionOnTouchingTeleporter ) {
+	if( this->m_stopPredictionOnTouchingTeleporter ) {
 		if( const uint16_t touchedTriggerNum = context->frameEvents.touchedTeleporterEntNum ) {
 			if( touchedTriggerNum == context->m_teleporterPathTriggerNum ) {
 				Debug( "A prediction step has lead to touching the teleporter, should stop planning\n" );
@@ -131,7 +131,7 @@ auto BaseAction::CheckPredictionStepResults( PredictionContext *context ) -> Pre
 			}
 		}
 	}
-	if( this->stopPredictionOnTouchingPlatform ) {
+	if( this->m_stopPredictionOnTouchingPlatform ) {
 		if( const uint16_t touchedPlatformNum = context->frameEvents.touchedPlatformEntNum ) {
 			if( touchedPlatformNum == context->m_platformPathTriggerNum ) {
 				Debug( "A prediction step has lead to touching the platform, should stop planning\n" );
@@ -143,19 +143,19 @@ auto BaseAction::CheckPredictionStepResults( PredictionContext *context ) -> Pre
 		}
 	}
 
-	if( this->stopPredictionOnTouchingNavEntity ) {
-		if( HasTouchedNavEntityThisFrame( context ) ) {
+	if( this->m_stopPredictionOnTouchingNavEntity ) {
+		if( hasTouchedNavEntityThisFrame( context ) ) {
 			Debug( "A prediction step has lead to touching the nav entity, should stop planning\n" );
 			return PredictionResult::Complete;
 		}
 	}
 
-	if( bot->ShouldRushHeadless() ) {
+	if( m_bot->ShouldRushHeadless() ) {
 		return PredictionResult::Complete;
 	}
 
-	if( this->failPredictionOnEnteringHazardImpactZone ) {
-		if( const auto *hazard = bot->PrimaryHazard() ) {
+	if( this->m_failPredictionOnEnteringHazardImpactZone ) {
+		if( const auto *hazard = m_bot->PrimaryHazard() ) {
 			if( hazard->SupportsImpactTests() ) {
 				// Check the new origin condition first to cut off early
 				if( hazard->HasImpactOnPoint( newEntityPhysicsState.Origin() ) ) {
@@ -169,7 +169,7 @@ auto BaseAction::CheckPredictionStepResults( PredictionContext *context ) -> Pre
 	}
 
 	// If misc tactics flag "rush headless" is set, areas occupied by enemies are never excluded from routing
-	const auto *routeCache = bot->RouteCache();
+	const auto *routeCache = m_bot->RouteCache();
 	// Check the new origin condition first to cut off early
 	if( routeCache->AreaDisabled( newAasAreaNum ) ) {
 		if( !routeCache->AreaDisabled( oldAasAreaNum ) ) {
@@ -181,46 +181,46 @@ auto BaseAction::CheckPredictionStepResults( PredictionContext *context ) -> Pre
 	return PredictionResult::Continue;
 }
 
-bool BaseAction::HasTouchedNavEntityThisFrame( PredictionContext *context ) {
+bool BaseAction::hasTouchedNavEntityThisFrame( PredictionContext *context ) {
 	const edict_t *gameEdicts = game.edicts;
 	const uint16_t *ents = context->frameEvents.otherTouchedTriggerEnts;
 	for( int i = 0, end = context->frameEvents.numOtherTouchedTriggers; i < end; ++i ) {
 		const edict_t *ent = gameEdicts + ents[i];
-		if( bot->IsNavTargetBasedOnEntity( ent ) ) {
+		if( m_bot->IsNavTargetBasedOnEntity( ent ) ) {
 			return true;
 		}
 	}
 	return false;
 }
 
-void BaseAction::BeforePlanning() {
-	bot = m_subsystem->bot;
-	isDisabledForPlanning = false;
-	sequenceStartFrameIndex = std::numeric_limits<unsigned>::max();
-	sequenceEndFrameIndex = std::numeric_limits<unsigned>::max();
-	thisFrameCMShapeList = nullptr;
+void BaseAction::beforePlanning() {
+	m_bot                     = m_subsystem->bot;
+	m_isDisabledForPlanning   = false;
+	m_sequenceStartFrameIndex = std::numeric_limits<unsigned>::max();
+	m_sequenceEndFrameIndex   = std::numeric_limits<unsigned>::max();
+	m_thisFrameCMShapeList    = nullptr;
 }
 
-void BaseAction::OnApplicationSequenceStarted( PredictionContext *context ) {
+void BaseAction::onApplicationSequenceStarted( PredictionContext *context ) {
 	Debug( "OnApplicationSequenceStarted(context): context->topOfStackIndex=%d\n", context->topOfStackIndex );
 
 	constexpr auto invalidValue = std::numeric_limits<unsigned>::max();
-	Assert( sequenceStartFrameIndex == invalidValue );
-	sequenceEndFrameIndex = invalidValue;
-	sequenceStartFrameIndex = context->topOfStackIndex;
-	originAtSequenceStart.Set( context->movementState->entityPhysicsState.Origin() );
-	thisFrameCMShapeList = nullptr;
+	Assert( m_sequenceStartFrameIndex == invalidValue );
+	m_sequenceEndFrameIndex   = invalidValue;
+	m_sequenceStartFrameIndex = context->topOfStackIndex;
+	m_originAtSequenceStart.Set( context->movementState->entityPhysicsState.Origin() );
+	m_thisFrameCMShapeList = nullptr;
 }
 
-void BaseAction::OnApplicationSequenceStopped( PredictionContext *context,
-													   SequenceStopReason reason,
-													   unsigned stoppedAtFrameIndex ) {
+void BaseAction::onApplicationSequenceStopped( PredictionContext *context,
+											   SequenceStopReason reason,
+											   unsigned stoppedAtFrameIndex ) {
 	constexpr auto invalidValue = std::numeric_limits<unsigned>::max();
-	Assert( sequenceStartFrameIndex != invalidValue );
-	Assert( sequenceEndFrameIndex == invalidValue );
-	Assert( sequenceStartFrameIndex <= stoppedAtFrameIndex );
-	sequenceStartFrameIndex = invalidValue;
-	sequenceEndFrameIndex = stoppedAtFrameIndex;
+	Assert( m_sequenceStartFrameIndex != invalidValue );
+	Assert( m_sequenceEndFrameIndex == invalidValue );
+	Assert( m_sequenceStartFrameIndex <= stoppedAtFrameIndex );
+	m_sequenceStartFrameIndex = invalidValue;
+	m_sequenceEndFrameIndex = stoppedAtFrameIndex;
 
 	const char *format = "OnApplicationSequenceStopped(context, %s, %d): context->topOfStackIndex=%d\n";
 	switch( reason ) {
@@ -243,8 +243,8 @@ void BaseAction::OnApplicationSequenceStopped( PredictionContext *context,
 	}
 }
 
-unsigned BaseAction::SequenceDuration( const PredictionContext *context ) const {
-	unsigned millisAheadAtSequenceStart = context->MillisAheadForFrameStart( sequenceStartFrameIndex );
+auto BaseAction::getSequenceDuration( const PredictionContext *context ) const -> unsigned {
+	unsigned millisAheadAtSequenceStart = context->MillisAheadForFrameStart( m_sequenceStartFrameIndex );
 	// TODO: Ensure that the method gets called only after prediction step in some way
 	// (We need a valid and actual prediction step millis)
 	Assert( context->predictionStepMillis );

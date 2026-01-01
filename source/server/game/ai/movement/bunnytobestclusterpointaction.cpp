@@ -5,15 +5,15 @@ BunnyToBestFloorClusterPointAction::BunnyToBestFloorClusterPointAction( Movement
 	: BunnyTestingMultipleLookDirsAction( subsystem, NAME, COLOR_RGB( 255, 0, 255 ) ) {
 }
 
-void BunnyToBestFloorClusterPointAction::OnApplicationSequenceStarted( PredictionContext *context ) {
-	Super::OnApplicationSequenceStarted( context );
+void BunnyToBestFloorClusterPointAction::onApplicationSequenceStarted( PredictionContext *context ) {
+	Super::onApplicationSequenceStarted( context );
 
 	FloorClusterAreasCache *const caches[2] = {
 		&m_subsystem->sameFloorClusterAreasCache,
 		&m_subsystem->nextFloorClusterAreasCache
 	};
 
-	bool *const testedFlags[2] = { &this->hasTestedSameCluster, &this->hasTestedNextCluster };
+	bool *const testedFlags[2] = { &m_hasTestedSameCluster, &m_hasTestedNextCluster };
 
 	for( int i = 0; i < 2; ++i ) {
 		if( *testedFlags[i] ) {
@@ -22,27 +22,27 @@ void BunnyToBestFloorClusterPointAction::OnApplicationSequenceStarted( Predictio
 		*testedFlags[i] = true;
 
 		int areaNum;
-		if( !caches[i]->GetClosestToTargetPoint( context, localDirStorage.Data(), &areaNum ) ) {
+		if( !caches[i]->GetClosestToTargetPoint( context, m_localDirStorage.Data(), &areaNum ) ) {
 			continue;
 		}
 
-		localDirStorage -= context->movementState->entityPhysicsState.Origin();
-		if( localDirStorage.normalize() ) {
-			currDir = localDirStorage.Data();
+		m_localDirStorage -= context->movementState->entityPhysicsState.Origin();
+		if( m_localDirStorage.normalize() ) {
+			m_currDir = m_localDirStorage.Data();
 			return;
 		}
 	}
 
-    currDir = nullptr;
+    m_currDir = nullptr;
 }
 
-void BunnyToBestFloorClusterPointAction::OnApplicationSequenceFailed( PredictionContext *context, unsigned ) {
-	if( hasTestedNextCluster ) {
+void BunnyToBestFloorClusterPointAction::onApplicationSequenceFailed( PredictionContext *context, unsigned ) {
+	if( m_hasTestedNextCluster ) {
 		return;
 	}
 
-	assert( hasTestedSameCluster );
+	assert( m_hasTestedSameCluster );
 	// Make sure we can restart this action after rolling back
-	disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
+	m_disabledForApplicationFrameIndex = std::numeric_limits<unsigned>::max();
 	// Force this action to be applied next frame (regardless of rolling back)
 }

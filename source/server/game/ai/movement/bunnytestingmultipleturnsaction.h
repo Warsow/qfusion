@@ -4,9 +4,9 @@
 #include "bunnyhopaction.h"
 
 class BunnyTestingMultipleTurnsAction : public BunnyHopAction {
-	Vec3 initialDir { 0, 0, 0 };
-	int attemptNum { 0 };
-	bool hasWalljumped { false };
+	Vec3 m_initialDir { 0, 0, 0 };
+	int m_attemptNum { 0 };
+	bool m_hasWalljumped { false };
 
 	static constexpr const auto kMaxAngles = 4;
 	static constexpr const auto kMaxAttempts = 2 * kMaxAngles;
@@ -16,19 +16,19 @@ public:
 	explicit BunnyTestingMultipleTurnsAction( MovementSubsystem *subsystem )
 		: BunnyHopAction( subsystem, "BunnyTestingMultipleTurnsAction", COLOR_RGB( 255, 0, 0 ) ) {}
 
-	auto PlanPredictionStep( PredictionContext *context ) -> PredictionResult override;
+	auto planPredictionStep( PredictionContext *context ) -> PredictionResult override;
 
-	void BeforePlanning() override {
-		BunnyHopAction::BeforePlanning();
-		attemptNum = 0;
+	void beforePlanning() override {
+		BunnyHopAction::beforePlanning();
+		m_attemptNum = 0;
 	}
 
-	void OnApplicationSequenceStarted( PredictionContext *context ) override {
-		BunnyHopAction::OnApplicationSequenceStarted( context );
-		hasWalljumped = false;
+	void onApplicationSequenceStarted( PredictionContext *context ) override {
+		BunnyHopAction::onApplicationSequenceStarted( context );
+		m_hasWalljumped = false;
 	}
 
-	void OnApplicationSequenceStopped( PredictionContext *context,
+	void onApplicationSequenceStopped( PredictionContext *context,
 									   SequenceStopReason stopReason,
 									   unsigned stoppedAtFrameIndex ) override;
 };

@@ -6,22 +6,22 @@
 
 BunnyTestingNextReachDirsAction::BunnyTestingNextReachDirsAction( MovementSubsystem *subsystem )
 	: BunnyTestingSavedLookDirsAction( subsystem, NAME, COLOR_RGB( 0, 192, 0 ) ) {
-	maxSuggestedLookDirs = kMaxSuggestedLookDirs;
+	m_maxSuggestedLookDirs = kMaxSuggestedLookDirs;
 }
 
-void BunnyTestingNextReachDirsAction::BeforePlanning() {
-	BunnyTestingSavedLookDirsAction::BeforePlanning();
+void BunnyTestingNextReachDirsAction::beforePlanning() {
+	BunnyTestingSavedLookDirsAction::beforePlanning();
 	// We plan to allow varying bot skill dynamically.
 	// This value should be recomputed every planning frame.
 
-	const float skill = bot->Skill();
+	const float skill = m_bot->Skill();
 	// Bunny-hopping is enabled for easy bots under certain conditions. Allow only up to 2 dirs in this case.
 	if( skill <= 0.33f ) {
-		maxSuggestedLookDirs = 2;
+		m_maxSuggestedLookDirs = 2;
 		return;
 	}
 
-	maxSuggestedLookDirs = kMaxSuggestedLookDirs;
+	m_maxSuggestedLookDirs = kMaxSuggestedLookDirs;
 	// Use the maximum possible number of suggested dirs for hard bots.
 	if( skill >= 0.66f ) {
 		return;
@@ -30,8 +30,8 @@ void BunnyTestingNextReachDirsAction::BeforePlanning() {
 	// TODO: All these decisions should not be made at movement m_subsystem level
 
 	// Check whether the bot is carrier. Use the maximal possible number of look dirs in this case.
-	const edict_t *self = game.edicts + bot->EntNum();
-	if( ( ( self->s.effects & EF_CARRIER ) || self->s.modelindex2 ) || bot->ShouldRushHeadless() ) {
+	const edict_t *self = game.edicts + m_bot->EntNum();
+	if( ( ( self->s.effects & EF_CARRIER ) || self->s.modelindex2 ) || m_bot->ShouldRushHeadless() ) {
 		return;
 	}
 
@@ -44,8 +44,8 @@ void BunnyTestingNextReachDirsAction::BeforePlanning() {
 	// Grow quadratic starting from a weakest mid-skill bot
 	float skillFrac = ( skill - 0.33f ) / ( 0.66f - 0.33f );
 	Assert( skillFrac > 0.0f && skillFrac < 1.0f );
-	maxSuggestedLookDirs = (unsigned)( 2 + ( skillFrac * skillFrac ) * kMaxSuggestedLookDirs );
-	maxSuggestedLookDirs = wsw::min( maxSuggestedLookDirs, (unsigned)kMaxSuggestedLookDirs );
+	m_maxSuggestedLookDirs = (unsigned)( 2 + ( skillFrac * skillFrac ) * kMaxSuggestedLookDirs );
+	m_maxSuggestedLookDirs = wsw::min( m_maxSuggestedLookDirs, (unsigned)kMaxSuggestedLookDirs );
 }
 
 class NextReachDirsCollector final : public ReachChainWalker {
@@ -99,21 +99,21 @@ public:
 	bool Accept( int, const aas_reachability_t &reach, int ) override;
 };
 
-void BunnyTestingNextReachDirsAction::SaveSuggestedLookDirs( PredictionContext *context ) {
-	Assert( suggestedLookDirs.empty() );
+void BunnyTestingNextReachDirsAction::saveSuggestedLookDirs( PredictionContext *context ) {
+	Assert( m_suggestedLookDirs.empty() );
 
 	if( context->IsInNavTargetArea() ) {
 		return;
 	}
 
 	AreaAndScore candidates[kMaxSuggestedLookDirs];
-	NextReachDirsCollector collector( bot, context, candidates, kMaxSuggestedLookDirs );
+	NextReachDirsCollector collector( m_bot, context, candidates, kMaxSuggestedLookDirs );
 	if( !collector.Exec() ) {
 		Debug( "Can't find areas for straightening a look dir\n" );
 	}
 
-	SaveCandidateAreaDirs( context, candidates, candidates + collector.numCandidates );
-	Assert( suggestedLookDirs.size() <= maxSuggestedLookDirs );
+	saveCandidateAreaDirs( context, candidates, candidates + collector.numCandidates );
+	Assert( m_suggestedLookDirs.size() <= m_maxSuggestedLookDirs );
 
 	if( !collector.lastReachNum ) {
 		return;
@@ -128,10 +128,10 @@ void BunnyTestingNextReachDirsAction::SaveSuggestedLookDirs( PredictionContext *
 	// TODO: Check a trace/an coarse arc trace to the trigger and ensure we do not hit anything besides maybe the trigger
 
 	// If there is a trigger entity in the reach chain, try keep looking at it
-	Assert( maxSuggestedLookDirs > 0 );
+	Assert( m_maxSuggestedLookDirs > 0 );
 	// Evict the last dir, the trigger should have a priority over it
-	if( suggestedLookDirs.size() == maxSuggestedLookDirs ) {
-		suggestedLookDirs.pop_back();
+	if( m_suggestedLookDirs.size() == m_maxSuggestedLookDirs ) {
+		m_suggestedLookDirs.pop_back();
 	}
 
 	Vec3 toTriggerDir( stoppedAtReach.start );
@@ -143,7 +143,7 @@ void BunnyTestingNextReachDirsAction::SaveSuggestedLookDirs( PredictionContext *
 	// The target area of reachStoppedAt is the area "behind" trigger.
 	// The prediction gets always interrupted on touching trigger.
 	// Just supply a dummy value and rely on touching the trigger during prediction.
-	suggestedLookDirs.emplace_back( SuggestedDir( toTriggerDir, 0 ) );
+	m_suggestedLookDirs.emplace_back( SuggestedDir( toTriggerDir, 0 ) );
 }
 
 inline bool NextReachDirsCollector::CheckForStairsCluster( int areaNum ) {

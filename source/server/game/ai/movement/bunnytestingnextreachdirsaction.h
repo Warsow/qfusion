@@ -6,13 +6,11 @@
 class BunnyTestingNextReachDirsAction final : public BunnyTestingSavedLookDirsAction {
 	static constexpr const char *NAME = "BunnyTestingNextReachDirsAction";
 
-	friend class BunnyToBestNavMeshPointAction;
-
-	void SaveSuggestedLookDirs( PredictionContext *context ) override;
+	void saveSuggestedLookDirs( PredictionContext *context ) override;
 public:
 	explicit BunnyTestingNextReachDirsAction( MovementSubsystem *subsystem );
 
-	void BeforePlanning() override;
+	void beforePlanning() override;
 };
 
 #endif
