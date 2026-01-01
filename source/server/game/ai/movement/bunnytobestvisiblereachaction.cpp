@@ -20,13 +20,13 @@ struct Walker : public ReachChainWalker {
 	bool Exec() override;
 };
 
-void BunnyToBestVisibleReachAction::PlanPredictionStep( PredictionContext *context ) {
-	if( !GenericCheckIsActionEnabled( context ) ) {
-		return;
+auto BunnyToBestVisibleReachAction::PlanPredictionStep( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = GenericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
-	if( !CheckCommonBunnyHopPreconditions( context ) ) {
-		return;
+	if( const auto result = CheckCommonBunnyHopPreconditions( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
 	Walker walker( context );
@@ -38,8 +38,10 @@ void BunnyToBestVisibleReachAction::PlanPredictionStep( PredictionContext *conte
     }
 
     if( !SetupBunnyHopping( intendedLookDir, context ) ) {
-    	context->SetPendingRollback();
+		return PredictionResult::Abort;
     }
+
+	return PredictionResult::Continue;
 }
 
 bool Walker::Accept( int, const aas_reachability_t &reach, int travelTime ) {

@@ -51,7 +51,7 @@ protected:
 		Assert( conditionLikeValue != 0, message );
 	}
 
-	bool GenericCheckIsActionEnabled( PredictionContext *context ) const;
+	auto GenericCheckIsActionEnabled( PredictionContext *context ) const -> PredictionResult;
 
 	void CheckDisableOrSwitchPreconditions( PredictionContext *context, const char *methodTag );
 
@@ -61,12 +61,12 @@ protected:
 public:
 	inline BaseAction( MovementSubsystem *subsystem, const char *name_, int debugColor_ = 0 )
 		: m_subsystem( subsystem ), name( name_ ), debugColor( debugColor_ ) {}
-	virtual void PlanPredictionStep( PredictionContext *context ) = 0;
+	virtual auto PlanPredictionStep( PredictionContext *context ) -> PredictionResult = 0;
 	virtual void ExecActionRecord( const MovementActionRecord *record,
 								   BotInput *inputWillBeUsed,
 								   PredictionContext *context = nullptr );
 
-	virtual void CheckPredictionStepResults( PredictionContext *context );
+	virtual auto CheckPredictionStepResults( PredictionContext *context ) -> PredictionResult;
 
 	virtual void BeforePlanning();
 	virtual void AfterPlanning() {}

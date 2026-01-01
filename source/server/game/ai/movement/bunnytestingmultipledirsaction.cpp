@@ -60,28 +60,28 @@ inline float SuggestObstacleAvoidanceCorrectionFraction( const PredictionContext
 	return 0.35f - 0.20f * speedOverRunSpeed / 500.0f;
 }
 
-void BunnyTestingMultipleLookDirsAction::PlanPredictionStep( PredictionContext *context ) {
-	if( !GenericCheckIsActionEnabled( context ) ) {
-		return;
+auto BunnyTestingMultipleLookDirsAction::PlanPredictionStep( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = GenericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
 	if( !currDir ) {
 		Debug( "There is no suggested look dirs yet/left\n" );
-		context->SetPendingRollback();
-		return;
+		return PredictionResult::Abort;
 	}
 
 	// Do this test after GenericCheckIsActionEnabled(), otherwise disabledForApplicationFrameIndex does not get tested
-	if( !CheckCommonBunnyHopPreconditions( context ) ) {
-		return;
+	if( const auto result = CheckCommonBunnyHopPreconditions( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
-	context->record->botInput.SetIntendedLookDir(currDir, true );
+	context->record->botInput.SetIntendedLookDir( currDir, true );
 
 	if( !SetupBunnyHopping( context->record->botInput.IntendedLookDir(), context ) ) {
-		context->SetPendingRollback();
-		return;
+		return PredictionResult::Restart;
 	}
+
+	return PredictionResult::Continue;
 }
 
 class DirRotatorsCache {

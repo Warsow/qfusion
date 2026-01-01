@@ -239,21 +239,14 @@ void PredictionContext::SetupStackForStep() {
 
 		// topOfStackIndex already points to a needed array element in case of rolling back
 		const auto &belowTopOfStack = ( *predictedMovementActions )[topOfStackIndex - 1];
-		// For case of rolling back to savepoint we have to truncate grew stacks to it
-		// The only exception is rolling back to the same top of stack.
-		if( this->shouldRollback ) {
-			Assert( this->topOfStackIndex <= predictedMovementActions->size() );
-			predictedMovementActions->truncate( topOfStackIndex );
-			botMovementStatesStack.truncate( topOfStackIndex );
-			playerStatesStack.truncate( topOfStackIndex );
 
-			defaultBotInputsCachesStack.PopToSize( topOfStackIndex );
-			environmentTestResultsStack.truncate( topOfStackIndex );
-		} else {
-			// For case of growing stack topOfStackIndex must point at the first
-			// 'illegal' yet free element at top of the stack
-			Assert( predictedMovementActions->size() == topOfStackIndex );
-		}
+		Assert( this->topOfStackIndex <= predictedMovementActions->size() );
+		predictedMovementActions->truncate( topOfStackIndex );
+		botMovementStatesStack.truncate( topOfStackIndex );
+		playerStatesStack.truncate( topOfStackIndex );
+
+		defaultBotInputsCachesStack.PopToSize( topOfStackIndex );
+		environmentTestResultsStack.truncate( topOfStackIndex );
 
 		topOfStack = new( predictedMovementActions->unsafe_grow_back() )PredictedMovementAction( belowTopOfStack );
 
@@ -308,16 +301,12 @@ void PredictionContext::SetupStackForStep() {
 	defaultBotInputsCachesStack.PushDummyNonCachedValue();
 	new ( environmentTestResultsStack.unsafe_grow_back() )EnvironmentTraceCache;
 
-	this->shouldRollback = false;
-
 	// Save a movement state BEFORE movement step
 	topOfStack->entityPhysicsState = this->movementState->entityPhysicsState;
 }
 
-bool PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStartedSequence ) {
+auto PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStartedSequence ) -> PredictionResult {
 	SetupStackForStep();
-
-	assert( !this->shouldRollback );
 
 	// Reset prediction step millis time.
 	// Actions might set their custom step value (otherwise it will be set to a default one).
@@ -331,37 +320,21 @@ bool PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStarted
 	}
 
 	Debug( "About to call action->PlanPredictionStep() for %s at ToS frame %d\n", action->Name(), topOfStackIndex );
-	action->PlanPredictionStep( this );
-
-	if( action->isDisabledForPlanning ) {
-		// Reset the rollback flag
-		if( this->shouldRollback ) {
-			this->RollbackToSavepoint();
+	if( const auto result = action->PlanPredictionStep( this ); result != PredictionResult::Continue ) {
+		if( result == PredictionResult::Complete ) {
+			SaveActionOnStack( action );
+			constexpr const char *format = "Movement prediction is completed on %s, ToS frame %d, %d millis ahead\n";
+			Debug( format, action->Name(), this->topOfStackIndex, this->totalMillisAhead );
+			// Stop an action application sequence manually with a success.
+			action->OnApplicationSequenceStopped( this, BaseAction::SUCCEEDED, this->topOfStackIndex );
+			return PredictionResult::Complete;
 		}
-		return false;
-	}
 
-	// Check for rolling back necessity (an action application chain has lead to an illegal state)
-	if( this->shouldRollback ) {
 		// Stop an action application sequence manually with a failure.
 		action->OnApplicationSequenceStopped( this, BaseAction::FAILED, (unsigned)-1 );
 		*hasStartedSequence = false;
 		Debug( "Prediction step failed after action->PlanPredictionStep() call for %s\n", action->Name() );
-		this->RollbackToSavepoint();
-		// Continue planning by returning true (the stack will be restored to a savepoint index)
-		return true;
-	}
-
-	// Movement prediction is completed
-	// TODO: Are we going to allow early completion?
-	if( this->isCompleted ) {
-		constexpr const char *format = "Movement prediction is completed on %s, ToS frame %d, %d millis ahead\n";
-		Debug( format, action->Name(), this->topOfStackIndex, this->totalMillisAhead );
-		// Stop an action application sequence manually with a success.
-		action->OnApplicationSequenceStopped( this, BaseAction::SUCCEEDED, this->topOfStackIndex );
-		SaveActionOnStack( action );
-		// Stop planning by returning false
-		return false;
+		return result;
 	}
 
 	// If prediction step millis time has not been set, set it to a default value
@@ -374,11 +347,8 @@ bool PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStarted
 
 	NextMovementStep( action );
 
-	action->CheckPredictionStepResults( this );
-	// If results check has been passed
-	if( !this->shouldRollback ) {
-		// If movement planning is completed, there is no need to do a next step
-		if( this->isCompleted ) {
+	if( const auto result = action->CheckPredictionStepResults( this ); result != PredictionResult::Continue ) {
+		if( result == PredictionResult::Complete ) {
 			constexpr const char *format = "Movement prediction is completed on %s, ToS frame %d, %d millis ahead\n";
 			Debug( format, action->Name(), this->topOfStackIndex, this->totalMillisAhead );
 			SaveActionOnStack( action );
@@ -387,32 +357,29 @@ bool PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStarted
 			// (it might have been done in action->CheckPredictionStepResults() for this->activeAction)
 			action->OnApplicationSequenceStopped( this, BaseAction::SUCCEEDED, topOfStackIndex );
 			*hasStartedSequence = false;
-			// Stop planning by returning false
-			return false;
+			return PredictionResult::Complete;
 		}
 
+		constexpr const char *format = "Prediction step failed for %s after calling action->CheckPredictionStepResults()\n";
+		Debug( format, action->Name() );
+
+		action->OnApplicationSequenceStopped( this, BaseAction::FAILED, (unsigned)-1 );
+		*hasStartedSequence = false;
+
+		return result;
+	} else {
 		// Check whether next prediction step is possible
 		if( this->CanGrowStackForNextStep() ) {
 			SaveActionOnStack( action );
-			// Continue planning by returning true
-			return true;
+			return PredictionResult::Continue;
+		} else {
+			// Disable this action for further planning (it has lead to stack overflow)
+			// TODO: It can perfectly be recoverable
+			action->isDisabledForPlanning = true;
+			Debug( "Stack overflow on action %s, this action will be disabled for further planning\n", action->Name() );
+			return PredictionResult::Abort;
 		}
-
-		// Disable this action for further planning (it has lead to stack overflow)
-		action->isDisabledForPlanning = true;
-		Debug( "Stack overflow on action %s, this action will be disabled for further planning\n", action->Name() );
-		this->SetPendingRollback();
 	}
-
-	constexpr const char *format = "Prediction step failed for %s after calling action->CheckPredictionStepResults()\n";
-	Debug( format, action->Name() );
-
-	action->OnApplicationSequenceStopped( this, BaseAction::FAILED, (unsigned)-1 );
-	*hasStartedSequence = false;
-
-	this->RollbackToSavepoint();
-	// Continue planning by returning true
-	return true;
 }
 
 void PredictionContext::SavePathTriggerNums() {
@@ -582,8 +549,6 @@ bool PredictionContext::BuildPlan( std::span<BaseAction *> actionsToUse ) {
 	// Remember to reset these values before each planning session
 	this->totalMillisAhead = 0;
 	this->topOfStackIndex  = 0;
-	this->isCompleted      = false;
-	this->shouldRollback   = false;
 
 	this->goodEnoughPath.clear();
 	this->goodEnoughPathPenalty = std::numeric_limits<unsigned>::max();
@@ -599,13 +564,14 @@ bool PredictionContext::BuildPlan( std::span<BaseAction *> actionsToUse ) {
 	for( BaseAction *action: actionsToUse ) {
 		// Millis are set appropritately to the top-of-stack index
 		assert( this->topOfStackIndex == 0 );
-		assert( !this->isCompleted );
-		assert( !this->shouldRollback );
-		TryBuildingPlanUsingAction( action );
-		if( isCompleted ) {
+		const PredictionResult result = TryBuildingPlanUsingAction( action );
+		assert( result == PredictionResult::Complete || result == PredictionResult::Abort );
+		if( result == PredictionResult::Complete ) {
 			succeeded = true;
 			break;
 		}
+		// Reset for the next action (assuming the previous one has been aborted)
+		topOfStackIndex = 0;
 	}
 
 	if( !succeeded ) {
@@ -675,22 +641,25 @@ bool PredictionContext::BuildPlan( std::span<BaseAction *> actionsToUse ) {
 	return succeeded;
 }
 
-void PredictionContext::TryBuildingPlanUsingAction( BaseAction *action ) {
+auto PredictionContext::TryBuildingPlanUsingAction( BaseAction *action ) -> PredictionResult {
 	action->BeforePlanning();
 
 #ifdef CHECK_INFINITE_NEXT_STEP_LOOPS
 	::nextStepIterationsCounter = 0;
 #endif
 
+	PredictionResult result = PredictionResult::Continue;
 	bool hasStartedSequence = false;
 	for(;; ) {
-		if( !NextPredictionStep( action, &hasStartedSequence ) ) {
-			break;
+		result = NextPredictionStep( action, &hasStartedSequence );
+		if( result != PredictionResult::Continue ) {
+			if( result == PredictionResult::Restart ) {
+				topOfStackIndex = 0;
+			} else {
+				assert( result == PredictionResult::Complete || result == PredictionResult::Abort );
+				break;
+			}
 		}
-
-		// Make sure that we have performed rolling back (if needed) first
-		assert( !shouldRollback );
-
 #ifdef CHECK_INFINITE_NEXT_STEP_LOOPS
 		++nextStepIterationsCounter;
 		if( nextStepIterationsCounter < NEXT_STEP_INFINITE_LOOP_THRESHOLD ) {
@@ -710,6 +679,8 @@ void PredictionContext::TryBuildingPlanUsingAction( BaseAction *action ) {
 #endif
 
 	action->AfterPlanning();
+	assert( result == PredictionResult::Complete || result == PredictionResult::Abort );
+	return result;
 }
 
 void PredictionContext::NextMovementStep( BaseAction *action ) {
@@ -724,12 +695,6 @@ void PredictionContext::NextMovementStep( BaseAction *action ) {
 	action->ExecActionRecord( this->record, botInput, this );
 	// Corresponds to Bot::Think();
 	m_subsystem->ApplyInput( botInput, this );
-
-	// ExecActionRecord() might fail or complete the planning execution early.
-	// Do not call PMove() in these cases
-	if( this->shouldRollback || this->isCompleted ) {
-		return;
-	}
 
 	const edict_t *self = game.edicts + bot->EntNum();
 

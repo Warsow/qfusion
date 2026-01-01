@@ -1,35 +1,33 @@
 #include "bunnyhopaction.h"
 #include "movementlocal.h"
 
-bool BunnyHopAction::GenericCheckIsActionEnabled( PredictionContext *context ) {
-	if( !BaseAction::GenericCheckIsActionEnabled( context ) ) {
-		return false;
+auto BunnyHopAction::GenericCheckIsActionEnabled( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = BaseAction::GenericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
 	// TODO: Get rid of disabledForApplicationFrameIndex
 	if( this->disabledForApplicationFrameIndex != context->topOfStackIndex ) {
-		return true;
+		return PredictionResult::Continue;
 	}
 
 	assert( context->topOfStackIndex == 0 );
 	Debug( "Cannot apply action: the action has been disabled for application on frame %d\n", context->topOfStackIndex );
 	this->isDisabledForPlanning = true;
-	return false;
+	return PredictionResult::Abort;
 }
 
-bool BunnyHopAction::CheckCommonBunnyHopPreconditions( PredictionContext *context ) {
+auto BunnyHopAction::CheckCommonBunnyHopPreconditions( PredictionContext *context ) -> PredictionResult {
 	int currAasAreaNum = context->CurrAasAreaNum();
 	if( !currAasAreaNum ) {
 		Debug( "Cannot apply action: curr AAS area num is undefined\n" );
-		context->SetPendingRollback();
-		return false;
+		return PredictionResult::Abort;
 	}
 
 	int navTargetAasAreaNum = context->NavTargetAasAreaNum();
 	if( !navTargetAasAreaNum ) {
 		Debug( "Cannot apply action: nav target AAS area num is undefined\n" );
-		context->SetPendingRollback();
-		return false;
+		return PredictionResult::Abort;
 	}
 
 	// Cannot find a next reachability in chain while it should exist
@@ -41,25 +39,22 @@ bool BunnyHopAction::CheckCommonBunnyHopPreconditions( PredictionContext *contex
 		if( minTravelTimeToNavTargetSoFar && minTravelTimeToNavTargetSoFar < travelTimeAtSequenceStart ) {
 			context->SaveLastResortPath( sequencePathPenalty );
 		}
-		context->SetPendingRollback();
-		return false;
+		return PredictionResult::Restart;
 	}
 
+	// TODO: Is this redundant? Just don't try executing the bhop script in the first place
 	if( !( context->currMinimalPlayerState->pmove.stats[PM_STAT_FEATURES] & PMFEAT_JUMP ) ) {
 		Debug( "Cannot apply action: bot does not have the jump movement feature\n" );
-		context->SetPendingRollback();
-		this->isDisabledForPlanning = true;
-		return false;
+		return PredictionResult::Abort;
 	}
 
+	// Same here
 	if( bot->ShouldBeSilent() ) {
 		Debug( "Cannot apply action: bot should be silent\n" );
-		context->SetPendingRollback();
-		this->isDisabledForPlanning = true;
-		return false;
+		return PredictionResult::Abort;
 	}
 
-	return true;
+	return PredictionResult::Continue;
 }
 
 void BunnyHopAction::SetupCommonBunnyHopInput( PredictionContext *context ) {
@@ -538,20 +533,17 @@ bool BunnyHopAction::HasMadeAnAdvancementPriorToLanding( PredictionContext *cont
 	return false;
 }
 
-void BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) {
-	BaseAction::CheckPredictionStepResults( context );
-	if( context->shouldRollback || context->isCompleted ) {
-		return;
+auto BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = BaseAction::CheckPredictionStepResults( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
 	if( !CheckStepSpeedGainOrLoss( context ) ) {
-		context->SetPendingRollback();
-		return;
+		return PredictionResult::Restart;
 	}
 
 	if( !CheckNavTargetAreaTransition( context ) ) {
-		context->SetPendingRollback();
-		return;
+		return PredictionResult::Restart;
 	}
 
 	// This entity physics state has been modified after prediction step
@@ -560,9 +552,9 @@ void BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) {
 	const int currTravelTimeToTarget = context->TravelTimeToNavTarget();
 	if( !currTravelTimeToTarget ) {
 		if( !TryHandlingUnreachableTarget( context ) ) {
-			context->SetPendingRollback();
+			return PredictionResult::Restart;
 		}
-		return;
+		return PredictionResult::Continue;
 	}
 
 	// Reset unreachable target timer
@@ -575,20 +567,18 @@ void BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) {
 		minTravelTimeAreaNumSoFar = context->CurrAasAreaNum();
 	} else {
 		if( !TryHandlingWorseTravelTimeToTarget( context, currTravelTimeToTarget, groundedAreaNum ) ) {
-			context->SetPendingRollback();
-			return;
+			return PredictionResult::Restart;
 		}
 	}
 
 	if( squareDistanceFromStart < wsw::square( 64 ) ) {
 		if( SequenceDuration( context ) < 384 ) {
-			return;
+			return PredictionResult::Continue;
 		}
 
 		// Prevent wasting CPU cycles on further prediction
 		Debug( "The bot still has not covered 64 units yet in 384 millis\n" );
-		context->SetPendingRollback();
-		return;
+		return PredictionResult::Restart;
 	}
 
 	if( WasOnGroundThisFrame( context ) ) {
@@ -600,8 +590,7 @@ void BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) {
 					// Try a "direct" completion if we've landed some sufficient units ahead of the last hop origin
 					if( latchedHopOrigin.SquareDistance2DTo( newEntityPhysicsState.Origin() ) > wsw::square( 72 ) ) {
 						if( !sequencePathPenalty && hopsCounter == 2 ) {
-							context->isCompleted = true;
-							return;
+							return PredictionResult::Complete;
 						}
 					}
 				} else {
@@ -634,8 +623,7 @@ void BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) {
 		} else {
 			// Don't waste further cycles (the completion condition won't hold).
 			if( hopsCounter && sequencePathPenalty ) {
-				context->SetPendingRollback();
-				return;
+				return PredictionResult::Restart;
 			}
 		}
 	}
@@ -651,12 +639,12 @@ void BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) {
 		stackGrowthLimit = ( 3 * naturalLimit ) / 4;
 	}
 	if( context->topOfStackIndex < stackGrowthLimit ) {
-		return;
+		return PredictionResult::Continue;
 	}
 
 	// Stop wasting CPU cycles on this. Also prevent overflow of the prediction stack
 	// leading to inability of restarting the action for testing a next direction (if any).
-	context->SetPendingRollback();
+	return PredictionResult::Restart;
 }
 
 void BunnyHopAction::OnApplicationSequenceStarted( PredictionContext *context ) {

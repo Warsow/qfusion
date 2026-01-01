@@ -20,8 +20,8 @@ public:
 		intendedLookDir = nullptr;
 	}
 
-	void PlanPredictionStep( PredictionContext *context ) override;
-	void CheckPredictionStepResults( PredictionContext *context ) override;
+	auto PlanPredictionStep( PredictionContext *context ) -> PredictionResult override;
+	auto CheckPredictionStepResults( PredictionContext *context ) -> PredictionResult override;
 };
 
 #endif

@@ -56,8 +56,8 @@ protected:
 
 	void SetupCommonBunnyHopInput( PredictionContext *context );
 	// TODO: Mark as virtual in base class and mark as final here to avoid a warning about hiding parent member?
-	bool GenericCheckIsActionEnabled( PredictionContext *context );
-	bool CheckCommonBunnyHopPreconditions( PredictionContext *context );
+	auto GenericCheckIsActionEnabled( PredictionContext *context ) -> PredictionResult;
+	auto CheckCommonBunnyHopPreconditions( PredictionContext *context ) -> PredictionResult;
 	bool SetupBunnyHopping( const Vec3 &intendedLookVec, PredictionContext *context );
 	bool CanFlyAboveGroundRelaxed( const PredictionContext *context ) const;
 	bool CanSetWalljump( PredictionContext *context,
@@ -95,7 +95,7 @@ public:
 		BaseAction::stopPredictionOnTouchingNavEntity = false;
 	}
 
-	void CheckPredictionStepResults( PredictionContext *context ) override;
+	auto CheckPredictionStepResults( PredictionContext *context ) -> PredictionResult override;
 	void OnApplicationSequenceStarted( PredictionContext *context ) override;
 	void OnApplicationSequenceStopped( PredictionContext *context,
 									   SequenceStopReason reason,

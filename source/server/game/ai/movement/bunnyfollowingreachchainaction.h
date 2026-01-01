@@ -13,7 +13,7 @@ public:
 	explicit BunnyFollowingReachChainAction( MovementSubsystem *subsystem )
 		: BunnyHopAction( subsystem, "BunnyFollowingReachChainAction", COLOR_RGB( 192, 64, 108 ) ) {}
 
-	void PlanPredictionStep( PredictionContext *context ) override;
+	auto PlanPredictionStep( PredictionContext *context ) -> PredictionResult override;
 
 	void BeforePlanning() override {
 		BunnyHopAction::BeforePlanning();

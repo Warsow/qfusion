@@ -56,12 +56,7 @@ void BaseAction::ExecActionRecord( const MovementActionRecord *record, BotInput 
 	}
 }
 
-void BaseAction::CheckPredictionStepResults( PredictionContext *context ) {
-	// These flags might be set by ExecActionRecord(). Skip checks in this case.
-	if( context->shouldRollback || context->isCompleted ) {
-		return;
-	}
-
+auto BaseAction::CheckPredictionStepResults( PredictionContext *context ) -> PredictionResult {
 	const auto &newEntityPhysicsState = context->movementState->entityPhysicsState;
 	const auto &oldEntityPhysicsState = context->PhysicsStateBeforeStep();
 
@@ -82,15 +77,13 @@ void BaseAction::CheckPredictionStepResults( PredictionContext *context ) {
 				Debug( "A prediction step has lead to entering CONTENTS_DONOTENTER point\n" );
 			}
 
-			context->SetPendingRollback();
-			return;
+			return PredictionResult::Restart;
 		}
 	}
 
 	if( stopPredictionOnEnteringWater && newEntityPhysicsState.waterLevel > 1 ) {
 		Debug( "A prediction step has lead to entering water, should stop planning\n" );
-		context->isCompleted = true;
-		return;
+		return PredictionResult::Complete;
 	}
 
 	// Check AAS areas in the same way
@@ -104,16 +97,14 @@ void BaseAction::CheckPredictionStepResults( PredictionContext *context ) {
 		if( currAreaSettings.areaflags & AREA_DISABLED ) {
 			if( !( prevAreaSettings.areaflags & AREA_DISABLED ) ) {
 				Debug( "A prediction step has lead to entering an AREA_DISABLED AAS area\n" );
-				context->SetPendingRollback();
-				return;
+				return PredictionResult::Restart;
 			}
 		}
 
 		if( currAreaSettings.contents & AREACONTENTS_DONOTENTER ) {
 			if( !( prevAreaSettings.contents & AREACONTENTS_DONOTENTER ) ) {
 				Debug( "A prediction step has lead to entering an AREACONTENTS_DONOTENTER AAS area\n" );
-				context->SetPendingRollback();
-				return;
+				return PredictionResult::Restart;
 			}
 		}
 	}
@@ -122,49 +113,45 @@ void BaseAction::CheckPredictionStepResults( PredictionContext *context ) {
 		if( const uint16_t touchedTriggerNum = context->frameEvents.touchedJumppadEntNum ) {
 			if( touchedTriggerNum == context->m_jumppadPathTriggerNum ) {
 				Debug( "A prediction step has lead to touching the jumppad, should stop planning\n" );
-				context->isCompleted = true;
+				return PredictionResult::Complete;
 			} else {
 				Debug( "A prediction step has lead to touching a (wrong) jumppad, rolling back\n" );
-				context->SetPendingRollback();
+				return PredictionResult::Restart;
 			}
-			return;
 		}
 	}
 	if( this->stopPredictionOnTouchingTeleporter ) {
 		if( const uint16_t touchedTriggerNum = context->frameEvents.touchedTeleporterEntNum ) {
 			if( touchedTriggerNum == context->m_teleporterPathTriggerNum ) {
 				Debug( "A prediction step has lead to touching the teleporter, should stop planning\n" );
-				context->isCompleted = true;
+				return PredictionResult::Complete;
 			} else {
 				Debug( "A prediction step has lead to touching a (wrong) teleporter, rolling back\n" );
-				context->SetPendingRollback();
+				return PredictionResult::Restart;
 			}
 		}
-		return;
 	}
 	if( this->stopPredictionOnTouchingPlatform ) {
 		if( const uint16_t touchedPlatformNum = context->frameEvents.touchedPlatformEntNum ) {
 			if( touchedPlatformNum == context->m_platformPathTriggerNum ) {
 				Debug( "A prediction step has lead to touching the platform, should stop planning\n" );
-				context->isCompleted = true;
+				return PredictionResult::Complete;
 			} else {
 				Debug( "A prediction step has lead to touching a (wrong) platform, rolling back\n" );
-				context->SetPendingRollback();
+				return PredictionResult::Restart;
 			}
 		}
-		return;
 	}
 
 	if( this->stopPredictionOnTouchingNavEntity ) {
 		if( HasTouchedNavEntityThisFrame( context ) ) {
 			Debug( "A prediction step has lead to touching the nav entity, should stop planning\n" );
-			context->isCompleted = true;
-			return;
+			return PredictionResult::Complete;
 		}
 	}
 
 	if( bot->ShouldRushHeadless() ) {
-		return;
+		return PredictionResult::Complete;
 	}
 
 	if( this->failPredictionOnEnteringHazardImpactZone ) {
@@ -174,8 +161,7 @@ void BaseAction::CheckPredictionStepResults( PredictionContext *context ) {
 				if( hazard->HasImpactOnPoint( newEntityPhysicsState.Origin() ) ) {
 					if( !hazard->HasImpactOnPoint( oldEntityPhysicsState.Origin() ) ) {
 						Debug( "A prediction step has lead to entering a hazard influence zone, should rollback\n" );
-						context->SetPendingRollback();
-						return;
+						return PredictionResult::Restart;
 					}
 				}
 			}
@@ -188,9 +174,11 @@ void BaseAction::CheckPredictionStepResults( PredictionContext *context ) {
 	if( routeCache->AreaDisabled( newAasAreaNum ) ) {
 		if( !routeCache->AreaDisabled( oldAasAreaNum ) ) {
 			Debug( "A prediction step has lead to entering a disabled for routing area, should rollback\n" );
-			return;
+			return PredictionResult::Restart;
 		}
 	}
+
+	return PredictionResult::Continue;
 }
 
 bool BaseAction::HasTouchedNavEntityThisFrame( PredictionContext *context ) {

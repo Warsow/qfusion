@@ -188,39 +188,6 @@ inline const char *PredictionContext::ActiveActionName() const {
 	return "<unspecified>";
 }
 
-inline void PredictionContext::SetPendingRollback() {
-	this->shouldRollback = true;
-
-#ifdef ENABLE_MOVEMENT_ASSERTIONS
-	if( !this->isCompleted ) {
-		return;
-	}
-
-	constexpr auto *tag = "PredictionContext::SetPendingRollback()";
-	constexpr auto *format = "%s: Attempt to rollback while the context is in completed state\n";
-	AI_FailWith( tag, format, ActiveActionName() );
-#endif
-}
-
-inline void PredictionContext::RollbackToSavepoint() {
-#ifdef ENABLE_MOVEMENT_ASSERTIONS
-	constexpr auto *tag = "PredictionContext::RollbackToSavepoint()";
-	const char *activeActionName = ActiveActionName();
-	activeActionName = activeActionName ? activeActionName : "(null action)";
-	if( this->isCompleted ) {
-		constexpr auto *format = "%s: Attempt to rollback while the context is in completed state\n";
-		AI_FailWith( tag, format, activeActionName );
-	}
-	if( !this->shouldRollback ) {
-		constexpr auto *format = "%s: Attempt to rollback while `shouldRollback` context flag is not set\n";
-		AI_FailWith( tag, format, activeActionName );
-	}
-#endif
-
-	this->shouldRollback  = false;
-	this->topOfStackIndex = 0;
-}
-
 inline unsigned PredictionContext::MillisAheadForFrameStart( unsigned frameIndex ) const {
 #ifdef ENABLE_MOVEMENT_ASSERTIONS
 	constexpr auto *tag = "PredictionContext::MillisAheadForFrameStart()";
@@ -235,34 +202,14 @@ inline unsigned PredictionContext::MillisAheadForFrameStart( unsigned frameIndex
 	return totalMillisAhead;
 }
 
-inline bool BaseAction::GenericCheckIsActionEnabled( PredictionContext *context ) const {
+inline auto BaseAction::GenericCheckIsActionEnabled( PredictionContext *context ) const -> PredictionResult {
 	// Put likely case first
 	if( !isDisabledForPlanning ) {
-		return true;
+		return PredictionResult::Continue;
 	}
 
 	Debug( "The action has been completely disabled for further planning\n" );
-	return false;
-}
-
-inline void BaseAction::CheckDisableOrSwitchPreconditions( PredictionContext *context, const char *methodTag ) {
-#ifdef ENABLE_MOVEMENT_ASSERTIONS
-	if( context->isCompleted ) {
-		AI_FailWith( va( "%s::%s()", Name(), methodTag ), "The context must not have `isCompleted` flag set" );
-	}
-	if( context->shouldRollback ) {
-		AI_FailWith( va( "%s::%s()", Name(), methodTag ), "The context must not have `shouldRollback` flag set" );
-	}
-	if( this->isDisabledForPlanning ) {
-		AI_FailWith( va( "%s::%s()", Name(), methodTag ), "The action must not have been already disabled for planning" );
-	}
-#endif
-}
-
-inline void BaseAction::DisableWithAlternative( PredictionContext *context ) {
-	CheckDisableOrSwitchPreconditions( context, "DisableWithAlternative" );
-
-	this->isDisabledForPlanning = true;
+	return PredictionResult::Abort;
 }
 
 inline float Distance2DSquared( const vec3_t a, const vec3_t b ) {

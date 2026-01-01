@@ -1,26 +1,26 @@
 #include "movementlocal.h"
 #include "bunnytostairsorrampexitaction.h"
 
-void BunnyToStairsOrRampExitAction::PlanPredictionStep( PredictionContext *context ) {
-	if( !GenericCheckIsActionEnabled( context ) ) {
-		return;
+auto BunnyToStairsOrRampExitAction::PlanPredictionStep( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = GenericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
-	if( !CheckCommonBunnyHopPreconditions( context ) ) {
-		return;
+	if( const auto result = CheckCommonBunnyHopPreconditions( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
 	if( !intendedLookDir ) {
 		if( !TryFindAndSaveLookDir( context ) ) {
-			this->isDisabledForPlanning = true;
-			context->SetPendingRollback();
-			return;
+			return PredictionResult::Abort;
 		}
 	}
 
 	if( !SetupBunnyHopping( Vec3( intendedLookDir ), context ) ) {
-		return;
+		return PredictionResult::Abort;
 	}
+
+	return PredictionResult::Continue;
 }
 
 bool BunnyToStairsOrRampExitAction::TryFindAndSaveLookDir( PredictionContext *context ) {
@@ -111,36 +111,35 @@ void BunnyToStairsOrRampExitAction::TrySaveExitFloorCluster( PredictionContext *
 	}
 }
 
-void BunnyToStairsOrRampExitAction::CheckPredictionStepResults( PredictionContext *context ) {
+auto BunnyToStairsOrRampExitAction::CheckPredictionStepResults( PredictionContext *context ) -> PredictionResult {
 	// We skip the direct superclass method call!
 	// Much more lenient checks are used for this specialized action.
 	// Only generic checks for all movement actions should be performed in addition.
-	BaseAction::CheckPredictionStepResults( context );
-	if( context->shouldRollback || context->isCompleted ) {
-		return;
+	if( const auto result = BaseAction::CheckPredictionStepResults( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
 	// There is no target floor cluster saved
 	if( !targetFloorCluster ) {
-		return;
+		return PredictionResult::Abort;
 	}
 
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	// Make sure we don't stop prediction at start.
 	// The distance threshold is low due to troublesome movement in these kinds of areas.
 	if( originAtSequenceStart.SquareDistance2DTo( entityPhysicsState.Origin() ) < wsw::square( 20 ) ) {
-		return;
+		return PredictionResult::Continue;
 	}
 
 	// If the bot has not touched a ground this frame
 	if( !entityPhysicsState.GroundEntity() && !context->frameEvents.hasJumped ) {
-		return;
+		return PredictionResult::Continue;
 	}
 
 	if( AiAasWorld::instance()->floorClusterNum( context->CurrGroundedAasAreaNum() ) != targetFloorCluster ) {
-		return;
+		return PredictionResult::Continue;
 	}
 
 	Debug( "The prediction step has lead to touching a ground in the target floor cluster" );
-	context->isCompleted = true;
+	return PredictionResult::Complete;
 }

@@ -16,7 +16,7 @@ public:
 	explicit BunnyTestingMultipleTurnsAction( MovementSubsystem *subsystem )
 		: BunnyHopAction( subsystem, "BunnyTestingMultipleTurnsAction", COLOR_RGB( 255, 0, 0 ) ) {}
 
-	void PlanPredictionStep( PredictionContext *context ) override;
+	auto PlanPredictionStep( PredictionContext *context ) -> PredictionResult override;
 
 	void BeforePlanning() override {
 		BunnyHopAction::BeforePlanning();

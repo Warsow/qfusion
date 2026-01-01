@@ -19,7 +19,7 @@ public:
 	void OnApplicationSequenceStopped( PredictionContext *context,
 									   SequenceStopReason stopReason,
 									   unsigned stoppedAtFrameIndex ) override;
-	void PlanPredictionStep( PredictionContext *context ) override;
+	auto PlanPredictionStep( PredictionContext *context ) -> PredictionResult override;
 };
 
 class BunnyTestingSavedLookDirsAction : public BunnyTestingMultipleLookDirsAction {

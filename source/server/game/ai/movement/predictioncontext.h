@@ -110,9 +110,6 @@ public:
 
 	unsigned topOfStackIndex;
 
-	bool isCompleted;
-	bool shouldRollback;
-
 	struct FrameEvents {
 		static constexpr auto MAX_TOUCHED_OTHER_TRIGGERS = 16;
 		// Not teleports, jumppads or platforms (usually items).
@@ -202,8 +199,8 @@ public:
 	explicit PredictionContext( MovementSubsystem *subsystem, PredictedPath *_predictedMovementActions );
 
 	bool BuildPlan( std::span<BaseAction *> actionsToUse );
-	void TryBuildingPlanUsingAction( BaseAction *action );
-	bool NextPredictionStep( BaseAction *action, bool *hasStartedSequence );
+	auto TryBuildingPlanUsingAction( BaseAction *action ) -> PredictionResult;
+	auto NextPredictionStep( BaseAction *action, bool *hasStartedSequence ) -> PredictionResult;
 	void SetupStackForStep();
 
 	void NextMovementStep( BaseAction *action );
@@ -224,9 +221,6 @@ public:
 
 	const char *ActiveActionName() const;
 
-	void SetPendingRollback();
-	void RollbackToSavepoint();
-	//void SaveSuggestedActionForNextFrame( BaseAction *action );
 	unsigned MillisAheadForFrameStart( unsigned frameIndex ) const;
 
 	void SaveGoodEnoughPath( unsigned advancement, unsigned penaltyMillis );

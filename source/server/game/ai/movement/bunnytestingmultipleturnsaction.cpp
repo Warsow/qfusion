@@ -11,15 +11,15 @@ const float BunnyTestingMultipleTurnsAction::kAngularSpeed[kMaxAngles] = {
 	kMinAngularSpeed + 0.66f * kAngularSpeedRange, kMaxAngularSpeed
 };
 
-void BunnyTestingMultipleTurnsAction::PlanPredictionStep( PredictionContext *context ) {
+auto BunnyTestingMultipleTurnsAction::PlanPredictionStep( PredictionContext *context ) -> PredictionResult {
 	// This action is the first applied action as it is specialized
 	// and falls back to other bunnying actions if it cannot be applied.
-	if( !GenericCheckIsActionEnabled( context ) ) {
-		return;
+	if( const auto result = GenericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
-	if( !CheckCommonBunnyHopPreconditions( context ) ) {
-		return;
+	if( const auto result = CheckCommonBunnyHopPreconditions( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
@@ -69,8 +69,10 @@ void BunnyTestingMultipleTurnsAction::PlanPredictionStep( PredictionContext *con
 	}
 
 	if( !SetupBunnyHopping( Vec3( lookDir ), context ) ) {
-		return;
+		return PredictionResult::Restart;
 	}
+
+	return PredictionResult::Continue;
 }
 
 void BunnyTestingMultipleTurnsAction::OnApplicationSequenceStopped( PredictionContext *context,

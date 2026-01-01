@@ -362,6 +362,4 @@ PredictionContext::PredictionContext( MovementSubsystem *subsystem, PredictedPat
 	, totalMillisAhead( 0 )
 	, predictionStepMillis( 0 )
 	, oldStepMillis( 0 )
-	, topOfStackIndex( 0 )
-	, isCompleted( false )
-	, shouldRollback( false ) {}
+	, topOfStackIndex( 0 ) {}

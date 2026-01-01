@@ -92,6 +92,13 @@ struct MovementPredictionConstants {
 		FAILED       // A prediction step has lead to a failure
 	};
 
+	enum class PredictionResult : unsigned {
+		Continue,
+		Abort,
+		Restart,
+		Complete,
+	};
+
 	static constexpr unsigned MAX_SAVED_LANDING_AREAS = 16;
 
 	// Note: We have deliberately lowered this value

@@ -28,13 +28,13 @@ static auto classifyTravelType( const aas_reachability_t &reach ) -> TravelTypeC
 	return TravelTypeClass::Incompatible;
 }
 
-void BunnyFollowingReachChainAction::PlanPredictionStep( PredictionContext *context ) {
-	if( !GenericCheckIsActionEnabled( context ) ) {
-		return;
+auto BunnyFollowingReachChainAction::PlanPredictionStep( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = GenericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
-	if( !CheckCommonBunnyHopPreconditions( context ) ) {
-		return;
+	if( const auto result = CheckCommonBunnyHopPreconditions( context ); result != PredictionResult::Continue ) {
+		return result;
 	}
 
 	const auto &__restrict entityPhysicsState = context->movementState->entityPhysicsState;
@@ -49,8 +49,7 @@ void BunnyFollowingReachChainAction::PlanPredictionStep( PredictionContext *cont
 			const auto &reach = aasReaches[m_cachedReachNum];
 			const TravelTypeClass travelTypeClass = classifyTravelType( reach );
 			if( travelTypeClass == TravelTypeClass::Incompatible ) {
-				context->SetPendingRollback();
-				return;
+				return PredictionResult::Abort;
 			}
 			if( travelTypeClass == TravelTypeClass::Trigger ) {
 				m_cachedReachPointsToTrigger = true;
@@ -58,12 +57,10 @@ void BunnyFollowingReachChainAction::PlanPredictionStep( PredictionContext *cont
 			const int targetAreaNum = context->NavTargetAasAreaNum();
 			if( const int nextAreaNum = reach.areanum; nextAreaNum != targetAreaNum ) {
 				if( !bot->RouteCache()->FindRoute( nextAreaNum, targetAreaNum, bot->TravelFlags(), &m_cachedNextReachNum ) ) {
-					context->SetPendingRollback();
-					return;
+					return PredictionResult::Abort;
 				}
 				if( classifyTravelType( aasReaches[m_cachedNextReachNum] ) == TravelTypeClass::Incompatible ) {
-					context->SetPendingRollback();
-					return;
+					return PredictionResult::Abort;
 				}
 			}
 		}
@@ -83,8 +80,7 @@ void BunnyFollowingReachChainAction::PlanPredictionStep( PredictionContext *cont
 			if( Distance2DSquared( reach.start, entityPhysicsState.Origin() ) > wsw::square( 1.0f ) ) {
 				chosenReachNum = m_cachedReachNum;
 			} else {
-				context->SetPendingRollback();
-				return;
+				return PredictionResult::Abort;
 			}
 		} else {
 			if( m_cachedNextReachNum ) {
@@ -92,8 +88,7 @@ void BunnyFollowingReachChainAction::PlanPredictionStep( PredictionContext *cont
 				if( Distance2DSquared( nextReach.start, entityPhysicsState.Origin() ) > wsw::square( 32.0f ) ) {
 					chosenReachNum = m_cachedNextReachNum;
 				} else {
-					context->SetPendingRollback();
-					return;
+					return PredictionResult::Abort;
 				}
 			}
 		}
@@ -113,12 +108,13 @@ void BunnyFollowingReachChainAction::PlanPredictionStep( PredictionContext *cont
 			navTargetOrigin.CopyTo( lookVec );
 			lookVec -= entityPhysicsState.Origin();
 		} else {
-			context->SetPendingRollback();
-			return;
+			return PredictionResult::Abort;
 		}
 	}
 
 	if( !SetupBunnyHopping( lookVec, context ) ) {
-		return;
+		return PredictionResult::Abort;
 	}
+
+	return PredictionResult::Continue;
 }
