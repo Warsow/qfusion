@@ -317,11 +317,11 @@ void PredictionContext::SetupStackForStep() {
 bool PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStartedSequence ) {
 	SetupStackForStep();
 
+	assert( !this->shouldRollback );
+
 	// Reset prediction step millis time.
 	// Actions might set their custom step value (otherwise it will be set to a default one).
 	this->predictionStepMillis = 0;
-	this->sequenceStopReason = UNSPECIFIED;
-	this->cannotApplyAction = false;
 	// Prevent reusing record from the switched on the current frame action
 	this->record->Clear();
 
@@ -333,9 +333,16 @@ bool PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStarted
 	Debug( "About to call action->PlanPredictionStep() for %s at ToS frame %d\n", action->Name(), topOfStackIndex );
 	action->PlanPredictionStep( this );
 
+	if( action->isDisabledForPlanning ) {
+		// Reset the rollback flag
+		if( this->shouldRollback ) {
+			this->RollbackToSavepoint();
+		}
+		return false;
+	}
+
 	// Check for rolling back necessity (an action application chain has lead to an illegal state)
-	//if( this->shouldRollback ) {
-	if( this->shouldRollback || this->cannotApplyAction ) {
+	if( this->shouldRollback ) {
 		// Stop an action application sequence manually with a failure.
 		action->OnApplicationSequenceStopped( this, BaseAction::FAILED, (unsigned)-1 );
 		*hasStartedSequence = false;
@@ -352,12 +359,7 @@ bool PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStarted
 		Debug( format, action->Name(), this->topOfStackIndex, this->totalMillisAhead );
 		// Stop an action application sequence manually with a success.
 		action->OnApplicationSequenceStopped( this, BaseAction::SUCCEEDED, this->topOfStackIndex );
-		// Save the predicted movement action
-		// Note: this condition is put outside since it is valid only once per a BuildPlan() call
-		// and the method is called every prediction frame (up to hundreds of times per a bot per a game frame)
-		if( !this->isTruncated ) {
-			this->SaveActionOnStack( action );
-		}
+		SaveActionOnStack( action );
 		// Stop planning by returning false
 		return false;
 	}
@@ -374,14 +376,12 @@ bool PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStarted
 
 	action->CheckPredictionStepResults( this );
 	// If results check has been passed
-	if( !( this->cannotApplyAction || this->shouldRollback ) ) {
+	if( !this->shouldRollback ) {
 		// If movement planning is completed, there is no need to do a next step
 		if( this->isCompleted ) {
 			constexpr const char *format = "Movement prediction is completed on %s, ToS frame %d, %d millis ahead\n";
 			Debug( format, action->Name(), this->topOfStackIndex, this->totalMillisAhead );
-			if( !this->isTruncated ) {
-				SaveActionOnStack( action );
-			}
+			SaveActionOnStack( action );
 			// Stop action application sequence manually with a success.
 			// Prevent duplicated OnApplicationSequenceStopped() call
 			// (it might have been done in action->CheckPredictionStepResults() for this->activeAction)
@@ -581,12 +581,9 @@ bool PredictionContext::BuildPlan( std::span<BaseAction *> actionsToUse ) {
 
 	// Remember to reset these values before each planning session
 	this->totalMillisAhead = 0;
-	this->savepointTopOfStackIndex = 0;
-	this->topOfStackIndex = 0;
-	this->sequenceStopReason = UNSPECIFIED;
-	this->isCompleted = false;
-	this->isTruncated = false;
-	this->shouldRollback = false;
+	this->topOfStackIndex  = 0;
+	this->isCompleted      = false;
+	this->shouldRollback   = false;
 
 	this->goodEnoughPath.clear();
 	this->goodEnoughPathPenalty = std::numeric_limits<unsigned>::max();
@@ -600,6 +597,10 @@ bool PredictionContext::BuildPlan( std::span<BaseAction *> actionsToUse ) {
 
 	bool succeeded = false;
 	for( BaseAction *action: actionsToUse ) {
+		// Millis are set appropritately to the top-of-stack index
+		assert( this->topOfStackIndex == 0 );
+		assert( !this->isCompleted );
+		assert( !this->shouldRollback );
 		TryBuildingPlanUsingAction( action );
 		if( isCompleted ) {
 			succeeded = true;
@@ -677,29 +678,25 @@ bool PredictionContext::BuildPlan( std::span<BaseAction *> actionsToUse ) {
 void PredictionContext::TryBuildingPlanUsingAction( BaseAction *action ) {
 	action->BeforePlanning();
 
-	bool hasStartedSequence = false;
-#ifndef CHECK_INFINITE_NEXT_STEP_LOOPS
-	for(;; ) {
-		if( !NextPredictionStep( action, &hasStartedSequence ) ) {
-			break;
-		}
-		if( cannotApplyAction || shouldRollback ) {
-			break;
-		}
-	}
-#else
+#ifdef CHECK_INFINITE_NEXT_STEP_LOOPS
 	::nextStepIterationsCounter = 0;
+#endif
+
+	bool hasStartedSequence = false;
 	for(;; ) {
 		if( !NextPredictionStep( action, &hasStartedSequence ) ) {
 			break;
 		}
-		if( cannotApplyAction || shouldRollback ) {
-			break;
-		}
+
+		// Make sure that we have performed rolling back (if needed) first
+		assert( !shouldRollback );
+
+#ifdef CHECK_INFINITE_NEXT_STEP_LOOPS
 		++nextStepIterationsCounter;
 		if( nextStepIterationsCounter < NEXT_STEP_INFINITE_LOOP_THRESHOLD ) {
 			continue;
 		}
+		v_debugOutput.setImmediately( true );
 		// An verbose output has been enabled at this stage
 		if( nextStepIterationsCounter < NEXT_STEP_INFINITE_LOOP_THRESHOLD + 200 ) {
 			continue;
@@ -728,9 +725,9 @@ void PredictionContext::NextMovementStep( BaseAction *action ) {
 	// Corresponds to Bot::Think();
 	m_subsystem->ApplyInput( botInput, this );
 
-	// ExecActionRecord() call in SimulateMockBotFrame() might fail or complete the planning execution early.
+	// ExecActionRecord() might fail or complete the planning execution early.
 	// Do not call PMove() in these cases
-	if( this->cannotApplyAction || this->isCompleted ) {
+	if( this->shouldRollback || this->isCompleted ) {
 		return;
 	}
 

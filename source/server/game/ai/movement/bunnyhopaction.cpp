@@ -6,13 +6,14 @@ bool BunnyHopAction::GenericCheckIsActionEnabled( PredictionContext *context ) {
 		return false;
 	}
 
+	// TODO: Get rid of disabledForApplicationFrameIndex
 	if( this->disabledForApplicationFrameIndex != context->topOfStackIndex ) {
 		return true;
 	}
 
+	assert( context->topOfStackIndex == 0 );
 	Debug( "Cannot apply action: the action has been disabled for application on frame %d\n", context->topOfStackIndex );
-	context->sequenceStopReason = DISABLED;
-	context->cannotApplyAction = true;
+	this->isDisabledForPlanning = true;
 	return false;
 }
 
@@ -539,7 +540,7 @@ bool BunnyHopAction::HasMadeAnAdvancementPriorToLanding( PredictionContext *cont
 
 void BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) {
 	BaseAction::CheckPredictionStepResults( context );
-	if( context->cannotApplyAction || context->isCompleted ) {
+	if( context->shouldRollback || context->isCompleted ) {
 		return;
 	}
 
@@ -660,7 +661,6 @@ void BunnyHopAction::CheckPredictionStepResults( PredictionContext *context ) {
 
 void BunnyHopAction::OnApplicationSequenceStarted( PredictionContext *context ) {
 	BaseAction::OnApplicationSequenceStarted( context );
-	context->MarkSavepoint( this, context->topOfStackIndex );
 
 	minTravelTimeToNavTargetSoFar = std::numeric_limits<int>::max();
 	minTravelTimeAreaNumSoFar = 0;
@@ -723,7 +723,7 @@ void BunnyHopAction::OnApplicationSequenceStopped( PredictionContext *context,
 	}
 
 	// Disable applying this action after rolling back to the savepoint
-	this->disabledForApplicationFrameIndex = context->savepointTopOfStackIndex;
+	this->disabledForApplicationFrameIndex = 0;
 }
 
 void BunnyHopAction::BeforePlanning() {

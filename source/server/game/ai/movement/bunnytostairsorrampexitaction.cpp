@@ -116,7 +116,7 @@ void BunnyToStairsOrRampExitAction::CheckPredictionStepResults( PredictionContex
 	// Much more lenient checks are used for this specialized action.
 	// Only generic checks for all movement actions should be performed in addition.
 	BaseAction::CheckPredictionStepResults( context );
-	if( context->cannotApplyAction || context->isCompleted ) {
+	if( context->shouldRollback || context->isCompleted ) {
 		return;
 	}
 

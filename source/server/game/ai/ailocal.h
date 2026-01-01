@@ -334,7 +334,7 @@ public:
 };
 
 extern const BoolConfigVar v_evolution;
-extern const BoolConfigVar v_debugOutput;
+extern BoolConfigVar v_debugOutput;
 extern const BoolConfigVar v_shareRoutingCache;
 extern const StringConfigVar v_forceWeapon;
 

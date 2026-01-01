@@ -188,34 +188,7 @@ inline const char *PredictionContext::ActiveActionName() const {
 	return "<unspecified>";
 }
 
-inline void PredictionContext::MarkSavepoint( BaseAction *markedBy, unsigned frameIndex ) {
-#ifdef ENABLE_MOVEMENT_ASSERTIONS
-	constexpr auto *tag = "PredictionContext::MarkSavepoint()";
-	if( !markedBy ) {
-		AI_FailWith( tag, "`markedBy` action is null\n" );
-	}
-	if( this->cannotApplyAction ) {
-		constexpr auto *format = "%s: Attempt to mark a savepoint while `cannotApplyAction` context flag is set\n";
-		AI_FailWith( tag, format, markedBy->Name() );
-	}
-	if( this->shouldRollback ) {
-		constexpr auto *format = "%s: Attempt to mark a savepoint while `shouldRollback` context flag is set\n";
-		AI_FailWith( tag, format, markedBy->Name() );
-	}
-	if( frameIndex != this->topOfStackIndex && frameIndex != this->topOfStackIndex + 1 ) {
-		constexpr auto *format =
-			"%s: Attempt to mark a savepoint at index %d while ToS index is %d:"
-			" the savepoint index must be the same or be a first next index\n";
-		AI_FailWith( tag, format, markedBy->Name(), frameIndex, this->topOfStackIndex );
-	}
-#endif
-
-	this->savepointTopOfStackIndex = frameIndex;
-	Debug( "%s has marked frame %d as a savepoint\n", markedBy->Name(), frameIndex );
-}
-
 inline void PredictionContext::SetPendingRollback() {
-	this->cannotApplyAction = true;
 	this->shouldRollback = true;
 
 #ifdef ENABLE_MOVEMENT_ASSERTIONS
@@ -238,30 +211,15 @@ inline void PredictionContext::RollbackToSavepoint() {
 		constexpr auto *format = "%s: Attempt to rollback while the context is in completed state\n";
 		AI_FailWith( tag, format, activeActionName );
 	}
-	if( false && !this->shouldRollback ) {
+	if( !this->shouldRollback ) {
 		constexpr auto *format = "%s: Attempt to rollback while `shouldRollback` context flag is not set\n";
 		AI_FailWith( tag, format, activeActionName );
 	}
-	if( !this->cannotApplyAction ) {
-		constexpr auto *format = "%s: Attempt to rollback while `cannotApplyAction` context flag is not set\n";
-		AI_FailWith( tag, format, activeActionName );
-	}
-	if( this->savepointTopOfStackIndex > this->topOfStackIndex ) {
-		constexpr auto *format = "The savepoint index %u is greater than the current ToS index %u\n";
-		AI_FailWith( tag, format, this->savepointTopOfStackIndex, this->topOfStackIndex );
-	}
 #endif
 
-	constexpr const char *format = "Rolling back to savepoint frame %d from ToS frame %d\n";
-	Debug( format, this->savepointTopOfStackIndex, this->topOfStackIndex );
-	this->topOfStackIndex = this->savepointTopOfStackIndex;
+	this->shouldRollback  = false;
+	this->topOfStackIndex = 0;
 }
-
-/*
-inline void PredictionContext::SaveSuggestedActionForNextFrame( BaseAction *action ) {
-	//Assert(!this->actionSuggestedByAction);
-	this->actionSuggestedByAction = action;
-}*/
 
 inline unsigned PredictionContext::MillisAheadForFrameStart( unsigned frameIndex ) const {
 #ifdef ENABLE_MOVEMENT_ASSERTIONS
@@ -283,8 +241,6 @@ inline bool BaseAction::GenericCheckIsActionEnabled( PredictionContext *context 
 		return true;
 	}
 
-	context->sequenceStopReason = DISABLED;
-	context->cannotApplyAction = true;
 	Debug( "The action has been completely disabled for further planning\n" );
 	return false;
 }
@@ -293,9 +249,6 @@ inline void BaseAction::CheckDisableOrSwitchPreconditions( PredictionContext *co
 #ifdef ENABLE_MOVEMENT_ASSERTIONS
 	if( context->isCompleted ) {
 		AI_FailWith( va( "%s::%s()", Name(), methodTag ), "The context must not have `isCompleted` flag set" );
-	}
-	if( context->cannotApplyAction ) {
-		AI_FailWith( va( "%s::%s()", Name(), methodTag ), "The context must not have `cannotApplyAction` flag set" );
 	}
 	if( context->shouldRollback ) {
 		AI_FailWith( va( "%s::%s()", Name(), methodTag ), "The context must not have `shouldRollback` flag set" );
@@ -309,34 +262,7 @@ inline void BaseAction::CheckDisableOrSwitchPreconditions( PredictionContext *co
 inline void BaseAction::DisableWithAlternative( PredictionContext *context ) {
 	CheckDisableOrSwitchPreconditions( context, "DisableWithAlternative" );
 
-	context->cannotApplyAction = true;
 	this->isDisabledForPlanning = true;
-}
-
-inline void BaseAction::SwitchOrStop( PredictionContext *context ) {
-	CheckDisableOrSwitchPreconditions( context, "SwitchOrStop" );
-
-	// Few predicted frames are enough if the action cannot be longer applied (but have not caused rollback)
-	if( context->topOfStackIndex > 0 ) {
-		Debug( "There were enough successfully predicted frames anyway, stopping prediction\n" );
-		context->isCompleted = true;
-		return;
-	}
-
-	DisableWithAlternative( context );
-}
-
-inline void BaseAction::SwitchOrRollback( PredictionContext *context ) {
-	CheckDisableOrSwitchPreconditions( context, "SwitchOrRollback" );
-
-	if( context->topOfStackIndex > 0 ) {
-		Debug( "There were some frames predicted ahead that lead to a failure, should rollback\n" );
-		this->isDisabledForPlanning = true;
-		context->SetPendingRollback();
-		return;
-	}
-
-	DisableWithAlternative( context );
 }
 
 inline float Distance2DSquared( const vec3_t a, const vec3_t b ) {

@@ -56,8 +56,6 @@ protected:
 	void CheckDisableOrSwitchPreconditions( PredictionContext *context, const char *methodTag );
 
 	void DisableWithAlternative( PredictionContext *context );
-	void SwitchOrStop( PredictionContext *context );
-	void SwitchOrRollback( PredictionContext *context );
 
 	bool HasTouchedNavEntityThisFrame( PredictionContext *context );
 public:

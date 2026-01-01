@@ -10,7 +10,7 @@
 using wsw::operator""_asView;
 
 const BoolConfigVar v_evolution { "ai_evolution"_asView, { .byDefault = false, .flags = 0, } };
-const BoolConfigVar v_debugOutput { "ai_debugOutput"_asView, { .byDefault = false, .flags = 0, } };
+BoolConfigVar v_debugOutput { "ai_debugOutput"_asView, { .byDefault = false, .flags = 0, } };
 const BoolConfigVar v_shareRoutingCache { "ai_shareRoutingCache"_asView, { .byDefault = true, .flags = 0, } };
 const StringConfigVar v_forceWeapon { "ai_forceWeapon"_asView, { .byDefault = {}, .flags = CVAR_CHEAT, } };
 

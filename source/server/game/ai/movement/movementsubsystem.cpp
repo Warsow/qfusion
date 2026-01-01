@@ -363,8 +363,5 @@ PredictionContext::PredictionContext( MovementSubsystem *subsystem, PredictedPat
 	, predictionStepMillis( 0 )
 	, oldStepMillis( 0 )
 	, topOfStackIndex( 0 )
-	, savepointTopOfStackIndex( 0 )
-	, sequenceStopReason( SequenceStopReason::SUCCEEDED )
 	, isCompleted( false )
-	, cannotApplyAction( false )
 	, shouldRollback( false ) {}

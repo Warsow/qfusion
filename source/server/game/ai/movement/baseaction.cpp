@@ -58,7 +58,7 @@ void BaseAction::ExecActionRecord( const MovementActionRecord *record, BotInput 
 
 void BaseAction::CheckPredictionStepResults( PredictionContext *context ) {
 	// These flags might be set by ExecActionRecord(). Skip checks in this case.
-	if( context->cannotApplyAction || context->isCompleted ) {
+	if( context->shouldRollback || context->isCompleted ) {
 		return;
 	}
 
@@ -242,15 +242,12 @@ void BaseAction::OnApplicationSequenceStopped( PredictionContext *context,
 			break;
 		case SUCCEEDED:
 			Debug( format, "succeeded", stoppedAtFrameIndex, context->topOfStackIndex );
-			context->MarkSavepoint( this, stoppedAtFrameIndex + 1 );
 			break;
 		case SWITCHED:
 			Debug( format, "switched", stoppedAtFrameIndex, context->topOfStackIndex );
-			context->MarkSavepoint( this, stoppedAtFrameIndex );
 			break;
 		case DISABLED:
 			Debug( format, "disabled", stoppedAtFrameIndex, context->topOfStackIndex );
-			context->MarkSavepoint( this, stoppedAtFrameIndex );
 			break;
 		case FAILED:
 			Debug( format, "failed", stoppedAtFrameIndex, context->topOfStackIndex );

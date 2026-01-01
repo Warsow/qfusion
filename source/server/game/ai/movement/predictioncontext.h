@@ -103,21 +103,14 @@ public:
 	MinimalSavedPlayerState *oldMinimalPlayerState { nullptr };
 	MinimalSavedPlayerState *currMinimalPlayerState { nullptr };
 
-	//BaseAction *actionSuggestedByAction;
-	//BaseAction *activeAction;
-
 	unsigned totalMillisAhead;
 	unsigned predictionStepMillis;
 	// Must be set to game.frameTime for the first step!
 	unsigned oldStepMillis;
 
 	unsigned topOfStackIndex;
-	unsigned savepointTopOfStackIndex;
 
-	SequenceStopReason sequenceStopReason;
 	bool isCompleted;
-	bool isTruncated;
-	bool cannotApplyAction;
 	bool shouldRollback;
 
 	struct FrameEvents {
@@ -228,9 +221,6 @@ public:
 	}
 
 	void SaveActionOnStack( BaseAction *action );
-
-	// Frame index is restricted to topOfStack or topOfStack + 1
-	void MarkSavepoint( BaseAction *markedBy, unsigned frameIndex );
 
 	const char *ActiveActionName() const;
 
