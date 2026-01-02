@@ -76,35 +76,59 @@ bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionC
 	botInput->canOverrideLookVec = false;
 	botInput->canOverridePitch   = false;
 
-	const float intendedLookDirDotActual = entityPhysicsState.ForwardDir().Dot( intendedLookDir );
+	const float intendedLookDirDotForward = entityPhysicsState.ForwardDir().Dot( intendedLookDir );
 	if( entityPhysicsState.GroundEntity() ) {
 		if( entityPhysicsState.Speed2D() <= context->GetRunSpeed() ) {
-			if( intendedLookDirDotActual > 0.9f ) {
-				botInput->SetForwardMovement( 1 );
+			int forwardMovement = 0;
+			int rightMovement   = 0;
+			EnvironmentTraceCache::Query dashQuery {};
+			constexpr float dashDotThreshold = 0.87f;
+			if( std::fabs( intendedLookDirDotForward ) > dashDotThreshold ) {
+				if( intendedLookDirDotForward > 0.0f ) {
+					dashQuery       = EnvironmentTraceCache::Query::front();
+					forwardMovement = +1;
+				} else {
+					dashQuery       = EnvironmentTraceCache::Query::back();
+					forwardMovement = -1;
+				}
+			} else {
+				const float intendedLookDirDotRight = entityPhysicsState.RightDir().Dot( intendedLookDir );
+				if( std::fabs( intendedLookDirDotRight ) > dashDotThreshold ) {
+					if( intendedLookDirDotRight > 0.0f ) {
+						dashQuery     = EnvironmentTraceCache::Query::right();
+						rightMovement = +1;
+					} else {
+						dashQuery     = EnvironmentTraceCache::Query::left();
+						rightMovement = -1;
+					}
+				}
+			}
+			if( forwardMovement | rightMovement ) {
 				bool shouldDash = false;
 				if( ( pmoveStats[PM_STAT_FEATURES] & PMFEAT_DASH ) && !pmoveStats[PM_STAT_DASHTIME] ) {
 					if( entityPhysicsState.Speed() < context->GetDashSpeed() && entityPhysicsState.GroundEntity() ) {
 						if( checkRiskyMovementAllowed( context ) ) {
 							// Prevent dashing into obstacles
 							auto &traceCache = context->TraceCache();
-							auto query( EnvironmentTraceCache::Query::front() );
-							traceCache.testForQuery( context, query );
-							if( traceCache.resultForQuery( query ).trace.fraction == 1.0f ) {
+							traceCache.testForQuery( context, dashQuery );
+							if( traceCache.resultForQuery( dashQuery ).trace.fraction == 1.0f ) {
 								shouldDash = true;
 							}
 						}
 					}
 				}
+				botInput->SetForwardMovement( forwardMovement );
+				botInput->SetRightMovement( rightMovement );
 				if( shouldDash ) {
 					botInput->SetSpecialButton( true );
 				} else {
 					botInput->SetUpMovement( 1 );
 				}
 			} else {
-				botInput->SetTurnSpeedMultiplier( 15.0f );
+				botInput->SetTurnSpeedMultiplier( 3.0f );
 			}
 		} else {
-			if( intendedLookDirDotActual > 0.0f ) {
+			if( intendedLookDirDotForward > 0.0f ) {
 				botInput->SetForwardMovement( 1 );
 			}
 			botInput->SetUpMovement( 1 );
@@ -160,7 +184,7 @@ bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionC
 			botInput->canOverrideLookVec = true;
 			botInput->canOverridePitch   = true;
 		} else {
-			if( intendedLookDirDotActual > 0.0f ) {
+			if( intendedLookDirDotForward > 0.0f ) {
 				botInput->SetForwardMovement( 1 );
 			}
 		}
