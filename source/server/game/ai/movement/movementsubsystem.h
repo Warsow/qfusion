@@ -127,15 +127,7 @@ class MovementSubsystem {
 	SameFloorClusterAreasCache sameFloorClusterAreasCache;
 	NextFloorClusterAreasCache nextFloorClusterAreasCache;
 
-	int64_t nextRotateInputAttemptAt { 0 };
-	int64_t inputRotationBlockingTimer { 0 };
-	int64_t lastInputRotationFailureAt { 0 };
-
 	void ApplyPendingTurnToLookAtPoint( BotInput *input, PredictionContext *context = nullptr );
-	inline void InvertInput( BotInput *input, PredictionContext *context = nullptr );
-	inline void TurnInputToSide( vec3_t sideDir, int sign, BotInput *input, PredictionContext *context = nullptr );
-	inline bool TryRotateInput( BotInput *input, PredictionContext *context = nullptr );
-	void CheckBlockingDueToInputRotation();
 
 	struct PendingLookAtPointState {
 		AiPendingLookAtPoint pendingLookAtPoint;

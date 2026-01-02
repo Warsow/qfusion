@@ -261,9 +261,5 @@ auto PredictingAndCachingMovementScript::lerpActionRecords( PredictedMovementAct
 		record_->botInput.SetIntendedLookDir( intendedLookVec );
 	}
 
-	auto prevRotationMask = (unsigned)prevAction->record.botInput.allowedRotationMask;
-	auto nextRotationMask = (unsigned)nextAction->record.botInput.allowedRotationMask;
-	record_->botInput.allowedRotationMask = (InputRotation)( prevRotationMask & nextRotationMask );
-
 	return nextAction->action;
 }

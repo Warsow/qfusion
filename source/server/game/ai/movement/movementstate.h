@@ -215,10 +215,6 @@ public:
 
 struct MovementState {
 	AiEntityPhysicsState entityPhysicsState;
-	// A current input rotation kind that is used in this state.
-	// This value is saved to prevent choice jitter trying to apply an input rotation.
-	// (The current input rotation kind has a bit less restrictive application conditions).
-	InputRotation inputRotation { InputRotation::NONE };
 };
 
 #endif

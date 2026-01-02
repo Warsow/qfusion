@@ -47,8 +47,6 @@ bool MovementSubsystem::CanInterruptMovement() const {
 }
 
 void MovementSubsystem::Frame( BotInput *input ) {
-	CheckBlockingDueToInputRotation();
-
 	// TODO:!!!!!!!!!!!!
 	// ApplyPendingTurnToLookAtPoint( input );
 
@@ -76,49 +74,6 @@ void MovementSubsystem::Frame( BotInput *input ) {
 		// TODO: ->activate() ?
 		activeScript->bumpTimeout();
 	}
-}
-
-void MovementSubsystem::CheckBlockingDueToInputRotation() {
-	/*
-	if( movementState.campingSpotState.IsActive() ) {
-		return;
-	}*/
-	if( movementState.inputRotation == InputRotation::NONE ) {
-		return;
-	}
-
-	const edict_t *self = game.edicts + bot->EntNum();
-
-	if( !self->groundentity ) {
-		return;
-	}
-
-	float threshold = self->r.client->ps.stats[PM_STAT_MAXSPEED] - 30.0f;
-	if( threshold < 0 ) {
-		threshold = GS_DefaultPlayerSpeed( *ggs ) - 30.0f;
-	}
-
-	if( self->velocity[0] * self->velocity[0] + self->velocity[1] * self->velocity[1] > threshold * threshold ) {
-		nextRotateInputAttemptAt = 0;
-		inputRotationBlockingTimer = 0;
-		lastInputRotationFailureAt = 0;
-		return;
-	}
-
-	inputRotationBlockingTimer += game.frametime;
-	if( inputRotationBlockingTimer < 200 ) {
-		return;
-	}
-
-	int64_t millisSinceLastFailure = level.time - lastInputRotationFailureAt;
-	assert( millisSinceLastFailure >= 0 );
-	if( millisSinceLastFailure >= 10000 ) {
-		nextRotateInputAttemptAt = level.time + 400;
-	} else {
-		nextRotateInputAttemptAt = level.time + 2000 - 400 * ( millisSinceLastFailure / 2500 );
-		assert( nextRotateInputAttemptAt > level.time + 400 );
-	}
-	lastInputRotationFailureAt = level.time;
 }
 
 void MovementSubsystem::ApplyPendingTurnToLookAtPoint( BotInput *botInput, PredictionContext *context ) {
@@ -187,7 +142,6 @@ void MovementSubsystem::ApplyInput( BotInput *input, PredictionContext *context 
 	if( context ) {
 		auto *entityPhysicsState_ = &context->movementState->entityPhysicsState;
 		if( !input->hasAlreadyComputedAngles ) {
-			TryRotateInput( input, context );
 			Vec3 newAngles( bot->GetNewViewAngles( entityPhysicsState_->Angles().Data(), input->IntendedLookDir(),
 												   context->predictionStepMillis, input->TurnSpeedMultiplier() ) );
 			input->SetAlreadyComputedAngles( newAngles );
@@ -199,158 +153,12 @@ void MovementSubsystem::ApplyInput( BotInput *input, PredictionContext *context 
 	} else {
 		edict_t *self = game.edicts + bot->EntNum();
 		if( !input->hasAlreadyComputedAngles ) {
-			// TODO: We don't have to rotate if it has been already rotated during prediction.
-			// Unfortunately, we can't make the distinction in the current codebase state.
-			// TryRotateInput() checks should prevent from a double rotation.
-			TryRotateInput( input, context );
 			Vec3 newAngles( bot->GetNewViewAngles( self->s.angles, input->IntendedLookDir(),
 												   game.frametime, input->TurnSpeedMultiplier() ) );
 			input->SetAlreadyComputedAngles( newAngles );
 		}
 		input->AlreadyComputedAngles().CopyTo( self->s.angles );
 	}
-}
-
-bool MovementSubsystem::TryRotateInput( BotInput *input, PredictionContext *context ) {
-
-	const float *botOrigin;
-	InputRotation *prevRotation;
-
-	if( context ) {
-		botOrigin = context->movementState->entityPhysicsState.Origin();
-		prevRotation = &context->movementState->inputRotation;
-	} else {
-		botOrigin = bot->Origin();
-		prevRotation = &movementState.inputRotation;
-	}
-
-	const std::optional<Vec3> &keptInFovPoint = bot->GetKeptInFovPoint();
-	if( !keptInFovPoint || nextRotateInputAttemptAt > level.time ) {
-		*prevRotation = InputRotation::NONE;
-		return false;
-	}
-
-	Vec3 selfToPoint( *keptInFovPoint );
-	selfToPoint -= botOrigin;
-	if( !selfToPoint.normalizeFast() ) {
-		*prevRotation = InputRotation::NONE;
-		return false;
-	}
-
-	if( input->IsRotationAllowed( InputRotation::BACK ) ) {
-		float backDotThreshold = ( *prevRotation == InputRotation::BACK ) ? -0.3f : -0.5f;
-		if( selfToPoint.Dot( input->IntendedLookDir() ) < backDotThreshold ) {
-			*prevRotation = InputRotation::BACK;
-			InvertInput( input, context );
-			return true;
-		}
-	}
-
-	if( input->IsRotationAllowed( InputRotation::SIDE_KINDS_MASK ) ) {
-		vec3_t intendedRightDir, intendedUpDir;
-		MakeNormalVectors( input->IntendedLookDir().Data(), intendedRightDir, intendedUpDir );
-		const float dotRight = selfToPoint.Dot( intendedRightDir );
-
-		if( input->IsRotationAllowed( InputRotation::RIGHT ) ) {
-			const float rightDotThreshold = ( *prevRotation == InputRotation::RIGHT ) ? 0.6f : 0.7f;
-			if( dotRight > rightDotThreshold ) {
-				*prevRotation = InputRotation::RIGHT;
-				TurnInputToSide( intendedRightDir, +1, input, context );
-				return true;
-			}
-		}
-
-		if( input->IsRotationAllowed( InputRotation::LEFT ) ) {
-			const float leftDotThreshold = ( *prevRotation == InputRotation::LEFT ) ? -0.6f : -0.7f;
-			if( dotRight < leftDotThreshold ) {
-				*prevRotation = InputRotation::LEFT;
-				TurnInputToSide( intendedRightDir, -1, input, context );
-				return true;
-			}
-		}
-	}
-
-	*prevRotation = InputRotation::NONE;
-	return false;
-}
-
-static inline void SetupInputForTransition( BotInput *input, const edict_t *groundEntity, const vec3_t intendedForwardDir ) {
-	// If actual input is not inverted, release keys/clear special button while starting a transition
-	float intendedDotForward = input->IntendedLookDir().Dot( intendedForwardDir );
-	if( intendedDotForward < 0 ) {
-		if( groundEntity ) {
-			input->SetSpecialButton( false );
-		}
-		input->ClearMovementDirections();
-		input->SetTurnSpeedMultiplier( 2.0f - 5.0f * intendedDotForward );
-	} else if( intendedDotForward < 0.3f ) {
-		if( groundEntity ) {
-			input->SetSpecialButton( false );
-		}
-		input->SetTurnSpeedMultiplier( 2.0f );
-	}
-}
-
-void MovementSubsystem::InvertInput( BotInput *input, PredictionContext *context ) {
-	input->SetForwardMovement( -input->ForwardMovement() );
-	input->SetRightMovement( -input->RightMovement() );
-
-	input->SetIntendedLookDir( -input->IntendedLookDir(), true );
-
-	const edict_t *groundEntity;
-	vec3_t forwardDir;
-	if( context ) {
-		context->movementState->entityPhysicsState.ForwardDir().CopyTo( forwardDir );
-		groundEntity = context->movementState->entityPhysicsState.GroundEntity();
-	} else {
-		movementState.entityPhysicsState.ForwardDir().CopyTo( forwardDir );
-		groundEntity = game.edicts[bot->EntNum()].groundentity;
-	}
-
-	SetupInputForTransition( input, groundEntity, forwardDir );
-
-	// Prevent doing a forward dash if all direction keys are clear.
-
-	if( !input->IsSpecialButtonSet() || !groundEntity ) {
-		return;
-	}
-
-	if( input->ForwardMovement() || input->RightMovement() ) {
-		return;
-	}
-
-	input->SetForwardMovement( -1 );
-}
-
-void MovementSubsystem::TurnInputToSide( vec3_t sideDir, int sign, BotInput *input, PredictionContext *context ) {
-	VectorScale( sideDir, sign, sideDir );
-
-	const edict_t *groundEntity;
-	vec3_t forwardDir;
-	if( context ) {
-		context->movementState->entityPhysicsState.ForwardDir().CopyTo( forwardDir );
-		groundEntity = context->movementState->entityPhysicsState.GroundEntity();
-	} else {
-		movementState.entityPhysicsState.ForwardDir().CopyTo( forwardDir );
-		groundEntity = game.edicts[bot->EntNum()].groundentity;
-	}
-
-	// Rotate input
-	input->SetIntendedLookDir( sideDir, true );
-
-	// If flying, release side keys to prevent unintended aircontrol usage
-	if( !groundEntity ) {
-		input->SetForwardMovement( 0 );
-		input->SetRightMovement( 0 );
-	} else {
-		int oldForwardMovement = input->ForwardMovement();
-		int oldRightMovement = input->RightMovement();
-		input->SetForwardMovement( sign * oldRightMovement );
-		input->SetRightMovement( sign * oldForwardMovement );
-		input->SetSpecialButton( false );
-	}
-
-	SetupInputForTransition( input, groundEntity, sideDir );
 }
 
 PredictionContext::PredictionContext( MovementSubsystem *subsystem, PredictedPath *predictedMovementActions_ )

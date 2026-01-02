@@ -3,15 +3,6 @@
 
 #include "../ailocal.h"
 
-enum class InputRotation : uint8_t {
-	NONE = 0,
-	BACK = 1 << 0,
-	RIGHT = 1 << 1,
-	LEFT = 1 << 2,
-	SIDE_KINDS_MASK = ( 1 << 1 ) | ( 1 << 2 ),
-	ALL_KINDS_MASK = ( 1 << 3 ) - 1
-};
-
 class alignas ( 4 )BotInput {
 	friend class PredictionContext;
 	friend class PredictingAndCachingMovementScript;
@@ -22,7 +13,6 @@ class alignas ( 4 )BotInput {
 	// the BotInput should be only mutable thing in the related code.
 	// Should be copied back to self->s.angles if it has been modified when the BotInput gets applied.
 	Vec3 alreadyComputedAngles { 0, 0, 0 };
-	InputRotation allowedRotationMask { InputRotation::ALL_KINDS_MASK };
 	uint8_t turnSpeedMultiplier { 16 };
 	// Unfortunately, we can't use bitfield member initializers with pre-20 language standards
 	signed ucmdForwardMove : 2;
@@ -55,7 +45,6 @@ public:
 	}
 
 	void Clear() {
-		allowedRotationMask = InputRotation::ALL_KINDS_MASK;
 		turnSpeedMultiplier = 16;
 		ucmdForwardMove = ucmdSideMove = ucmdUpMove = 0;
 		attackButton = specialButton = walkButton = false;
@@ -64,14 +53,6 @@ public:
 		hasAlreadyComputedAngles = false;
 		canOverrideUcmd = shouldOverrideUcmd = false;
 		canOverrideLookVec = shouldOverrideLookVec = canOverridePitch = false;
-	}
-
-	void SetAllowedRotationMask( InputRotation rotationMask ) {
-		this->allowedRotationMask = rotationMask;
-	}
-
-	bool IsRotationAllowed( InputRotation rotation ) {
-		return ( (int)allowedRotationMask & (int)rotation ) != 0;
 	}
 
 	// Button accessors are kept for backward compatibility with existing bot movement code
