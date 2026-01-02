@@ -237,33 +237,6 @@ static inline bool ShouldCrouchSlideNow( PredictionContext *context ) {
 	return false;
 }
 
-// Height threshold should be set according to used time step
-// (we might miss crouch sliding activation if its low and the time step is large)
-inline bool ShouldPrepareForCrouchSliding( PredictionContext *context, float heightThreshold = 12.0f ) {
-	if( !( context->currMinimalPlayerState->pmove.stats[PM_STAT_FEATURES] & PMFEAT_CROUCHSLIDING ) ) {
-		return false;
-	}
-
-	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
-	if( entityPhysicsState.GroundEntity() ) {
-		return false;
-	}
-
-	if( entityPhysicsState.Velocity()[2] > 0 ) {
-		return false;
-	}
-
-	if( entityPhysicsState.HeightOverGround() > heightThreshold ) {
-		return false;
-	}
-
-	if( entityPhysicsState.Speed() < context->GetRunSpeed() ) {
-		return false;
-	}
-
-	return true;
-}
-
 class RegionBoundsCache {
 	const char *const tag;
 	const float *const addToMins;

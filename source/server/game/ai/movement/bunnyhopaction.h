@@ -68,19 +68,19 @@ protected:
 
 	unsigned m_hopCounter { 0 };
 
-	void setupCommonBunnyHopInput( PredictionContext *context );
 	// TODO: Mark as virtual in base class and mark as final here to avoid a warning about hiding parent member?
 	[[nodiscard]]
 	auto genericCheckIsActionEnabled( PredictionContext *context ) -> PredictionResult;
 	[[nodiscard]]
 	auto checkCommonBunnyHopPreconditions( PredictionContext *context ) -> PredictionResult;
 	[[nodiscard]]
-	bool setupBunnyHopping( const Vec3 &intendedLookVec, PredictionContext *context );
+	bool setupBunnyHopping( const Vec3 &intendedLookDir, PredictionContext *context );
 	[[nodiscard]]
 	bool canFlyAboveGroundRelaxed( const PredictionContext *context ) const;
 	[[nodiscard]]
+	bool checkRiskyMovementAllowed( PredictionContext *context ) const;
+	[[nodiscard]]
 	bool canSetWalljump( PredictionContext *context, const Vec3 &velocity2DDir, const Vec3 &intended2DLookDir ) const;
-	void trySettingWalljump( PredictionContext *context, const Vec3 &velocity2DDir, const Vec3 &intended2DLookDir );
 
 	// Can be overridden for finer control over tests
 	[[nodiscard]]

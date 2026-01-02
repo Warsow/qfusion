@@ -112,6 +112,9 @@ auto BunnyFollowingReachChainAction::planPredictionStep( PredictionContext *cont
 		}
 	}
 
+	if( !lookVec.normalizeFast( { .minAcceptableLength = 1.0f } ) ) {
+		return PredictionResult::Abort;
+	}
 	if( !setupBunnyHopping( lookVec, context ) ) {
 		return PredictionResult::Abort;
 	}

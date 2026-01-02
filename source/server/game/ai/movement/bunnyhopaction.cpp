@@ -57,145 +57,156 @@ auto BunnyHopAction::checkCommonBunnyHopPreconditions( PredictionContext *contex
 	return PredictionResult::Continue;
 }
 
-void BunnyHopAction::setupCommonBunnyHopInput( PredictionContext *context ) {
-	const auto *pmoveStats = context->currMinimalPlayerState->pmove.stats;
+bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionContext *context ) {
+	assert( intendedLookDir.LengthFast() - 1.0f < 0.01f );
 
-	auto *botInput = &context->record->botInput;
+	const auto *const pmoveStats   = context->currMinimalPlayerState->pmove.stats;
+	auto *const botInput           = &context->record->botInput;
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 
-	botInput->SetForwardMovement( 1 );
-	botInput->canOverrideLookVec = true;
-	botInput->canOverridePitch   = true;
+	botInput->SetIntendedLookDir( intendedLookDir, true );
+	assert( botInput->isLookDirSet );
+	botInput->isUcmdSet = true;
+	assert( botInput->ForwardMovement() == 0 );
+	assert( botInput->RightMovement() == 0 );
+	assert( botInput->UpMovement() == 0 );
+	assert( !botInput->IsSpecialButtonSet() );
+	assert( !botInput->IsCrouching() );
 
-	if( ( pmoveStats[PM_STAT_FEATURES] & PMFEAT_DASH ) && !pmoveStats[PM_STAT_DASHTIME] ) {
-		bool shouldDash = false;
-		if( entityPhysicsState.Speed() < context->GetDashSpeed() && entityPhysicsState.GroundEntity() ) {
-			// Prevent dashing into obstacles
-			auto &traceCache = context->TraceCache();
-			auto query( EnvironmentTraceCache::Query::front() );
-			traceCache.testForQuery( context, query );
-			if( traceCache.resultForQuery( query ).trace.fraction == 1.0f ) {
-				shouldDash = true;
+	botInput->canOverrideLookVec = false;
+	botInput->canOverridePitch   = false;
+
+	const float intendedLookDirDotActual = entityPhysicsState.ForwardDir().Dot( intendedLookDir );
+	if( entityPhysicsState.GroundEntity() ) {
+		if( entityPhysicsState.Speed2D() <= context->GetRunSpeed() ) {
+			if( intendedLookDirDotActual > 0.9f ) {
+				botInput->SetForwardMovement( 1 );
+				bool shouldDash = false;
+				if( ( pmoveStats[PM_STAT_FEATURES] & PMFEAT_DASH ) && !pmoveStats[PM_STAT_DASHTIME] ) {
+					if( entityPhysicsState.Speed() < context->GetDashSpeed() && entityPhysicsState.GroundEntity() ) {
+						if( checkRiskyMovementAllowed( context ) ) {
+							// Prevent dashing into obstacles
+							auto &traceCache = context->TraceCache();
+							auto query( EnvironmentTraceCache::Query::front() );
+							traceCache.testForQuery( context, query );
+							if( traceCache.resultForQuery( query ).trace.fraction == 1.0f ) {
+								shouldDash = true;
+							}
+						}
+					}
+				}
+				if( shouldDash ) {
+					botInput->SetSpecialButton( true );
+				} else {
+					botInput->SetUpMovement( 1 );
+				}
+			} else {
+				botInput->SetTurnSpeedMultiplier( 15.0f );
 			}
-		}
-
-		if( shouldDash ) {
-			botInput->SetSpecialButton( true );
-			botInput->SetUpMovement( 0 );
-			// Predict dash precisely
-			context->predictionStepMillis = context->DefaultFrameTime();
 		} else {
+			if( intendedLookDirDotActual > 0.0f ) {
+				botInput->SetForwardMovement( 1 );
+			}
 			botInput->SetUpMovement( 1 );
+			botInput->canOverrideLookVec = true;
+			botInput->canOverridePitch   = true;
 		}
 	} else {
-		if( entityPhysicsState.Speed() < context->GetRunSpeed() ) {
-			botInput->SetUpMovement( 0 );
-		} else {
-			botInput->SetUpMovement( 1 );
-		}
-	}
-}
+		Vec3 toTargetDir2D( intendedLookDir.X(), intendedLookDir.Y(), 0.0f );
+		Vec3 velocityDir2D( entityPhysicsState.Velocity()[0], entityPhysicsState.Velocity()[1], 0.0f );
+		bool have2DDirsBeenNormalized = false;
+		// This check is not that cheap, hence we compute the result on demand
+		bool hasCheckedRiskyMovement  = false;
+		bool isRiskyMovementAllowed   = false;
 
-bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookVec, PredictionContext *context ) {
-	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
-	auto *botInput = &context->record->botInput;
+		if( const float squareSpeed2D = entityPhysicsState.SquareSpeed2D(); squareSpeed2D > 1.0f ) {
+			velocityDir2D *= Q_RSqrt( squareSpeed2D );
 
-	Vec3 toTargetDir2D( intendedLookVec );
-	botInput->SetIntendedLookDir( intendedLookVec );
-	botInput->isUcmdSet = true;
-	toTargetDir2D.Z() = 0;
+			if( const float toTargetDir2DSqLen = toTargetDir2D.SquaredLength(); toTargetDir2DSqLen > 0.1f ) {
+				toTargetDir2D *= Q_RSqrt( toTargetDir2DSqLen );
+				have2DDirsBeenNormalized = true;
 
-	Vec3 velocityDir2D( entityPhysicsState.Velocity() );
-	velocityDir2D.Z() = 0;
-
-	float squareSpeed2D = entityPhysicsState.SquareSpeed2D();
-	float toTargetDir2DSqLen = toTargetDir2D.SquaredLength();
-
-	if( squareSpeed2D > 1.0f ) {
-		setupCommonBunnyHopInput( context );
-
-		velocityDir2D *= 1.0f / entityPhysicsState.Speed2D();
-
-		if( toTargetDir2DSqLen > 0.1f ) {
-			toTargetDir2D *= Q_RSqrt( toTargetDir2DSqLen );
-			float velocityDir2DDotToTargetDir2D = velocityDir2D.Dot( toTargetDir2D );
-			if( velocityDir2DDotToTargetDir2D > 0.0f ) {
-				// Apply a full acceleration at the initial trajectory part.
-				// A reached dot threshold is the only extra condition.
-				// The action activation rate is still relatively low
-				// and the resulting velocity gain accumulated over real game frames is moderate.
-				// Make sure we use the maximal acceleration possible for first frames
-				// switching to the default fraction to simulate an actual resulting trajectory.
-				if( velocityDir2DDotToTargetDir2D > 0.7f && context->totalMillisAhead <= 64 ) {
-					context->CheatingAccelerate( 1.0f );
-				} else {
-					context->CheatingAccelerate( velocityDir2DDotToTargetDir2D );
+				const float velocityDir2DDotToTargetDir2D = velocityDir2D.Dot( toTargetDir2D );
+				if( velocityDir2DDotToTargetDir2D > 0.0f ) {
+					hasCheckedRiskyMovement = true;
+					isRiskyMovementAllowed  = checkRiskyMovementAllowed( context );
+					// Consider that acceleration is risky (may lead to a miss)
+					if( isRiskyMovementAllowed ) {
+						// Apply a full acceleration at the initial trajectory part.
+						// A reached dot threshold is the only extra condition.
+						// The action activation rate is still relatively low
+						// and the resulting velocity gain accumulated over real game frames is moderate.
+						// Make sure we use the maximal acceleration possible for first frames
+						// switching to the default fraction to simulate an actual resulting trajectory.
+						if( velocityDir2DDotToTargetDir2D > 0.7f && context->totalMillisAhead <= 64 ) {
+							context->CheatingAccelerate( 1.0f );
+						} else {
+							context->CheatingAccelerate( velocityDir2DDotToTargetDir2D );
+						}
+					}
+				}
+				if( velocityDir2DDotToTargetDir2D < STRAIGHT_MOVEMENT_DOT_THRESHOLD ) {
+					// Apply a path penalty for aircontrol abuse
+					if( velocityDir2DDotToTargetDir2D < 0 ) {
+						ensurePathPenalty( 1000 );
+					}
+					context->CheatingCorrectVelocity( velocityDir2DDotToTargetDir2D, toTargetDir2D );
 				}
 			}
-			if( velocityDir2DDotToTargetDir2D < STRAIGHT_MOVEMENT_DOT_THRESHOLD ) {
-				// Apply a path penalty for aircontrol abuse
-				if( velocityDir2DDotToTargetDir2D < 0 ) {
-					ensurePathPenalty( 1000 );
-				}
-				context->CheatingCorrectVelocity( velocityDir2DDotToTargetDir2D, toTargetDir2D );
-			}
 		}
-	}
-	// Looks like the bot is in air falling vertically
-	else if( !entityPhysicsState.GroundEntity() ) {
-		// Release keys to allow full control over view in air without affecting movement
+
 		if( m_bot->ShouldAttack() && canFlyAboveGroundRelaxed( context ) ) {
 			botInput->ClearMovementDirections();
 			botInput->canOverrideLookVec = true;
+			botInput->canOverridePitch   = true;
+		} else {
+			if( intendedLookDirDotActual > 0.0f ) {
+				botInput->SetForwardMovement( 1 );
+			}
 		}
-		return true;
-	} else {
-		setupCommonBunnyHopInput( context );
-		return true;
+
+		if( !hasCheckedRiskyMovement ) {
+			hasCheckedRiskyMovement = true;
+			isRiskyMovementAllowed  = checkRiskyMovementAllowed( context );
+		}
+
+		if( isRiskyMovementAllowed ) {
+			// Make sure that we provide valid input
+			if( have2DDirsBeenNormalized ) {
+				if( canSetWalljump( context, velocityDir2D, toTargetDir2D ) ) {
+					botInput->ClearMovementDirections();
+					botInput->SetSpecialButton( true );
+				}
+			}
+		}
 	}
 
-	if( m_bot->ShouldAttack() && canFlyAboveGroundRelaxed( context ) ) {
-		botInput->ClearMovementDirections();
-		botInput->canOverrideLookVec = true;
+	if( botInput->IsSpecialButtonSet() ) {
+		context->predictionStepMillis = context->DefaultFrameTime();
 	}
 
-	// Skip dash and WJ near triggers and nav targets to prevent missing a trigger/nav target
+	return true;
+}
+
+bool BunnyHopAction::checkRiskyMovementAllowed( PredictionContext *context ) const {
 	const int nextReachNum = context->NextReachNum();
 	if( !nextReachNum ) {
 		// Preconditions check must not allow bunnying outside of nav target area having an empty reach. chain
 		Assert( context->IsInNavTargetArea() );
-		botInput->SetSpecialButton( false );
-		botInput->canOverrideLookVec = false;
-		botInput->canOverridePitch = false;
-		return true;
+		return !context->IsCloseToNavTarget();
 	}
 
-	switch( AiAasWorld::instance()->getReaches()[nextReachNum].traveltype ) {
+	const auto &reach = AiAasWorld::instance()->getReaches()[nextReachNum];
+	switch( reach.traveltype ) {
 		case TRAVEL_TELEPORT:
 		case TRAVEL_JUMPPAD:
 		case TRAVEL_ELEVATOR:
 		case TRAVEL_LADDER:
 		case TRAVEL_BARRIERJUMP:
-			botInput->SetSpecialButton( false );
-			botInput->canOverrideLookVec = false;
-			botInput->canOverridePitch = true;
-			return true;
+			return Distance2DSquared( context->movementState->entityPhysicsState.Origin(), reach.start ) > wsw::square( 72.0f );
 		default:
-			if( context->IsCloseToNavTarget() ) {
-				botInput->SetSpecialButton( false );
-				botInput->canOverrideLookVec = false;
-				botInput->canOverridePitch = false;
-				return true;
-			}
+			return !context->IsCloseToNavTarget();
 	}
-
-	if( ShouldPrepareForCrouchSliding( context, 8.0f ) ) {
-		botInput->SetUpMovement( -1 );
-		context->predictionStepMillis = context->DefaultFrameTime();
-	}
-
-	trySettingWalljump( context, velocityDir2D, toTargetDir2D );
-	return true;
 }
 
 bool BunnyHopAction::canFlyAboveGroundRelaxed( const PredictionContext *context ) const {
@@ -206,18 +217,6 @@ bool BunnyHopAction::canFlyAboveGroundRelaxed( const PredictionContext *context 
 
 	float desiredHeightOverGround = 0.3f * AI_JUMPABLE_HEIGHT;
 	return entityPhysicsState.HeightOverGround() >= desiredHeightOverGround;
-}
-
-void BunnyHopAction::trySettingWalljump( PredictionContext *context, const Vec3 &velocity2DDir, const Vec3 &intendedLookDir2D ) {
-	if( !canSetWalljump( context, velocity2DDir, intendedLookDir2D ) ) {
-		return;
-	}
-
-	auto *botInput = &context->record->botInput;
-	botInput->ClearMovementDirections();
-	botInput->SetSpecialButton( true );
-	// Predict a frame precisely for walljumps
-	context->predictionStepMillis = context->DefaultFrameTime();
 }
 
 bool BunnyHopAction::canSetWalljump( PredictionContext *context, const Vec3 &velocity2DDir, const Vec3 &intended2DLookDir ) const {
@@ -235,9 +234,8 @@ bool BunnyHopAction::canSetWalljump( PredictionContext *context, const Vec3 &vel
 	}
 
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
-	if( entityPhysicsState.GroundEntity() ) {
-		return false;
-	}
+	// Just don't call this subroutine on ground
+	assert( !entityPhysicsState.GroundEntity() );
 
 	if( entityPhysicsState.HeightOverGround() < 8.0f && entityPhysicsState.Velocity()[2] <= 0 ) {
 		return false;
