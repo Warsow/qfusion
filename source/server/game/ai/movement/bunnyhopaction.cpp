@@ -37,7 +37,9 @@ auto BunnyHopAction::checkCommonBunnyHopPreconditions( PredictionContext *contex
 		// This might be another router woe as many rejected trajectories seem legit.
 		// We have decided to save the trajectory if there was an advancement applying a huge penalty.
 		if( m_minTravelTimeToNavTargetSoFar && m_minTravelTimeToNavTargetSoFar < m_travelTimeAtSequenceStart ) {
-			context->SaveLastResortPath( m_sequencePathPenalty );
+			if( m_hopCounter > 0 ) {
+				context->SaveLastResortPath( m_sequencePathPenalty );
+			}
 		}
 		return PredictionResult::Restart;
 	}
