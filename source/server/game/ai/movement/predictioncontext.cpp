@@ -711,7 +711,8 @@ void PredictionContext::NextMovementStep( BaseAction *action ) {
 	playerStateForPmove.pmove.gravity = (int)level.gravity;
 	playerStateForPmove.pmove.pm_type = PM_NORMAL;
 
-	const Vec3 angles( entityPhysicsState->Angles() );
+	Assert( botInput->hasAlreadyComputedAngles );
+	const Vec3 angles( botInput->AlreadyComputedAngles() );
 	VectorCopy( entityPhysicsState->Origin(), playerStateForPmove.pmove.origin );
 	VectorCopy( entityPhysicsState->Velocity(), playerStateForPmove.pmove.velocity );
 	angles.CopyTo( playerStateForPmove.viewangles );
