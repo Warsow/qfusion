@@ -14,6 +14,8 @@
 #include "bunnytobestvisiblereachaction.h"
 #include "bunnytobestclusterpointaction.h"
 
+#include "walktopointscript.h"
+
 class Bot;
 
 // Roughly based on token buckets algorithm
@@ -78,6 +80,8 @@ class MovementSubsystem {
 	friend class PredictionContext;
 	friend class BaseAction;
 	friend class MovementScript;
+	friend class WalkToPointAction;
+	friend class WalkToPointScript;
 	friend class BunnyToBestFloorClusterPointAction;
 	friend class PredictingAndCachingMovementScript;
 
@@ -137,6 +141,10 @@ class MovementSubsystem {
 	MovementScript *activeScript { nullptr };
 
 	BunnyHopScript bunnyHopScript { this };
+	WalkToPointScript walkToPointScript { this };
+
+	[[nodiscard]]
+	auto findFallbackScript( BotInput *input ) -> MovementScript *;
 public:
 	explicit MovementSubsystem( Bot *bot_ );
 

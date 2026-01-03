@@ -18,7 +18,7 @@ static constexpr int NEXT_STEP_INFINITE_LOOP_THRESHOLD = 10000;
 #endif
 
 // Useful for debugging but freezes even Release version
-#if 0
+#if 1
 #define ENABLE_MOVEMENT_DEBUG_OUTPUT
 #endif
 

@@ -1,8 +1,8 @@
 #include "../bot.h"
 #include "movementsubsystem.h"
 #include "movementlocal.h"
-#include "environmenttracecache.h"
-#include "bestjumpablespotdetector.h"
+#include <common/helpers/algorithm.h>
+#include <common/helpers/scopeexitaction.h>
 
 MovementSubsystem::MovementSubsystem( Bot *bot_ )
 	: bot( bot_ )
@@ -64,16 +64,81 @@ void MovementSubsystem::Frame( BotInput *input ) {
 
 	const bool shouldSelectNewScript = !activeScript;
 	if( shouldSelectNewScript ) {
-		activeScript = &bunnyHopScript;
-		if( !activeScript->produceBotInput( input ) ) {
-			activeScript = nullptr;
+		if( bot->Skill() >= 0.33f ) {
+			activeScript = &bunnyHopScript;
+			if( !bunnyHopScript.produceBotInput( input ) ) {
+				activeScript = nullptr;
+			}
+		}
+		if( !activeScript ) {
+			// TODO: Check for immediate recovery in case of a dangerous failure
+			if( movementState.entityPhysicsState.GroundEntity() ) {
+				activeScript = findFallbackScript( input );
+			} else {
+				input->SetIntendedLookDir( movementState.entityPhysicsState.ForwardDir() );
+				input->ClearMovementDirections();
+				input->isUcmdSet = true;
+			}
 		}
 	}
 
 	if( shouldSelectNewScript && activeScript ) {
-		// TODO: ->activate() ?
-		activeScript->bumpTimeout();
+		// Make sure the script bumps its own timeout properly
+		assert( activeScript->getTimeoutAt() > level.time );
 	}
+}
+
+auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript * {
+	MovementScript *const oldScript = activeScript;
+	[[maybe_unused]] volatile wsw::ScopeExitAction restoreOldScript( [&, this]() { activeScript = oldScript; } );
+
+	if( const int navTargetAreaNum = bot->NavTargetAasAreaNum() ) {
+		const auto *const aasWorld = AiAasWorld::instance();
+
+		// Make sure that there's no areas below
+		assert( movementState.entityPhysicsState.GroundEntity() );
+
+		// We have to retrieve all areas in the box of the bot.
+		// It's the correct approach for navigation.
+		// Currently, it is not performed during prediction for performance reasons.
+
+		int botAreas[32];
+		int numBotAreas = (int)aasWorld->findAreasInBox( bot->self->r.absmin, bot->self->r.absmax,
+														 botAreas, sizeof( botAreas ) ).size();
+
+		// TODO: Is it needed?
+		for( const int areaNum: { movementState.entityPhysicsState.CurrAasAreaNum(),
+								  movementState.entityPhysicsState.DroppedToFloorAasAreaNum() } ) {
+			if( areaNum && numBotAreas < (int)std::size( botAreas ) ) {
+				if( !wsw::contains( botAreas, botAreas + numBotAreas, areaNum ) ) {
+					botAreas[numBotAreas++] = areaNum;
+				}
+			}
+		}
+
+		if( wsw::contains( botAreas, botAreas + numBotAreas, navTargetAreaNum ) ) {
+			walkToPointScript.setTargetPoint( bot->NavTargetOrigin() );
+			activeScript = &walkToPointScript;
+			if( activeScript->produceBotInput( input ) ) {
+				return &walkToPointScript;
+			}
+		} else {
+			const auto *routeCache = bot->RouteCache();
+			const int travelFlags  = bot->TravelFlags();
+
+			int reachNum = 0;
+			if( routeCache->FindRoute( botAreas, numBotAreas, navTargetAreaNum, travelFlags, &reachNum ) ) {
+				const auto &reach = aasWorld->getReaches()[reachNum];
+				walkToPointScript.setTargetPoint( Vec3( reach.start ) );
+				activeScript = &walkToPointScript;
+				if( activeScript->produceBotInput( input ) ) {
+					return &walkToPointScript;
+				}
+			}
+		}
+	}
+
+	return nullptr;
 }
 
 void MovementSubsystem::ApplyPendingTurnToLookAtPoint( BotInput *botInput, PredictionContext *context ) {

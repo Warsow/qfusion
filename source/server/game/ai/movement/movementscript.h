@@ -118,13 +118,6 @@ public:
 
 	[[nodiscard]]
 	virtual bool produceBotInput( BotInput *botInput ) = 0;
-
-	void bumpTimeout() {
-		// TODO: std::optional<int64_t>?
-		if( m_timeoutAt != std::numeric_limits<int64_t>::max() ) {
-			m_timeoutAt = level.time + 3000;
-		}
-	};
 protected:
 	int64_t m_timeoutAt { 0 };
 	MovementSubsystem *const m_subsystem;
@@ -145,10 +138,10 @@ class PredictingAndCachingMovementScript : public PredictingMovementScript {
 public:
 	explicit PredictingAndCachingMovementScript( MovementSubsystem *movementSubsystem )
 		: PredictingMovementScript( movementSubsystem ) {}
-private:
-	void Debug( const char *format, ... ) const;
 
 	bool produceBotInput( BotInput *input ) override;
+private:
+	void Debug( const char *format, ... ) const;
 
 	[[nodiscard]]
 	auto getCachedActionAndRecordForCurrTime( MovementActionRecord *record_ ) -> BaseAction *;
@@ -170,8 +163,8 @@ private:
 	[[nodiscard]]
 	bool checkPredictedAngles( PredictedMovementAction *prevAction, PredictedMovementAction *nextAction, float frac );
 
-	wsw::StaticVector<PredictedMovementAction, MAX_PREDICTED_STATES> m_predictedMovementActions;
 protected:
+	wsw::StaticVector<PredictedMovementAction, MAX_PREDICTED_STATES> m_predictedMovementActions;
 	std::span<BaseAction *> m_movementActions;
 };
 
