@@ -131,7 +131,7 @@ public:
 	void onInterceptedPredictedEvent( int ev, int parm );
 	void onInterceptedPMoveTouchTriggers( pmove_t *pm, vec3_t const previousOrigin );
 protected:
-	PredictionContext *m_activeContext { nullptr };
+	PredictionContext *m_testedContext { nullptr };
 };
 
 class PredictingAndCachingMovementScript : public PredictingMovementScript {

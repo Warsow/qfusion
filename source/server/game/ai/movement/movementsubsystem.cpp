@@ -57,7 +57,7 @@ void MovementSubsystem::Frame( BotInput *input ) {
 	}
 
 	if( activeScript ) {
-		if( !activeScript->produceBotInput( input ) ) {
+		if( !produceBotInput( activeScript, input ) ) {
 			activeScript = nullptr;
 		}
 	}
@@ -65,9 +65,8 @@ void MovementSubsystem::Frame( BotInput *input ) {
 	const bool shouldSelectNewScript = !activeScript;
 	if( shouldSelectNewScript ) {
 		if( bot->Skill() >= 0.33f ) {
-			activeScript = &bunnyHopScript;
-			if( !bunnyHopScript.produceBotInput( input ) ) {
-				activeScript = nullptr;
+			if( produceBotInput( &bunnyHopScript, input ) ) {
+				activeScript = &bunnyHopScript;
 			}
 		}
 		if( !activeScript ) {
@@ -88,10 +87,14 @@ void MovementSubsystem::Frame( BotInput *input ) {
 	}
 }
 
-auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript * {
-	MovementScript *const oldScript = activeScript;
-	[[maybe_unused]] volatile wsw::ScopeExitAction restoreOldScript( [&, this]() { activeScript = oldScript; } );
+bool MovementSubsystem::produceBotInput( MovementScript *script, BotInput *input ) {
+	testedScript = script;
+	bool result  = script->produceBotInput( input );
+	testedScript = nullptr;
+	return result;
+}
 
+auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript * {
 	if( const int navTargetAreaNum = bot->NavTargetAasAreaNum() ) {
 		const auto *const aasWorld = AiAasWorld::instance();
 
@@ -118,8 +121,7 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 
 		if( wsw::contains( botAreas, botAreas + numBotAreas, navTargetAreaNum ) ) {
 			walkToPointScript.setTargetPoint( bot->NavTargetOrigin() );
-			activeScript = &walkToPointScript;
-			if( activeScript->produceBotInput( input ) ) {
+			if( produceBotInput( &walkToPointScript, input ) ) {
 				return &walkToPointScript;
 			}
 		} else {
@@ -130,8 +132,7 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 			if( routeCache->FindRoute( botAreas, numBotAreas, navTargetAreaNum, travelFlags, &reachNum ) ) {
 				const auto &reach = aasWorld->getReaches()[reachNum];
 				walkToPointScript.setTargetPoint( Vec3( reach.start ) );
-				activeScript = &walkToPointScript;
-				if( activeScript->produceBotInput( input ) ) {
+				if( produceBotInput( &walkToPointScript, input ) ) {
 					return &walkToPointScript;
 				}
 			}

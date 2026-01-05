@@ -27,11 +27,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define Assert( expr ) assert( expr )
 
 void PredictingMovementScript::onInterceptedPredictedEvent( int ev, int parm ) {
-	m_activeContext->OnInterceptedPredictedEvent( ev, parm );
+	assert( m_testedContext );
+	m_testedContext->OnInterceptedPredictedEvent( ev, parm );
 }
 
 void PredictingMovementScript::onInterceptedPMoveTouchTriggers( pmove_t *pm, vec3_t const previousOrigin ) {
-	m_activeContext->OnInterceptedPMoveTouchTriggers( pm, previousOrigin );
+	assert( m_testedContext );
+	m_testedContext->OnInterceptedPMoveTouchTriggers( pm, previousOrigin );
 }
 
 void PredictingAndCachingMovementScript::Debug( const char *format, ... ) const {
@@ -52,9 +54,9 @@ bool PredictingAndCachingMovementScript::produceBotInput( BotInput *input ) {
 	m_predictedMovementActions.clear();
 
 	PredictionContext context( m_subsystem, &m_predictedMovementActions );
-	m_activeContext = &context;
+	m_testedContext = &context;
 	const bool succeeded = context.BuildPlan( m_movementActions );
-	m_activeContext = nullptr;
+	m_testedContext = nullptr;
 
 	if( succeeded ) {
 		assert( !m_predictedMovementActions.empty() );

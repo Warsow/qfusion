@@ -139,21 +139,27 @@ class MovementSubsystem {
 	} pendingLookAtPointState;
 
 	MovementScript *activeScript { nullptr };
+	MovementScript *testedScript { nullptr };
 
 	BunnyHopScript bunnyHopScript { this };
 	WalkToPointScript walkToPointScript { this };
 
 	[[nodiscard]]
 	auto findFallbackScript( BotInput *input ) -> MovementScript *;
+
+	[[nodiscard]]
+	bool produceBotInput( MovementScript *script, BotInput *input );
 public:
 	explicit MovementSubsystem( Bot *bot_ );
 
 	void OnInterceptedPredictedEvent( int ev, int parm ) {
-		static_cast<PredictingMovementScript *>( activeScript )->onInterceptedPredictedEvent( ev, parm );
+		assert( testedScript );
+		static_cast<PredictingMovementScript *>( testedScript )->onInterceptedPredictedEvent( ev, parm );
 	}
 
 	void OnInterceptedPMoveTouchTriggers( pmove_t *pm, const vec3_t previousOrigin ) {
-		static_cast<PredictingMovementScript *>( activeScript )->onInterceptedPMoveTouchTriggers( pm, previousOrigin );
+		assert( testedScript );
+		static_cast<PredictingMovementScript *>( testedScript )->onInterceptedPMoveTouchTriggers( pm, previousOrigin );
 	}
 
 	void SetCampingSpot( const AiCampingSpot &campingSpot ) {
