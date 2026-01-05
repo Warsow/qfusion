@@ -167,11 +167,11 @@ inline void PredictionContext::SaveActionOnStack( BaseAction *action ) {
 	if( !action ) {
 		AI_FailWith( tag, "The action is null\n" );
 	}
-	if( this->predictionStepMillis > 100 ) {
+	if( this->predictionStepMillis > 16 * 16 ) {
 		const char *format =
 			"%s: The prediction step millis value %u is way too large. "
 			"Is it a result of wrapping of negative values in unsigned context?\n";
-		AI_FailWith( tag, format, action->getName() );
+		AI_FailWith( tag, format, action->getName(), this->predictionStepMillis );
 	}
 	if( this->predictionStepMillis % DefaultFrameTime() ) {
 		const char *format = "%s: The prediction step millis value %u is no a multiple of %u\n";

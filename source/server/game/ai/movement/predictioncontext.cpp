@@ -739,7 +739,7 @@ void PredictionContext::NextMovementStep( BaseAction *action ) {
 	VectorSet( playerStateForPmove.pmove.delta_angles, 0, 0, 0 );
 
 	// Check for unsigned value wrapping
-	Assert( this->predictionStepMillis && this->predictionStepMillis < 100 );
+	Assert( this->predictionStepMillis && this->predictionStepMillis < 16 * 16 );
 	Assert( this->predictionStepMillis % 16 == 0 );
 	pm.cmd.msec = (uint8_t)this->predictionStepMillis;
 	pm.cmd.serverTimeStamp = game.serverTime + this->totalMillisAhead;

@@ -14,7 +14,7 @@
 #include "bunnytobestvisiblereachaction.h"
 #include "bunnytobestclusterpointaction.h"
 
-#include "walktopointscript.h"
+#include "fallbackscriptsandactions.h"
 
 class Bot;
 
@@ -143,6 +143,9 @@ class MovementSubsystem {
 
 	BunnyHopScript bunnyHopScript { this };
 	WalkToPointScript walkToPointScript { this };
+	TraverseJumpReachScript traverseJumpReachScript { this };
+	TraverseBarrierJumpReachScript traverseBarrierJumpReachScript { this };
+	TraverseWalkOffLedgeReachScript traverseWalkOffLedgeReachScript { this };
 
 	[[nodiscard]]
 	auto findFallbackScript( BotInput *input ) -> MovementScript *;
@@ -151,6 +154,8 @@ class MovementSubsystem {
 	bool produceBotInput( MovementScript *script, BotInput *input );
 public:
 	explicit MovementSubsystem( Bot *bot_ );
+
+	auto getMovementState() -> const MovementState & { return movementState; }
 
 	void OnInterceptedPredictedEvent( int ev, int parm ) {
 		assert( testedScript );
