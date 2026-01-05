@@ -74,6 +74,9 @@ void MovementSubsystem::Frame( BotInput *input ) {
 			if( movementState.entityPhysicsState.GroundEntity() ) {
 				activeScript = findFallbackScript( input );
 			} else {
+				Vec3 v1( movementState.entityPhysicsState.Origin() );
+				Vec3 v2( Vec3( 0, 0, 72 ) + v1 );
+				AITools_DrawColorLine( v1.Data(), v2.Data(), COLOR_RGB( 192, 0, 192 ), 0 );
 				input->SetIntendedLookDir( movementState.entityPhysicsState.ForwardDir() );
 				input->ClearMovementDirections();
 				input->isUcmdSet = true;
@@ -125,15 +128,36 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 				return &walkToPointScript;
 			}
 		} else {
-			const auto *routeCache = bot->RouteCache();
-			const int travelFlags  = bot->TravelFlags();
-
 			int reachNum = 0;
-			if( routeCache->FindRoute( botAreas, numBotAreas, navTargetAreaNum, travelFlags, &reachNum ) ) {
+			if( bot->RouteCache()->FindRoute( botAreas, numBotAreas, navTargetAreaNum, bot->TravelFlags(), &reachNum ) ) {
 				const auto &reach = aasWorld->getReaches()[reachNum];
-				walkToPointScript.setTargetPoint( Vec3( reach.start ) );
-				if( produceBotInput( &walkToPointScript, input ) ) {
-					return &walkToPointScript;
+				if( reach.traveltype == TRAVEL_WALK || reach.traveltype == TRAVEL_JUMPPAD ||
+					reach.traveltype == TRAVEL_TELEPORT || reach.traveltype == TRAVEL_ELEVATOR ) {
+					walkToPointScript.setTargetPoint( Vec3( reach.start ) );
+					if( produceBotInput( &walkToPointScript, input ) ) {
+						return &walkToPointScript;
+					}
+				} else if( reach.traveltype == TRAVEL_WALKOFFLEDGE ) {
+					if( DistanceSquared( reach.start, reach.end ) <= wsw::square( AI_JUMPABLE_HEIGHT ) ) {
+						walkToPointScript.setTargetPoint( Vec3( reach.end ) );
+						if( produceBotInput( &walkToPointScript, input ) ) {
+							return &walkToPointScript;
+						}
+					}
+					traverseWalkOffLedgeReachScript.setTargetReachNum( reachNum );
+					if( produceBotInput( &traverseWalkOffLedgeReachScript, input ) ) {
+						return &traverseWalkOffLedgeReachScript;
+					}
+				} else if( reach.traveltype == TRAVEL_JUMP || reach.traveltype == TRAVEL_STRAFEJUMP ) {
+					traverseJumpReachScript.setTargetReachNum( reachNum );
+					if( produceBotInput( &traverseJumpReachScript, input ) ) {
+						return &traverseJumpReachScript;
+					}
+				} else if( reach.traveltype == TRAVEL_BARRIERJUMP ) {
+					traverseBarrierJumpReachScript.setTargetReachNum( reachNum );
+					if( produceBotInput( &traverseBarrierJumpReachScript, input ) ) {
+						return &traverseBarrierJumpReachScript;
+					}
 				}
 			}
 		}
