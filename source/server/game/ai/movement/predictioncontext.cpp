@@ -1,6 +1,6 @@
 #include "predictioncontext.h"
 #include "movementlocal.h"
-#include "triggerareanumscache.h"
+#include "triggeraaspropscache.h"
 #include "../classifiedentitiescache.h"
 
 void PredictionContext::NextReachNumAndTravelTimeToNavTarget( int *reachNum, int *travelTimeToNavTarget ) {
@@ -396,13 +396,30 @@ void PredictionContext::SavePathTriggerNums() {
 		return;
 	}
 
-	const auto aasReaches = AiAasWorld::instance()->getReaches();
-	const auto *const __restrict routeCache = bot->RouteCache();
-	const auto *const __restrict botOrigin = bot->Origin();
-	const int travelFlags = bot->TravelFlags();
+	const auto *const classifiedEntitiesCache = wsw::ai::ClassifiedEntitiesCache::instance();
 
-	int reachAreaNum = 0;
+	unsigned possibleTriggerBits = 0;
 	enum MetTriggerFlags : unsigned { Teleporter = 0x1, Jumppad = 0x2, Platform = 0x4 };
+	if( !classifiedEntitiesCache->getAllPersistentMapTeleporters().empty() ) {
+		possibleTriggerBits |= Teleporter;
+	}
+	if( !classifiedEntitiesCache->getAllPersistentMapJumppads().empty() ) {
+		possibleTriggerBits |= Jumppad;
+	}
+	if( !classifiedEntitiesCache->getAllPersistentMapPlatformTriggers().empty() ) {
+		possibleTriggerBits |= Platform;
+	}
+
+	if( !possibleTriggerBits ) {
+		return;
+	}
+
+	const auto aasReaches        = AiAasWorld::instance()->getReaches();
+	const auto *const routeCache = bot->RouteCache();
+	const auto *const botOrigin  = bot->Origin();
+	const int travelFlags        = bot->TravelFlags();
+
+	int reachAreaNum        = 0;
 	unsigned metTriggerBits = 0;
 	// Don't inspect the whole reach chain to target for performance/logical reasons, and also protect from routing bugs
 	for( int i = 0; i < 32; ++i ) {
@@ -416,38 +433,34 @@ void PredictionContext::SavePathTriggerNums() {
 			break;
 		}
 		const auto &__restrict reach = aasReaches[reachNum];
+		if( reach.traveltype == TRAVEL_TELEPORT ) {
+			if( std::optional<int> maybeEntNum = triggerAasPropsCache.getTriggerEntNumForTeleportReach( reachNum ) ) {
+				m_teleporterPathTriggerNum = *maybeEntNum;
+				metTriggerBits |= Teleporter;
+			}
+		} else if( reach.traveltype == TRAVEL_JUMPPAD ) {
+			if( std::optional<int> maybeEntNum = triggerAasPropsCache.getTriggerEntNumForJumppadReach( reachNum ) ) {
+				m_jumppadPathTriggerNum = *maybeEntNum;
+				metTriggerBits |= Jumppad;
+			}
+			// Find a jumppad with the appropriate model
+		} else if( reach.traveltype == TRAVEL_ELEVATOR ) {
+			if( std::optional<int> maybeEntNum = triggerAasPropsCache.getTriggerEntNumForElevatorReach( reachNum ) ) {
+				m_platformPathTriggerNum = *maybeEntNum;
+				metTriggerBits |= Platform;
+			}
+		}
+
 		reachAreaNum = reach.areanum;
 		if( reachAreaNum == targetAreaNum ) {
 			break;
 		}
 		// Another cutoff
-		if( DistanceSquared( botOrigin, reach.start ) > wsw::square( 768 ) ) {
+		if( DistanceSquared( botOrigin, reach.end ) > wsw::square( 1024 ) ) {
 			break;
 		}
-		if( const auto *const __restrict classTriggerNums = triggerAreaNumsCache.getTriggersForArea( reachAreaNum ) ) {
-			if( !m_teleporterPathTriggerNum ) {
-				if( const std::optional<uint16_t> maybeTeleporterNum = classTriggerNums->getFirstTeleporterNum() ) {
-					m_teleporterPathTriggerNum = *maybeTeleporterNum;
-					metTriggerBits |= Teleporter;
-				}
-			}
-			if( !m_jumppadPathTriggerNum ) {
-				if( const std::optional<uint16_t> maybeJumppadNum = classTriggerNums->getFirstJummpadNum() ) {
-					m_jumppadPathTriggerNum = *maybeJumppadNum;
-					metTriggerBits |= Jumppad;
-				}
-			}
-			if( !m_platformPathTriggerNum ) {
-				if( const std::optional<uint16_t> maybePlatformNum = classTriggerNums->getFirstPlatformNum() ) {
-					m_platformPathTriggerNum = *maybePlatformNum;
-					metTriggerBits |= Platform;
-				}
-			}
-			// Interrupt at this
-			// TODO: Don't even try testing for kinds of triggers that are not even present on the map
-			if( metTriggerBits == ( Teleporter | Jumppad | Platform ) ) {
-				break;
-			}
+		if( metTriggerBits == possibleTriggerBits ) {
+			break;
 		}
 	}
 }
