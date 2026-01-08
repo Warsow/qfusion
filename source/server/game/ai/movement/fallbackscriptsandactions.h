@@ -166,6 +166,9 @@ public:
 		m_targetPoint   = targetPoint;
 		m_targetAreaNum = targetAreaNum;
 	}
+
+	[[nodiscard]]
+	auto getTargetAreaNum() -> int { return m_targetAreaNum; }
 private:
 	void beforePlanning() override;
 	void afterPlanning() override;
@@ -247,6 +250,43 @@ private:
 	WalkToPointAction m_walkToPointAction;
 	ClimbOntoBarrierAction m_climbOntoBarrierAction;
 	int m_targetReachNum { 0 };
+};
+
+class JumppadScript : public SwitchingActionsForStateScript {
+public:
+	explicit JumppadScript( MovementSubsystem *movementSubsystem )
+		: SwitchingActionsForStateScript( movementSubsystem ), m_landOnPointAction( movementSubsystem ) {
+		m_timeoutAt = std::numeric_limits<decltype( m_timeoutAt )>::max();
+	}
+
+	[[nodiscard]]
+	bool produceBotInput( BotInput *input ) override;
+
+	void setTarget( int triggerEntNum, int reachNum ) {
+		assert( triggerEntNum > 0 );
+		assert( reachNum >= 0 );
+		m_triggerEntNum  = triggerEntNum;
+		m_targetReachNum = reachNum;
+	}
+private:
+	[[nodiscard]]
+	bool reuseCachedPathForLastGoodArea( BotInput *input );
+	[[nodiscard]]
+	bool tryLandingOnArea( int areaNum, BotInput *input );
+	[[nodiscard]]
+	bool tryLandingOnAreas( std::span<const uint16_t> areaNums, int skipAreaNum, BotInput *input );
+	[[nodiscard]]
+	bool setupFreeflyMovement( BotInput *input, const float *targetTriggerOrigin, const AiEntityPhysicsState & );
+	[[nodiscard]]
+	bool setupRestartTriggerMovement( BotInput *input, const AiEntityPhysicsState & );
+	[[nodiscard]]
+	bool setupNonLandingMovement( BotInput *input, const float *triggerTargetOrigin, const AiEntityPhysicsState & );
+
+	LandOnPointAction m_landOnPointAction;
+
+	int m_triggerEntNum { 0 };
+	int m_targetReachNum { 0 };
+	int m_lastGoodLandingAreaNum { 0 };
 };
 
 #endif

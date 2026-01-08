@@ -82,6 +82,7 @@ class MovementSubsystem {
 	friend class MovementScript;
 	friend class WalkToPointAction;
 	friend class WalkToPointScript;
+	friend class JumppadScript;
 	friend class BunnyToBestFloorClusterPointAction;
 	friend class PredictingAndCachingMovementScript;
 
@@ -141,6 +142,7 @@ class MovementSubsystem {
 	MovementScript *activeScript { nullptr };
 	MovementScript *testedScript { nullptr };
 
+	JumppadScript jumppadScript { this };
 	BunnyHopScript bunnyHopScript { this };
 	WalkToPointScript walkToPointScript { this };
 	TraverseJumpReachScript traverseJumpReachScript { this };
@@ -193,9 +195,7 @@ public:
 		return pendingLookAtPointState.timeoutAt > level.time;
 	}
 
-	void ActivateJumppadState( const edict_t *jumppadEnt ) {
-		//movementState.jumppadMovementState.Activate( jumppadEnt );
-	}
+	void ActivateJumppadState( const edict_t *jumppadEnt );
 
 	bool CanChangeWeapons() const;
 

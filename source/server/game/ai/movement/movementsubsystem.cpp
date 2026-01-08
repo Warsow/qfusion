@@ -29,7 +29,36 @@ bool MovementSubsystem::CanChangeWeapons() const {
 	return !limiter.TryAcquire( levelTime + 384 );
 }
 
+void MovementSubsystem::ActivateJumppadState( const edict_t *jumppadEnt ) {
+	int targetReachNum = 0;
+	if( const int navTargetAreaNum = bot->NavTargetAasAreaNum() ) {
+		int startAreaNums[2] { 0, 0 };
+		const int numStartAreas = bot->EntityPhysicsState()->PrepareRoutingStartAreas( startAreaNums );
+		int reachNum       = 0;
+		int bestTravelTime = std::numeric_limits<int>::max();
+		// Note: We loop over areas instead of passing span of areas to the routing call
+		// as we're specifically interested in TRAVEL_JUMPPAD reachabilities
+		for( int i = 0; i < numStartAreas; ++i ) {
+			if( const int travelTime = bot->RouteCache()->FindRoute( startAreaNums[i], navTargetAreaNum,
+																	 bot->TravelFlags(), &reachNum ) ) {
+				if( AiAasWorld::instance()->getReaches()[reachNum].traveltype == TRAVEL_JUMPPAD ) {
+					if( bestTravelTime > travelTime ) {
+						bestTravelTime = travelTime;
+						targetReachNum = reachNum;
+					}
+				}
+			}
+		}
+	}
+	aiNotice() << "Target reach num" << targetReachNum;
+	jumppadScript.setTarget( ENTNUM( jumppadEnt ), targetReachNum );
+	activeScript = &jumppadScript;
+}
+
 bool MovementSubsystem::CanInterruptMovement() const {
+	if( activeScript == &jumppadScript ) {
+		return false;
+	}
 	/*
 	if( movementState.jumppadMovementState.IsActive() ) {
 		return false;
@@ -47,9 +76,6 @@ bool MovementSubsystem::CanInterruptMovement() const {
 }
 
 void MovementSubsystem::Frame( BotInput *input ) {
-	// TODO:!!!!!!!!!!!!
-	// ApplyPendingTurnToLookAtPoint( input );
-
 	if( activeScript ) {
 		if( activeScript->getTimeoutAt() <= level.time ) {
 			activeScript = nullptr;

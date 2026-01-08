@@ -26,11 +26,7 @@ inline void add( Container *c, int num ) {
 	}
 }
 
-void ClassifiedEntitiesCache::retrievePersistentEntities() {
-	m_allJumppads.clear();
-	m_allTeleporters.clear();
-	m_allPlatformTriggers.clear();
-
+ClassifiedEntitiesCache::ClassifiedEntitiesCache() {
 	const auto *__restrict gameEnts = game.edicts;
 	const int numEnts = game.numentities;
 	for( int i = ggs->maxclients + 1; i < numEnts; ++i ) {
@@ -53,12 +49,6 @@ void ClassifiedEntitiesCache::retrievePersistentEntities() {
 }
 
 void ClassifiedEntitiesCache::update() {
-	// TODO: Call this explicitly upon map loading
-	if( !m_hasRetrievedPersistentEntities ) {
-		retrievePersistentEntities();
-		m_hasRetrievedPersistentEntities = true;
-	}
-
 	m_allOtherTriggers.clear();
 
 	m_rockets.clear();

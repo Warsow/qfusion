@@ -144,9 +144,6 @@ private:
 	void Debug( const char *format, ... ) const;
 
 	[[nodiscard]]
-	auto getCachedActionAndRecordForCurrTime( MovementActionRecord *record_ ) -> BaseAction *;
-
-	[[nodiscard]]
 	auto tryCheckingAndLerpingActions( PredictedMovementAction *prevAction,
 									   PredictedMovementAction *nextAction,
 									   MovementActionRecord *record_ ) -> BaseAction *;
@@ -164,6 +161,9 @@ private:
 	bool checkPredictedAngles( PredictedMovementAction *prevAction, PredictedMovementAction *nextAction, float frac );
 
 protected:
+	[[nodiscard]]
+	auto getCachedActionAndRecordForCurrTime( MovementActionRecord *record_ ) -> BaseAction *;
+
 	wsw::StaticVector<PredictedMovementAction, MAX_PREDICTED_STATES> m_predictedMovementActions;
 	std::span<BaseAction *> m_movementActions;
 };

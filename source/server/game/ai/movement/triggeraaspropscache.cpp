@@ -5,12 +5,6 @@
 
 TriggerAasPropsCache triggerAasPropsCache;
 
-void TriggerAasPropsCache::clear() {
-	m_triggerAreaNumsForTeleportReach.clear();
-	m_triggerAreaNumsForJumppadReach.clear();
-	m_triggerAreaNumsForElevatorReach.clear();
-}
-
 [[nodiscard]]
 static auto findContactingEntNumForReach( int reachNum, [[maybe_unused]] int travelType, float halfExtraExtent,
 										  std::span<const uint16_t> classEntNums ) -> int {
@@ -41,7 +35,7 @@ static auto findTeleporterEntNumForReach( int reachNum ) -> int {
 
 [[nodiscard]]
 static auto findJumppadEntNumForReach( int reachNum ) -> int {
-	return findContactingEntNumForReach( reachNum, TRAVEL_JUMPPAD, 16.0f,
+	return findContactingEntNumForReach( reachNum, TRAVEL_JUMPPAD, 32.0f,
 										 wsw::ai::ClassifiedEntitiesCache::instance()->getAllPersistentMapJumppads() );
 }
 
@@ -66,27 +60,63 @@ static auto findElevatorEntNumForReach( int reachNum ) -> int {
 }
 
 [[nodiscard]]
-static auto getTriggerEntNumForReach( int reachNum, std::unordered_map<int, int> *cache, auto (*findFn)( int ) -> int )
-	-> std::optional<int> {
+static auto getTriggerEntNumForReach( int reachNum, std::unordered_map<int, int> *cache ) -> std::optional<int> {
 	if( auto it = cache->find( reachNum ); it != cache->end() ) {
-		return it->second ? std::optional( it->second ) : std::nullopt;
+		return it->second;
 	}
-	const int entNum = findFn( reachNum );
-	cache->insert( { reachNum, entNum } );
-	return entNum ? std::optional( entNum ) : std::nullopt;
+	return std::nullopt;
 }
 
 auto TriggerAasPropsCache::getTriggerEntNumForTeleportReach( int reachNum ) const -> std::optional<int> {
-	return getTriggerEntNumForReach( reachNum, &m_triggerAreaNumsForTeleportReach,
-									 &findTeleporterEntNumForReach );
+	return getTriggerEntNumForReach( reachNum, &m_triggerEntNumsForTeleportReach );
 }
 
 auto TriggerAasPropsCache::getTriggerEntNumForJumppadReach( int reachNum ) const -> std::optional<int> {
-	return getTriggerEntNumForReach( reachNum, &m_triggerAreaNumsForJumppadReach,
-									 &findJumppadEntNumForReach );
+	return getTriggerEntNumForReach( reachNum, &m_triggerEntNumsForJumppadReach );
 }
 
 auto TriggerAasPropsCache::getTriggerEntNumForElevatorReach( int reachNum ) const -> std::optional<int> {
-	return getTriggerEntNumForReach( reachNum, &m_triggerAreaNumsForElevatorReach,
-									 &findElevatorEntNumForReach );
+	return getTriggerEntNumForReach( reachNum, &m_triggerEntNumsForElevatorReach );
+}
+
+auto TriggerAasPropsCache::getJumppadTargetAreas( int entNum ) const -> std::span<const uint16_t> {
+	if( auto it = m_jummpadTargetAreas.find( entNum ); it != m_jummpadTargetAreas.end() ) {
+		return it->second;
+	}
+	return {};
+}
+
+void TriggerAasPropsCache::reload() {
+	m_triggerEntNumsForTeleportReach.clear();
+	m_triggerEntNumsForJumppadReach.clear();
+	m_triggerEntNumsForElevatorReach.clear();
+
+	const auto *const aasWorld = AiAasWorld::instance();
+	// TODO: zipWithIndex
+	for( int reachNum = 1; reachNum < (int)aasWorld->getReaches().size(); ++reachNum ) {
+		const auto &reach = aasWorld->getReaches()[reachNum];
+		if( reach.traveltype == TRAVEL_TELEPORT ) {
+			if( const int entNum = findTeleporterEntNumForReach( reachNum ) ) {
+				m_triggerEntNumsForTeleportReach.insert( { reachNum, entNum } );
+			}
+		} else if( reach.traveltype == TRAVEL_JUMPPAD ) {
+			if( const int entNum = findJumppadEntNumForReach( reachNum ) ) {
+				m_triggerEntNumsForJumppadReach.insert( { reachNum, entNum } );
+				m_jummpadTargetAreas[entNum].append( reach.areanum );
+			}
+		} else if( reach.traveltype == TRAVEL_ELEVATOR ) {
+			if( const int entNum = findElevatorEntNumForReach( reachNum ) ) {
+				m_triggerEntNumsForElevatorReach.insert( { reachNum, entNum } );
+			}
+		}
+	}
+
+	for( const int entNum: wsw::ai::ClassifiedEntitiesCache::instance()->getAllPersistentMapJumppads() ) {
+		const auto *ent = game.edicts + entNum;
+		if( !m_jummpadTargetAreas.contains( entNum ) ) {
+			aiWarning() << "Failed to find jumppad target areas for" << wsw::StringView( ent->classname ) << "at" <<
+				"mins" << ent->r.absmin[0] << ent->r.absmin[1] << ent->r.absmin[2] <<
+				"maxs" << ent->r.absmax[0] << ent->r.absmax[1] << ent->r.absmax[2];
+		}
+	}
 }

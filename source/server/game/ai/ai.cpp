@@ -176,8 +176,11 @@ void AI_InitLevel( void ) {
 	AiManager::Init( g_gametype->string, level.mapname );
 
 	NavEntitiesRegistry::Init();
+}
+
+void AI_PostInitLevel() {
 	wsw::ai::ClassifiedEntitiesCache::init();
-	::triggerAasPropsCache.clear();
+	::triggerAasPropsCache.reload();
 }
 
 void AI_Shutdown( void ) {

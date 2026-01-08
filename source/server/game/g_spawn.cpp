@@ -944,6 +944,8 @@ void G_InitLevel( char *mapname, char *entities, int entstrlen, int64_t levelTim
 	// call map specific
 	G_asCallMapInit();
 
+	AI_PostInitLevel();
+
 	// always start in warmup match state and let the thinking code
 	// revert it to wait state if empty ( so gametype based item masks are setup )
 	G_Match_LaunchState( MATCH_STATE_WARMUP );

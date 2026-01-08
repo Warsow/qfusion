@@ -20,7 +20,6 @@ private:
 	wsw::StaticVector<uint16_t, kMaxClassTriggerEnts> m_allPlatformTriggers;
 	wsw::StaticVector<uint16_t, MAX_EDICTS> m_allOtherTriggers;
 	std::bitset<MAX_EDICTS> m_persistentEntitiesMask;
-	bool m_hasRetrievedPersistentEntities { false };
 
 	wsw::StaticVector<uint16_t, MAX_EDICTS> m_rockets;
 	wsw::StaticVector<uint16_t, MAX_EDICTS> m_grenades;
@@ -28,13 +27,13 @@ private:
 	wsw::StaticVector<uint16_t, MAX_EDICTS> m_blasts;
 	wsw::StaticVector<uint16_t, MAX_EDICTS> m_lasers;
 	wsw::StaticVector<uint16_t, MAX_EDICTS> m_waves;
-
-	void retrievePersistentEntities();
 public:
 	static void init();
 	static void shutdown();
 	[[nodiscard]]
 	static auto instance() -> ClassifiedEntitiesCache *;
+
+	ClassifiedEntitiesCache();
 
 	void update();
 

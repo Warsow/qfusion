@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "fallbackscriptsandactions.h"
 #include "movementsubsystem.h"
 #include "movementlocal.h"
+#include "triggeraaspropscache.h"
 #include <common/helpers/algorithm.h>
 
 [[nodiscard]]
@@ -738,4 +739,197 @@ bool TraverseBarrierJumpReachScript::produceBotInput( BotInput *input ) {
 	}
 
 	return false;
+}
+
+bool JumppadScript::produceBotInput( BotInput *input ) {
+	const auto &entityPhysicsState = *m_subsystem->bot->EntityPhysicsState();
+	// TODO: Is the jumppad entity considered to be "ground entity"?
+	// TODO: Is entityPhysicsState up-to-date when we activate this script?
+	if( entityPhysicsState.GroundEntity() ) {
+		return false;
+	}
+
+	const auto *const aasWorld = AiAasWorld::instance();
+
+	[[maybe_unused]]
+	const float *const triggerTargetOrigin = game.edicts[m_triggerEntNum].target_ent->s.origin;
+
+	if( m_targetReachNum > 0 ) {
+		const auto &targetReach = aasWorld->getReaches()[m_targetReachNum];
+		const auto &targetArea  = aasWorld->getAreas()[targetReach.areanum];
+		// If the bot should be landing (the feet are above the target area or the origin is above the reach end point)
+		if( entityPhysicsState.Origin()[2] + playerbox_stand_mins[2] > targetArea.mins[2] ||
+			entityPhysicsState.Origin()[2] > targetReach.end[2] ) {
+			// Prefer the target area even if we have failed on a previous attempt
+			if( m_lastGoodLandingAreaNum == targetReach.areanum ) {
+				if( reuseCachedPathForLastGoodArea( input ) ) {
+					return true;
+				}
+			}
+			if( tryLandingOnArea( targetReach.areanum, input ) ) {
+				return true;
+			}
+			// If we're still flying upwards
+			if( entityPhysicsState.Velocity()[2] > 0 ) {
+				// Try to continue controlled flight
+				if( setupFreeflyMovement( input, triggerTargetOrigin, entityPhysicsState ) ) {
+					return true;
+				}
+				// Just wait for starting falling
+				input->SetIntendedLookDir( Vec3( 0, 0, 1 ), true );
+				input->isUcmdSet = true;
+				return true;
+			} else {
+				// Try landing on arbitrary areas
+				std::span<const uint16_t> jumppadTargetAreas = ::triggerAasPropsCache.getJumppadTargetAreas( m_triggerEntNum );
+				if( tryLandingOnAreas( jumppadTargetAreas, targetReach.areanum, input ) ) {
+					return true;
+				}
+				// Just wait for irrecoverable falling
+				input->SetIntendedLookDir( Vec3( 0, 0, 1 ), true );
+				input->isUcmdSet = true;
+				return true;
+			}
+			return false;
+		} else {
+			return setupNonLandingMovement( input, triggerTargetOrigin, entityPhysicsState );
+		}
+	} else {
+		// Note: In case of no target areas we fall back to "non-landing" movement
+		float minTargetAreaHeight = std::numeric_limits<float>::max();
+		for( const int areaNum : ::triggerAasPropsCache.getJumppadTargetAreas( m_triggerEntNum ) ) {
+			minTargetAreaHeight = wsw::min( minTargetAreaHeight, aasWorld->getAreas()[areaNum].mins[2] );
+		}
+		if( entityPhysicsState.Origin()[2] + playerbox_stand_mins[2] > minTargetAreaHeight ) {
+			if( reuseCachedPathForLastGoodArea( input ) ) {
+				return true;
+			}
+			if( m_lastGoodLandingAreaNum > 0 ) {
+				if( tryLandingOnArea( m_lastGoodLandingAreaNum, input ) ) {
+					return true;
+				}
+			}
+			std::span<const uint16_t> jumppadTargetAreas = ::triggerAasPropsCache.getJumppadTargetAreas( m_triggerEntNum );
+			if( tryLandingOnAreas( jumppadTargetAreas, m_lastGoodLandingAreaNum, input ) ) {
+				return true;
+			}
+			input->SetIntendedLookDir( Vec3( 0, 0, 1 ), true );
+			input->isUcmdSet = true;
+			return true;
+		} else {
+			return setupNonLandingMovement( input, triggerTargetOrigin, entityPhysicsState );
+		}
+	}
+}
+
+bool JumppadScript::setupNonLandingMovement( BotInput *input, const float *triggerTargetOrigin,
+											 const AiEntityPhysicsState &entityPhysicsState ) {
+	if( entityPhysicsState.Velocity()[2] > 0 ) {
+		if( setupFreeflyMovement( input, triggerTargetOrigin, entityPhysicsState ) ) {
+			return true;
+		}
+		// Just wait for irrecoverable falling
+		input->SetIntendedLookDir( Vec3( 0, 0, 1 ), true );
+		input->isUcmdSet = true;
+		return true;
+	} else {
+		if( setupRestartTriggerMovement( input, entityPhysicsState ) ) {
+			return true;
+		}
+		// Just wait for falling somewhere (TODO?)
+		input->SetIntendedLookDir( Vec3( 0, 0, -1 ), true );
+		input->isUcmdSet = true;
+		return true;
+	}
+}
+
+bool JumppadScript::reuseCachedPathForLastGoodArea( BotInput *input ) {
+	if( !m_predictedMovementActions.empty() ) {
+		if( m_predictedMovementActions.front().action == &m_landOnPointAction ) {
+			if( m_lastGoodLandingAreaNum == m_landOnPointAction.getTargetAreaNum() ) {
+				MovementActionRecord record {};
+				if( getCachedActionAndRecordForCurrTime( &record ) ) {
+					m_predictedMovementActions.front().action->execActionRecord( &record, input );
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+bool JumppadScript::tryLandingOnArea( int areaNum, BotInput *input ) {
+	const auto &area = AiAasWorld::instance()->getAreas()[areaNum];
+	Vec3 areaPoint( area.center[0], area.center[1], area.mins[2] + 32.0f );
+
+	m_landOnPointAction.setTarget( areaPoint, areaNum );
+	m_predictedMovementActions.clear();
+	selectActiveAction( &m_landOnPointAction );
+
+	if( PredictingAndCachingMovementScript::produceBotInput( input ) ) {
+		m_lastGoodLandingAreaNum = areaNum;
+		return true;
+	}
+
+	return false;
+}
+
+bool JumppadScript::tryLandingOnAreas( std::span<const uint16_t> areaNums, int skipAreaNum, BotInput *input ) {
+	for( const int areaNum: areaNums ) {
+		if( areaNum != skipAreaNum ) [[likely]] {
+			if( tryLandingOnArea( areaNum, input ) ) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool JumppadScript::setupFreeflyMovement( BotInput *input, const float *targetTriggerOrigin,
+										  const AiEntityPhysicsState &entityPhysicsState ) {
+
+	// TODO: Check distance of origin to the reach segment
+
+	Vec3 viewOrigin( entityPhysicsState.Origin() );
+	viewOrigin.Z() += playerbox_stand_viewheight;
+	if( const auto maybePoint = m_subsystem->bot->GetKeptInFovPoint() ) {
+		Vec3 intendedLookDir( *maybePoint - viewOrigin );
+		if( intendedLookDir.normalizeFast() ) {
+			input->SetIntendedLookDir( intendedLookDir, true );
+		} else {
+			input->SetIntendedLookDir( Vec3( 0, 0, 1 ), true );
+		}
+	} else {
+		Vec3 intendedLookDir( Vec3( targetTriggerOrigin ) - viewOrigin );
+		if( intendedLookDir.normalizeFast() ) {
+			input->SetIntendedLookDir( intendedLookDir, true );
+		} else {
+			input->SetIntendedLookDir( Vec3( 0, 0, 1 ), true );
+		}
+	}
+
+	input->isUcmdSet          = true;
+	input->canOverridePitch   = true;
+	input->canOverrideLookVec = true;
+	return true;
+}
+
+bool JumppadScript::setupRestartTriggerMovement( BotInput *input, const AiEntityPhysicsState &entityPhysicsState ) {
+	Vec3 viewOrigin( entityPhysicsState.Origin() );
+	viewOrigin.Z() += playerbox_stand_viewheight;
+
+	const auto *trigger = &game.edicts[m_triggerEntNum];
+	const Vec3 triggerOrigin( 0.5f * ( Vec3( trigger->r.absmin ) + Vec3( trigger->r.absmax ) ) );
+
+	Vec3 intendedLookDir( triggerOrigin - viewOrigin );
+	if( intendedLookDir.normalizeFast() ) {
+		input->SetIntendedLookDir( intendedLookDir, true );
+	} else {
+		input->SetIntendedLookDir( Vec3( 0, 0, -1 ), true );
+	}
+
+	input->isUcmdSet        = true;
+	input->canOverridePitch = true;
+	input->canOverrideUcmd  = true;
+	return true;
 }

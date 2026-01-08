@@ -15,7 +15,7 @@
 
 class TriggerAasPropsCache {
 public:
-	void clear();
+	void reload();
 
 	[[nodiscard]]
 	auto getTriggerEntNumForTeleportReach( int reachNum ) const -> std::optional<int>;
@@ -23,10 +23,14 @@ public:
 	auto getTriggerEntNumForJumppadReach( int reachNum ) const -> std::optional<int>;
 	[[nodiscard]]
 	auto getTriggerEntNumForElevatorReach( int reachNum ) const -> std::optional<int>;
+
+	auto getJumppadTargetAreas( int entNum ) const -> std::span<const uint16_t>;
 private:
-	mutable std::unordered_map<int, int> m_triggerAreaNumsForJumppadReach;
-	mutable std::unordered_map<int, int> m_triggerAreaNumsForTeleportReach;
-	mutable std::unordered_map<int, int> m_triggerAreaNumsForElevatorReach;
+	mutable std::unordered_map<int, wsw::PodVector<const uint16_t>> m_jummpadTargetAreas;
+
+	mutable std::unordered_map<int, int> m_triggerEntNumsForJumppadReach;
+	mutable std::unordered_map<int, int> m_triggerEntNumsForTeleportReach;
+	mutable std::unordered_map<int, int> m_triggerEntNumsForElevatorReach;
 };
 
 extern TriggerAasPropsCache triggerAasPropsCache;

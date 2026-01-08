@@ -64,6 +64,7 @@ typedef enum {
 
 // Should be called before static entities spawn
 void AI_InitLevel( void );
+void AI_PostInitLevel();
 // Should be called before level and entities data cleanup
 void AI_Shutdown( void );
 void AI_BeforeLevelLevelScriptShutdown( void );
