@@ -119,7 +119,7 @@ public:
 
 		uint16_t touchedJumppadEntNum;
 		uint16_t touchedTeleporterEntNum;
-		uint16_t touchedPlatformEntNum;
+		uint16_t touchedElevatorTriggerEntNum;
 
 		bool hasJumped: 1;
 		bool hasDoubleJumped: 1;
@@ -140,7 +140,7 @@ public:
 			hasTakenFallDamage = false;
 			touchedJumppadEntNum = 0;
 			touchedTeleporterEntNum = 0;
-			touchedPlatformEntNum = 0;
+			touchedElevatorTriggerEntNum = 0;
 		}
 	};
 
@@ -148,7 +148,7 @@ public:
 
 	int m_jumppadPathTriggerNum { 0 };
 	int m_teleporterPathTriggerNum { 0 };
-	int m_platformPathTriggerNum { 0 };
+	int m_elevatorPathTriggerNum { 0 };
 
 	// ClassifiedEntitiesCache stores parameters of all entities on the map for respective classes.
 	// Assume that we won't move more than some limit of units during prediction.
@@ -161,7 +161,8 @@ public:
 	// A: It's still useful for other bots (that have a different origin) and for various other calculations.
 	wsw::StaticVector<uint16_t, 12> m_teleporterEntNumsToUseDuringPrediction;
 	wsw::StaticVector<uint16_t, 12> m_jumppadEntNumsToUseDuringPrediction;
-	wsw::StaticVector<uint16_t, 12> m_platformTriggerEntNumsToUseDuringPrediction;
+	wsw::StaticVector<uint16_t, 12> m_elevatorTriggerEntNumsToUseDuringPrediction;
+	wsw::StaticVector<uint16_t, 12> m_elevatorMovingEntNumsToUseDuringPrediction;
 	wsw::StaticVector<uint16_t, 32> m_otherTriggerEntNumsToUseDuringPrediction;
 
 	//class BaseAction *SuggestSuitableAction();

@@ -40,7 +40,7 @@ ClassifiedEntitiesCache::ClassifiedEntitiesCache() {
 					add( &m_allTeleporters, ent->s.number );
 					m_persistentEntitiesMask.set( (size_t)i );
 				} else if( !Q_stricmp( classname, "trigger_platform" ) ) {
-					add( &m_allPlatformTriggers, ent->s.number );
+					add( &m_allElevatorTriggers, ent->s.number );
 					m_persistentEntitiesMask.set( (size_t)i );
 				}
 			}

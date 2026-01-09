@@ -132,12 +132,12 @@ auto BaseAction::checkPredictionStepResults( PredictionContext *context ) -> Pre
 		}
 	}
 	if( this->m_stopPredictionOnTouchingPlatform ) {
-		if( const uint16_t touchedPlatformNum = context->frameEvents.touchedPlatformEntNum ) {
-			if( touchedPlatformNum == context->m_platformPathTriggerNum ) {
-				Debug( "A prediction step has lead to touching the platform, should stop planning\n" );
+		if( const uint16_t touchedTriggerNum = context->frameEvents.touchedElevatorTriggerEntNum ) {
+			if( touchedTriggerNum == context->m_elevatorPathTriggerNum ) {
+				Debug( "A prediction step has lead to touching the elevator trigger, should stop planning\n" );
 				return PredictionResult::Complete;
 			} else {
-				Debug( "A prediction step has lead to touching a (wrong) platform, rolling back\n" );
+				Debug( "A prediction step has lead to touching a (wrong) elevator trigger, rolling back\n" );
 				return PredictionResult::Restart;
 			}
 		}

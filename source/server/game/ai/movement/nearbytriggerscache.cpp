@@ -12,11 +12,11 @@ NearbyTriggersCache::NearbyTriggersCache() {
 
 	triggerNumEnts[0] = &numJumppadEnts;
 	triggerNumEnts[1] = &numTeleportEnts;
-	triggerNumEnts[2] = &numPlatformTriggerEnts;
+	triggerNumEnts[2] = &numElevatorTriggerEnts;
 
 	triggerEntNums[0] = &jumppadEntNums[0];
 	triggerEntNums[1] = &teleportEntNums[0];
-	triggerEntNums[2] = &platformTriggerEntNums[0];
+	triggerEntNums[2] = &elevatorTriggerEntNums[0];
 }
 
 auto NearbyTriggersCache::clipToRegion( std::span<const uint16_t> entNums, uint16_t *dest, size_t destSize ) -> unsigned {
@@ -64,29 +64,10 @@ void NearbyTriggersCache::ensureValidForBounds( const float *__restrict absMins,
 	VectorAdd( absMins, lastComputedForMins, lastComputedForMins );
 	VectorAdd( absMaxs, lastComputedForMaxs, lastComputedForMaxs );
 
-	numTeleportEnts = clipToRegion( context->m_teleporterEntNumsToUseDuringPrediction, teleportEntNums, kMaxClassEnts );
-	numJumppadEnts  = clipToRegion( context->m_jumppadEntNumsToUseDuringPrediction, jumppadEntNums, kMaxClassEnts );
-	numOtherEnts    = clipToRegion( context->m_otherTriggerEntNumsToUseDuringPrediction, otherEntNums, kMaxOtherEnts );
-
-	numPlatformSolidEnts   = 0;
-	numPlatformTriggerEnts = 0;
-
-	// Note: This iterated span includes triggers that are outside the region if their solid body is within it
-	for( const uint16_t triggerEntNum: context->m_platformTriggerEntNumsToUseDuringPrediction ) {
-		const auto *__restrict trigger = game.edicts + triggerEntNum;
-		if( numPlatformTriggerEnts < std::size( platformTriggerEntNums ) ) [[likely]] {
-			if( GClip_EntityContact( lastComputedForMins, lastComputedForMaxs, trigger ) ) {
-				platformTriggerEntNums[numPlatformTriggerEnts++] = triggerEntNum;
-			}
-		}
-		if( numPlatformSolidEnts < std::size( platformSolidEntNums ) ) [[likely]] {
-			const auto *__restrict platform = trigger->enemy;
-			assert( platform && platform->use == Use_Plat );
-			if( GClip_EntityContact( lastComputedForMins, lastComputedForMaxs, platform ) ) {
-				platformSolidEntNums[numPlatformSolidEnts++] = platform->s.number;
-			}
-		}
-	}
+	numTeleportEnts        = clipToRegion( context->m_teleporterEntNumsToUseDuringPrediction, teleportEntNums, kMaxClassEnts );
+	numJumppadEnts         = clipToRegion( context->m_jumppadEntNumsToUseDuringPrediction, jumppadEntNums, kMaxClassEnts );
+	numElevatorTriggerEnts = clipToRegion( context->m_elevatorTriggerEntNumsToUseDuringPrediction, elevatorTriggerEntNums, kMaxClassEnts );
+	numOtherEnts           = clipToRegion( context->m_otherTriggerEntNumsToUseDuringPrediction, otherEntNums, kMaxOtherEnts );
 }
 
 }

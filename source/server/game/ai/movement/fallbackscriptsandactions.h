@@ -33,6 +33,8 @@ public:
 	[[nodiscard]]
 	auto checkPredictionStepResults( PredictionContext *context ) -> PredictionResult override;
 
+	[[nodiscard]]
+	auto getTargetPoint() const -> const Vec3 & { return m_targetPoint; }
 	void setTargetPoint( const Vec3 &targetPoint ) { m_targetPoint = targetPoint; }
 	void setAllowToReachThePointInAir( bool allow ) { m_allowToReachThePointInAir = true; }
 	void setWalkProximityThreshold( float distance ) { m_walkProximityThreshold = distance; }
@@ -287,6 +289,50 @@ private:
 	int m_triggerEntNum { 0 };
 	int m_targetReachNum { 0 };
 	int m_lastGoodLandingAreaNum { 0 };
+};
+
+class ElevatorScript : public SwitchingActionsForStateScript {
+public:
+	explicit ElevatorScript( MovementSubsystem *movementSubsystem )
+		: SwitchingActionsForStateScript( movementSubsystem )
+		, m_walkToPointAction( movementSubsystem )
+		, m_landOnPointAction( movementSubsystem ) {
+		m_timeoutAt = std::numeric_limits<int64_t>::max();
+	}
+
+	[[nodiscard]]
+	bool produceBotInput( BotInput *input ) override;
+
+	void setTarget( int triggerEntNum, int reachNum ) {
+		assert( triggerEntNum > 0 );
+		assert( reachNum >= 0 );
+		m_triggerEntNum       = triggerEntNum;
+		m_targetReachNum      = reachNum;
+		m_lastGoodExitAreaNum = -1;
+		m_lastGoodExitOrigin.Set( 0, 0, 0 );
+	}
+private:
+	[[nodiscard]]
+	bool reuseCachedPathForLastGoodResult( BotInput *input, BaseAction *appropriateAction );
+
+	[[nodiscard]]
+	bool setupExitPlatformMovement( BotInput *input, const edict_s *platformEntity, const AiEntityPhysicsState & );
+	[[nodiscard]]
+	bool setupRidePlatformMovement( BotInput *input, const edict_s *platformEntity, const AiEntityPhysicsState & );
+
+	[[nodiscard]]
+	bool tryMovingToArea( BaseAction *appropriateAction, int areaNum, BotInput *input );
+	[[nodiscard]]
+	bool tryMovingToAreas( BaseAction *appropriateAction, std::span<const uint16_t> areasToTest,
+						   std::span<int> areasToSkip, BotInput *input );
+
+	WalkToPointAction m_walkToPointAction;
+	LandOnPointAction m_landOnPointAction;
+
+	int m_triggerEntNum { 0 };
+	int m_targetReachNum { 0 };
+	int m_lastGoodExitAreaNum { 0 };
+	Vec3 m_lastGoodExitOrigin { 0, 0, 0 };
 };
 
 #endif

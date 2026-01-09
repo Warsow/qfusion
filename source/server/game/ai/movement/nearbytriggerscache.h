@@ -15,8 +15,7 @@ struct NearbyTriggersCache {
 
 	unsigned numJumppadEnts { 0 };
 	unsigned numTeleportEnts { 0 };
-	unsigned numPlatformTriggerEnts { 0 };
-	unsigned numPlatformSolidEnts { 0 };
+	unsigned numElevatorTriggerEnts { 0 };
 	unsigned numOtherEnts { 0 };
 
 	static constexpr const size_t kMaxClassEnts { 8 };
@@ -24,7 +23,7 @@ struct NearbyTriggersCache {
 
 	uint16_t jumppadEntNums[kMaxClassEnts];
 	uint16_t teleportEntNums[kMaxClassEnts];
-	uint16_t platformTriggerEntNums[kMaxClassEnts];
+	uint16_t elevatorTriggerEntNums[kMaxClassEnts];
 	uint16_t platformSolidEntNums[kMaxClassEnts];
 	uint16_t otherEntNums[kMaxOtherEnts];
 

@@ -82,6 +82,7 @@ class MovementSubsystem {
 	friend class MovementScript;
 	friend class WalkToPointAction;
 	friend class WalkToPointScript;
+	friend class ElevatorScript;
 	friend class JumppadScript;
 	friend class BunnyToBestFloorClusterPointAction;
 	friend class PredictingAndCachingMovementScript;
@@ -143,6 +144,7 @@ class MovementSubsystem {
 	MovementScript *testedScript { nullptr };
 
 	JumppadScript jumppadScript { this };
+	ElevatorScript elevatorScript { this };
 	BunnyHopScript bunnyHopScript { this };
 	WalkToPointScript walkToPointScript { this };
 	TraverseJumpReachScript traverseJumpReachScript { this };
@@ -154,6 +156,9 @@ class MovementSubsystem {
 
 	[[nodiscard]]
 	bool produceBotInput( MovementScript *script, BotInput *input );
+
+	[[nodiscard]]
+	auto findDirectReachNumForTravelType( int aasTravelType ) -> int;
 public:
 	explicit MovementSubsystem( Bot *bot_ );
 
@@ -196,6 +201,7 @@ public:
 	}
 
 	void ActivateJumppadState( const edict_t *jumppadEnt );
+	void ActivateElevatorState( const edict_t *triggerEnt );
 
 	bool CanChangeWeapons() const;
 
