@@ -46,11 +46,12 @@ static auto findElevatorEntNumForReach( int reachNum ) -> int {
 	const auto &reach          = aasWorld->getReaches()[reachNum];
 	assert( reach.traveltype == TRAVEL_ELEVATOR );
 
-	for( const auto entNum: wsw::ai::ClassifiedEntitiesCache::instance()->getAllPersistentMapPlatformTriggers() ) {
+	for( const auto entNum: wsw::ai::ClassifiedEntitiesCache::instance()->getAllPersistentMapElevatorTriggers() ) {
 		const auto *const trigger = gameEnts + entNum;
 		if( const auto *platform = trigger->enemy ) [[likely]] {
+			assert( platform->use == Use_Plat );
 			// BSPC be_aas_reach.c: "the facenum is the model number"
-			if( (int)platform->s.modelindex == (int)reach.edgenum ) {
+			if( (int)platform->s.modelindex == (int)reach.facenum ) {
 				return entNum;
 			}
 		}
@@ -79,17 +80,30 @@ auto TriggerAasPropsCache::getTriggerEntNumForElevatorReach( int reachNum ) cons
 	return getTriggerEntNumForReach( reachNum, &m_triggerEntNumsForElevatorReach );
 }
 
-auto TriggerAasPropsCache::getJumppadTargetAreas( int entNum ) const -> std::span<const uint16_t> {
-	if( auto it = m_jummpadTargetAreas.find( entNum ); it != m_jummpadTargetAreas.end() ) {
+[[nodiscard]]
+static auto getListOfAreasForEntity( int entNum, const std::unordered_map<int, wsw::PodVector<uint16_t>> &areasForEntity )
+	-> std::span<const uint16_t> {
+	if( auto it = areasForEntity.find( entNum ); it != areasForEntity.end() ) {
 		return it->second;
 	}
 	return {};
+}
+
+auto TriggerAasPropsCache::getJumppadTargetAreas( int entNum ) const -> std::span<const uint16_t> {
+	return getListOfAreasForEntity( entNum, m_jumppadTargetAreas );
+}
+
+auto TriggerAasPropsCache::getElevatorTargetAreas( int entNum ) const -> std::span<const uint16_t> {
+	return getListOfAreasForEntity( entNum, m_elevatorTargetAreas );
 }
 
 void TriggerAasPropsCache::reload() {
 	m_triggerEntNumsForTeleportReach.clear();
 	m_triggerEntNumsForJumppadReach.clear();
 	m_triggerEntNumsForElevatorReach.clear();
+
+	m_jumppadTargetAreas.clear();
+	m_elevatorTargetAreas.clear();
 
 	const auto *const aasWorld = AiAasWorld::instance();
 	// TODO: zipWithIndex
@@ -102,21 +116,29 @@ void TriggerAasPropsCache::reload() {
 		} else if( reach.traveltype == TRAVEL_JUMPPAD ) {
 			if( const int entNum = findJumppadEntNumForReach( reachNum ) ) {
 				m_triggerEntNumsForJumppadReach.insert( { reachNum, entNum } );
-				m_jummpadTargetAreas[entNum].append( reach.areanum );
+				m_jumppadTargetAreas[entNum].append( reach.areanum );
 			}
 		} else if( reach.traveltype == TRAVEL_ELEVATOR ) {
 			if( const int entNum = findElevatorEntNumForReach( reachNum ) ) {
 				m_triggerEntNumsForElevatorReach.insert( { reachNum, entNum } );
+				m_elevatorTargetAreas[entNum].append( reach.areanum );
 			}
 		}
 	}
 
-	for( const int entNum: wsw::ai::ClassifiedEntitiesCache::instance()->getAllPersistentMapJumppads() ) {
-		const auto *ent = game.edicts + entNum;
-		if( !m_jummpadTargetAreas.contains( entNum ) ) {
-			aiWarning() << "Failed to find jumppad target areas for" << wsw::StringView( ent->classname ) << "at" <<
+	const std::pair<std::span<const uint16_t>, decltype( m_jumppadTargetAreas ) *> entNumsAndTargetAreas[] {
+		{ wsw::ai::ClassifiedEntitiesCache::instance()->getAllPersistentMapJumppads(), &m_jumppadTargetAreas },
+		{ wsw::ai::ClassifiedEntitiesCache::instance()->getAllPersistentMapElevatorTriggers(), &m_elevatorTargetAreas },
+	};
+
+	for( const auto &[entNums, entTargetAreas] : entNumsAndTargetAreas ) {
+		for( const int entNum: entNums ) {
+			const auto *ent = game.edicts + entNum;
+			if( !entTargetAreas->contains( entNum ) ) {
+				aiWarning() << "Failed to find target areas for" << wsw::StringView( ent->classname ) << "at" <<
 				"mins" << ent->r.absmin[0] << ent->r.absmin[1] << ent->r.absmin[2] <<
 				"maxs" << ent->r.absmax[0] << ent->r.absmax[1] << ent->r.absmax[2];
+			}
 		}
 	}
 }

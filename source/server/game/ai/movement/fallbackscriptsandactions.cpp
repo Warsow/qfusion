@@ -933,3 +933,243 @@ bool JumppadScript::setupRestartTriggerMovement( BotInput *input, const AiEntity
 	input->canOverrideUcmd  = true;
 	return true;
 }
+
+bool ElevatorScript::produceBotInput( BotInput *input ) {
+	const auto &entityPhysicsState = m_subsystem->getMovementState().entityPhysicsState;
+	const edict_t *platformEntity  = nullptr;
+	if( const auto *groundEntity = entityPhysicsState.GroundEntity() ) {
+		if( groundEntity->use == Use_Plat ) {
+			platformEntity = groundEntity;
+		}
+	} else {
+		trace_t trace;
+		// TODO: Limit trace bounds
+		Vec3 traceEnd( Vec3( 0, 0, -99999 ) + entityPhysicsState.Origin() );
+		G_Trace( &trace, entityPhysicsState.Origin(), nullptr, nullptr, traceEnd.Data(),
+				 game.edicts + m_subsystem->bot->EntNum(), MASK_SOLID );
+		if( trace.fraction != 1.0f && !trace.allsolid && !trace.startsolid ) {
+			const edict_t *entity = game.edicts + trace.ent;
+			if( entity->use == Use_Plat ) {
+				platformEntity = entity;
+			}
+		}
+	}
+	if( !platformEntity ) {
+		return false;
+	}
+	if( platformEntity->moveinfo.state == STATE_TOP ) {
+		return setupExitPlatformMovement( input, platformEntity, entityPhysicsState );
+	} else {
+		return setupRidePlatformMovement( input, platformEntity, entityPhysicsState );
+	}
+}
+
+bool ElevatorScript::setupExitPlatformMovement( BotInput *input, const edict_t *platformEntity,
+												const AiEntityPhysicsState &entityPhysicsState ) {
+	BaseAction *appropriateAction;
+	if( entityPhysicsState.GroundEntity() ) {
+		assert( entityPhysicsState.GroundEntity() == platformEntity );
+		appropriateAction = &m_walkToPointAction;
+	} else {
+		appropriateAction = &m_landOnPointAction;
+	}
+
+	const auto *const aasWorld = AiAasWorld::instance();
+	if( m_targetReachNum > 0 ) {
+		const auto &targetReach = aasWorld->getReaches()[m_targetReachNum];
+		// Prefer the target area even if we've failed
+		if( m_lastGoodExitAreaNum == targetReach.areanum ) {
+			if( reuseCachedPathForLastGoodResult( input, appropriateAction ) ) {
+				return true;
+			}
+		}
+		if( tryMovingToArea( appropriateAction, targetReach.areanum, input ) ) {
+			return true;
+		}
+		wsw::StaticVector<int, 2> areasToSkip;
+		areasToSkip.push_back( targetReach.areanum );
+		if( m_lastGoodExitAreaNum > 0 && m_lastGoodExitAreaNum != targetReach.areanum ) {
+			if( tryMovingToArea( appropriateAction, m_lastGoodExitAreaNum, input ) ) {
+				return true;
+			}
+			areasToSkip.push_back( m_lastGoodExitAreaNum );
+		}
+		std::span<const uint16_t> areasToTest = ::triggerAasPropsCache.getElevatorTargetAreas( m_triggerEntNum );
+		if( tryMovingToAreas( appropriateAction, areasToTest, areasToSkip, input ) ) {
+			return true;
+		}
+		if( entityPhysicsState.GroundEntity() ) {
+			const Vec3 reachEnd( targetReach.end );
+			m_predictedMovementActions.clear();
+			selectActiveAction( &m_walkToPointAction );
+			m_walkToPointAction.setTargetPoint( reachEnd );
+			if( PredictingAndCachingMovementScript::produceBotInput( input ) ) {
+				m_lastGoodExitAreaNum = -1;
+				m_lastGoodExitOrigin  = reachEnd;
+				return true;
+			}
+			Vec3 viewOrigin( entityPhysicsState.Origin() );
+			viewOrigin.Z() += playerbox_stand_viewheight;
+			Vec3 intendedLookDir( reachEnd - viewOrigin );
+			if( intendedLookDir.normalizeFast() ) {
+				input->SetIntendedLookDir( intendedLookDir, true );
+				input->isUcmdSet = true;
+				if( intendedLookDir.Dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
+					input->SetForwardMovement( 1 );
+				}
+				return true;
+			}
+			return false;
+		} else {
+			// Try landing
+			input->SetIntendedLookDir( Vec3( 0, 0, -1 ), true );
+			input->isUcmdSet          = true;
+			input->canOverrideLookVec = true;
+			input->canOverridePitch   = true;
+			return true;
+		}
+	} else {
+		if( reuseCachedPathForLastGoodResult( input, appropriateAction ) ) {
+			return true;
+		}
+		wsw::StaticVector<int, 1> areasToSkip;
+		if( m_lastGoodExitAreaNum > 0 ) {
+			if( tryMovingToArea( appropriateAction, m_lastGoodExitAreaNum, input ) ) {
+				return true;
+			}
+			areasToSkip.push_back( m_lastGoodExitAreaNum );
+		}
+		std::span<const uint16_t> areasToTest = ::triggerAasPropsCache.getElevatorTargetAreas( m_triggerEntNum );
+		if( tryMovingToAreas( appropriateAction, areasToTest, areasToSkip, input ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool ElevatorScript::setupRidePlatformMovement( BotInput *input, const edict_t *platformEntity,
+												const AiEntityPhysicsState &entityPhysicsState ) {
+	if( entityPhysicsState.GroundEntity() ) {
+		assert( entityPhysicsState.GroundEntity() == platformEntity );
+		if( platformEntity->moveinfo.state == STATE_BOTTOM ) {
+			const Vec3 botMins( Vec3( playerbox_stand_mins ) + entityPhysicsState.Origin() );
+			const Vec3 botMaxs( Vec3( playerbox_stand_maxs ) + entityPhysicsState.Origin() );
+			const edict_t *const triggerEntity = platformEntity->enemy;
+			assert( triggerEntity == game.edicts + m_triggerEntNum );
+			if( !GClip_EntityContact( botMins.Data(), botMaxs.Data(), triggerEntity ) ) {
+				// TODO: Account for kept in fov point
+				Vec3 viewOrigin( entityPhysicsState.Origin() );
+				viewOrigin.Z() += playerbox_stand_viewheight;
+				Vec3 triggerOrigin( 0.5f * ( Vec3( triggerEntity->r.absmin ) + Vec3( triggerEntity->r.absmax ) ) );
+				Vec3 intendedLookDir( triggerOrigin - viewOrigin );
+				if( intendedLookDir.normalizeFast() ) {
+					input->SetIntendedLookDir( intendedLookDir, true );
+					if( intendedLookDir.Dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
+						input->SetForwardMovement( true );
+					} else {
+						input->SetTurnSpeedMultiplier( 3.0f );
+					}
+					input->isUcmdSet = true;
+				} else {
+					aiWarning() << "Failed to normalize the dir to the target trigger";
+				}
+			}
+		}
+		if( !input->isLookDirSet ) {
+			input->SetIntendedLookDir( Vec3( 0, 0, 1 ), true );
+			input->isUcmdSet          = true;
+			input->canOverrideLookVec = true;
+			input->canOverridePitch   = true;
+		}
+	} else {
+		Vec3 viewOrigin( entityPhysicsState.Origin() );
+		viewOrigin.Z() += playerbox_stand_viewheight;
+		if( const std::optional<Vec3> maybeKeptInFovPoint = m_subsystem->bot->GetKeptInFovPoint() ) {
+			Vec3 intendedLookDir( *maybeKeptInFovPoint - viewOrigin );
+			if( intendedLookDir.normalizeFast() ) {
+				input->SetIntendedLookDir( intendedLookDir, true );
+			}
+		}
+		if( !input->isLookDirSet && m_targetReachNum > 0 ) {
+			Vec3 intendedLookDir( Vec3( AiAasWorld::instance()->getReaches()[m_targetReachNum].end ) - viewOrigin );
+			if( intendedLookDir.normalizeFast() ) {
+				input->SetIntendedLookDir( intendedLookDir, true );
+			}
+		}
+		if( !input->isLookDirSet ) {
+			input->SetIntendedLookDir( Vec3( 0, 0, -1 ), true );
+		}
+		input->isUcmdSet          = true;
+		input->canOverrideLookVec = true;
+		input->canOverridePitch   = true;
+	}
+
+	return true;
+}
+
+// TODO: Split it into two subroutines?
+bool ElevatorScript::reuseCachedPathForLastGoodResult( BotInput *input, BaseAction *appropriateAction ) {
+	assert( appropriateAction == &m_walkToPointAction || appropriateAction == &m_landOnPointAction );
+	if( !m_predictedMovementActions.empty() ) {
+		if( m_predictedMovementActions.front().action == appropriateAction ) {
+			if( appropriateAction == &m_landOnPointAction ) {
+				if( m_lastGoodExitAreaNum == m_landOnPointAction.getTargetAreaNum() ) {
+					MovementActionRecord record {};
+					if( getCachedActionAndRecordForCurrTime( &record ) ) {
+						m_landOnPointAction.execActionRecord( &record, input );
+						return true;
+					}
+				}
+			} else {
+				// If we have been using this origin
+				// TODO: Handle land->walk transitions
+				if( m_lastGoodExitOrigin == m_walkToPointAction.getTargetPoint() ) {
+					MovementActionRecord record {};
+					if( getCachedActionAndRecordForCurrTime( &record ) ) {
+						m_walkToPointAction.execActionRecord( &record, input );
+						return true;
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
+
+bool ElevatorScript::tryMovingToArea( BaseAction *appropriateAction, int areaNum, BotInput *input ) {
+	assert( appropriateAction == &m_walkToPointAction || appropriateAction == &m_landOnPointAction );
+	m_predictedMovementActions.clear();
+	selectActiveAction( appropriateAction );
+	const auto &area = AiAasWorld::instance()->getAreas()[areaNum];
+	Vec3 targetPoint( area.center[0], area.center[1], area.mins[2] + 32.0f );
+	if( appropriateAction == &m_walkToPointAction ) {
+		m_walkToPointAction.setTargetPoint( targetPoint );
+		if( PredictingAndCachingMovementScript::produceBotInput( input ) ) {
+			m_lastGoodExitAreaNum = areaNum;
+			m_lastGoodExitOrigin  = targetPoint;
+			return true;
+		}
+	} else {
+		m_landOnPointAction.setTarget( targetPoint, areaNum );
+		if( PredictingAndCachingMovementScript::produceBotInput( input ) ) {
+			m_lastGoodExitAreaNum = areaNum;
+			// TODO: std::optional?
+			m_lastGoodExitOrigin  = Vec3( 0, 0, 0 );
+			return true;
+		}
+	}
+	return false;
+}
+
+bool ElevatorScript::tryMovingToAreas( BaseAction *appropriateAction, std::span<const uint16_t> areasToTest,
+									   std::span<int> areasToSkip, BotInput *input ) {
+	for( const int areaNum: areasToTest ) {
+		if( !wsw::contains( areasToSkip, areaNum ) ) [[likely]] {
+			if( tryMovingToArea( appropriateAction, areaNum, input ) ) {
+				return true;
+			}
+		}
+	}
+	return false;
+}

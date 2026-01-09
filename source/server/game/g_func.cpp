@@ -341,7 +341,7 @@ static void Touch_Plat_Center( edict_t *ent, edict_t *other, cplane_t *plane, in
 	}
 }
 
-static void plat_spawn_inside_trigger( edict_t *ent ) {
+static edict_t *plat_spawn_inside_trigger( edict_t *ent ) {
 	edict_t *trigger;
 	vec3_t tmin, tmax;
 
@@ -383,6 +383,8 @@ static void plat_spawn_inside_trigger( edict_t *ent ) {
 	VectorCopy( tmax, trigger->r.maxs );
 
 	GClip_LinkEntity( trigger );
+
+	return trigger;
 }
 
 
@@ -448,7 +450,7 @@ void SP_func_plat( edict_t *ent ) {
 
 	ent->use = Use_Plat;
 
-	plat_spawn_inside_trigger( ent ); // the "start moving" trigger
+	ent->enemy = plat_spawn_inside_trigger( ent ); // the "start moving" trigger
 
 	if( ent->targetname ) {
 		ent->moveinfo.state = STATE_UP;

@@ -29,7 +29,7 @@ bool MovementSubsystem::CanChangeWeapons() const {
 	return !limiter.TryAcquire( levelTime + 384 );
 }
 
-void MovementSubsystem::ActivateJumppadState( const edict_t *jumppadEnt ) {
+auto MovementSubsystem::findDirectReachNumForTravelType( int aasTravelType ) -> int {
 	int targetReachNum = 0;
 	if( const int navTargetAreaNum = bot->NavTargetAasAreaNum() ) {
 		int startAreaNums[2] { 0, 0 };
@@ -41,7 +41,7 @@ void MovementSubsystem::ActivateJumppadState( const edict_t *jumppadEnt ) {
 		for( int i = 0; i < numStartAreas; ++i ) {
 			if( const int travelTime = bot->RouteCache()->FindRoute( startAreaNums[i], navTargetAreaNum,
 																	 bot->TravelFlags(), &reachNum ) ) {
-				if( AiAasWorld::instance()->getReaches()[reachNum].traveltype == TRAVEL_JUMPPAD ) {
+				if( AiAasWorld::instance()->getReaches()[reachNum].traveltype == aasTravelType ) {
 					if( bestTravelTime > travelTime ) {
 						bestTravelTime = travelTime;
 						targetReachNum = reachNum;
@@ -50,9 +50,19 @@ void MovementSubsystem::ActivateJumppadState( const edict_t *jumppadEnt ) {
 			}
 		}
 	}
-	aiNotice() << "Target reach num" << targetReachNum;
-	jumppadScript.setTarget( ENTNUM( jumppadEnt ), targetReachNum );
+	return targetReachNum;
+}
+
+void MovementSubsystem::ActivateJumppadState( const edict_t *jumppadEnt ) {
+	jumppadScript.setTarget( ENTNUM( jumppadEnt ), findDirectReachNumForTravelType( TRAVEL_JUMPPAD ) );
 	activeScript = &jumppadScript;
+}
+
+void MovementSubsystem::ActivateElevatorState( const edict_t *triggerEnt ) {
+	if( activeScript != &elevatorScript ) {
+		jumppadScript.setTarget( ENTNUM( triggerEnt ), findDirectReachNumForTravelType( TRAVEL_ELEVATOR ) );
+		activeScript = &jumppadScript;
+	}
 }
 
 bool MovementSubsystem::CanInterruptMovement() const {
@@ -79,6 +89,15 @@ void MovementSubsystem::Frame( BotInput *input ) {
 	if( activeScript ) {
 		if( activeScript->getTimeoutAt() <= level.time ) {
 			activeScript = nullptr;
+		}
+	}
+
+	if( const auto *groundEntity = movementState.entityPhysicsState.GroundEntity() ) {
+		if( groundEntity->use == Use_Plat ) {
+			if( activeScript != &elevatorScript ) {
+				activeScript = &elevatorScript;
+				elevatorScript.setTarget( ENTNUM( groundEntity->enemy ), findDirectReachNumForTravelType( TRAVEL_ELEVATOR ) );
+			}
 		}
 	}
 

@@ -146,8 +146,9 @@ void Bot::TouchedOtherEntity( const edict_t *entity ) {
 		return;
 	}
 
-	if( !Q_stricmp( entity->classname, "func_plat" ) ) {
+	if( !Q_stricmp( entity->classname, "trigger_platform" ) ) {
 		m_lastTouchedElevatorAt = level.time;
+		m_movementSubsystem.ActivateElevatorState( entity );
 		return;
 	}
 }

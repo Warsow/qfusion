@@ -62,25 +62,21 @@ static void Intercepted_Trace( trace_t *t, const vec3_t start, const vec3_t mins
 							   int ignore, int contentmask, int timeDelta ) {
 	// TODO: Check whether contentmask is compatible
 	SV_ClipToShapeList( pmoveShapeList, t, start, end, mins, maxs, contentmask );
-	if( !currPredictionContext->m_platformTriggerEntNumsToUseDuringPrediction.empty() ) [[unlikely]] {
+	if( !currPredictionContext->m_elevatorMovingEntNumsToUseDuringPrediction.empty() ) [[unlikely]] {
 		if( t->fraction > 0.0f ) [[likely]] {
-			auto *const cache = &currPredictionContext->nearbyTriggersCache;
-			// Note: We don't expand actually checked bounds as it does some expansion on its own and mins/maxs are small
-			cache->ensureValidForBounds( start, end );
-			const float *clipMins = mins ? mins : vec3_origin;
-			const float *clipMaxs = maxs ? maxs : vec3_origin;
-			for( unsigned platformIndex = 0; platformIndex < cache->numPlatformSolidEnts; ++platformIndex ) {
-				const auto *const platform = game.edicts + cache->platformSolidEntNums[platformIndex];
-				if( ISBRUSHMODEL( platform->s.modelindex ) ) [[likely]] {
-					struct cmodel_s *cmodel = SV_InlineModel( (int)platform->s.modelindex );
-					trace_t t2;
-					SV_TransformedBoxTrace( &t2, start, end, clipMins, clipMaxs, cmodel, contentmask,
-												 platform->s.origin, platform->s.angles );
-					if( t2.fraction < t->fraction ) {
-						*t = t2;
-						if( t2.fraction == 0.0f ) {
-							break;
-						}
+			const float *const clipMins = mins ? mins : vec3_origin;
+			const float *const clipMaxs = maxs ? maxs : vec3_origin;
+			for( const auto platformEntNum: currPredictionContext->m_elevatorMovingEntNumsToUseDuringPrediction ) {
+				const auto *const platform = game.edicts + platformEntNum;
+				assert( ISBRUSHMODEL( platform->s.modelindex ) );
+				struct cmodel_s *cmodel = SV_InlineModel( (int)platform->s.modelindex );
+				trace_t t2;
+				SV_TransformedBoxTrace( &t2, start, end, clipMins, clipMaxs, cmodel, contentmask,
+										platform->s.origin, platform->s.angles );
+				if( t2.fraction < t->fraction ) {
+					*t = t2;
+					if( t2.fraction == 0.0f ) {
+						break;
 					}
 				}
 			}
@@ -158,10 +154,10 @@ void PredictionContext::OnInterceptedPMoveTouchTriggers( pmove_t *pm, vec3_t con
 		}
 	}
 
-	for( unsigned i = 0; i < nearbyTriggersCache.numPlatformTriggerEnts; ++i ) {
-		const uint16_t entNum = nearbyTriggersCache.platformTriggerEntNums[i];
+	for( unsigned i = 0; i < nearbyTriggersCache.numElevatorTriggerEnts; ++i ) {
+		const uint16_t entNum = nearbyTriggersCache.elevatorTriggerEntNums[i];
 		if( GClip_EntityContact( mins, maxs, gameEdicts + entNum ) ) {
-			frameEvents.touchedPlatformEntNum = entNum;
+			frameEvents.touchedElevatorTriggerEntNum = entNum;
 			break;
 		}
 	}
@@ -383,7 +379,7 @@ auto PredictionContext::NextPredictionStep( BaseAction *action, bool *hasStarted
 }
 
 void PredictionContext::SavePathTriggerNums() {
-	m_jumppadPathTriggerNum = m_teleporterPathTriggerNum = m_platformPathTriggerNum = 0;
+	m_jumppadPathTriggerNum = m_teleporterPathTriggerNum = m_elevatorPathTriggerNum = 0;
 
 	const int targetAreaNum = bot->NavTargetAasAreaNum();
 	if( !targetAreaNum ) {
@@ -399,15 +395,15 @@ void PredictionContext::SavePathTriggerNums() {
 	const auto *const classifiedEntitiesCache = wsw::ai::ClassifiedEntitiesCache::instance();
 
 	unsigned possibleTriggerBits = 0;
-	enum MetTriggerFlags : unsigned { Teleporter = 0x1, Jumppad = 0x2, Platform = 0x4 };
+	enum MetTriggerFlags : unsigned { Teleporter = 0x1, Jumppad = 0x2, Elevator = 0x4 };
 	if( !classifiedEntitiesCache->getAllPersistentMapTeleporters().empty() ) {
 		possibleTriggerBits |= Teleporter;
 	}
 	if( !classifiedEntitiesCache->getAllPersistentMapJumppads().empty() ) {
 		possibleTriggerBits |= Jumppad;
 	}
-	if( !classifiedEntitiesCache->getAllPersistentMapPlatformTriggers().empty() ) {
-		possibleTriggerBits |= Platform;
+	if( !classifiedEntitiesCache->getAllPersistentMapElevatorTriggers().empty() ) {
+		possibleTriggerBits |= Elevator;
 	}
 
 	if( !possibleTriggerBits ) {
@@ -446,8 +442,8 @@ void PredictionContext::SavePathTriggerNums() {
 			// Find a jumppad with the appropriate model
 		} else if( reach.traveltype == TRAVEL_ELEVATOR ) {
 			if( std::optional<int> maybeEntNum = triggerAasPropsCache.getTriggerEntNumForElevatorReach( reachNum ) ) {
-				m_platformPathTriggerNum = *maybeEntNum;
-				metTriggerBits |= Platform;
+				m_elevatorPathTriggerNum = *maybeEntNum;
+				metTriggerBits |= Elevator;
 			}
 		}
 
@@ -465,6 +461,8 @@ void PredictionContext::SavePathTriggerNums() {
 	}
 }
 
+static constexpr float kSaveEntNumsInRaduis = 768.0f;
+
 // TODO: Make a non-template wrapper for fixed vectors so we don't have to instantiate templates for different size
 template <unsigned N>
 static void collectNearbyTriggers( wsw::StaticVector<uint16_t, N> *__restrict dest,
@@ -476,7 +474,7 @@ static void collectNearbyTriggers( wsw::StaticVector<uint16_t, N> *__restrict de
 
 	for( const uint16_t entNum: entNums ) {
 		const edict_t *const trigger = gameEdicts + entNum;
-		if( BoundsAndSphereIntersect( trigger->r.absmin, trigger->r.absmax, botOrigin, 768.0f ) ) {
+		if( BoundsAndSphereIntersect( trigger->r.absmin, trigger->r.absmax, botOrigin, kSaveEntNumsInRaduis ) ) {
 			dest->push_back( entNum );
 			// TODO: Add an initial pass to select nearest/best in this case?
 			if( dest->full() ) [[unlikely]] {
@@ -494,25 +492,25 @@ void PredictionContext::SaveNearbyEntities() {
 	collectNearbyTriggers( &m_teleporterEntNumsToUseDuringPrediction, origin, cache->getAllPersistentMapTeleporters() );
 	collectNearbyTriggers( &m_otherTriggerEntNumsToUseDuringPrediction, origin, cache->getAllOtherTriggersInThisFrame() );
 
-	m_platformTriggerEntNumsToUseDuringPrediction.clear();
-	for( const uint16_t entNum: cache->getAllPersistentMapPlatformTriggers() ) {
-		bool shouldAddThisTrigger = false;
+	m_elevatorTriggerEntNumsToUseDuringPrediction.clear();
+	m_elevatorMovingEntNumsToUseDuringPrediction.clear();
+	for( const uint16_t entNum: cache->getAllPersistentMapElevatorTriggers() ) {
 		const edict_t *const trigger = game.edicts + entNum;
-		if( BoundsAndSphereIntersect( trigger->r.absmin, trigger->r.absmax, origin, 768.0f ) ) {
-			shouldAddThisTrigger = true;
-		} else {
-			const edict_t *platform = trigger->enemy;
-			assert( platform && platform->use == Use_Plat );
-			if( BoundsAndSphereIntersect( platform->r.absmin, platform->r.absmax, origin, 768.0f ) ) {
-				shouldAddThisTrigger = true;
+		if( BoundsAndSphereIntersect( trigger->r.absmin, trigger->r.absmax, origin, kSaveEntNumsInRaduis ) ) {
+			if( !m_elevatorTriggerEntNumsToUseDuringPrediction.full() ) [[likely]] {
+				m_elevatorTriggerEntNumsToUseDuringPrediction.push_back( entNum );
 			}
 		}
-		if( shouldAddThisTrigger ) {
-			m_platformTriggerEntNumsToUseDuringPrediction.push_back( entNum );
-			if( m_platformTriggerEntNumsToUseDuringPrediction.full() ) [[unlikely]] {
-				break;
+		const edict_t *const platform = trigger->enemy;
+		assert( platform && platform->use == Use_Plat );
+		if( BoundsAndSphereIntersect( platform->r.absmin, platform->r.absmax, origin, kSaveEntNumsInRaduis ) ) {
+			if( !m_elevatorMovingEntNumsToUseDuringPrediction.full() ) [[likely]] {
+				m_elevatorMovingEntNumsToUseDuringPrediction.push_back( ENTNUM( platform ) );
 			}
 		}
+		// Note: The overflow of both containers is possible but is very unlikely to happen,
+		// so we don't add extra code for early interruption of the loop.
+		// It's still correct in the mentioned case.
 	}
 
 	nearbyTriggersCache.context = this;

@@ -25,8 +25,10 @@ public:
 	auto getTriggerEntNumForElevatorReach( int reachNum ) const -> std::optional<int>;
 
 	auto getJumppadTargetAreas( int entNum ) const -> std::span<const uint16_t>;
+	auto getElevatorTargetAreas( int entNum ) const -> std::span<const uint16_t>;
 private:
-	mutable std::unordered_map<int, wsw::PodVector<const uint16_t>> m_jummpadTargetAreas;
+	mutable std::unordered_map<int, wsw::PodVector<uint16_t>> m_jumppadTargetAreas;
+	mutable std::unordered_map<int, wsw::PodVector<uint16_t>> m_elevatorTargetAreas;
 
 	mutable std::unordered_map<int, int> m_triggerEntNumsForJumppadReach;
 	mutable std::unordered_map<int, int> m_triggerEntNumsForTeleportReach;
