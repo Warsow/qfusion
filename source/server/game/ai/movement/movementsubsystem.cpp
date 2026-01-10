@@ -1,6 +1,7 @@
 #include "../bot.h"
 #include "movementsubsystem.h"
 #include "movementlocal.h"
+#include "triggeraaspropscache.h"
 #include <common/helpers/algorithm.h>
 #include <common/helpers/scopeexitaction.h>
 
@@ -29,44 +30,103 @@ bool MovementSubsystem::CanChangeWeapons() const {
 	return !limiter.TryAcquire( levelTime + 384 );
 }
 
-auto MovementSubsystem::findDirectReachNumForTravelType( int aasTravelType ) -> int {
-	int targetReachNum = 0;
+auto MovementSubsystem::findTriggerReachNumForScriptActivation( int entNum, int desiredTravelType,
+																const CachedLastNearbyTriggerReach &cached ) -> int {
+	if( cached.entNum == entNum && cached.reachNum > 0 && ( level.time - cached.touchedAt ) < 1000 ) {
+		return cached.reachNum;
+	}
+	// Try inspecting the direct reachability from the current area
+	// TODO: Should we update the cache?
+	return findNextReachNumForTravelType( desiredTravelType, 1 );
+}
+
+// Note: We don't put a distance limit because the limit on the distance to a reachability start
+// works unexpectedly for very large triggers (you're about to touch it and still are far from the reach start point).
+// The limit of hops is theoretically prone to a similar issue, but we have opted to use a sufficiently large value.
+auto MovementSubsystem::findNextReachNumForTravelType( int desiredTravelType, int hopLimit ) -> int {
+	assert( hopLimit >= 1 );
 	if( const int navTargetAreaNum = bot->NavTargetAasAreaNum() ) {
 		int startAreaNums[2] { 0, 0 };
 		const int numStartAreas = bot->EntityPhysicsState()->PrepareRoutingStartAreas( startAreaNums );
-		int reachNum       = 0;
-		int bestTravelTime = std::numeric_limits<int>::max();
+		for( int startAreaIndex = 0; startAreaIndex < numStartAreas; ++startAreaIndex ) {
+			if( startAreaIndex == navTargetAreaNum ) {
+				return 0;
+			}
+		}
+
+		int desiredReachNum = 0;
+		int genericReachNum = 0;
+
+		int bestDesiredReachTravelTime = std::numeric_limits<int>::max();
+		int bestGenericTravelTime      = std::numeric_limits<int>::max();
+
+		const auto aasReaches  = AiAasWorld::instance()->getReaches();
+		const auto *routeCache = bot->RouteCache();
+		const auto travelFlags = bot->TravelFlags();
+
 		// Note: We loop over areas instead of passing span of areas to the routing call
-		// as we're specifically interested in TRAVEL_JUMPPAD reachabilities
-		for( int i = 0; i < numStartAreas; ++i ) {
-			if( const int travelTime = bot->RouteCache()->FindRoute( startAreaNums[i], navTargetAreaNum,
-																	 bot->TravelFlags(), &reachNum ) ) {
-				if( AiAasWorld::instance()->getReaches()[reachNum].traveltype == aasTravelType ) {
-					if( bestTravelTime > travelTime ) {
-						bestTravelTime = travelTime;
-						targetReachNum = reachNum;
+		// as we're specifically interested in desiredTravelType reachabilities
+		for( int startAreaIndex = 0; startAreaIndex < numStartAreas; ++startAreaIndex ) {
+			int reachNum = 0;
+			if( const int travelTime = routeCache->FindRoute( startAreaNums[startAreaIndex], navTargetAreaNum,
+															  travelFlags, &reachNum ) ) {
+				if( aasReaches[reachNum].traveltype == desiredTravelType ) {
+					if( bestDesiredReachTravelTime > travelTime ) {
+						bestDesiredReachTravelTime = travelTime;
+						desiredReachNum            = reachNum;
+					}
+				} else {
+					if( bestGenericTravelTime > travelTime ) {
+						bestGenericTravelTime = travelTime;
+						genericReachNum       = reachNum;
 					}
 				}
 			}
 		}
+		if( desiredReachNum ) {
+			return desiredReachNum;
+		}
+		if( genericReachNum ) {
+			int fromAreaNum = aasReaches[genericReachNum].areanum;
+			for( int hopNum = 1; hopNum < hopLimit; ++hopNum ) {
+				// We've reached the nav target without using a reachability of the desired travel type
+				if( fromAreaNum == navTargetAreaNum ) {
+					return 0;
+				}
+				int reachNum = 0;
+				if( routeCache->FindRoute( fromAreaNum, navTargetAreaNum, travelFlags, &reachNum ) ) {
+					const auto &reach = aasReaches[reachNum];
+					if( reach.traveltype == desiredTravelType ) {
+						return reachNum;
+					}
+					fromAreaNum = reach.areanum;
+				} else {
+					return 0;
+				}
+			}
+		}
 	}
-	return targetReachNum;
+	return 0;
 }
 
 void MovementSubsystem::ActivateJumppadState( const edict_t *jumppadEnt ) {
-	jumppadScript.setTarget( ENTNUM( jumppadEnt ), findDirectReachNumForTravelType( TRAVEL_JUMPPAD ) );
+	const int entNum   = ENTNUM( jumppadEnt );
+	const int reachNum = findTriggerReachNumForScriptActivation( entNum, TRAVEL_JUMPPAD, lastNearbyJumppadReach );
+	jumppadScript.setTarget( entNum, reachNum );
 	activeScript = &jumppadScript;
 }
 
 void MovementSubsystem::ActivateElevatorState( const edict_t *triggerEnt ) {
 	if( activeScript != &elevatorScript ) {
-		jumppadScript.setTarget( ENTNUM( triggerEnt ), findDirectReachNumForTravelType( TRAVEL_ELEVATOR ) );
-		activeScript = &jumppadScript;
+		const int entNum   = ENTNUM( triggerEnt );
+		const int reachNum = findTriggerReachNumForScriptActivation( entNum, TRAVEL_ELEVATOR, lastNearbyElevatorReach );
+		elevatorScript.setTarget( entNum, reachNum );
+		activeScript = &elevatorScript;
 	}
 }
 
 bool MovementSubsystem::CanInterruptMovement() const {
-	if( activeScript == &jumppadScript ) {
+	if( activeScript == &jumppadScript || activeScript == &elevatorScript ) {
 		return false;
 	}
 	/*
@@ -85,7 +145,19 @@ bool MovementSubsystem::CanInterruptMovement() const {
 	return !( self->groundentity && self->groundentity->use == Use_Plat && self->groundentity->moveinfo.state != STATE_TOP );
 }
 
+
 void MovementSubsystem::Frame( BotInput *input ) {
+	if( const int reachNum = findNextReachNumForTravelType( TRAVEL_JUMPPAD, 24 ) ) {
+		lastNearbyJumppadReach.reachNum  = reachNum;
+		lastNearbyJumppadReach.touchedAt = level.time;
+		lastNearbyJumppadReach.entNum    = ::triggerAasPropsCache.getTriggerEntNumForJumppadReach( reachNum ).value_or( 0 );
+	}
+	if( const int reachNum = findNextReachNumForTravelType( TRAVEL_ELEVATOR, 24 ) ) {
+		lastNearbyElevatorReach.reachNum  = reachNum;
+		lastNearbyElevatorReach.touchedAt = level.time;
+		lastNearbyElevatorReach.entNum    = ::triggerAasPropsCache.getTriggerEntNumForElevatorReach( reachNum ).value_or( 0 );
+	}
+
 	if( activeScript ) {
 		if( activeScript->getTimeoutAt() <= level.time ) {
 			activeScript = nullptr;
@@ -96,7 +168,9 @@ void MovementSubsystem::Frame( BotInput *input ) {
 		if( groundEntity->use == Use_Plat ) {
 			if( activeScript != &elevatorScript ) {
 				activeScript = &elevatorScript;
-				elevatorScript.setTarget( ENTNUM( groundEntity->enemy ), findDirectReachNumForTravelType( TRAVEL_ELEVATOR ) );
+				const int entNum   = ENTNUM( groundEntity->enemy );
+				const int reachNum = findTriggerReachNumForScriptActivation( entNum, TRAVEL_ELEVATOR, lastNearbyElevatorReach );
+				elevatorScript.setTarget( entNum, reachNum );
 			}
 		}
 	}

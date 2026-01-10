@@ -151,6 +151,15 @@ class MovementSubsystem {
 	TraverseBarrierJumpReachScript traverseBarrierJumpReachScript { this };
 	TraverseWalkOffLedgeReachScript traverseWalkOffLedgeReachScript { this };
 
+	struct CachedLastNearbyTriggerReach {
+		int64_t touchedAt { 0 };
+		int reachNum { 0 };
+		int entNum { 0 };
+	};
+
+	CachedLastNearbyTriggerReach lastNearbyJumppadReach;
+	CachedLastNearbyTriggerReach lastNearbyElevatorReach;
+
 	[[nodiscard]]
 	auto findFallbackScript( BotInput *input ) -> MovementScript *;
 
@@ -158,7 +167,11 @@ class MovementSubsystem {
 	bool produceBotInput( MovementScript *script, BotInput *input );
 
 	[[nodiscard]]
-	auto findDirectReachNumForTravelType( int aasTravelType ) -> int;
+	auto findNextReachNumForTravelType( int desiredTravelType, int hopLimit ) -> int;
+
+	[[nodiscard]]
+	auto findTriggerReachNumForScriptActivation( int triggerEntNum, int desiredTravelType,
+												 const CachedLastNearbyTriggerReach &cached ) -> int;
 public:
 	explicit MovementSubsystem( Bot *bot_ );
 
@@ -207,6 +220,8 @@ public:
 
 	void Reset() {
 		ResetPendingLookAtPoint();
+		lastNearbyElevatorReach.entNum = 0;
+		lastNearbyJumppadReach.entNum  = 0;
 	}
 
 	bool CanInterruptMovement() const;
