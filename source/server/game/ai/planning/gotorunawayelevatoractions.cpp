@@ -86,7 +86,7 @@ PlannerNode *DoRunAwayViaElevatorAction::TryApply( const WorldState &worldState 
 	const Vec3 botOrigin       = worldState.getVec3( WorldState::BotOrigin ).value();
 	const Vec3 navTargetOrigin = worldState.getVec3( WorldState::NavTargetOrigin ).value();
 
-	if( botOrigin.FastDistanceTo( navTargetOrigin ) > GOAL_PICKUP_ACTION_RADIUS ) {
+	if( botOrigin.fastDistanceTo( navTargetOrigin ) > GOAL_PICKUP_ACTION_RADIUS ) {
 		Debug( "Bot is too far from the nav target (elevator origin)\n" );
 		return nullptr;
 	}
@@ -94,7 +94,7 @@ PlannerNode *DoRunAwayViaElevatorAction::TryApply( const WorldState &worldState 
 	const Vec3 &elevatorOrigin = navTargetOrigin;
 	unsigned selectedEnemyInstanceId = Self()->GetSelectedEnemy().value().InstanceId();
 
-	const float elevatorDistance = ( elevatorOrigin - *pendingOrigin ).LengthFast();
+	const float elevatorDistance = ( elevatorOrigin - *pendingOrigin ).fastLength();
 	// Assume that elevator speed is 400 units per second
 	const float speedInUnitsPerMillis = 400 / 1000.0f;
 	const float cost = elevatorDistance * Q_Rcp( speedInUnitsPerMillis );

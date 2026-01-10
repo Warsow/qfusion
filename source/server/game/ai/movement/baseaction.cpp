@@ -48,7 +48,7 @@ void BaseAction::execActionRecord( const MovementActionRecord *record, BotInput 
 	edict_t *const self = game.edicts + m_bot->EntNum();
 
 	if( record->hasModifiedVelocity ) {
-		record->ModifiedVelocity().CopyTo( self->velocity );
+		record->ModifiedVelocity().copyTo( self->velocity );
 	}
 
 	if( record->pendingWeapon != -1 ) {
@@ -208,7 +208,7 @@ void BaseAction::onApplicationSequenceStarted( PredictionContext *context ) {
 	Assert( m_sequenceStartFrameIndex == invalidValue );
 	m_sequenceEndFrameIndex   = invalidValue;
 	m_sequenceStartFrameIndex = context->topOfStackIndex;
-	m_originAtSequenceStart.Set( context->movementState->entityPhysicsState.Origin() );
+	m_originAtSequenceStart.set( context->movementState->entityPhysicsState.Origin() );
 	m_thisFrameCMShapeList = nullptr;
 }
 

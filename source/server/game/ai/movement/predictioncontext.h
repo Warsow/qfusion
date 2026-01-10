@@ -242,7 +242,7 @@ public:
 	void CheatingAccelerate( float frac );
 
 	void CheatingCorrectVelocity( const Vec3 &target ) {
-		CheatingCorrectVelocity( target.Data() );
+		CheatingCorrectVelocity( target.data() );
 	}
 
 	void CheatingCorrectVelocity( const vec3_t target );

@@ -19,11 +19,11 @@ static auto computeHash( const std::optional<T> *varsBegin, const std::optional<
 		if( const std::optional<T> &var = *varIt; var.has_value() ) {
 			if constexpr( std::is_same_v<T, Vec3> ) {
 				const Vec3 &varValue = *var;
-				result += bitsOf( varValue.X() );
+				result += bitsOf( varValue.x() );
 				result = result * 31;
-				result += bitsOf( varValue.Y() );
+				result += bitsOf( varValue.y() );
 				result = result * 31;
-				result += bitsOf( varValue.Z() );
+				result += bitsOf( varValue.z() );
 			} else {
 				static_assert( std::is_integral_v<T> || std::is_floating_point_v<T> );
 				result += bitsOf( *var );

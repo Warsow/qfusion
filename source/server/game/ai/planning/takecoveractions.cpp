@@ -20,7 +20,7 @@ PlannerNode *StartGotoCoverAction::TryApply( const WorldState &worldState ) {
 	}
 
 	const Vec3 botOrigin = worldState.getVec3( WorldState::BotOrigin ).value();
-	if( botOrigin.FastDistanceTo( Self()->Origin() ) > 1.0f ) {
+	if( botOrigin.fastDistanceTo( Self()->Origin() ) > 1.0f ) {
 		Debug( "This action is only applicable to the actual bot origin\n" );
 		return nullptr;
 	}
@@ -58,7 +58,7 @@ void TakeCoverActionRecord::Deactivate() {
 AiActionRecord::Status TakeCoverActionRecord::UpdateStatus( const WorldState &currWorldState ) {
 	static_assert( GOAL_PICKUP_ACTION_RADIUS > TACTICAL_SPOT_RADIUS );
 
-	float distanceToActionNavTarget = ( navSpot.Origin() - Self()->Origin() ).SquaredLength();
+	float distanceToActionNavTarget = ( navSpot.Origin() - Self()->Origin() ).squareLength();
 	if( distanceToActionNavTarget > GOAL_PICKUP_ACTION_RADIUS ) {
 		Debug( "Bot is too far from nav target\n" );
 		return INVALID;
@@ -78,12 +78,12 @@ PlannerNode *TakeCoverAction::TryApply( const WorldState &worldState ) {
 		return nullptr;
 	}
 
-	if( pendingOrigin->SquareDistanceTo( *navTargetOrigin ) > 1.0f ) {
+	if( pendingOrigin->squareDistanceTo( *navTargetOrigin ) > 1.0f ) {
 		return nullptr;
 	}
 
 	const Vec3 botOrigin = worldState.getVec3( WorldState::BotOrigin ).value();
-	if( botOrigin.SquareDistanceTo( *navTargetOrigin ) > TACTICAL_SPOT_RADIUS ) {
+	if( botOrigin.squareDistanceTo( *navTargetOrigin ) > TACTICAL_SPOT_RADIUS ) {
 		Debug( "Bot is too far from the nav target (pending cover spot)\n" );
 		return nullptr;
 	}

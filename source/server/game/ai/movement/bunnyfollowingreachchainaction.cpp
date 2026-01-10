@@ -98,14 +98,14 @@ auto BunnyFollowingReachChainAction::planPredictionStep( PredictionContext *cont
 
 	Vec3 lookVec( 0, 0, 0 );
 	if( chosenReachNum > 0 ) {
-		lookVec.Set( aasReaches[chosenReachNum].start );
-		lookVec.Z() += 32.0f;
+		lookVec.set( aasReaches[chosenReachNum].start );
+		lookVec.z() += 32.0f;
 		lookVec -= entityPhysicsState.Origin();
-		lookVec.Z() *= Z_NO_BEND_SCALE;
+		lookVec.z() *= Z_NO_BEND_SCALE;
 	} else {
 		const Vec3 navTargetOrigin( context->NavTargetOrigin() );
-		if( navTargetOrigin.SquareDistance2DTo( entityPhysicsState.Origin() ) > wsw::square( 8.0f ) ) {
-			navTargetOrigin.CopyTo( lookVec );
+		if( navTargetOrigin.squareDistance2DTo( entityPhysicsState.Origin() ) > wsw::square( 8.0f ) ) {
+			navTargetOrigin.copyTo( lookVec );
 			lookVec -= entityPhysicsState.Origin();
 		} else {
 			return PredictionResult::Abort;

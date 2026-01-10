@@ -33,7 +33,7 @@ AiActionRecord::Status PickupNavEntityActionRecord::UpdateStatus( const WorldSta
 	}
 
 	const Vec3 navEntityOrigin( m_selectedNavEntity.navEntity->Origin() );
-	if( navEntityOrigin.SquareDistanceTo( Self()->Origin() ) > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
+	if( navEntityOrigin.squareDistanceTo( Self()->Origin() ) > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
 		Debug( "The nav entity is too far from the bot to pickup it\n" );
 		return INVALID;
 	}
@@ -54,7 +54,7 @@ PlannerNode *PickupNavEntityAction::TryApply( const WorldState &worldState ) {
 	}
 
 	const Vec3 botOrigin = worldState.getVec3( WorldState::BotOrigin ).value();
-	if( navTargetOrigin->SquareDistanceTo( botOrigin ) > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
+	if( navTargetOrigin->squareDistanceTo( botOrigin ) > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
 		Debug( "Distance to goal item nav target is too large to pick up an item in the given world state\n" );
 		return nullptr;
 	}

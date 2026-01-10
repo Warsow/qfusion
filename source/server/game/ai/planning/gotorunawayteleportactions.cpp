@@ -51,7 +51,7 @@ PlannerNode *DoRunAwayViaTeleportAction::TryApply( const WorldState &worldState 
 	const Vec3 botOrigin = worldState.getVec3( WorldState::BotOrigin ).value();
 	const Vec3 navTargetOrigin = worldState.getVec3( WorldState::NavTargetOrigin ).value();
 
-	if( botOrigin.SquareDistanceTo( navTargetOrigin ) > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
+	if( botOrigin.squareDistanceTo( navTargetOrigin ) > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
 		Debug( "Bot is too far from the nav target (teleport origin)\n" );
 		return nullptr;
 	}
@@ -82,7 +82,7 @@ AiActionRecord::Status DoRunAwayViaTeleportActionRecord::UpdateStatus( const Wor
 
 	// Use the same radius as for goal items pickups
 	// (running actions for picking up an item and running away might be shared)
-	if( ( navSpot.Origin() - Self()->Origin() ).SquaredLength() > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
+	if( ( navSpot.Origin() - Self()->Origin() ).squareLength() > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
 		Debug( "Bot is too far from the teleport trigger\n" );
 		return INVALID;
 	}

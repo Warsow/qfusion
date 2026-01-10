@@ -47,7 +47,7 @@ public:
 	}
 
 	void SetModifiedVelocity( const Vec3 &velocity ) {
-		SetModifiedVelocity( velocity.Data() );
+		SetModifiedVelocity( velocity.data() );
 	}
 
 	void SetModifiedVelocity( const vec3_t velocity ) {

@@ -1124,14 +1124,14 @@ void addRotationToDir( float *dir, float coneAngleCosine, float angleAlongCone )
 void EffectsSystemFacade::spawnBulletImpactModel( unsigned delay, const float *origin, const float *normal ) {
 	Vec3 capturedOrigin( origin ), capturedNormal( normal );
 	cg.delayedExecutionSystem.post( delay, [=, this]() {
-		m_transientEffectsSystem.spawnBulletImpactModel( capturedOrigin.Data(), capturedNormal.Data() );
+		m_transientEffectsSystem.spawnBulletImpactModel( capturedOrigin.data(), capturedNormal.data() );
 	});
 }
 
 void EffectsSystemFacade::spawnPelletImpactModel( unsigned delay, const float *origin, const float *normal ) {
 	Vec3 capturedOrigin( origin ), capturedNormal( normal );
 	cg.delayedExecutionSystem.post( delay, [=, this]() {
-		m_transientEffectsSystem.spawnPelletImpactModel( capturedOrigin.Data(), capturedNormal.Data() );
+		m_transientEffectsSystem.spawnPelletImpactModel( capturedOrigin.data(), capturedNormal.data() );
 	});
 }
 
@@ -2658,15 +2658,15 @@ void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay,
 	assert( std::fabs( VectorLengthFast( impact.normal ) - 1.0f ) < 1e-2f );
 	if( impactSound ) {
 		Vec3 capturedSoundOrigin( Vec3( impact.origin ) + Vec3( impact.normal ) );
-		assert( !( CG_PointContents( capturedSoundOrigin.Data() ) & MASK_SOLID ) );
+		assert( !( CG_PointContents( capturedSoundOrigin.data() ) & MASK_SOLID ) );
 		const auto group = (uintptr_t)impactSound;
-		if( m_solidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), group, params ) ) {
+		if( m_solidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.data(), group, params ) ) {
 			startPreImpactBulletFlybySound( delay, capturedSoundOrigin );
 			cg.delayedExecutionSystem.post( delay, [=, this] {
-				startEffectSound( impactSound, capturedSoundOrigin.Data(), ATTN_STATIC, impactVolumeScale );
+				startEffectSound( impactSound, capturedSoundOrigin.data(), ATTN_STATIC, impactVolumeScale );
 				if( ricochetSound ) {
 					if( m_rng.tryWithChance( ricochetChance ) ) {
-						startEffectSound( ricochetSound, capturedSoundOrigin.Data(), ATTN_STATIC, ricochetVolumeScale );
+						startEffectSound( ricochetSound, capturedSoundOrigin.data(), ATTN_STATIC, ricochetVolumeScale );
 					}
 				}
 			});
@@ -2678,11 +2678,11 @@ void EffectsSystemFacade::startSoundForImpactUsingLimiter( unsigned delay, const
 														   const LiquidImpact &impact, const EventRateLimiterParams &params ) {
 	if( sound ) {
 		Vec3 capturedSoundOrigin( Vec3( impact.origin ) + Vec3( impact.burstDir ) );
-		assert( !( CG_PointContents( capturedSoundOrigin.Data() ) & MASK_SOLID ) );
-		if( m_liquidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.Data(), params ) ) {
+		assert( !( CG_PointContents( capturedSoundOrigin.data() ) & MASK_SOLID ) );
+		if( m_liquidImpactSoundsRateLimiter.acquirePermission( cg.time, capturedSoundOrigin.data(), params ) ) {
 			startPreImpactBulletFlybySound( delay, capturedSoundOrigin );
 			cg.delayedExecutionSystem.post( delay, [=, this]() {
-				startEffectSound( sound, capturedSoundOrigin.Data(), ATTN_STATIC, volumeScale );
+				startEffectSound( sound, capturedSoundOrigin.data(), ATTN_STATIC, volumeScale );
 			});
 		}
 	}
@@ -2694,7 +2694,7 @@ void EffectsSystemFacade::startPreImpactBulletFlybySound( unsigned delay, const 
 	if( delay > minVolumeDelay ) {
 		const float rcpDelayRange = Q_Rcp( (float)( fullVolumeDelay - minVolumeDelay ) );
 		const float volumeScale   = wsw::min( 1.0f, (float)( delay - minVolumeDelay ) * rcpDelayRange );
-		startEffectSound( cgs.media.sndBulletFlyby, origin.Data(), ATTN_STATIC, volumeScale );
+		startEffectSound( cgs.media.sndBulletFlyby, origin.data(), ATTN_STATIC, volumeScale );
 	}
 }
 

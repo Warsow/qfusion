@@ -66,11 +66,11 @@ void GrabItemGoal::UpdateWeight( const WorldState &currWorldState ) {
 	const Vec3 botOrigin( currWorldState.getVec3( WorldState::BotOrigin ).value() );
 
 	// LG range seems to be an appropriate threshold
-	if( botOrigin.SquareDistanceTo( navEntity->Origin() ) > wsw::square( kLasergunRange ) ) {
+	if( botOrigin.squareDistanceTo( navEntity->Origin() ) > wsw::square( kLasergunRange ) ) {
 		return;
 	}
 
-	if( !SV_InPVS( botOrigin.Data(), navEntity->Origin().Data() ) ) {
+	if( !SV_InPVS( botOrigin.data(), navEntity->Origin().data() ) ) {
 		return;
 	}
 
@@ -357,7 +357,7 @@ void ReactToEnemyLostGoal::ModifyWeightForTurningBack( const WorldState &currWor
 
 	const float offensiveness = Self()->GetEffectiveOffensiveness();
 	// We know a certain distance threshold that losing enemy out of sight can be very dangerous. This is LG range.
-	const float distanceToEnemy = enemyOrigin.FastDistanceTo( Self()->Origin() );
+	const float distanceToEnemy = enemyOrigin.fastDistanceTo( Self()->Origin() );
 	if( distanceToEnemy < kLasergunRange ) {
 		this->weight *= 1.75f + 3.0f * offensiveness;
 		return;
@@ -398,7 +398,7 @@ void ReactToEnemyLostGoal::ModifyWeightForPursuit( const WorldState &currWorldSt
 		distanceThreshold = 768.0f;
 	}
 
-	const float distanceToEnemy = enemyOrigin.FastDistanceTo( Self()->Origin() );
+	const float distanceToEnemy = enemyOrigin.fastDistanceTo( Self()->Origin() );
 	if( distanceToEnemy > distanceThreshold ) {
 		return;
 	}
@@ -482,7 +482,7 @@ void RoamGoal::UpdateWeight( const WorldState &currWorldState ) {
 
 bool RoamGoal::IsSatisfiedBy( const WorldState &worldState ) const {
 	if( const auto maybeBotOrigin = worldState.getVec3( WorldState::BotOrigin ) ) {
-		return Vec3( *maybeBotOrigin ).SquareDistanceTo( module->roamingManager.GetCachedRoamingSpot() ) < 1.0f;
+		return Vec3( *maybeBotOrigin ).squareDistanceTo( module->roamingManager.GetCachedRoamingSpot() ) < 1.0f;
 	}
 	return false;
 }

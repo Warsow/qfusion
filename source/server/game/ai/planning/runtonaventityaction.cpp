@@ -22,7 +22,7 @@ AiActionRecord::Status RunToNavEntityActionRecord::UpdateStatus( const WorldStat
 		return INVALID;
 	}
 
-	if( m_selectedNavEntity.navEntity->Origin().FastDistanceTo( Self()->Origin() ) <= GOAL_PICKUP_ACTION_RADIUS ) {
+	if( m_selectedNavEntity.navEntity->Origin().fastDistanceTo( Self()->Origin() ) <= GOAL_PICKUP_ACTION_RADIUS ) {
 		Debug( "Nav target pickup distance has been reached\n" );
 		return COMPLETED;
 	}
@@ -122,23 +122,23 @@ bool RunToNavEntityActionRecord::ShouldUseSneakyBehaviour( const WorldState &cur
 	AngleVectors( targetEnt->s.angles, targetLookDir, nullptr, nullptr );
 	Vec3 targetToBotDir( Q_RSqrt( squareDistanceToTarget ) * Vec3( botEnt->s.origin ) - targetEnt->s.origin );
 	// If the bot not in the center of the leader view
-	if( targetToBotDir.Dot( targetLookDir ) < 0.7f ) {
+	if( targetToBotDir.dot( targetLookDir ) < 0.7f ) {
 		return true;
 	}
 
 	// Check whether the bot looks approximately at the leader as well.
 	// This allows to behave realistically "understanding" a leader intent.
-	if( targetToBotDir.Dot( Self()->EntityPhysicsState()->ForwardDir() ) > 0.3f ) {
+	if( targetToBotDir.dot( Self()->EntityPhysicsState()->ForwardDir() ) > 0.3f ) {
 		return true;
 	}
 
 	trace_t trace;
 	Vec3 traceStart( Vec3( targetEnt->s.origin ) + Vec3( 0, 0, targetEnt->viewheight ) );
 	// Do an approximate test whether the bot is behind a wall or an obstacle
-	SolidWorldTrace( &trace, traceStart.Data(), botEnt->s.origin );
+	SolidWorldTrace( &trace, traceStart.data(), botEnt->s.origin );
 	if( trace.fraction != 1.0f ) {
 		Vec3 traceEnd( Vec3( botEnt->s.origin ) + Vec3( 0, 0, playerbox_stand_maxs[2] ) );
-		SolidWorldTrace( &trace, traceStart.Data(), traceEnd.Data() );
+		SolidWorldTrace( &trace, traceStart.data(), traceEnd.data() );
 		if( trace.fraction != 1.0f ) {
 			return false;
 		}
@@ -188,12 +188,12 @@ PlannerNode *RunToNavEntityAction::TryApply( const WorldState &worldState ) {
 	}
 
 	const Vec3 botOrigin = worldState.getVec3( WorldState::BotOrigin ).value();
-	if( botOrigin.FastDistanceTo( *navTargetOriginVar ) <= GOAL_PICKUP_ACTION_RADIUS ) {
+	if( botOrigin.fastDistanceTo( *navTargetOriginVar ) <= GOAL_PICKUP_ACTION_RADIUS ) {
 		Debug( "Distance to goal item nav target is too low in the given world state\n" );
 		return nullptr;
 	}
 
-	if( ( botOrigin - Self()->Origin() ).SquaredLength() > 1.0f ) {
+	if( ( botOrigin - Self()->Origin() ).squareLength() > 1.0f ) {
 		Debug( "Selected goal item is valid only for current bot origin\n" );
 		return nullptr;
 	}

@@ -306,15 +306,15 @@ void TrackedEffectsSystem::updateCurvedPolyTrail( const CurvedPolyTrailProps &__
 		float totalLength = 0.0f;
 		const unsigned maxSegmentNum = points->size() - 2;
 		for( unsigned segmentNum = 0; segmentNum <= maxSegmentNum; ++segmentNum ) {
-			const float *__restrict pt1 = ( *points )[segmentNum + 0].Data();
-			const float *__restrict pt2 = ( *points )[segmentNum + 1].Data();
+			const float *__restrict pt1 = ( *points )[segmentNum + 0].data();
+			const float *__restrict pt2 = ( *points )[segmentNum + 1].data();
 			totalLength += DistanceFast( pt1, pt2 );
 		}
 		if( totalLength > props.maxLength ) {
 			unsigned segmentNum = 0;
 			for(; segmentNum <= maxSegmentNum; ++segmentNum ) {
-				const float *__restrict pt1 = ( *points )[segmentNum + 0].Data();
-				const float *__restrict pt2 = ( *points )[segmentNum + 1].Data();
+				const float *__restrict pt1 = ( *points )[segmentNum + 0].data();
+				const float *__restrict pt2 = ( *points )[segmentNum + 1].data();
 				totalLength -= DistanceFast( pt1, pt2 );
 				if( totalLength <= props.maxLength ) {
 					break;
@@ -332,7 +332,7 @@ void TrackedEffectsSystem::updateCurvedPolyTrail( const CurvedPolyTrailProps &__
 
 	bool shouldAddPoint = true;
 	if( !points->empty() ) [[likely]] {
-		if( DistanceSquared( points->back().Data(), origin ) < wsw::square( props.minDistanceBetweenNodes ) ) {
+		if( DistanceSquared( points->back().data(), origin ) < wsw::square( props.minDistanceBetweenNodes ) ) {
 			shouldAddPoint = false;
 		} else {
 			if( points->full() ) {
@@ -1419,7 +1419,7 @@ void TrackedEffectsSystem::simulateFrame( int64_t currTime ) {
 				// Update the lingering trail as usual.
 				// Submit the last known position as the current one.
 				// This allows trails to shrink naturally.
-				updateCurvedPolyTrail( *trail->props, trail->points.back().Data(), currTime, &trail->points, &trail->timestamps );
+				updateCurvedPolyTrail( *trail->props, trail->points.back().data(), currTime, &trail->points, &trail->timestamps );
 				const float lingeringFrac = (float)lingeringTime * Q_Rcp( (float)lingeringLimit );
 				vec4_t fadingOutFromColor, fadingOutToColor;
 				copyWithAlphaScale( trail->props->fromColor, fadingOutFromColor, 1.0f - lingeringFrac );

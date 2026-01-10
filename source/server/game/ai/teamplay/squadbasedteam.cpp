@@ -625,7 +625,7 @@ bool AiSquad::ShouldNotDropItemsNow() const {
 		assert( enemy->IsValid() );
 
 		Vec3 enemyVelocityDir( enemy->LastSeenVelocity() );
-		float squareEnemySpeed = enemyVelocityDir.SquaredLength();
+		float squareEnemySpeed = enemyVelocityDir.squareLength();
 		if( squareEnemySpeed < 1 ) {
 			continue;
 		}
@@ -649,14 +649,14 @@ bool AiSquad::ShouldNotDropItemsNow() const {
 			continue;
 		}
 
-		float directionFactor = enemyToSquadCenterDir.Dot( enemyVelocityDir );
+		float directionFactor = enemyToSquadCenterDir.dot( enemyVelocityDir );
 		if( directionFactor < 0 ) {
-			if( BoundsAndSphereIntersect( mins, maxs, extrapolatedLastSeenPosition.Data(), 192.0f ) ) {
+			if( BoundsAndSphereIntersect( mins, maxs, extrapolatedLastSeenPosition.data(), 192.0f ) ) {
 				maybeStealers.push_back( MaybeStealer( enemy, extrapolatedLastSeenPosition ) );
 			}
 		} else {
 			float radius = 192.0f + extrapolationSeconds * enemySpeed * directionFactor;
-			if( BoundsAndSphereIntersect( mins, maxs, extrapolatedLastSeenPosition.Data(), radius ) ) {
+			if( BoundsAndSphereIntersect( mins, maxs, extrapolatedLastSeenPosition.data(), radius ) ) {
 				maybeStealers.push_back( MaybeStealer( enemy, extrapolatedLastSeenPosition ) );
 			}
 		}
@@ -677,7 +677,7 @@ bool AiSquad::ShouldNotDropItemsNow() const {
 				continue;
 			}
 
-			G_Trace( &trace, botEnt->s.origin, nullptr, nullptr, stealer.extrapolatedOrigin.Data(), botEnt, MASK_AISOLID );
+			G_Trace( &trace, botEnt->s.origin, nullptr, nullptr, stealer.extrapolatedOrigin.data(), botEnt, MASK_AISOLID );
 			if( trace.fraction == 1.0f || game.edicts + trace.ent == stealer.enemy->m_ent ) {
 				return true;
 			}
@@ -689,7 +689,7 @@ bool AiSquad::ShouldNotDropItemsNow() const {
 
 void AiSquad::FindSupplierCandidates( Bot *consumer, Bot **suppliersListHead ) const {
 	Vec3 botVelocityDir( consumer->Velocity() );
-	float squareBotSpeed = botVelocityDir.SquaredLength();
+	float squareBotSpeed = botVelocityDir.squareLength();
 
 	// If a bot moves fast, modify score for mates depending of the bot velocity direction
 	// (try to avoid stopping a fast-moving bot)
@@ -729,7 +729,7 @@ void AiSquad::FindSupplierCandidates( Bot *consumer, Bot **suppliersListHead ) c
 			Vec3 botToThatBot( bot->Origin() );
 			botToThatBot -= consumer->Origin();
 			if( botToThatBot.normalizeFast() ) {
-				score *= 0.5f + 0.5f * botToThatBot.Dot( botVelocityDir );
+				score *= 0.5f + 0.5f * botToThatBot.dot( botVelocityDir );
 			}
 		}
 		candidates.push_back( BotAndScore( bot, score ) );
@@ -1425,7 +1425,7 @@ void AiSquadBasedTeam::PlayerAssistanceTracker::UpdateInfluence() {
 
 			Vec3 toBotVec( bot->Origin() );
 			toBotVec -= ent->s.origin;
-			const float squareDistance = toBotVec.SquaredLength();
+			const float squareDistance = toBotVec.squareLength();
 			// Check whether the teammate is zooming
 			// Skip far bots unless a teammate tries to highlight the bot while zooming.
 			// (`squareDistanceThreshold` depends of zooming).
@@ -1434,7 +1434,7 @@ void AiSquadBasedTeam::PlayerAssistanceTracker::UpdateInfluence() {
 			}
 
 			// Check whether the teammate is looking at the bot
-			if( toBotVec.Dot( mateForwardDir ) * Q_RSqrt( squareDistance + 1.0f ) < dotThreshold ) {
+			if( toBotVec.dot( mateForwardDir ) * Q_RSqrt( squareDistance + 1.0f ) < dotThreshold ) {
 				continue;
 			}
 
@@ -1445,12 +1445,12 @@ void AiSquadBasedTeam::PlayerAssistanceTracker::UpdateInfluence() {
 			// TODO: Use raycast in a floor cluster for quick rejection?
 
 			Vec3 traceStart( ent->s.origin );
-			traceStart.Z() += ent->viewheight;
+			traceStart.z() += ent->viewheight;
 			Vec3 traceEnd( mateForwardDir );
 			traceEnd *= 99999.0f;
 			traceEnd += traceStart;
 
-			G_Trace( &trace, traceStart.Data(), nullptr, nullptr, traceEnd.Data(), ent, MASK_PLAYERSOLID );
+			G_Trace( &trace, traceStart.data(), nullptr, nullptr, traceEnd.data(), ent, MASK_PLAYERSOLID );
 			if( gameEdicts + trace.ent != botEnt ) {
 				continue;
 			}

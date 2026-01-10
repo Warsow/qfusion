@@ -55,8 +55,8 @@ EnemyComputationalProxy::EnemyComputationalProxy( const TrackedEnemy *enemy, flo
 	// Otherwise bot behaviour is pretty poor as they think every path is blocked.
 	float baseBlockingRadius = enemy->HasQuad() ? 384.0f : 40.0f;
 	squareBaseBlockingRadius = baseBlockingRadius * baseBlockingRadius;
-	enemy->LastSeenOrigin().CopyTo( origin );
-	enemy->LookDir().CopyTo( lookDir );
+	enemy->LastSeenOrigin().copyTo( origin );
+	enemy->LookDir().copyTo( lookDir );
 
 	int ownAreaNums[MAX_AREAS];
 	const int numOwnAreas = ComputeAreaNums( ownAreaNums );
@@ -399,7 +399,7 @@ bool EnemyComputationalProxy::CutOffForFlags( const aas_area_t &area, const floa
 	toAreaDir -= origin;
 
 	const float invDistance = Q_RSqrt( squareDistance );
-	const float dot = toAreaDir.Dot( lookDir ) * invDistance;
+	const float dot = toAreaDir.dot( lookDir ) * invDistance;
 	return !isZooming ? dot < 0.5f : dot < 0.8f;
 }
 
@@ -450,7 +450,7 @@ bool EnemyComputationalProxy::MayBlockGroundedArea( int areaNum, int hitFlagsMas
 		const float invDistance = Q_RSqrt( squareDistance );
 		Vec3 toAreaDir( area.center );
 		toAreaDir -= origin;
-		if( toAreaDir.Dot( lookDir ) * invDistance < 0.7f ) {
+		if( toAreaDir.dot( lookDir ) * invDistance < 0.7f ) {
 			return false;
 		}
 	}

@@ -29,11 +29,11 @@ auto BunnyTestingMultipleTurnsAction::planPredictionStep( PredictionContext *con
 		if( m_hasWalljumped && entityPhysicsState.Speed() > 1 ) {
 			Vec3 velocityDir( entityPhysicsState.Velocity() );
 			velocityDir *= 1.0f / entityPhysicsState.Speed();
-			velocityDir.CopyTo( lookDir );
+			velocityDir.copyTo( lookDir );
 		} else {
 			if( context->frameEvents.hasWalljumped ) {
 				// Keep rotating the look dir if a walljump happened at the very beginning of the path
-				if( m_originAtSequenceStart.SquareDistance2DTo( entityPhysicsState.Origin() ) > wsw::square( 32 ) ) {
+				if( m_originAtSequenceStart.squareDistance2DTo( entityPhysicsState.Origin() ) > wsw::square( 32 ) ) {
 					m_hasWalljumped = true;
 				}
 			}
@@ -57,15 +57,15 @@ auto BunnyTestingMultipleTurnsAction::planPredictionStep( PredictionContext *con
 			mat3_t m;
 			const float angle = ( sign * attemptAngularSpeed ) * timeLike;
 			Matrix3_Rotate( axis_identity, angle, 0.0f, 0.0f, 1.0f, m );
-			Matrix3_TransformVector( m, m_initialDir.Data(), lookDir );
+			Matrix3_TransformVector( m, m_initialDir.data(), lookDir );
 		}
 	} else {
 		Vec3 forwardDir( entityPhysicsState.ForwardDir() );
 		if( !m_attemptNum ) {
 			// Save the initial look dir for this bot and game frame
-			forwardDir.CopyTo( m_initialDir );
+			forwardDir.copyTo( m_initialDir );
 		}
-		forwardDir.CopyTo( lookDir );
+		forwardDir.copyTo( lookDir );
 	}
 
 	if( !setupBunnyHopping( Vec3( lookDir ), context ) ) {

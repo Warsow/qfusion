@@ -453,7 +453,7 @@ void BotItemsSelector::Debug( const char *format, ... ) {
 }
 
 bool BotItemsSelector::IsShortRangeReachable( const NavEntity *navEnt, const int *fromAreaNums, int numFromAreas ) const {
-	if( navEnt->Origin().SquareDistanceTo( bot->Origin() ) > 256.0f * 256.0f ) {
+	if( navEnt->Origin().squareDistanceTo( bot->Origin() ) > 256.0f * 256.0f ) {
 		return false;
 	}
 
@@ -468,10 +468,10 @@ bool BotItemsSelector::IsShortRangeReachable( const NavEntity *navEnt, const int
 	}
 
 	Vec3 viewOrigin( self->s.origin );
-	viewOrigin.Z() += self->viewheight;
+	viewOrigin.z() += self->viewheight;
 	trace_t trace;
 
-	SolidWorldTrace( &trace, viewOrigin.Data(), ent->s.origin );
+	SolidWorldTrace( &trace, viewOrigin.data(), ent->s.origin );
 	if( trace.fraction != 1.0f ) {
 		return false;
 	}

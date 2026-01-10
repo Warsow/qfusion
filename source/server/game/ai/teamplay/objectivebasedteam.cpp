@@ -628,7 +628,7 @@ bool AiObjectiveBasedTeam::DefenceSpot::IsVisibleForDefenders() {
 		Vec3 botToSpot( spotOrigin );
 		botToSpot -= bot->Origin();
 		// Don't normalize and use a dot product sign for a coarse test
-		if( bot->EntityPhysicsState()->ForwardDir().Dot( botToSpot ) < 0 ) {
+		if( bot->EntityPhysicsState()->ForwardDir().dot( botToSpot ) < 0 ) {
 			continue;
 		}
 
@@ -637,8 +637,8 @@ bool AiObjectiveBasedTeam::DefenceSpot::IsVisibleForDefenders() {
 		}
 
 		Vec3 viewOrigin( bot->Origin() );
-		viewOrigin.Z() += botEnt->viewheight;
-		G_Trace( &trace, viewOrigin.Data(), nullptr, nullptr, spotOrigin, ignore, MASK_AISOLID );
+		viewOrigin.z() += botEnt->viewheight;
+		G_Trace( &trace, viewOrigin.data(), nullptr, nullptr, spotOrigin, ignore, MASK_AISOLID );
 		if( trace.fraction != 1.0f ) {
 			continue;
 		}

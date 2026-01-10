@@ -40,7 +40,7 @@ bool KeptInFovPointTracker::isPointInPvs( const Vec3 &point ) const {
 	const Vec3 maxs( Vec3( +8, +8, +8 ) + point );
 
 	int leafNums[16], unused = 0;
-	const int numLeafs = SV_BoxLeafnums( mins.Data(), maxs.Data(), leafNums, (int)std::size( leafNums ), &unused );
+	const int numLeafs = SV_BoxLeafnums( mins.data(), maxs.data(), leafNums, (int)std::size( leafNums ), &unused );
 
 	const auto *const botEnt = game.edicts + m_bot->EntNum();
 	for( int botLeafIndex = 0; botLeafIndex < botEnt->r.num_clusters; ++botLeafIndex ) {
@@ -57,7 +57,7 @@ bool KeptInFovPointTracker::isPointInPvs( const Vec3 &point ) const {
 
 [[nodiscard]]
 static inline bool isWithinValidRange( const Vec3 &a, const Vec3 &b, float threshold ) {
-	const float squareDistance = a.SquareDistanceTo( b );
+	const float squareDistance = a.squareDistanceTo( b );
 	// Discard way too close points
 	return squareDistance < threshold * threshold && squareDistance > 32.0f * 32.0f;
 }

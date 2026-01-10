@@ -240,13 +240,13 @@ static int FindGoalAASArea( edict_t *ent ) {
 
 	Vec3 mins( ent->r.mins ), maxs( ent->r.maxs );
 	// Extend AABB XY dimensions
-	ExtendDimension( mins.Data(), maxs.Data(), 0 );
-	ExtendDimension( mins.Data(), maxs.Data(), 1 );
+	ExtendDimension( mins.data(), maxs.data(), 0 );
+	ExtendDimension( mins.data(), maxs.data(), 1 );
 	// Z needs special extension rules
-	float presentHeight = maxs.Z() - mins.Z();
+	float presentHeight = maxs.z() - mins.z();
 	float playerHeight = playerbox_stand_maxs[2] - playerbox_stand_mins[2];
 	if( playerHeight > presentHeight ) {
-		maxs.Z() += playerHeight - presentHeight;
+		maxs.z() += playerHeight - presentHeight;
 	}
 
 	// Find all areas in bounds

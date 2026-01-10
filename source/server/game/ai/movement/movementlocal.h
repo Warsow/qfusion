@@ -59,7 +59,7 @@ inline float PredictionContext::NavTargetRadius() const {
 
 inline bool PredictionContext::IsCloseToNavTarget() const {
 	float distance = NavTargetRadius() + 32.0f;
-	return NavTargetOrigin().SquareDistanceTo( movementState->entityPhysicsState.Origin() ) < distance * distance;
+	return NavTargetOrigin().squareDistanceTo( movementState->entityPhysicsState.Origin() ) < distance * distance;
 }
 
 inline int PredictionContext::CurrAasAreaNum() const {

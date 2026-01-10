@@ -39,13 +39,13 @@ bool BunnyToStairsOrRampExitAction::tryFindingAndSavingLookDir( PredictionContex
 		}
 
 		Debug( "Found a best exit area of an inclined floor area\n" );
-		m_lookDirStorage.Set( aasWorld->getAreas()[*exitAreaNum].center );
+		m_lookDirStorage.set( aasWorld->getAreas()[*exitAreaNum].center );
 		m_lookDirStorage -= context->movementState->entityPhysicsState.Origin();
 		if( !m_lookDirStorage.normalize() ) {
 			return false;
 		}
 
-		m_intendedLookDir = m_lookDirStorage.Data();
+		m_intendedLookDir = m_lookDirStorage.data();
 
 		trySavingExitFloorCluster( context, *exitAreaNum );
 		return true;
@@ -64,13 +64,13 @@ bool BunnyToStairsOrRampExitAction::tryFindingAndSavingLookDir( PredictionContex
 	}
 
 	Debug( "Found a best exit area of an stairs cluster\n" );
-	m_lookDirStorage.Set( aasWorld->getAreas()[*exitAreaNum].center );
+	m_lookDirStorage.set( aasWorld->getAreas()[*exitAreaNum].center );
 	m_lookDirStorage -= context->movementState->entityPhysicsState.Origin();
 	if( !m_lookDirStorage.normalize() ) {
 		return false;
 	}
 
-	m_intendedLookDir = m_lookDirStorage.Data();
+	m_intendedLookDir = m_lookDirStorage.data();
 
 	// Try find an area that is a boundary area of the exit area and is in a floor cluster
 	trySavingExitFloorCluster( context, *exitAreaNum );
@@ -127,7 +127,7 @@ auto BunnyToStairsOrRampExitAction::checkPredictionStepResults( PredictionContex
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	// Make sure we don't stop prediction at start.
 	// The distance threshold is low due to troublesome movement in these kinds of areas.
-	if( m_originAtSequenceStart.SquareDistance2DTo( entityPhysicsState.Origin() ) < wsw::square( 20 ) ) {
+	if( m_originAtSequenceStart.squareDistance2DTo( entityPhysicsState.Origin() ) < wsw::square( 20 ) ) {
 		return PredictionResult::Continue;
 	}
 

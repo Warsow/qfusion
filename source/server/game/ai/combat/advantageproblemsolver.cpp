@@ -77,12 +77,12 @@ void AdvantageProblemSolver::selectCandidateSpots( const SpotsQueryVector &spots
 			continue;
 		}
 
-		float squareDistanceToOrigin = DistanceSquared( origin.Data(), spot.origin );
+		float squareDistanceToOrigin = DistanceSquared( origin.data(), spot.origin );
 		if( squareDistanceToOrigin > searchRadius * searchRadius ) {
 			continue;
 		}
 
-		float squareDistanceToEntity = DistanceSquared( entityOrigin.Data(), spot.origin );
+		float squareDistanceToEntity = DistanceSquared( entityOrigin.data(), spot.origin );
 		if( squareDistanceToEntity < minSquareDistanceToEntity ) {
 			continue;
 		}
@@ -107,7 +107,7 @@ void AdvantageProblemSolver::pruneByVisTables( SpotsQueryVector &spotsFromQuery 
 	int keepVisibleAreaNum = 0;
 	Vec3 keepVisibleOrigin( problemParams.keepVisibleOrigin );
 	if( const auto *keepVisibleEntity = problemParams.keepVisibleEntity ) {
-		keepVisibleOrigin.Z() += 0.66f * keepVisibleEntity->r.maxs[2];
+		keepVisibleOrigin.z() += 0.66f * keepVisibleEntity->r.maxs[2];
 		if( const Bot *bot = keepVisibleEntity->bot ) {
 			int areaNums[2] { 0, 0 };
 			bot->EntityPhysicsState()->PrepareRoutingStartAreas( areaNums );
@@ -149,7 +149,7 @@ void AdvantageProblemSolver::checkOriginVisibility( SpotsAndScoreVector &candida
 	Vec3 keepVisibleOrigin( problemParams.keepVisibleOrigin );
 	if( keepVisibleEntity ) {
 		// Its a good idea to add some offset from the ground
-		keepVisibleOrigin.Z() += 0.66f * keepVisibleEntity->r.maxs[2];
+		keepVisibleOrigin.z() += 0.66f * keepVisibleEntity->r.maxs[2];
 	}
 
 	trace_t trace;
@@ -162,8 +162,8 @@ void AdvantageProblemSolver::checkOriginVisibility( SpotsAndScoreVector &candida
 		//.Spot origins are dropped to floor (only few units above)
 		// Check whether we can hit standing on this spot (having the gun at viewheight)
 		Vec3 from( spots[spotAndScore.spotNum].origin );
-		from.Z() += spotZOffset;
-		G_Trace( &trace, from.Data(), nullptr, nullptr, keepVisibleOrigin.Data(), passent, MASK_AISOLID );
+		from.z() += spotZOffset;
+		G_Trace( &trace, from.data(), nullptr, nullptr, keepVisibleOrigin.data(), passent, MASK_AISOLID );
 		if( trace.fraction != 1.0f && gameEdicts + trace.ent != keepVisibleEntity ) {
 			continue;
 		}
@@ -213,11 +213,11 @@ void AdvantageProblemSolver::applyVisAndOtherFactors( SpotsAndScoreVector &candi
 		// The maximum possible visibility score for a pair of spots is 255
 		float visFactor = Q_Sqrt( 0.001f + (float)visSum / ( candidateSpots.size() * 256.0f ) );
 
-		float originDistance = Q_Sqrt( 0.001f + origin.SquareDistanceTo( testedSpot.origin ) );
+		float originDistance = Q_Sqrt( 0.001f + origin.squareDistanceTo( testedSpot.origin ) );
 		// TODO: Refactor/inline that too
 		float originDistanceFactor = ComputeDistanceFactor( originDistance, originWeightFalloffDistanceRatio, searchRadius );
 
-		float entityDistance = Q_Sqrt( 0.001f + DistanceSquared( testedSpot.origin, entityOrigin.Data() ) );
+		float entityDistance = Q_Sqrt( 0.001f + DistanceSquared( testedSpot.origin, entityOrigin.data() ) );
 		entityDistance -= minSpotDistanceToEntity;
 		// TODO: Refactor/inline that too
 		float entityDistanceFactor = ComputeDistanceFactor( entityDistance,

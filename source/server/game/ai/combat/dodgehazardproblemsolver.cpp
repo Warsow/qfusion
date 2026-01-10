@@ -52,7 +52,7 @@ std::optional<Vec3> DodgeHazardProblemSolver::getVelocityDirForConformanceTests(
 	}
 
 	Vec3 velocityDir( ent->velocity );
-	const float squareSpeed = velocityDir.SquaredLength();
+	const float squareSpeed = velocityDir.squareLength();
 	const float runSpeed = GS_DefaultPlayerSpeed( *ggs );
 	if( squareSpeed < runSpeed * runSpeed ) {
 		return std::nullopt;
@@ -69,7 +69,7 @@ void DodgeHazardProblemSolver::modifyScoreByVelocityConformance( V &input, const
 		Vec3 toSpotDir = Vec3( ::SpotOriginOf( spotAndScoreLike ) ) - origin;
 		float velocityDotFactor;
 		if( toSpotDir.normalizeFast() ) {
-			velocityDotFactor = 0.5f * ( 1.0f + velocityDir.Dot( toSpotDir ) );
+			velocityDotFactor = 0.5f * ( 1.0f + velocityDir.dot( toSpotDir ) );
 		} else {
 			velocityDotFactor = 1.0f;
 		}
@@ -101,13 +101,13 @@ void DodgeHazardProblemSolver::selectCandidateSpots( const SpotsQueryVector &spo
 		}
 
 		Vec3 toSpotDir = Vec3( spot.origin ) - origin;
-		const float squareDistance = toSpotDir.SquaredLength();
+		const float squareDistance = toSpotDir.squareLength();
 		if( squareDistance < 1 ) {
 			continue;
 		}
 
 		toSpotDir *= Q_RSqrt( squareDistance );
-		const float dot = toSpotDir.Dot( dodgeDir );
+		const float dot = toSpotDir.dot( dodgeDir );
 		const float absDot = std::fabs( dot );
 		// We can do smarter tricks using std::signbit() & !mightNegateDodgeDir but this is not really a hot code path
 		if( ( mayNegateDodgeDir ? absDot : dot ) < 0.2f ) {
@@ -141,34 +141,34 @@ std::pair<Vec3, bool> DodgeHazardProblemSolver::makeDodgeHazardDir() const {
 		Vec3 result( 0, 0, 0 );
 		Vec3 originToHitDir = problemParams.hazardHitPoint - originParams.origin;
 		float degrees = originParams.originEntity ? -originParams.originEntity->s.angles[YAW] : -90;
-		RotatePointAroundVector( result.Data(), &axis_identity[AXIS_UP], originToHitDir.Data(), degrees );
+		RotatePointAroundVector( result.data(), &axis_identity[AXIS_UP], originToHitDir.data(), degrees );
 		if( !result.normalizeFast() ) {
 			result = Vec3( 1, 0, 0 );
 		}
-		if( std::fabs( result.X() ) < 0.3 ) {
-			result.X() = 0;
+		if( std::fabs( result.x() ) < 0.3 ) {
+			result.x() = 0;
 		}
-		if( std::fabs( result.Y() ) < 0.3 ) {
-			result.Y() = 0;
+		if( std::fabs( result.y() ) < 0.3 ) {
+			result.y() = 0;
 		}
-		result.Z() = 0;
-		result.X() *= -1.0f;
-		result.Y() *= -1.0f;
+		result.z() = 0;
+		result.x() *= -1.0f;
+		result.y() *= -1.0f;
 		return std::make_pair( result, false );
 	}
 
 	Vec3 selfToHitPoint = problemParams.hazardHitPoint - originParams.origin;
-	selfToHitPoint.Z() = 0;
+	selfToHitPoint.z() = 0;
 	// If bot is not hit in its center, try pick a direction that is opposite to a vector from bot center to hit point
 	if( selfToHitPoint.normalizeFast( { .minAcceptableLength = 4.0f } ) ) {
 		// Check whether this direction really helps to dodge the hazard
 		// (the less is the abs. value of the dot product, the closer is the chosen direction to a perpendicular one)
-		if( std::fabs( selfToHitPoint.Dot( originParams.origin ) ) < 0.5f ) {
-			if( std::fabs( selfToHitPoint.X() ) < 0.3f ) {
-				selfToHitPoint.X() = 0;
+		if( std::fabs( selfToHitPoint.dot( originParams.origin ) ) < 0.5f ) {
+			if( std::fabs( selfToHitPoint.x() ) < 0.3f ) {
+				selfToHitPoint.x() = 0;
 			}
-			if( std::fabs( selfToHitPoint.Y() ) < 0.3f ) {
-				selfToHitPoint.Y() = 0;
+			if( std::fabs( selfToHitPoint.y() ) < 0.3f ) {
+				selfToHitPoint.y() = 0;
 			}
 			return std::make_pair( -selfToHitPoint, false );
 		}
@@ -178,16 +178,16 @@ std::pair<Vec3, bool> DodgeHazardProblemSolver::makeDodgeHazardDir() const {
 	float maxCrossSqLen = 0.0f;
 	Vec3 result( 0, 0, 0 );
 	for( int i = 0; i < 3; ++i ) {
-		Vec3 cross = problemParams.hazardDirection.Cross( &axis_identity[i * 3] );
-		cross.Z() = 0;
-		float crossSqLen = cross.SquaredLength();
+		Vec3 cross = problemParams.hazardDirection.cross( &axis_identity[i * 3] );
+		cross.z() = 0;
+		float crossSqLen = cross.squareLength();
 		if( crossSqLen <= maxCrossSqLen ) {
 			continue;
 		}
 		maxCrossSqLen = crossSqLen;
 		float invLen = Q_RSqrt( crossSqLen );
-		result.X() = cross.X() * invLen;
-		result.Y() = cross.Y() * invLen;
+		result.x() = cross.x() * invLen;
+		result.y() = cross.y() * invLen;
 	}
 	return std::make_pair( result, true );
 }

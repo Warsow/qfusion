@@ -31,8 +31,8 @@ bool HazardsSelector::TryAddHazard( float damageScore,
 
 	if( Hazard *hazard = hazardsPool.New() ) {
 		hazard->damage = damageScore;
-		hazard->hitPoint.Set( hitPoint );
-		hazard->direction.Set( direction );
+		hazard->hitPoint.set( hitPoint );
+		hazard->direction.set( direction );
 		hazard->attacker = owner;
 		hazard->splashRadius = splashRadius;
 		if( primaryHazard ) {
@@ -111,13 +111,13 @@ public:
 	auto calcLineEquationParam( const edict_t *projectile ) -> float {
 		const float *origin = projectile->s.origin;
 
-		if( std::fabs( m_avgDirection.X() ) > 0.1f ) {
-			return ( origin[0] - m_lineEquationPoint.X() ) * Q_Rcp( m_avgDirection.X() );
+		if( std::fabs( m_avgDirection.x() ) > 0.1f ) {
+			return ( origin[0] - m_lineEquationPoint.x() ) * Q_Rcp( m_avgDirection.x() );
 		}
-		if( std::fabs( m_avgDirection.Y() ) > 0.1f ) {
-			return ( origin[1] - m_lineEquationPoint.Y() ) * Q_Rcp( m_avgDirection.Y() );
+		if( std::fabs( m_avgDirection.y() ) > 0.1f ) {
+			return ( origin[1] - m_lineEquationPoint.y() ) * Q_Rcp( m_avgDirection.y() );
 		}
-		return ( origin[2] - m_lineEquationPoint.Z() ) * Q_Rcp( m_avgDirection.Z() );
+		return ( origin[2] - m_lineEquationPoint.z() ) * Q_Rcp( m_avgDirection.z() );
 	}
 };
 
@@ -165,7 +165,7 @@ SameDirBeamsList::SameDirBeamsList( const edict_t *firstEntity, const edict_t *b
 	: m_avgDirection( firstEntity->velocity ), m_lineEquationPoint( firstEntity->s.origin ) {
 	if( m_avgDirection.normalizeFast() ) [[likely]] {
 		const Vec3 botToLinePoint = m_lineEquationPoint - bot->s.origin;
-		const float squaredDistToBeamLine = botToLinePoint.Cross( m_avgDirection ).SquaredLength();
+		const float squaredDistToBeamLine = botToLinePoint.cross( m_avgDirection ).squareLength();
 		if( squaredDistToBeamLine < wsw::square( 200.0f ) ) {
 			auto [projectilesBuffer, beamsBuffer] = parent->allocNextBuffers();
 			m_projectilesHeap = (EntAndLineParam *)projectilesBuffer;
@@ -184,7 +184,7 @@ SameDirBeamsList::SameDirBeamsList( const edict_t *firstEntity, const edict_t *b
 
 bool SameDirBeamsList::tryAddingProjectile( const edict_t *projectile ) {
 	if( Vec3 velocityDir( projectile->velocity ); velocityDir.normalizeFast() ) {
-		if( velocityDir.Dot( m_avgDirection ) > 0.995f ) {
+		if( velocityDir.dot( m_avgDirection ) > 0.995f ) {
 			// Just consume the projectile (it belongs to this spatial bin) but don't actually add
 			if( !m_isDiscarded ) {
 				// Update the average direction
@@ -293,15 +293,15 @@ void PlasmaBeamsBuilder::findMostHazardousBeams( HazardsSelector *hazardsSelecto
 			if( beam->m_startProjectile == beam->m_endProjectile ) {
 				const Vec3 botToBeam = beam->startOrigin() - botOrigin;
 				// If this projectile has entirely passed the bot and is flying away, skip it
-				if( botToBeam.Dot( beamsList.m_avgDirection ) > 0 ) {
+				if( botToBeam.dot( beamsList.m_avgDirection ) > 0 ) {
 					continue;
 				}
 			} else {
 				const Vec3 botToBeamStart = beam->startOrigin() - botOrigin;
 				const Vec3 botToBeamEnd   = beam->endOrigin() - botOrigin;
 
-				const float dotBotToStartWithDir = botToBeamStart.Dot( beamsList.m_avgDirection );
-				const float dotBotToEndWithDir   = botToBeamEnd.Dot( beamsList.m_avgDirection );
+				const float dotBotToStartWithDir = botToBeamStart.dot( beamsList.m_avgDirection );
+				const float dotBotToEndWithDir   = botToBeamEnd.dot( beamsList.m_avgDirection );
 
 				// If the aggregate beam has entirely passed the bot and is flying away, skip it
 				if( dotBotToStartWithDir > 0 && dotBotToEndWithDir > 0 ) {
@@ -319,7 +319,7 @@ void PlasmaBeamsBuilder::findMostHazardousBeams( HazardsSelector *hazardsSelecto
 			// which is extremely unlikely.
 			// TODO: Test against some kind of "fat" bot bounds
 			// TODO: Check line-to-bot distance, assuming hit point is past the bot with regard to line parameter
-			G_Trace( &trace, tracedBeamStart.Data(), nullptr, nullptr, tracedBeamEnd.Data(), nullptr, MASK_SHOT );
+			G_Trace( &trace, tracedBeamStart.data(), nullptr, nullptr, tracedBeamEnd.data(), nullptr, MASK_SHOT );
 			if( trace.fraction != 1.0f ) {
 				// Direct hit
 				if( m_bot == gameEnts + trace.ent ) {
@@ -328,7 +328,7 @@ void PlasmaBeamsBuilder::findMostHazardousBeams( HazardsSelector *hazardsSelecto
 					const edict_t *owner    = beam->m_ownerNum ? gameEnts + beam->m_ownerNum : nullptr;
 					if( damageScore > maxDamageScoreSoFar ) {
 						if( hazardsSelector->TryAddHazard( damageScore, trace.endpos,
-														   beamsList.m_avgDirection.Data(),
+														   beamsList.m_avgDirection.data(),
 														   owner, splashRadius ) ) {
 							maxDamageScoreSoFar = damageScore;
 						}
@@ -339,14 +339,14 @@ void PlasmaBeamsBuilder::findMostHazardousBeams( HazardsSelector *hazardsSelecto
 						// Check also the trace between the hit point and the bot.
 						// This still fails for pillar-like environment, but it's better than nothing.
 						const Vec3 hitPoint( Vec3( trace.endpos ) + trace.plane.normal );
-						G_Trace( &trace, botOrigin, nullptr, nullptr, hitPoint.Data(), m_bot, MASK_SHOT );
+						G_Trace( &trace, botOrigin, nullptr, nullptr, hitPoint.data(), m_bot, MASK_SHOT );
 						if( trace.fraction == 1.0f ) {
 							const float distanceFrac = hitToBotDistance * Q_Rcp( splashRadius );
 							const float damageScore  = beam->m_damage * ( 1.0f - distanceFrac );
 							const edict_t *owner     = beam->m_ownerNum ? gameEnts + beam->m_ownerNum : nullptr;
 							if( damageScore > maxDamageScoreSoFar ) {
 								if( hazardsSelector->TryAddHazard( damageScore, trace.endpos,
-																	beamsList.m_avgDirection.Data(),
+																	beamsList.m_avgDirection.data(),
 																	owner, splashRadius ) ) {
 									maxDamageScoreSoFar = damageScore;
 								}
@@ -381,7 +381,7 @@ void HazardsSelector::FindWaveHazards( const EntNumsVector &entNums ) {
 
 		// Compute a distance from wave linear movement line to bot
 		Vec3 lineDir( wave->velocity );
-		float squareSpeed = lineDir.SquaredLength();
+		float squareSpeed = lineDir.squareLength();
 		if( squareSpeed < 1 ) {
 			continue;
 		}
@@ -390,10 +390,10 @@ void HazardsSelector::FindWaveHazards( const EntNumsVector &entNums ) {
 		Vec3 botToLinePoint( wave->s.origin );
 		botToLinePoint -= self->s.origin;
 		Vec3 projection( lineDir );
-		projection *= botToLinePoint.Dot( lineDir );
+		projection *= botToLinePoint.dot( lineDir );
 		Vec3 perpendicular( botToLinePoint );
 		perpendicular -= projection;
-		const float squareDistance =  perpendicular.SquaredLength();
+		const float squareDistance =  perpendicular.squareLength();
 		if( squareDistance > hazardRadius * hazardRadius ) {
 			continue;
 		}
@@ -404,7 +404,7 @@ void HazardsSelector::FindWaveHazards( const EntNumsVector &entNums ) {
 		Vec3 traceEnd( lineDir );
 		traceEnd *= HazardsDetector::kWaveDetectionRadius * Q_Rcp( waveSpeed );
 		traceEnd += wave->s.origin;
-		G_Trace( &trace, wave->s.origin, nullptr, nullptr, traceEnd.Data(), wave, MASK_SHOT );
+		G_Trace( &trace, wave->s.origin, nullptr, nullptr, traceEnd.data(), wave, MASK_SHOT );
 		bool isDirectHit = false;
 		if( trace.fraction != 1.0f ) {
 			if( DistanceSquared( trace.endpos, self->s.origin ) > hazardRadius * hazardRadius ) {
@@ -423,9 +423,9 @@ void HazardsSelector::FindWaveHazards( const EntNumsVector &entNums ) {
 			hitPoint += self->s.origin;
 			Vec3 hitDir( perpendicular );
 			hitDir *= 1.0f / distance;
-			TryAddHazard( damageScore, hitPoint.Data(), hitDir.Data(), gameEdicts + wave->s.ownerNum, hazardRadius );
+			TryAddHazard( damageScore, hitPoint.data(), hitDir.data(), gameEdicts + wave->s.ownerNum, hazardRadius );
 		} else {
-			TryAddHazard( 3.0f * damage, trace.endpos, lineDir.Data(), gameEdicts + wave->s.ownerNum, hazardRadius );
+			TryAddHazard( 3.0f * damage, trace.endpos, lineDir.data(), gameEdicts + wave->s.ownerNum, hazardRadius );
 		}
 	}
 }
@@ -457,7 +457,7 @@ void HazardsSelector::FindLaserHazards( const EntNumsVector &entNums ) {
 
 		Vec3 direction( beam->s.origin2 );
 		direction -= beam->s.origin;
-		float squareLen = direction.SquaredLength();
+		float squareLen = direction.squareLength();
 		if( squareLen > 1 ) {
 			direction *= 1.0f / sqrtf( squareLen );
 		} else {
@@ -483,7 +483,7 @@ void HazardsSelector::FindLaserHazards( const EntNumsVector &entNums ) {
 		}
 
 		if( damageScore > maxDamageScore ) {
-			if( TryAddHazard( damageScore, trace.endpos, direction.Data(), owner, 0.0f ) ) {
+			if( TryAddHazard( damageScore, trace.endpos, direction.data(), owner, 0.0f ) ) {
 				maxDamageScore = damageScore;
 			}
 		}
@@ -499,7 +499,7 @@ void HazardsSelector::FindProjectileHazards( const EntNumsVector &entNums ) {
 	for( unsigned i = 0; i < entNums.size(); ++i ) {
 		edict_t *target = gameEdicts + entNums[i];
 		Vec3 end = Vec3( target->s.origin ) + 2.0f * Vec3( target->velocity );
-		G_Trace( &trace, target->s.origin, target->r.mins, target->r.maxs, end.Data(), target, MASK_AISOLID );
+		G_Trace( &trace, target->s.origin, target->r.mins, target->r.maxs, end.data(), target, MASK_AISOLID );
 		if( trace.fraction >= minPrjFraction ) {
 			continue;
 		}
@@ -518,13 +518,13 @@ void HazardsSelector::FindProjectileHazards( const EntNumsVector &entNums ) {
 
 		// Velocity may be zero for some projectiles (e.g. grenades)
 		Vec3 direction( target->velocity );
-		float squaredLen = direction.SquaredLength();
+		float squaredLen = direction.squareLength();
 		if( squaredLen > 0.1f ) {
 			direction *= 1.0f / sqrtf( squaredLen );
 		} else {
 			direction = Vec3( &axis_identity[AXIS_UP] );
 		}
-		if( TryAddHazard( damageScore, trace.endpos, direction.Data(),
+		if( TryAddHazard( damageScore, trace.endpos, direction.data(),
 						  gameEdicts + target->s.ownerNum,
 						  1.25f * target->projectileInfo.radius ) ) {
 			minDamageScore = damageScore;

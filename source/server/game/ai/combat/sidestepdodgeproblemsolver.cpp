@@ -8,33 +8,33 @@ bool SideStepDodgeProblemSolver::findSingle( vec_t *spotOrigin ) {
 	int testedAreaNum = -1;
 	if( auto originEntity = originParams.originEntity ) {
 		if( originEntity->groundentity ) {
-			tmpVec3.Set( originEntity->s.origin );
-			tmpVec3.Z() += originEntity->r.mins[2];
+			tmpVec3.set( originEntity->s.origin );
+			tmpVec3.z() += originEntity->r.mins[2];
 			droppedToFloorOrigin = &tmpVec3;
 		} else if( Bot *bot = originEntity->bot ) {
 			const auto &entityPhysicsState = bot->EntityPhysicsState();
 			if( entityPhysicsState->HeightOverGround() < 32.0f ) {
-				tmpVec3.Set( entityPhysicsState->Origin() );
-				tmpVec3.Z() += playerbox_stand_mins[2];
-				tmpVec3.Z() -= entityPhysicsState->HeightOverGround();
+				tmpVec3.set( entityPhysicsState->Origin() );
+				tmpVec3.z() += playerbox_stand_mins[2];
+				tmpVec3.z() -= entityPhysicsState->HeightOverGround();
 				droppedToFloorOrigin = &tmpVec3;
 			}
 		} else {
 			auto *ent = const_cast<edict_t *>( originEntity );
 			Vec3 end( originEntity->s.origin );
-			end.Z() += originEntity->r.mins[2] - 32.0f;
-			G_Trace( &trace, ent->s.origin, ent->r.mins, ent->r.maxs, end.Data(), ent, MASK_SOLID );
+			end.z() += originEntity->r.mins[2] - 32.0f;
+			G_Trace( &trace, ent->s.origin, ent->r.mins, ent->r.maxs, end.data(), ent, MASK_SOLID );
 			if( trace.fraction != 1.0f && ISWALKABLEPLANE( &trace.plane ) ) {
-				tmpVec3.Set( trace.endpos );
+				tmpVec3.set( trace.endpos );
 				droppedToFloorOrigin = &tmpVec3;
 			}
 		}
 	} else {
 		Vec3 end( originParams.origin );
-		end.Z() -= 48.0f;
-		G_Trace( &trace, const_cast<float *>( originParams.origin ), nullptr, nullptr, end.Data(), nullptr, MASK_SOLID );
+		end.z() -= 48.0f;
+		G_Trace( &trace, const_cast<float *>( originParams.origin ), nullptr, nullptr, end.data(), nullptr, MASK_SOLID );
 		if( trace.fraction != 1.0f && ISWALKABLEPLANE( &trace.plane ) ) {
-			tmpVec3.Set( trace.endpos );
+			tmpVec3.set( trace.endpos );
 			droppedToFloorOrigin = &tmpVec3;
 		}
 	}
@@ -69,11 +69,11 @@ bool SideStepDodgeProblemSolver::findSingle( vec_t *spotOrigin ) {
 
 	Vec3 testedOrigin( *droppedToFloorOrigin );
 	// Make sure the tested box will be at least few units above the ground
-	testedOrigin.Z() += ( -playerbox_stand_mins[2] ) + 3.0f;
+	testedOrigin.z() += ( -playerbox_stand_mins[2] ) + 3.0f;
 
 	Vec3 keepVisible2DDir( problemParams.keepVisibleOrigin );
 	keepVisible2DDir -= originParams.origin;
-	keepVisible2DDir.Z() = 0;
+	keepVisible2DDir.z() = 0;
 
 	const auto checkAgainstKeepVisibleOrigin = (bool)keepVisible2DDir.normalize();
 
@@ -108,9 +108,9 @@ bool SideStepDodgeProblemSolver::findSingle( vec_t *spotOrigin ) {
 
 			Vec3 vec( spot.origin );
 			vec -= originParams.origin;
-			vec.Z() = 0;
+			vec.z() = 0;
 
-			const float squareDistance = vec.SquaredLength();
+			const float squareDistance = vec.squareLength();
 			if( squareDistance < 32 * 32 ) {
 				continue;
 			}
@@ -122,7 +122,7 @@ bool SideStepDodgeProblemSolver::findSingle( vec_t *spotOrigin ) {
 
 			if( checkAgainstKeepVisibleOrigin ) {
 				// Check actual visibility of the origin specified in problem params
-				G_Trace( &trace, testedOrigin.Data(), nullptr, nullptr, problemParams.keepVisibleOrigin, ignore, MASK_SOLID );
+				G_Trace( &trace, testedOrigin.data(), nullptr, nullptr, problemParams.keepVisibleOrigin, ignore, MASK_SOLID );
 				if( trace.fraction != 1.0f || trace.startsolid ) {
 					continue;
 				}
@@ -135,7 +135,7 @@ bool SideStepDodgeProblemSolver::findSingle( vec_t *spotOrigin ) {
 			float score;
 			// Give side spots a greater score, but make sure the score is always positive for each spot
 			if( checkAgainstKeepVisibleOrigin ) {
-				score = ( 1.0f - fabsf( dir.Dot( keepVisible2DDir ) ) ) + 0.1f;
+				score = ( 1.0f - fabsf( dir.dot( keepVisible2DDir ) ) ) + 0.1f;
 			} else {
 				score = 1.0f;
 			}
@@ -143,18 +143,18 @@ bool SideStepDodgeProblemSolver::findSingle( vec_t *spotOrigin ) {
 			// Modulate score by distance (give nearby spots a priority too)
 			score *= 0.5f + 0.5f * ( 1.0f - ( distance / originParams.searchRadius ) );
 			// Modulate by velocity influence
-			score *= ( 1.0f - velocityInfluence ) + velocityInfluence * ( 1.0f + dir.Dot( velocityDir ) );
+			score *= ( 1.0f - velocityInfluence ) + velocityInfluence * ( 1.0f + dir.dot( velocityDir ) );
 			if( score <= bestScore ) {
 				continue;
 			}
 
 			bestScore = score;
-			vec.CopyTo( bestVec );
+			vec.copyTo( bestVec );
 		}
 
 		if( bestScore > 0 ) {
 			VectorCopy( bestVec, spotOrigin );
-			VectorAdd( spotOrigin, testedOrigin.Data(), spotOrigin );
+			VectorAdd( spotOrigin, testedOrigin.data(), spotOrigin );
 			return true;
 		}
 	}
@@ -172,11 +172,11 @@ bool SideStepDodgeProblemSolver::findSingle( vec_t *spotOrigin ) {
 				continue;
 			}
 
-			testedOrigin.X() = droppedToFloorOrigin->X() + i * dx;
-			testedOrigin.Y() = droppedToFloorOrigin->Y() + j * dy;
+			testedOrigin.x() = droppedToFloorOrigin->x() + i * dx;
+			testedOrigin.y() = droppedToFloorOrigin->y() + j * dy;
 
 			// Check actual visibility of the origin specified in problem params
-			G_Trace( &trace, testedOrigin.Data(), nullptr, nullptr, problemParams.keepVisibleOrigin, ignore, MASK_SOLID );
+			G_Trace( &trace, testedOrigin.data(), nullptr, nullptr, problemParams.keepVisibleOrigin, ignore, MASK_SOLID );
 			if( trace.fraction != 1.0f || trace.startsolid ) {
 				continue;
 			}
@@ -184,15 +184,15 @@ bool SideStepDodgeProblemSolver::findSingle( vec_t *spotOrigin ) {
 			const float *mins = playerbox_stand_mins;
 			const float *maxs = playerbox_stand_maxs;
 			// Test whether the box intersects solid
-			G_Trace( &trace, testedOrigin.Data(), mins, maxs, testedOrigin.Data(), ignore, MASK_SOLID );
+			G_Trace( &trace, testedOrigin.data(), mins, maxs, testedOrigin.data(), ignore, MASK_SOLID );
 			if( trace.fraction != 1.0f || trace.startsolid ) {
 				continue;
 			}
 
 			// Check ground below
 			Vec3 groundTraceEnd( testedOrigin );
-			groundTraceEnd.Z() -= 72.0f;
-			G_Trace( &trace, testedOrigin.Data(), nullptr, nullptr, groundTraceEnd.Data(), ignore, MASK_SOLID );
+			groundTraceEnd.z() -= 72.0f;
+			G_Trace( &trace, testedOrigin.data(), nullptr, nullptr, groundTraceEnd.data(), ignore, MASK_SOLID );
 			if( trace.fraction == 1.0f || trace.allsolid ) {
 				continue;
 			}
@@ -203,30 +203,30 @@ bool SideStepDodgeProblemSolver::findSingle( vec_t *spotOrigin ) {
 				continue;
 			}
 
-			Vec3 spot2DDir( testedOrigin.Data() );
+			Vec3 spot2DDir( testedOrigin.data() );
 			spot2DDir -= originParams.origin;
-			spot2DDir.Z() = 0;
+			spot2DDir.z() = 0;
 			if( !spot2DDir.normalize() ) {
 				continue;
 			}
 
 			// Give side spots a greater score, but make sure the score is always positive for each spot
-			float score = ( 1.0f - std::fabs( spot2DDir.Dot( keepVisible2DDir ) ) ) + 0.1f;
+			float score = ( 1.0f - std::fabs( spot2DDir.dot( keepVisible2DDir ) ) ) + 0.1f;
 			// Modulate by velocity influence
-			score *= ( 1.0f - velocityInfluence ) + velocityInfluence * ( 1.0f + spot2DDir.Dot( velocityDir ) );
+			score *= ( 1.0f - velocityInfluence ) + velocityInfluence * ( 1.0f + spot2DDir.dot( velocityDir ) );
 			if( score <= bestScore ) {
 				continue;
 			}
 
 			bestScore = score;
-			spot2DDir.CopyTo( bestDir );
+			spot2DDir.copyTo( bestDir );
 		}
 	}
 
 	if( bestScore > 0 ) {
 		VectorCopy( bestDir, spotOrigin );
 		VectorScale( spotOrigin, sqrtf( dx * dx + dy * dy ), spotOrigin );
-		VectorAdd( spotOrigin, testedOrigin.Data(), spotOrigin );
+		VectorAdd( spotOrigin, testedOrigin.data(), spotOrigin );
 		return true;
 	}
 

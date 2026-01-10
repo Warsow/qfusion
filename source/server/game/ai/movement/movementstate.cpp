@@ -23,7 +23,7 @@ void AiEntityPhysicsState::UpdateAreaNums() {
 		// TODO: We can replace this inefficient G_Trace() call
 		// by clipping against nearby solid entities which could be cached
 		trace_t trace;
-		G_Trace( &trace, this->origin, ent->r.mins, ent->r.maxs, traceEnd.Data(), ent, MASK_PLAYERSOLID );
+		G_Trace( &trace, this->origin, ent->r.mins, ent->r.maxs, traceEnd.data(), ent, MASK_PLAYERSOLID );
 		// Check not only whether there is a hit but test whether is it really a ground (and not a wall or obstacle)
 		if( ( trace.fraction != 1.0f ) && ( origin[2] - trace.endpos[2] ) > -playerbox_stand_mins[2] ) {
 			SetHeightOverGround( ( trace.fraction * GROUND_TRACE_DEPTH ) + playerbox_stand_mins[2] );
@@ -143,9 +143,9 @@ float AiEntityPhysicsState::GetGroundNormalZ() const {
 	trace_t trace;
 	auto *start = const_cast<float *>( Origin() );
 	Vec3 end( Origin() );
-	end.Z() -= 0.25f;
+	end.z() -= 0.25f;
 	edict_t *self = game.edicts + selfEntNum;
-	G_Trace( &trace, start, playerbox_stand_mins, playerbox_stand_maxs, end.Data(), self, MASK_PLAYERSOLID );
+	G_Trace( &trace, start, playerbox_stand_mins, playerbox_stand_maxs, end.data(), self, MASK_PLAYERSOLID );
 	if( trace.fraction != 1.0f ) {
 		groundNormalZ = (int16_t)( trace.plane.normal[2] / std::numeric_limits<int16_t>::max() );
 	}

@@ -640,16 +640,16 @@ void AiAasWorld::trySettingAreaRampFlags( int areaNum ) {
 		for( int j = -2; j <= 2; ++j ) {
 			Vec3 start( area.center );
 			Vec3 end( area.center );
-			start.X() += stepX * i;
-			start.Y() += stepY * j;
-			end.X() += stepX * i;
-			end.Y() += stepY * j;
+			start.x() += stepX * i;
+			start.y() += stepY * j;
+			end.x() += stepX * i;
+			end.y() += stepY * j;
 
 			// These margins added are absolutely required in order to produce satisfiable results
-			start.Z() = area.maxs[2] + 16.0f;
-			end.Z() = area.mins[2] - 16.0f;
+			start.z() = area.maxs[2] + 16.0f;
+			end.z() = area.mins[2] - 16.0f;
 
-			G_Trace( &trace, start.Data(), nullptr, nullptr, end.Data(), nullptr, MASK_PLAYERSOLID );
+			G_Trace( &trace, start.data(), nullptr, nullptr, end.data(), nullptr, MASK_PLAYERSOLID );
 			if( trace.fraction == 1.0f || trace.startsolid ) {
 				continue;
 			}
@@ -671,8 +671,8 @@ void AiAasWorld::trySettingAreaRampFlags( int areaNum ) {
 			// Area bounds extend the actual area geometry,
 			// so a point might be within the bounds but outside the area hull
 			//Vec3 testedPoint( trace.endpos );
-			//testedPoint.Z() += 1.0f;
-			//if( PointAreaNum( testedPoint.Data() ) != areaNum ) {
+			//testedPoint.z() += 1.0f;
+			//if( PointAreaNum( testedPoint.data() ) != areaNum ) {
 			//	continue;
 			//}
 
@@ -834,12 +834,12 @@ void AiAasWorld::trySettingAreaSkipCollisionFlags() {
 				Vec3 testedMaxs = areaRelativeMaxs + addedMaxs;
 
 				float minMaxsZ = playerHeight + extent;
-				if( testedMaxs.Z() < minMaxsZ ) {
-					testedMaxs.Z() = minMaxsZ;
+				if( testedMaxs.z() < minMaxsZ ) {
+					testedMaxs.z() = minMaxsZ;
 				}
 
 				trace_t trace;
-				G_Trace( &trace, area.center, testedMins.Data(), testedMaxs.Data(), area.center, nullptr, clipMask );
+				G_Trace( &trace, area.center, testedMins.data(), testedMaxs.data(), area.center, nullptr, clipMask );
 				if ( trace.fraction == 1.0f && !trace.startsolid ) {
 					*areaFlags |= flagsToSet[flagNum];
 					break;
@@ -903,7 +903,7 @@ void AiAasWorld::setupPointAreaNumLookupGrid() {
 	for( int i = 0; i < 3; ++i ) {
 		// Truncating the fractional part is used during lookups.
 		// Add +1 to account for points that are located on world boundaries (they aren't that uncommon).
-		m_numGridCellsPerDimensions[i] = (unsigned)std::floor( dimensions.Data()[i] / kAreaGridCellSize ) + 1;
+		m_numGridCellsPerDimensions[i] = (unsigned)std::floor( dimensions.data()[i] / kAreaGridCellSize ) + 1;
 		gridDataSize *= m_numGridCellsPerDimensions[i];
 	}
 
@@ -911,11 +911,11 @@ void AiAasWorld::setupPointAreaNumLookupGrid() {
 
 	size_t offset = 0;
 	for( unsigned iStep = 0; iStep < m_numGridCellsPerDimensions[0]; ++iStep ) {
-		const float minX = worldMins.X() + kAreaGridCellSize * (float)iStep;
+		const float minX = worldMins.x() + kAreaGridCellSize * (float)iStep;
 		for( unsigned jStep = 0; jStep < m_numGridCellsPerDimensions[1]; ++jStep ) {
-			const float minY = worldMins.Y() + kAreaGridCellSize * (float)jStep;
+			const float minY = worldMins.y() + kAreaGridCellSize * (float)jStep;
 			for( unsigned kStep = 0; kStep < m_numGridCellsPerDimensions[2]; ++kStep ) {
-				const float minZ = worldMins.Z() + kAreaGridCellSize * (float)kStep;
+				const float minZ = worldMins.z() + kAreaGridCellSize * (float)kStep;
 				const Vec3 cellMins( minX, minY, minZ );
 				const Vec3 cellMaxs( cellMins + cellDimensions );
 				const int32_t encoded = computePointAreaNumLookupDataForCell( cellMins, cellMaxs );
@@ -937,8 +937,8 @@ auto AiAasWorld::computePointAreaNumLookupDataForCell( const Vec3 &cellMins, con
 		int lastCornerAreaNum = -1;
 		bool allInsideTheSameArea = true;
 		for( unsigned i = 0; i < 8; ++i ) {
-			const Vec3 corner( bounds[( i >> 2 ) & 1]->X(), bounds[( i >> 1 ) & 1]->Y(), bounds[( i >> 0 ) & 1]->Z() );
-			const int cornerAreaNum = pointAreaNumNaive( corner.Data() );
+			const Vec3 corner( bounds[( i >> 2 ) & 1]->x(), bounds[( i >> 1 ) & 1]->y(), bounds[( i >> 0 ) & 1]->z() );
+			const int cornerAreaNum = pointAreaNumNaive( corner.data() );
 			if( i > 0 ) {
 				if( cornerAreaNum != lastCornerAreaNum ) {
 					allInsideTheSameArea = false;
@@ -955,7 +955,7 @@ auto AiAasWorld::computePointAreaNumLookupDataForCell( const Vec3 &cellMins, con
 	}
 
 	// Supply original bounds (findTopNodeForBox() spreads bounds itself)
-	const int topNode = findTopNodeForBox( cellMins.Data(), cellMaxs.Data() );
+	const int topNode = findTopNodeForBox( cellMins.data(), cellMaxs.data() );
 	assert( topNode > 0 && topNode < m_numnodes );
 	return topNode;
 }
@@ -992,9 +992,9 @@ int AiAasWorld::pointAreaNum( const float *point ) const {
 			const Vec3 diffWithMins( Vec3( point ) - Vec3( m_worldMins ) );
 
 			constexpr double rcpAreaGridCellSize = 1.0 / kAreaGridCellSize;
-			const auto xCellIndex = (unsigned)( (double)diffWithMins.X() * rcpAreaGridCellSize );
-			const auto yCellIndex = (unsigned)( (double)diffWithMins.Y() * rcpAreaGridCellSize );
-			const auto zCellIndex = (unsigned)( (double)diffWithMins.Z() * rcpAreaGridCellSize );
+			const auto xCellIndex = (unsigned)( (double)diffWithMins.x() * rcpAreaGridCellSize );
+			const auto yCellIndex = (unsigned)( (double)diffWithMins.y() * rcpAreaGridCellSize );
+			const auto zCellIndex = (unsigned)( (double)diffWithMins.z() * rcpAreaGridCellSize );
 
 			assert( xCellIndex < m_numGridCellsPerDimensions[0] );
 			assert( yCellIndex < m_numGridCellsPerDimensions[1] );
@@ -1850,7 +1850,7 @@ void AiAasWorld::computeFace2DProjVertices() {
 			if( !dir.normalizeFast() ) {
 				continue;
 			}
-			if( fabsf( dir.Z() ) > 0.001f ) {
+			if( fabsf( dir.z() ) > 0.001f ) {
 				continue;
 			}
 			n1 = ev1;
@@ -2057,12 +2057,12 @@ bool AiAasWorld::isAreaWalkableInFloorCluster( int startAreaNum, int targetAreaN
 			// Do not try intersection tests for already "passed" by the ray faces
 			int areaBehindFace;
 			if( signedFaceNum < 0 ) {
-				if( rayDir.Dot( plane.normal ) < 0 ) {
+				if( rayDir.dot( plane.normal ) < 0 ) {
 					continue;
 				}
 				areaBehindFace = face.frontarea;
 			} else {
-				if( rayDir.Dot( plane.normal ) > 0 ) {
+				if( rayDir.dot( plane.normal ) > 0 ) {
 					continue;
 				}
 				areaBehindFace = face.backarea;

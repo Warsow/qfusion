@@ -16,7 +16,7 @@ void DodgeToSpotActionRecord::Deactivate() {
 AiActionRecord::Status DodgeToSpotActionRecord::UpdateStatus( const WorldState &currWorldState ) {
 	// If the bot has reached the spot, consider the action completed
 	// (use a low threshold because dodging is a precise movement)
-	if( ( navSpot.Origin() - Self()->Origin() ).SquaredLength() < 16 * 16 ) {
+	if( ( navSpot.Origin() - Self()->Origin() ).squareLength() < 16 * 16 ) {
 		return COMPLETED;
 	}
 
@@ -37,7 +37,7 @@ PlannerNode *DodgeToSpotAction::TryApply( const WorldState &worldState ) {
 
 	const Vec3 botOrigin = worldState.getVec3( WorldState::BotOrigin ).value();
 	const float *actualOrigin = Self()->Origin();
-	if( botOrigin.DistanceTo( actualOrigin ) >= 1.0f ) {
+	if( botOrigin.distanceTo( actualOrigin ) >= 1.0f ) {
 		Debug( "The action can be applied only to the current bot origin\n" );
 		return nullptr;
 	}

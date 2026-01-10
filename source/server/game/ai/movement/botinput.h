@@ -118,16 +118,16 @@ public:
 	}
 
 	void SetIntendedLookDir( const Vec3 &intendedLookVec, bool alreadyNormalized = false ) {
-		SetIntendedLookDir( intendedLookVec.Data(), alreadyNormalized );
+		SetIntendedLookDir( intendedLookVec.data(), alreadyNormalized );
 	}
 
 	void SetIntendedLookDir( const vec3_t intendedLookVec, bool alreadyNormalized = false ) {
-		this->intendedLookDir.Set( intendedLookVec );
+		this->intendedLookDir.set( intendedLookVec );
 		if( !alreadyNormalized ) {
 			this->intendedLookDir.normalizeFastOrThrow();
 		}
 #ifndef PUBLIC_BUILD
-		else if( fabsf( this->intendedLookDir.LengthFast() - 1.0f ) > 0.1f ) {
+		else if( fabsf( this->intendedLookDir.fastLength() - 1.0f ) > 0.1f ) {
 			AI_FailWith( "BotInput::SetIntendedLookDir()", "The argument is claimed to be normalized but it isn't\n" );
 		}
 #endif

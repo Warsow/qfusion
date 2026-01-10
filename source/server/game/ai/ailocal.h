@@ -159,7 +159,7 @@ inline void SetPacked4uVec( const vec3_t vec, int16_t *packed ) {
 }
 
 inline void SetPacked4uVec( const Vec3 &vec, int16_t *packed ) {
-	SetPacked4uVec( vec.Data(), packed );
+	SetPacked4uVec( vec.data(), packed );
 }
 
 inline Vec3 GetUnpacked4uVec( const int16_t *packed ) {

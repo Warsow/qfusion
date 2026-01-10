@@ -12,7 +12,7 @@ BotRoamingManager::BotRoamingManager( Bot *bot_ )
 
 const Vec3 &BotRoamingManager::GetCachedRoamingSpot() {
 	if( spotSelectedAt != level.time ) {
-		cachedSpotOrigin.Set( GetRoamingSpot() );
+		cachedSpotOrigin.set( GetRoamingSpot() );
 		spotSelectedAt = level.time;
 	}
 	return cachedSpotOrigin;
@@ -55,7 +55,7 @@ const Vec3 &BotRoamingManager::GetRoamingSpot() {
 
 	int spotNum = TrySuggestTacticalSpot();
 	if( spotNum >= 0 ) {
-		tmpSpotOrigin.Set( tacticalSpotsRegistry->spots[spotNum].origin );
+		tmpSpotOrigin.set( tacticalSpotsRegistry->spots[spotNum].origin );
 		currTacticalSpotNum = spotNum;
 		return tmpSpotOrigin;
 	}
@@ -68,14 +68,14 @@ const Vec3 &BotRoamingManager::GetRoamingSpot() {
 		return SetTmpSpotFromArea( areaNum );
 	}
 
-	tmpSpotOrigin.Set( -99999, -99999, -99999 );
+	tmpSpotOrigin.set( -99999, -99999, -99999 );
 	return tmpSpotOrigin;
 }
 
 inline const Vec3 &BotRoamingManager::SetTmpSpotFromArea( int areaNum ) {
 	const auto &area = aasWorld->getAreas()[areaNum];
-	tmpSpotOrigin.Set( area.center );
-	tmpSpotOrigin.Z() = area.mins[2] + 8.0f;
+	tmpSpotOrigin.set( area.center );
+	tmpSpotOrigin.z() = area.mins[2] + 8.0f;
 	return tmpSpotOrigin;
 }
 
@@ -239,8 +239,8 @@ bool BotRoamingManager::IsFeasibleArea( const aas_area_t &area, const aas_arease
 	}
 
 	Vec3 areaPoint( area.center );
-	areaPoint.Z() = area.mins[2] + 16.0f;
-	if( areaPoint.SquareDistanceTo( bot->Origin() ) <= 144.0f ) {
+	areaPoint.z() = area.mins[2] + 16.0f;
+	if( areaPoint.squareDistanceTo( bot->Origin() ) <= 144.0f ) {
 		return false;
 	}
 

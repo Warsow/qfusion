@@ -317,7 +317,7 @@ public:
 	}
 
 	bool IsCloseToNavTarget( float proximityThreshold ) const {
-		return DistanceSquared( self->s.origin, navTarget->Origin().Data() ) < proximityThreshold * proximityThreshold;
+		return DistanceSquared( self->s.origin, navTarget->Origin().data() ) < proximityThreshold * proximityThreshold;
 	}
 
 	unsigned MillisInBlockedState() const {

@@ -65,7 +65,7 @@ public:
 	}
 
 	void DisableSpotsInRadius( const Vec3 &origin, float radius ) {
-		DisableSpotsInRadius( origin.Data(), radius );
+		DisableSpotsInRadius( origin.data(), radius );
 	}
 
 	void DisableSpotsInRadius( const vec3_t origin, float radius );

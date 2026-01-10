@@ -22,13 +22,13 @@ void BunnyToBestFloorClusterPointAction::onApplicationSequenceStarted( Predictio
 		*testedFlags[i] = true;
 
 		int areaNum;
-		if( !caches[i]->GetClosestToTargetPoint( context, m_localDirStorage.Data(), &areaNum ) ) {
+		if( !caches[i]->GetClosestToTargetPoint( context, m_localDirStorage.data(), &areaNum ) ) {
 			continue;
 		}
 
 		m_localDirStorage -= context->movementState->entityPhysicsState.Origin();
 		if( m_localDirStorage.normalize() ) {
-			m_currDir = m_localDirStorage.Data();
+			m_currDir = m_localDirStorage.data();
 			return;
 		}
 	}

@@ -1271,7 +1271,7 @@ void ParticleSystem::runStepKinematics( ParticleFlock *__restrict flock, float d
 			vec3_t scaledOrigin;
 			VectorScale( particle->origin, flock->turbulenceCoordinateScale, scaledOrigin );
 			const Vec3 turbulence = calcSimplexNoiseCurl( scaledOrigin[0], scaledOrigin[1], scaledOrigin[2] );
-			VectorMA( particle->artificialVelocity, flock->turbulenceSpeed, turbulence.Data(), particle->artificialVelocity );
+			VectorMA( particle->artificialVelocity, flock->turbulenceSpeed, turbulence.data(), particle->artificialVelocity );
 		}
 
 		vec3_t effectiveVelocity;
@@ -1606,7 +1606,7 @@ void ParticleSystem::simulatePolyTrailOfParticles( ParticleFlock *baseFlock, Pol
 				// Update the lingering trail as usual.
 				// Submit the last known position as the current one.
 				// This allows trails to shrink naturally.
-				updateTrailFn( trail->props, entry->points.back().Data(), currTime, &entry->points, &entry->timestamps );
+				updateTrailFn( trail->props, entry->points.back().data(), currTime, &entry->points, &entry->timestamps );
 			} else {
 				entry->points.clear();
 				entry->timestamps.clear();
@@ -1616,7 +1616,7 @@ void ParticleSystem::simulatePolyTrailOfParticles( ParticleFlock *baseFlock, Pol
 			BoundsBuilder boundsBuilder;
 			unsigned nodeNum = 0;
 			do {
-				boundsBuilder.addPoint( entry->points[nodeNum].Data() );
+				boundsBuilder.addPoint( entry->points[nodeNum].data() );
 			} while( ++nodeNum < numNodes );
 			boundsBuilder.storeToWithAddedEpsilon( entry->poly.cullMins, entry->poly.cullMaxs );
 			entry->poly.cullMins[3] = 0.0f, entry->poly.cullMaxs[3] = 1.0f;

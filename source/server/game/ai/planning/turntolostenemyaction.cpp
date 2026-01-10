@@ -24,7 +24,7 @@ AiActionRecord::Status TurnToLostEnemyActionRecord::UpdateStatus( const WorldSta
 		return COMPLETED;
 	}
 
-	if( toEnemyDir.Dot( lookDir ) >= Self()->FovDotFactor() ) {
+	if( toEnemyDir.dot( lookDir ) >= Self()->FovDotFactor() ) {
 		return COMPLETED;
 	}
 
@@ -48,7 +48,7 @@ PlannerNode *TurnToLostEnemyAction::TryApply( const WorldState &worldState ) {
 	}
 
 	const Vec3 botOrigin( worldState.getVec3( WorldState::BotOrigin ).value() );
-	if( botOrigin.FastDistanceTo( Self()->Origin() ) > 1.0f ) {
+	if( botOrigin.fastDistanceTo( Self()->Origin() ) > 1.0f ) {
 		Debug( "The action can be applied only to the current bot origin\n" );
 		return nullptr;
 	}
