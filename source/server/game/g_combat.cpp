@@ -1120,8 +1120,8 @@ void SplashPropagationSolver::operator()() {
 			const Vec3 splashMins = Vec3( -radius, -radius, -radius ) + m_inflictor->s.origin;
 			const Vec3 splashMaxs = Vec3( +radius, +radius, +radius ) + m_inflictor->s.origin;
 			// TODO: Add/use a fused call
-			SV_BuildShapeList( s_shapeListStorage, splashMins.Data(), splashMaxs.Data(), MASK_SOLID );
-			SV_ClipShapeList( s_shapeListStorage, s_shapeListStorage, splashMins.Data(), splashMaxs.Data() );
+			SV_BuildShapeList( s_shapeListStorage, splashMins.data(), splashMaxs.data(), MASK_SOLID );
+			SV_ClipShapeList( s_shapeListStorage, s_shapeListStorage, splashMins.data(), splashMaxs.data() );
 
 			const ClipRegion clipRegion( s_shapeListStorage, std::span<int>( waveObstacles.begin(), waveObstacles.size() ) );
 

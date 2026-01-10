@@ -13,7 +13,7 @@ inline float BotTacticalSpotsCache::Skill() const {
 }
 
 bool BotTacticalSpotsCache::botHasAlmostSameOrigin( const Vec3 &unpackedOrigin ) const {
-	return unpackedOrigin.SquareDistanceTo( unpackedOrigin ) < 1.0f;
+	return unpackedOrigin.squareDistanceTo( unpackedOrigin ) < 1.0f;
 }
 
 void BotTacticalSpotsCache::clear() {
@@ -36,7 +36,7 @@ inline bool BotTacticalSpotsCache::findForOrigin( const ProblemParams &problemPa
 		AdvantageProblemSolver::OriginParams originParams( game.edicts + m_bot->EntNum(), searchRadius, RouteCache() );
 		return AdvantageProblemSolver( originParams, problemParams ).findSingle( result );
 	}
-	TacticalSpotsRegistry::OriginParams originParams( origin.Data(), searchRadius, RouteCache() );
+	TacticalSpotsRegistry::OriginParams originParams( origin.data(), searchRadius, RouteCache() );
 	return AdvantageProblemSolver( originParams, problemParams ).findSingle( result );
 }
 
@@ -103,7 +103,7 @@ inline void BotTacticalSpotsCache::takeEnemiesIntoAccount( ProblemParams &proble
 
 auto BotTacticalSpotsCache::findCoverSpot( const Vec3 &origin, const Vec3 &enemyOrigin ) -> std::optional<Vec3> {
 	const float searchRadius = kLasergunRange;
-	CoverProblemSolver::ProblemParams problemParams( enemyOrigin.Data(), 32.0f );
+	CoverProblemSolver::ProblemParams problemParams( enemyOrigin.data(), 32.0f );
 	problemParams.setMinHeightAdvantageOverOrigin( -searchRadius );
 	problemParams.setCheckToAndBackReach( false );
 	problemParams.setMaxFeasibleTravelTimeMillis( 1250 );
@@ -117,7 +117,7 @@ auto BotTacticalSpotsCache::findCoverSpot( const Vec3 &origin, const Vec3 &enemy
 		}
 	}
 
-	TacticalSpotsRegistry::OriginParams originParams( origin.Data(), searchRadius, RouteCache() );
+	TacticalSpotsRegistry::OriginParams originParams( origin.data(), searchRadius, RouteCache() );
 	if( CoverProblemSolver( originParams, problemParams ).findSingle( result ) ) {
 		return Vec3( result );
 	}
@@ -147,7 +147,7 @@ auto BotTacticalSpotsCache::findNearbyEntities( const Vec3 &origin, float radius
 		return { cacheEntry->entNums, cacheEntry->numEntities };
 	}
 
-	NearbyEntitiesCache::Entry *const cacheEntry = m_nearbyEntitiesCache.tryAlloc( origin.Data(), radius );
+	NearbyEntitiesCache::Entry *const cacheEntry = m_nearbyEntitiesCache.tryAlloc( origin.data(), radius );
 	if( !cacheEntry ) {
 		return {};
 	}
@@ -156,7 +156,7 @@ auto BotTacticalSpotsCache::findNearbyEntities( const Vec3 &origin, float radius
 
 	int radiusEntNums[64];
 	assert( std::size( cacheEntry->entNums ) < std::size( radiusEntNums ) );
-	int numRadiusEntities = GClip_FindInRadius( origin.Data(), radius, radiusEntNums, std::size( radiusEntNums ) );
+	int numRadiusEntities = GClip_FindInRadius( origin.data(), radius, radiusEntNums, std::size( radiusEntNums ) );
 	// Note that this value might be greater than the buffer capacity (an actual number of entities is returned)
 	numRadiusEntities = wsw::min<int>( numRadiusEntities, std::size( radiusEntNums ) );
 
@@ -184,7 +184,7 @@ void BotTacticalSpotsCache::findReachableClassEntities( const Vec3 &origin, floa
 	for( const int entNum: entNums ) {
 		const auto *const ent = gameEnts + entNum;
 		if( !Q_stricmp( ent->classname, classname ) ) {
-			const float distance = DistanceFast( origin.Data(), ent->s.origin );
+			const float distance = DistanceFast( origin.data(), ent->s.origin );
 			candidateEntities.push_back( EntAndScore( entNum, radius - distance ) );
 			if( candidateEntities.full() ) [[unlikely]] {
 				break;
@@ -231,7 +231,7 @@ int BotTacticalSpotsCache::findMostFeasibleEntityAasArea( const edict_t *ent, co
 	int areaNumsBuffer[24];
 	const Vec3 boxMins( Vec3( -20, -20, -12 ) + ent->r.absmin );
 	const Vec3 boxMaxs( Vec3( +20, +20, +12 ) + ent->r.absmax );
-	const auto boxAreaNums = aasWorld->findAreasInBox( boxMins.Data(), boxMaxs.Data(), areaNumsBuffer, 24 );
+	const auto boxAreaNums = aasWorld->findAreasInBox( boxMins.data(), boxMaxs.data(), areaNumsBuffer, 24 );
 
 	const auto aasAreaSettings = aasWorld->getAreaSettings();
 	for( const int areaNum : boxAreaNums ) {
@@ -337,7 +337,7 @@ auto BotTacticalSpotsCache::findRunAwayElevatorOrigin( const Vec3 &origin, const
 		// Copy trigger origin
 		Vec3 movesFrom( ent->s.origin );
 		// Drop origin to the elevator bottom
-		movesFrom.Z() = ent->r.absmin[2] + 16;
+		movesFrom.z() = ent->r.absmin[2] + 16;
 		Vec3 movesTo( ent->moveinfo.end_origin );
 		return std::make_pair( movesFrom, movesTo );
 	}

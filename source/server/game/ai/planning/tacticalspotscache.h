@@ -153,7 +153,7 @@ private:
 		[[nodiscard]]
 		auto tryGettingCached( const Vec3 &origin, float radius ) const -> const Entry * {
 			for( const Entry &entry: m_entries ) {
-				if( VectorCompare( entry.botOrigin, origin.Data() ) && entry.radius == radius ) {
+				if( VectorCompare( entry.botOrigin, origin.data() ) && entry.radius == radius ) {
 					return std::addressof( entry );
 				}
 			}

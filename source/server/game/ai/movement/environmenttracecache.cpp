@@ -36,7 +36,7 @@ void EnvironmentTraceCache::makeRandomizedKeyMovesToTarget( PredictionContext *c
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	const Vec3 forwardDir( entityPhysicsState.ForwardDir() );
 	const Vec3 rightDir( entityPhysicsState.RightDir() );
-	assert( ( intendedMoveDir.Length() - 1.0f ) < 0.01f );
+	assert( ( intendedMoveDir.length() - 1.0f ) < 0.01f );
 
 	// Choose randomly from all non-blocked dirs based on scores
 	// For each non - blocked area make an interval having a corresponding to the area score length.
@@ -48,9 +48,9 @@ void EnvironmentTraceCache::makeRandomizedKeyMovesToTarget( PredictionContext *c
 	for( unsigned i = 0; i < numNonBlockedDirs; ++i ) {
 		vec3_t keyMoveVec;
 		const float *fractions = kSideDirFractions[nonBlockedDirIndices[i]];
-		VectorScale( forwardDir.Data(), fractions[0], keyMoveVec );
-		VectorMA( keyMoveVec, fractions[1], rightDir.Data(), keyMoveVec );
-		scoresSum += 0.55f + 0.45f * intendedMoveDir.Dot( keyMoveVec );
+		VectorScale( forwardDir.data(), fractions[0], keyMoveVec );
+		VectorMA( keyMoveVec, fractions[1], rightDir.data(), keyMoveVec );
+		scoresSum += 0.55f + 0.45f * intendedMoveDir.dot( keyMoveVec );
 		dirDistributionUpperBound[i] = scoresSum;
 	}
 
@@ -77,7 +77,7 @@ void EnvironmentTraceCache::makeKeyMovesToTarget( PredictionContext *context, co
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	const Vec3 forwardDir( entityPhysicsState.ForwardDir() );
 	const Vec3 rightDir( entityPhysicsState.RightDir() );
-	assert( ( intendedMoveDir.Length() - 1.0f ) < 0.01f );
+	assert( ( intendedMoveDir.length() - 1.0f ) < 0.01f );
 
 	float bestScore = 0.0f;
 	auto bestDirIndex = std::numeric_limits<unsigned>::max();
@@ -85,9 +85,9 @@ void EnvironmentTraceCache::makeKeyMovesToTarget( PredictionContext *context, co
 		vec3_t keyMoveVec;
 		unsigned dirIndex = nonBlockedDirIndices[i];
 		const float *const fractions = kSideDirFractions[dirIndex];
-		VectorScale( forwardDir.Data(), fractions[0], keyMoveVec );
-		VectorMA( keyMoveVec, fractions[1], rightDir.Data(), keyMoveVec );
-		float score = 0.55f + 0.45f * intendedMoveDir.Dot( keyMoveVec );
+		VectorScale( forwardDir.data(), fractions[0], keyMoveVec );
+		VectorMA( keyMoveVec, fractions[1], rightDir.data(), keyMoveVec );
+		float score = 0.55f + 0.45f * intendedMoveDir.dot( keyMoveVec );
 		if( score > bestScore ) {
 			bestScore = score;
 			bestDirIndex = dirIndex;
@@ -125,8 +125,8 @@ void EnvironmentTraceCache::testForResultsMask( PredictionContext *context, unsi
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	vec3_t front2DDir, right2DDir, traceEnd;
 	Vec3 angles( entityPhysicsState.Angles() );
-	angles.Data()[PITCH] = 0.0f;
-	AngleVectors( angles.Data(), front2DDir, right2DDir, nullptr );
+	angles.data()[PITCH] = 0.0f;
+	AngleVectors( angles.data(), front2DDir, right2DDir, nullptr );
 
 	const float *origin = entityPhysicsState.Origin();
 	constexpr auto contentsMask = MASK_SOLID | MASK_WATER;
@@ -249,7 +249,7 @@ const CMShapeList *EnvironmentTraceCache::getShapeListForPMoveCollision( Predict
 
     if( physicsState.GroundEntity() ) {
         bool isZeroStep = !context->topOfStackIndex;
-        return ( cachedShapeList = shapesListCache.prepareList( regionMins.Data(), regionMaxs.Data(), isZeroStep ) );
+        return ( cachedShapeList = shapesListCache.prepareList( regionMins.data(), regionMaxs.data(), isZeroStep ) );
     }
 
     const auto *aasWorld = AiAasWorld::instance();
@@ -281,10 +281,10 @@ const CMShapeList *EnvironmentTraceCache::getShapeListForPMoveCollision( Predict
     // TODO: There should be a "withinBounds" subroutine, preferably using SIMD
     int i = 0;
     for(; i < 3; ++i ) {
-        if( areaInnerMins[i] > regionMins.Data()[i] ) {
+        if( areaInnerMins[i] > regionMins.data()[i] ) {
             break;
         }
-        if( areaInnerMaxs[i] < regionMaxs.Data()[i] ) {
+        if( areaInnerMaxs[i] < regionMaxs.data()[i] ) {
             break;
         }
     }
@@ -295,5 +295,5 @@ const CMShapeList *EnvironmentTraceCache::getShapeListForPMoveCollision( Predict
     }
 
     bool isZeroStep = !context->topOfStackIndex;
-    return ( cachedShapeList = shapesListCache.prepareList( regionMins.Data(), regionMaxs.Data(), isZeroStep ) );
+    return ( cachedShapeList = shapesListCache.prepareList( regionMins.data(), regionMaxs.data(), isZeroStep ) );
 }

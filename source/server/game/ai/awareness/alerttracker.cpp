@@ -41,7 +41,7 @@ void AlertTracker::CheckAlertSpots( const wsw::StaticVector<uint16_t, MAX_CLIENT
 		const float invRadius = 1.0f / alertSpot.radius;
 		for( uint16_t entNum: visibleTargets ) {
 			edict_t *ent = gameEdicts + entNum;
-			float squareDistance = DistanceSquared( ent->s.origin, alertSpot.origin.Data() );
+			float squareDistance = DistanceSquared( ent->s.origin, alertSpot.origin.data() );
 			if( squareDistance > squareRadius ) {
 				continue;
 			}

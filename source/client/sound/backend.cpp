@@ -679,7 +679,7 @@ void Backend::setEntitySpatialParams( const EntitySpatialParamsBatch &batch ) {
 }
 
 void Backend::setListener( int entNum, const Vec3 &origin, const Vec3 &velocity, const std::array<Vec3, 3> &axis ) {
-	S_SetListener( entNum, origin.Data(), velocity.Data(), (const float *)axis.data() );
+	S_SetListener( entNum, origin.data(), velocity.data(), (const float *)axis.data() );
 }
 
 void Backend::startLocalSound( const SoundSet *sound, float volume ) {
@@ -697,7 +697,7 @@ void Backend::startLocalSoundByName( const wsw::PodVector<char> &name, float vol
 
 void Backend::startFixedSound( const SoundSet *sound, const Vec3 &origin, int channel, float volume, float attenuation ) {
 	if( const std::optional<std::pair<ALuint, unsigned>> bufferAndIndex = getBufferForPlayback( sound ) ) {
-		S_StartFixedSound( sound, *bufferAndIndex, getPitchForPlayback( sound ), origin.Data(), channel, volume, attenuation );
+		S_StartFixedSound( sound, *bufferAndIndex, getPitchForPlayback( sound ), origin.data(), channel, volume, attenuation );
 	}
 }
 

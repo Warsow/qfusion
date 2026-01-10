@@ -28,12 +28,12 @@ struct Hazard : public PoolItem {
 	bool SupportsImpactTests() const { return IsSplashLike(); }
 
 	bool HasImpactOnPoint( const Vec3 &point ) const {
-		return HasImpactOnPoint( point.Data() );
+		return HasImpactOnPoint( point.data() );
 	}
 
 	bool HasImpactOnPoint( const vec3_t point ) const {
 		// Currently only splash-like hazards are supported
-		return IsSplashLike() && hitPoint.SquareDistanceTo( point ) <= splashRadius * splashRadius;
+		return IsSplashLike() && hitPoint.squareDistanceTo( point ) <= splashRadius * splashRadius;
 	}
 };
 

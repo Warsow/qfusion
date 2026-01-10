@@ -21,7 +21,7 @@ inline const float *SpotOriginOf( const TacticalSpotsProblemSolver::SpotAndScore
 
 template <>
 inline const float *SpotOriginOf( const TacticalSpotsProblemSolver::OriginAndScore &spotLike ) {
-	return spotLike.origin.Data();
+	return spotLike.origin.data();
 }
 
 inline float ComputeDistanceFactor( float distance, float weightFalloffDistanceRatio, float searchRadius ) {

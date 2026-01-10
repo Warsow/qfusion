@@ -8,7 +8,7 @@ bool FloorClusterAreasCache::AreaPassesCollisionTest( PredictionContext *context
 
 	Vec3 start( entityPhysicsState.Origin() );
 	if( entityPhysicsState.GroundEntity() ) {
-		start.Z() += 3.0f;
+		start.z() += 3.0f;
 	}
 
 	vec3_t mins, maxs;
@@ -22,14 +22,14 @@ bool SameFloorClusterAreasCache::AreaPassesCollisionTest( const Vec3 &start,
 														  const vec3_t maxs ) const {
 	const auto &area = aasWorld->getAreas()[areaNum];
 	Vec3 areaPoint( area.center );
-	areaPoint.Z() = area.mins[2] + 1.0f + ( -playerbox_stand_mins[2] );
+	areaPoint.z() = area.mins[2] + 1.0f + ( -playerbox_stand_mins[2] );
 
 	// We deliberately have to check against entities, like the tank on wbomb1 A spot, and not only solid world
 	trace_t trace;
-	float *start_ = const_cast<float *>( start.Data() );
+	float *start_ = const_cast<float *>( start.data() );
 	float *mins_ = const_cast<float *>( mins );
 	float *maxs_ = const_cast<float *>( maxs );
-	G_Trace( &trace, start_, mins_, maxs_, areaPoint.Data(), game.edicts + bot->EntNum(), MASK_AISOLID );
+	G_Trace( &trace, start_, mins_, maxs_, areaPoint.data(), game.edicts + bot->EntNum(), MASK_AISOLID );
 	return trace.fraction == 1.0f;
 }
 
@@ -39,12 +39,12 @@ bool NextFloorClusterAreasCache::AreaPassesCollisionTest( const Vec3 &start,
 														  const vec3_t maxs ) const {
 	const auto &area = aasWorld->getAreas()[areaNum];
 	Vec3 areaPoint( area.center );
-	areaPoint.Z() = area.mins[2] + 1.0f + ( -playerbox_stand_mins[2] );
+	areaPoint.z() = area.mins[2] + 1.0f + ( -playerbox_stand_mins[2] );
 
 	trace_t trace;
 	// We cannot ensure walkability with the same degree of certainty as for the same floor cluster.
 	// Use a cheaper collision test only against the solid world.
-	SolidWorldTrace( &trace, start.Data(), areaPoint.Data(), mins, maxs );
+	SolidWorldTrace( &trace, start.data(), areaPoint.data(), mins, maxs );
 	if( trace.fraction != 1.0f ) {
 		return false;
 	}
@@ -56,13 +56,13 @@ bool NextFloorClusterAreasCache::AreaPassesCollisionTest( const Vec3 &start,
 	// There are no callers that use this cache without prediction.
 
 	// Can't use the hack below if the tested area has greater elevation.
-	if( start.Z() + playerbox_stand_mins[2] < area.mins[2] ) {
+	if( start.z() + playerbox_stand_mins[2] < area.mins[2] ) {
 		return true;
 	}
 
-	areaPoint.Z() -= 96.0f;
+	areaPoint.z() -= 96.0f;
 	// Use a segment instead of a box but check for liquids
-	StaticWorldTrace( &trace, start.Data(), areaPoint.Data(), CONTENTS_SOLID | CONTENTS_WATER );
+	StaticWorldTrace( &trace, start.data(), areaPoint.data(), CONTENTS_SOLID | CONTENTS_WATER );
 	// If there is a gap in-between the trace is very likely to hit solid below the area floor.
 	return trace.fraction != 1.0f && trace.endpos[2] >= area.mins[2];
 }
@@ -79,7 +79,7 @@ bool SameFloorClusterAreasCache::NeedsToBeComputed( PredictionContext *context )
 		return true;
 	}
 
-	if( computedTargetAreaPoint.SquareDistanceTo( entityPhysicsState.Origin() ) < wsw::square( REACHABILITY_RADIUS ) ) {
+	if( computedTargetAreaPoint.squareDistanceTo( entityPhysicsState.Origin() ) < wsw::square( REACHABILITY_RADIUS ) ) {
 		return true;
 	}
 
@@ -102,12 +102,12 @@ int FloorClusterAreasCache::GetClosestToTargetPoint( PredictionContext *context,
 	// Check whether an old value is present and is feasible
 	if( NeedsToBeComputed( context ) ) {
 		computedTargetAreaNum = 0;
-		computedTargetAreaPoint.Set( 0, 0, 0 );
+		computedTargetAreaPoint.set( 0, 0, 0 );
 		if( ( computedTravelTime = FindClosestToTargetPoint( context, &computedTargetAreaNum ) ) ) {
 			computedAt = level.time;
 			const auto &area = aasWorld->getAreas()[computedTargetAreaNum];
-			computedTargetAreaPoint.Set( area.center );
-			computedTargetAreaPoint.Z() = area.mins[2] + ( -playerbox_stand_mins[2] );
+			computedTargetAreaPoint.set( area.center );
+			computedTargetAreaPoint.z() = area.mins[2] + ( -playerbox_stand_mins[2] );
 		}
 	}
 
@@ -116,7 +116,7 @@ int FloorClusterAreasCache::GetClosestToTargetPoint( PredictionContext *context,
 			*resultAreaNum = computedTargetAreaNum;
 		}
 		if( resultPoint ) {
-			computedTargetAreaPoint.CopyTo( resultPoint );
+			computedTargetAreaPoint.copyTo( resultPoint );
 		}
 		return computedTravelTime;
 	}
@@ -172,7 +172,7 @@ int SameFloorClusterAreasCache::FindClosestToTargetPoint( PredictionContext *con
 	TacticalSpotsRegistry::GetSpotsWalkabilityTraceBounds( traceMins, traceMaxs );
 	Vec3 start( entityPhysicsState.Origin() );
 	if( entityPhysicsState.GroundEntity() ) {
-		start.Z() += 1.0f;
+		start.z() += 1.0f;
 	}
 
 	while( !candidateAreasHeap.empty() ) {
@@ -222,9 +222,9 @@ void FloorClusterAreasCache::PrepareAreasForSmallCluster( PredictionContext *__r
 	for( const int areaNum : clusterAreaNums ) {
 		const auto &area = aasAreas[areaNum];
 		Vec3 areaPoint( area.center );
-		areaPoint.Z() = area.mins[2] + zOffset;
+		areaPoint.z() = area.mins[2] + zOffset;
 
-		const float squareDistance = areaPoint.SquareDistanceTo( botOrigin );
+		const float squareDistance = areaPoint.squareDistanceTo( botOrigin );
 		if( squareDistance < squareNearThreshold || squareDistance > squareFarThreshold ) {
 			continue;
 		}
@@ -269,9 +269,9 @@ void FloorClusterAreasCache::PrepareAreasForLargeCluster( PredictionContext *__r
 	for( const int areaNum : clusterAreaNums ) {
 		const auto &area = aasAreas[areaNum];
 		Vec3 areaPoint( area.center );
-		areaPoint.Z() = area.mins[2] + zOffset;
+		areaPoint.z() = area.mins[2] + zOffset;
 
-		const float squareDistance = areaPoint.SquareDistanceTo( botOrigin );
+		const float squareDistance = areaPoint.squareDistanceTo( botOrigin );
 		if( squareDistance < squareNearThreshold || squareDistance > squareFarThreshold ) {
 			continue;
 		}
@@ -403,7 +403,7 @@ int NextFloorClusterAreasCache::FindClosestToTargetPoint( PredictionContext *con
 	TacticalSpotsRegistry::GetSpotsWalkabilityTraceBounds( traceMins, traceMaxs );
 	Vec3 start( entityPhysicsState.Origin() );
 	if( entityPhysicsState.GroundEntity() ) {
-		start.Z() += 4.0f;
+		start.z() += 4.0f;
 	}
 
 	while( !candidateAreasHeap.empty() ) {

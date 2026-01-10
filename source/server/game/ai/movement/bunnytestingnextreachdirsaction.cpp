@@ -82,7 +82,7 @@ public:
 		, maxCandidates( maxCandidates_ ) {
 		const auto &physicsState = context->movementState->entityPhysicsState;
 		SetAreaNums( physicsState, context->NavTargetAasAreaNum() );
-		traceStartPoint.Z() += playerbox_stand_viewheight;
+		traceStartPoint.z() += playerbox_stand_viewheight;
 
 		hazardToEvade = bot_->PrimaryHazard();
 		if( bot_->ShouldRushHeadless() || ( hazardToEvade && !hazardToEvade->SupportsImpactTests() ) ) {
@@ -206,7 +206,7 @@ bool NextReachDirsCollector::Accept( int, const aas_reachability_t &reach, int )
 	const auto &__restrict area = aasAreas[areaNum];
 	Vec3 areaPoint( area.center[0], area.center[1], area.mins[2] - playerbox_stand_mins[2] );
 
-	const float squareDistanceToArea = areaPoint.SquareDistanceTo( traceStartPoint );
+	const float squareDistanceToArea = areaPoint.squareDistanceTo( traceStartPoint );
 	// Skip way too close areas (otherwise the bot might fall into endless looping)
 	if( squareDistanceToArea < wsw::square( 96 ) ) {
 		return true;
@@ -239,7 +239,7 @@ bool NextReachDirsCollector::Accept( int, const aas_reachability_t &reach, int )
 	} else {
 		// TraceArcInSolidWorld() is very coarse and should not be 100% trusted.
 		// Take the dir but make sure it gets tested last.
-		if( !TraceArcInSolidWorld( traceStartPoint.Data(), areaPoint.Data() ) ) {
+		if( !TraceArcInSolidWorld( traceStartPoint.data(), areaPoint.data() ) ) {
 			dropDirPriority = true;
 		}
 

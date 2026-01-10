@@ -309,7 +309,7 @@ public:
 		m_triggerEntNum       = triggerEntNum;
 		m_targetReachNum      = reachNum;
 		m_lastGoodExitAreaNum = -1;
-		m_lastGoodExitOrigin.Set( 0, 0, 0 );
+		m_lastGoodExitOrigin.set( 0, 0, 0 );
 	}
 private:
 	[[nodiscard]]

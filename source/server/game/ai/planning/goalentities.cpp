@@ -203,7 +203,7 @@ void NavEntitiesRegistry::Update() {
 		if( ( navEnt->flags & NavEntityFlags::MOVABLE ) != NavEntityFlags::NONE ) {
 			// If it has been moved
 			if( navEnt->origin != Vec3( navEnt->ent->s.origin ) ) {
-				navEnt->origin.Set( navEnt->ent->s.origin );
+				navEnt->origin.set( navEnt->ent->s.origin );
 				navEnt->aasAreaNum = aasWorld->findAreaNum( navEnt->ent->s.origin );
 			}
 		}

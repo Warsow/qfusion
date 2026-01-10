@@ -6,45 +6,47 @@
 
 #include <optional>
 
-class Vec3
-{
-	vec3_t vec;
-
+class Vec3 {
+	// Note: This implementation strives to reduce depth of inline calls
 public:
-	explicit Vec3( const vec3_t that ) {
-		VectorCopy( that, Data() );
+	[[nodiscard]]
+	constexpr explicit Vec3( const vec3_t that ) { VectorCopy( that, m_data ); }
+	[[nodiscard]]
+	constexpr Vec3( const Vec3 &that ) = default;
+	[[nodiscard]]
+	constexpr Vec3( float x, float y, float z ) { VectorSet( m_data, x, y, z ); }
+
+	[[nodiscard]] auto length() const -> float { return (float)VectorLength( m_data ); }
+	[[nodiscard]] auto fastLength() const -> float { return VectorLengthFast( m_data ); }
+	[[nodiscard]] constexpr auto squareLength() const -> float { return VectorLengthSquared( m_data ); }
+
+	[[nodiscard]] auto distanceTo( const Vec3 &that ) const -> float { return distanceTo( that.m_data ); }
+	[[nodiscard]] auto distanceTo( const vec3_t that ) const -> float { return (float)Distance( m_data, that ); }
+	[[nodiscard]] auto fastDistanceTo( const Vec3 &that ) const -> float { return fastDistanceTo( that.m_data ); }
+	[[nodiscard]] auto fastDistanceTo( const vec3_t that ) const -> float { return DistanceFast( m_data, that ); }
+
+	[[nodiscard]] auto distance2DTo( const Vec3 &that ) const -> float { return distance2DTo( that.m_data ); }
+	[[nodiscard]] auto distance2DTo( const vec3_t that ) const -> float { return std::sqrt( squareDistance2DTo( that ) ); }
+	[[nodiscard]] auto fastDistance2DTo( const Vec3 &that ) const -> float { return fastDistance2DTo( that.m_data ); }
+	[[nodiscard]] auto fastDistance2DTo( const vec3_t that ) const -> float { return Q_Sqrt( squareDistance2DTo( that ) ); }
+
+	[[nodiscard]]
+	constexpr auto squareDistanceTo( const Vec3 &that ) const -> float {
+		return DistanceSquared( m_data, that.m_data );
 	}
-	Vec3( const Vec3 &that ) {
-		VectorCopy( that.Data(), Data() );
+	[[nodiscard]]
+	constexpr auto squareDistanceTo( const vec3_t that ) const -> float {
+		return DistanceSquared( m_data, that );
 	}
 
-	Vec3( vec_t x, vec_t y, vec_t z ) {
-		VectorSet( vec, x, y, z );
+	[[nodiscard]]
+	constexpr auto squareDistance2DTo( const Vec3 &that ) const -> float {
+		return squareDistance2DTo( that.m_data );
 	}
-
-	Vec3 &operator=( const Vec3 &that ) {
-		VectorCopy( that.Data(), Data() );
-		return *this;
-	}
-
-	float Length() const { return (float)VectorLength( vec ); }
-	float LengthFast() const { return VectorLengthFast( vec ); }
-	float SquaredLength() const { return VectorLengthSquared( vec ); }
-
-	float DistanceTo( const Vec3 &that ) const { return DistanceTo( that.Data() ); }
-	float DistanceTo( const vec3_t that ) const { return (float)Distance( vec, that ); }
-	float FastDistanceTo( const Vec3 &that ) const { return FastDistanceTo( that.Data() ); }
-	float FastDistanceTo( const vec3_t that ) const { return DistanceFast( vec, that ); }
-	float SquareDistanceTo( const Vec3 &that ) const { return SquareDistanceTo( that.Data() ); }
-	float SquareDistanceTo( const vec3_t that ) const { return DistanceSquared( vec, that ); }
-	float Distance2DTo( const Vec3 &that ) const { return Distance2DTo( that.vec ); }
-	float Distance2DTo( const vec3_t that ) const { return std::sqrt( SquareDistance2DTo( that ) ); }
-	float FastDistance2DTo( const Vec3 &that ) const { return FastDistance2DTo( that.vec ); }
-	float FastDistance2DTo( const vec3_t that ) const { return Q_Sqrt( SquareDistance2DTo( that ) ); }
-	float SquareDistance2DTo( const Vec3 &that ) const { return SquareDistanceTo( that.vec ); }
-	float SquareDistance2DTo( const vec3_t that ) const {
-		float dx = vec[0] - that[0];
-		float dy = vec[1] - that[1];
+	[[nodiscard]]
+	constexpr auto squareDistance2DTo( const vec3_t that ) const -> float {
+		const float dx = m_data[0] - that[0];
+		const float dy = m_data[1] - that[1];
 		return dx * dx + dy * dy;
 	}
 
@@ -58,13 +60,13 @@ public:
 	auto normalize( NormalizationParams params = { .minAcceptableLength = 1e-3f } ) -> std::optional<float> {
 		assert( params.minAcceptableLength > 0.0f );
 		const float squaredThreshold = params.minAcceptableLength * params.minAcceptableLength;
-		const float squaredLength    = VectorLengthSquared( vec );
-		if( squaredLength >= squaredThreshold ) [[likely]] {
+		const float squareLength    = VectorLengthSquared( m_data );
+		if( squareLength >= squaredThreshold ) [[likely]] {
 			// We have to return the exact length by the contract,
 			// so no reciprocal optimization is applied, even if it could be quite precise.
-			const float length    = std::sqrt( squaredLength );
+			const float length    = std::sqrt( squareLength );
 			const float rcpLength = 1.0f / length;
-			VectorScale( vec, rcpLength, vec );
+			VectorScale( m_data, rcpLength, m_data );
 			return length;
 		}
 		return std::nullopt;
@@ -74,11 +76,11 @@ public:
 	auto normalizeOrFail( NormalizationParams params = { .minAcceptableLength = 1e-3f } ) -> float {
 		assert( params.minAcceptableLength > 0.0f );
 		const float squaredThreshold = params.minAcceptableLength * params.minAcceptableLength;
-		const float squaredLength    = VectorLengthSquared( vec );
-		if( squaredLength >= squaredThreshold ) [[likely]] {
-			const float length    = std::sqrt( squaredLength );
+		const float squareLength    = VectorLengthSquared( m_data );
+		if( squareLength >= squaredThreshold ) [[likely]] {
+			const float length    = std::sqrt( squareLength );
 			const float rcpLength = 1.0f / length;
-			VectorScale( vec, rcpLength, vec );
+			VectorScale( m_data, rcpLength, m_data );
 			return length;
 		}
 		wsw::failWithRuntimeError( "Normalization failure" );
@@ -88,11 +90,11 @@ public:
 	auto normalizeFast( NormalizationParams params = { .minAcceptableLength = 1e-3f } ) -> std::optional<float> {
 		assert( params.minAcceptableLength > 0.0f );
 		const float squaredThreshold = params.minAcceptableLength * params.minAcceptableLength;
-		const float squaredLength    = VectorLengthSquared( vec );
-		if( squaredLength >= squaredThreshold ) [[likely]] {
-			const float rcpLength = Q_RSqrt( squaredLength );
-			VectorScale( vec, rcpLength, vec );
-			return squaredLength * rcpLength;
+		const float squareLength    = VectorLengthSquared( m_data );
+		if( squareLength >= squaredThreshold ) [[likely]] {
+			const float rcpLength = Q_RSqrt( squareLength );
+			VectorScale( m_data, rcpLength, m_data );
+			return squareLength * rcpLength;
 		}
 		return std::nullopt;
 	}
@@ -101,104 +103,100 @@ public:
 	auto normalizeFastOrThrow( NormalizationParams params = { .minAcceptableLength = 1e-3f } ) -> float {
 		assert( params.minAcceptableLength > 0.0f );
 		const float squaredThreshold = params.minAcceptableLength * params.minAcceptableLength;
-		const float squaredLength    = VectorLengthSquared( vec );
-		if( squaredLength >= squaredThreshold ) [[likely]] {
-			const float rcpLength = Q_RSqrt( squaredLength );
-			VectorScale( vec, rcpLength, vec );
-			return squaredLength * rcpLength;
+		const float squareLength    = VectorLengthSquared( m_data );
+		if( squareLength >= squaredThreshold ) [[likely]] {
+			const float rcpLength = Q_RSqrt( squareLength );
+			VectorScale( m_data, rcpLength, m_data );
+			return squareLength * rcpLength;
 		}
 		wsw::failWithRuntimeError( "Fast normalization failure" );
 	}
 
 	[[nodiscard]]
-	bool operator==( const Vec3 &that ) const { return VectorCompare( vec, that.vec ); }
+	bool operator!=( const Vec3 &that ) const { return !VectorCompare( m_data, that.m_data ); }
+	[[nodiscard]]
+	bool operator==( const Vec3 &that ) const { return VectorCompare( m_data, that.m_data ); }
 
-	float *Data() { return vec; }
-	const float *Data() const { return vec; }
+	[[nodiscard]] constexpr auto data() -> float * { return m_data; }
+	[[nodiscard]] constexpr auto data() const -> const float * { return m_data; }
 
-	void Set( const Vec3 &that ) { Set( that.Data() ); }
-	void Set( const vec3_t that ) { Set( that[0], that[1], that[2] ); }
-	void Set( vec_t x, vec_t y, vec_t z ) {
-		VectorSet( this->vec, x, y, z );
-	}
-	void CopyTo( Vec3 &that ) const { that.Set( *this ); }
-	void CopyTo( vec3_t that ) const { VectorCopy( this->vec, that ); }
-	void CopyTo( vec_t *x, vec_t *y, vec_t *z ) const {
-		if( x ) {
-			*x = X();
-		}
-		if( y ) {
-			*y = Y();
-		}
-		if( z ) {
-			*z = Z();
-		}
-	}
+	// TODO: Deprecate these methods
+	constexpr void set( const Vec3 &that ) { VectorCopy( that.m_data, m_data ); }
+	constexpr void set( const vec3_t that ) { VectorCopy( that, m_data ); }
+	constexpr void set( vec_t x, vec_t y, vec_t z ) { VectorSet( m_data, x, y, z ); }
+	// TODO: Deprecate these methods
+	constexpr void copyTo( Vec3 &that ) const { VectorCopy( m_data, that.m_data ); }
+	constexpr void copyTo( vec3_t that ) const { VectorCopy( m_data, that ); }
 
-	vec_t &X() { return vec[0]; }
-	vec_t &Y() { return vec[1]; }
-	vec_t &Z() { return vec[2]; }
+	[[nodiscard]] constexpr auto x() -> float & { return m_data[0]; }
+	[[nodiscard]] constexpr auto y() -> float & { return m_data[1]; }
+	[[nodiscard]] constexpr auto z() -> float & { return m_data[2]; }
 
-	vec_t X() const { return vec[0]; }
-	vec_t Y() const { return vec[1]; }
-	vec_t Z() const { return vec[2]; }
+	[[nodiscard]] constexpr auto x() const -> float { return m_data[0]; }
+	[[nodiscard]] constexpr auto y() const -> float { return m_data[1]; }
+	[[nodiscard]] constexpr auto z() const -> float { return m_data[2]; }
 
-	void operator+=( const Vec3 &that ) {
-		VectorAdd( vec, that.vec, vec );
+	constexpr void operator+=( const Vec3 &that ) {
+		VectorAdd( m_data, that.m_data, m_data );
 	}
-	void operator+=( const vec3_t that ) {
-		VectorAdd( vec, that, vec );
+	constexpr void operator+=( const vec3_t that ) {
+		VectorAdd( m_data, that, m_data );
 	}
-	void operator-=( const Vec3 &that ) {
-		VectorSubtract( vec, that.vec, vec );
+	constexpr void operator-=( const Vec3 &that ) {
+		VectorSubtract( m_data, that.m_data, m_data );
 	}
-	void operator-=( const vec3_t that ) {
-		VectorSubtract( vec, that, vec );
+	constexpr void operator-=( const vec3_t that ) {
+		VectorSubtract( m_data, that, m_data );
 	}
-	void operator*=( float scale ) {
-		VectorScale( vec, scale, vec );
+	constexpr void operator*=( float scale ) {
+		VectorScale( m_data, scale, m_data );
 	}
-	Vec3 operator*( float scale ) const {
-		return Vec3( scale * X(), scale * Y(), scale * Z() );
+	[[nodiscard]]
+	constexpr auto operator*( float scale ) const -> Vec3 {
+		return { scale * m_data[0], scale * m_data[1], scale * m_data[2] };
 	}
-	Vec3 operator+( const Vec3 &that ) const {
-		return Vec3( X() + that.X(), Y() + that.Y(), Z() + that.Z() );
+	[[nodiscard]]
+	constexpr auto operator+( const Vec3 &that ) const -> Vec3 {
+		return { m_data[0] + that.m_data[0], m_data[1] + that.m_data[1], m_data[2] + that.m_data[2] };
 	}
-	Vec3 operator+( const vec3_t that ) const {
-		return Vec3( X() + that[0], Y() + that[1], Z() + that[2] );
+	[[nodiscard]]
+	constexpr auto operator+( const vec3_t that ) const -> Vec3 {
+		return { m_data[0] + that[0], m_data[1] + that[1], m_data[2] + that[2] };
 	}
-	Vec3 operator-( const Vec3 &that ) const {
-		return Vec3( X() - that.X(), Y() - that.Y(), Z() - that.Z() );
+	[[nodiscard]]
+	constexpr auto operator-( const Vec3 &that ) const -> Vec3 {
+		return { m_data[0] - that.m_data[0], m_data[1] - that.m_data[1], m_data[2] - that.m_data[2] };
 	}
-	Vec3 operator-( const vec3_t that ) const {
-		return Vec3( X() - that[0], Y() - that[1], Z() - that[2] );
+	[[nodiscard]]
+	constexpr auto operator-( const vec3_t that ) const -> Vec3 {
+		return { m_data[0] - that[0], m_data[1] - that[1], m_data[2] - that[2] };
 	}
-	Vec3 operator-() const {
-		return Vec3( -X(), -Y(), -Z() );
+	[[nodiscard]]
+	constexpr auto operator-() const -> Vec3 {
+		return { -m_data[0], -m_data[1], -m_data[2] };
 	}
 
-	vec_t Dot( const Vec3 &that ) const {
-		return DotProduct( vec, that.vec );
-	}
-	float Dot( const vec3_t that ) const {
-		return DotProduct( vec, that );
-	}
+	[[nodiscard]] constexpr auto dot( const Vec3 &that ) const -> float { return DotProduct( m_data, that.m_data ); }
+	[[nodiscard]] constexpr auto dot( const vec3_t that ) const -> float { return DotProduct( m_data, that ); }
 
-	inline Vec3 Cross( const Vec3 &that ) const {
-		return Vec3(
-			Y() * that.Z() - Z() * that.Y(),
-			Z() * that.X() - X() * that.Z(),
-			X() * that.Y() - Y() * that.X() );
+	[[nodiscard]]
+	constexpr auto cross( const Vec3 &that ) const -> Vec3 {
+		vec3_t result;
+		CrossProduct( m_data, that.m_data, result );
+		return Vec3( result );
 	}
-	inline Vec3 Cross( const vec3_t that ) const {
-		return Vec3(
-			Y() * that[2] - Z() * that[1],
-			Z() * that[0] - X() * that[2],
-			X() * that[2] - Y() * that[1] );
+	[[nodiscard]]
+	constexpr auto cross( const vec3_t that ) const -> Vec3 {
+		vec3_t result;
+		CrossProduct( m_data, that, result );
+		return Vec3( result );
 	}
+private:
+	float m_data[3];
 };
 
-inline Vec3 operator *( float scale, const Vec3 &v ) {
+[[nodiscard]]
+inline constexpr auto operator *( float scale, const Vec3 &v ) -> Vec3 {
 	return v * scale;
 }
 

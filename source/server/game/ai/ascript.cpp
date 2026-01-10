@@ -362,14 +362,14 @@ static const asBehavior_t asAiCampingSpot_ObjectBehaviors[] =
 static asvec3_t objectCampingSpot_get_origin(const AiCampingSpot *obj)
 {
     asvec3_t result;
-    obj->Origin().CopyTo(result.v);
+    obj->Origin().copyTo(result.v);
     return result;
 }
 
 static asvec3_t objectCampingSpot_get_lookAtPoint(const AiCampingSpot *obj)
 {
     asvec3_t result;
-    obj->LookAtPoint().CopyTo(result.v);
+    obj->LookAtPoint().copyTo(result.v);
     return result;
 }
 
@@ -416,7 +416,7 @@ static const asBehavior_t asAiPendingLookAtPoint_ObjectBehaviors[] =
 static asvec3_t objectPendingLookAtPoint_get_origin(const AiPendingLookAtPoint *obj)
 {
     asvec3_t result;
-    obj->Origin().CopyTo(result.v);
+    obj->Origin().copyTo(result.v);
     return result;
 }
 

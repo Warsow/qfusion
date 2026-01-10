@@ -757,8 +757,8 @@ class CMBenchmark {
 		const Vec3 listMins( Vec3( -16, -16, -16 ) + ent->r.absmin );
 		const Vec3 listMaxs( Vec3( +16, +16, +16 ) + ent->r.absmax );
 
-		SV_BuildShapeList( baseList, listMins.Data(), listMaxs.Data(), MASK_SOLID );
-		SV_ClipShapeList( clippedList, baseList, listMins.Data(), listMaxs.Data() );
+		SV_BuildShapeList( baseList, listMins.data(), listMaxs.data(), MASK_SOLID );
+		SV_ClipShapeList( clippedList, baseList, listMins.data(), listMaxs.data() );
 
 		wsw::StaticVector<Vec3, 8> vertices;
 		const float *bounds[2] { ent->r.absmin, ent->r.absmax };
@@ -775,9 +775,9 @@ class CMBenchmark {
 				if( i == j ) {
 					continue;
 				}
-				SV_ClipToShapeList( clippedList, &tr, vertices[i].Data(),
-												vertices[j].Data(), vec3_origin, vec3_origin, MASK_SOLID );
-				//GAME_IMPORT.CM_TransformedBoxTrace( &tr, vertices[i].Data(), vertices[j].Data(),
+				SV_ClipToShapeList( clippedList, &tr, vertices[i].data(),
+												vertices[j].data(), vec3_origin, vec3_origin, MASK_SOLID );
+				//GAME_IMPORT.CM_TransformedBoxTrace( &tr, vertices[i].data(), vertices[j].data(),
 				// vec3_origin, vec3_origin, nullptr, MASK_SOLID, nullptr, nullptr, 0 );
 			}
 		}

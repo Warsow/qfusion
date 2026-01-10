@@ -623,7 +623,7 @@ void AiPlanner::SetGoalAndPlan( AiGoal *activeGoal_, AiActionRecord *planHead_ )
 #if 0
 	if( Bot *bot = dynamic_cast<Bot *>( ai ) ) {
 		const edict_t *self = game.edicts + bot->EntNum();
-		AITools_DrawColorLine( self->s.origin, ( Vec3( 0, 0, 56 ) + self->s.origin ).Data(), activeGoal_->DebugColor(), 0 );
+		AITools_DrawColorLine( self->s.origin, ( Vec3( 0, 0, 56 ) + self->s.origin ).data(), activeGoal_->DebugColor(), 0 );
 	}
 #endif
 

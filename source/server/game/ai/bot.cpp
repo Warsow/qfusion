@@ -202,7 +202,7 @@ bool Bot::TryReachNavTargetByProximity() {
 		return false;
 	}
 
-	if( ( navTarget->Origin() - self->s.origin ).SquaredLength() < wsw::square( navTarget->RadiusOrDefault( 40.0f ) ) ) {
+	if( ( navTarget->Origin() - self->s.origin ).squareLength() < wsw::square( navTarget->RadiusOrDefault( 40.0f ) ) ) {
 		return true;
 	}
 
@@ -678,7 +678,7 @@ float Bot::GetChangedAngle( float oldAngle, float desiredAngle, unsigned frameTi
 Vec3 Bot::GetNewViewAngles( const vec3_t oldAngles, const Vec3 &desiredDirection,
 						    unsigned frameTime, float angularSpeedMultiplier ) const {
 	vec3_t newAngles, desiredAngles;
-	VecToAngles( desiredDirection.Data(), desiredAngles );
+	VecToAngles( desiredDirection.data(), desiredAngles );
 	assert( desiredAngles[ROLL] == 0.0f );
 
 	for( auto angleNum: { YAW, PITCH } ) {
@@ -701,7 +701,7 @@ int Bot::CheckTravelTimeMillis( const Vec3& from, const Vec3 &to, bool allowUnre
 	// because a reachability must have been checked by the spots registry first in a few preceeding calls.
 
 	int fromAreaNum;
-	if( ( from - self->s.origin ).SquaredLength() < wsw::square( 4.0f ) ) {
+	if( ( from - self->s.origin ).squareLength() < wsw::square( 4.0f ) ) {
 		fromAreaNum = aasWorld->findAreaNum( self );
 	} else {
 		fromAreaNum = aasWorld->findAreaNum( from );
@@ -715,7 +715,7 @@ int Bot::CheckTravelTimeMillis( const Vec3& from, const Vec3 &to, bool allowUnre
 		FailWith( "CheckTravelTimeMillis(): Can't find `from` AAS area" );
 	}
 
-	const int toAreaNum = aasWorld->findAreaNum( to.Data() );
+	const int toAreaNum = aasWorld->findAreaNum( to.data() );
 	if( !toAreaNum ) {
 		if( allowUnreachable ) {
 			return 0;

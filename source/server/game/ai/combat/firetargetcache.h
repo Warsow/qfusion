@@ -26,7 +26,7 @@ class BotFireTargetCache {
 		void CacheFor( const SelectedEnemy &selectedEnemy,
 					   const SelectedWeapons &selectedWeapons,
 					   const vec3_t origin_ ) {
-			this->origin.Set( origin_ );
+			this->origin.set( origin_ );
 			selectedEnemyInstanceId = selectedEnemy.InstanceId();
 			selectedWeaponsInstanceId = selectedWeapons.InstanceId();
 			invalidAt = level.time + 64;

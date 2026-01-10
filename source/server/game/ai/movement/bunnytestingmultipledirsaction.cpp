@@ -23,7 +23,7 @@ void BunnyTestingSavedLookDirsAction::onApplicationSequenceStarted( PredictionCo
 	}
 
 	const SuggestedDir &suggestedDir = m_suggestedLookDirs[m_currSuggestedLookDirNum];
-	m_currDir = suggestedDir.dir.Data();
+	m_currDir = suggestedDir.dir.data();
 	if( unsigned penalty = suggestedDir.pathPenalty ) {
 		ensurePathPenalty( penalty );
 	}
@@ -94,8 +94,8 @@ public:
 
 		Vec3 rotate( const Vec3 &__restrict v ) const {
 			vec3_t result;
-			assert( std::fabs( v.Length() - 1.0f ) < 0.001f );
-			Matrix3_TransformVector( matrix, v.Data(), result );
+			assert( std::fabs( v.length() - 1.0f ) < 0.001f );
+			Matrix3_TransformVector( matrix, v.data(), result );
 			return Vec3( result );
 		}
 	};
@@ -162,9 +162,9 @@ public:
 static DirRotatorsCache dirRotatorsCache;
 
 static inline bool areDirsSimilar( const Vec3 &__restrict a, const Vec3 &__restrict b ) {
-	assert( std::fabs( a.SquaredLength() - 1.0f ) < 0.1f );
-	assert( std::fabs( b.SquaredLength() - 1.0f ) < 0.1f );
-	return a.Dot( b ) > 0.998f;
+	assert( std::fabs( a.squareLength() - 1.0f ) < 0.1f );
+	assert( std::fabs( b.squareLength() - 1.0f ) < 0.1f );
+	return a.dot( b ) > 0.998f;
 }
 
 void BunnyTestingSavedLookDirsAction::deriveMoreDirsFromSavedDirs() {
@@ -268,14 +268,14 @@ void BunnyTestingSavedLookDirsAction::saveCandidateAreaDirs( PredictionContext *
 		Vec3 target( 0, 0, 0 );
 		if( areaNum != navTargetAreaNum ) {
 			const auto &area = aasAreas[areaNum];
-			target.Set( area.center );
-			target.Z() = area.mins[2] + 32.0f;
+			target.set( area.center );
+			target.z() = area.mins[2] + 32.0f;
 		} else {
-			context->NavTargetOrigin().CopyTo( target );
+			context->NavTargetOrigin().copyTo( target );
 		}
-		if( target.SquareDistance2DTo( entityPhysicsState.Origin() ) > wsw::square( 24.0f ) ) {
+		if( target.squareDistance2DTo( entityPhysicsState.Origin() ) > wsw::square( 24.0f ) ) {
 			Vec3 dir( target - entityPhysicsState.Origin() );
-			dir *= Q_RSqrt( dir.SquaredLength() );
+			dir *= Q_RSqrt( dir.squareLength() );
 			m_suggestedLookDirs.emplace_back( SuggestedDir { dir, areaNum } );
 		}
 	}

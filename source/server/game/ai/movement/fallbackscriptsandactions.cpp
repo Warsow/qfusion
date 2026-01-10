@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 static bool contactsTargetPoint( const AiEntityPhysicsState &entityPhysicsState, const Vec3 &targetPoint ) {
 	const Vec3 botMins( Vec3( playerbox_stand_mins ) + entityPhysicsState.Origin() );
 	const Vec3 botMaxs( Vec3( playerbox_stand_maxs ) + entityPhysicsState.Origin() );
-	return BoundsAndSphereIntersect( botMins.Data(), botMaxs.Data(), targetPoint.Data(), 1.0f );
+	return BoundsAndSphereIntersect( botMins.data(), botMaxs.data(), targetPoint.data(), 1.0f );
 }
 
 void JumpToPointAction::beforePlanning() {
@@ -45,7 +45,7 @@ void JumpToPointAction::afterPlanning() {
 
 void JumpToPointAction::onApplicationSequenceStarted( PredictionContext *context ) {
 	BaseAction::onApplicationSequenceStarted( context );
-	m_startPoint.Set( context->movementState->entityPhysicsState.Origin() );
+	m_startPoint.set( context->movementState->entityPhysicsState.Origin() );
 	m_hasJumped = false;
 }
 
@@ -70,7 +70,7 @@ auto JumpToPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 	auto *const botInput           = &context->record->botInput;
 
 	Vec3 viewOrigin( entityPhysicsState.Origin() );
-	viewOrigin.Z() += playerbox_stand_viewheight;
+	viewOrigin.z() += playerbox_stand_viewheight;
 
 	Vec3 intendedLookDir( ( Vec3( 0, 0, 24 ) + m_targetPoint ) - viewOrigin );
 	if( !intendedLookDir.normalizeFast( { .minAcceptableLength = 1.0f } ) ) {
@@ -81,7 +81,7 @@ auto JumpToPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 
 	if( entityPhysicsState.GroundEntity() ) {
 		if( !m_hasJumped ) {
-			if( intendedLookDir.Dot( entityPhysicsState.ForwardDir() ) > 0.95f ) {
+			if( intendedLookDir.dot( entityPhysicsState.ForwardDir() ) > 0.95f ) {
 				botInput->SetForwardMovement( 1 );
 				botInput->SetUpMovement( 1 );
 				// TODO: Vary for reachability kind
@@ -96,7 +96,7 @@ auto JumpToPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 	} else {
 		// Otherwise, wait for landing on the initial position first
 		if( m_hasJumped ) {
-			if( intendedLookDir.Dot( entityPhysicsState.ForwardDir() ) > 0.7f ) {
+			if( intendedLookDir.dot( entityPhysicsState.ForwardDir() ) > 0.7f ) {
 				botInput->SetForwardMovement( 1 );
 				if( m_attemptNum > 0 ) {
 					const float accelFrac = Q_Sqrt( (float)m_attemptNum * ( 1.0f / kMaxAttempts ) );
@@ -125,7 +125,7 @@ static bool handleImperfectLanding( PredictionContext *context, const Vec3 &targ
 	}
 
 	if( wsw::contains( currAreaNums, currAreaNums + numCurrAreas, targetAreaNum ) ) {
-		context->SaveGoodEnoughPath( 1, (unsigned)targetPoint.FastDistanceTo( entityPhysicsState.Origin() ) );
+		context->SaveGoodEnoughPath( 1, (unsigned)targetPoint.fastDistanceTo( entityPhysicsState.Origin() ) );
 		return true;
 	}
 
@@ -133,7 +133,7 @@ static bool handleImperfectLanding( PredictionContext *context, const Vec3 &targ
 	if( const auto targetClusterNum = aasWorld->floorClusterNum( targetAreaNum ) ) {
 		for( int i = 0; i < numCurrAreas; ++i ) {
 			if( targetClusterNum == aasWorld->floorClusterNum( currAreaNums[i] ) ) {
-				context->SaveLastResortPath( (unsigned)targetPoint.FastDistanceTo( entityPhysicsState.Origin() ) );
+				context->SaveLastResortPath( (unsigned)targetPoint.fastDistanceTo( entityPhysicsState.Origin() ) );
 				return true;
 			}
 		}
@@ -158,8 +158,8 @@ auto JumpToPointAction::checkPredictionStepResults( PredictionContext *context )
 
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	if( entityPhysicsState.GroundEntity() ) {
-		if( m_targetPoint.SquareDistanceTo( entityPhysicsState.Origin() ) <
-			m_startPoint.SquareDistanceTo( entityPhysicsState.Origin() ) ) {
+		if( m_targetPoint.squareDistanceTo( entityPhysicsState.Origin() ) <
+			m_startPoint.squareDistanceTo( entityPhysicsState.Origin() ) ) {
 			if( contactsTargetPoint( entityPhysicsState, m_targetPoint ) ) {
 				return PredictionResult::Complete;
 			}
@@ -200,7 +200,7 @@ bool TraverseJumpReachScript::produceBotInput( BotInput *input ) {
 	Vec3 reachDir( Vec3( targetReach.end ) - Vec3( targetReach.start ) );
 	reachDir.normalizeFastOrThrow();
 	vec3_t realReachStart;
-	VectorMA( targetReach.start, -16.0f, reachDir.Data(), realReachStart );
+	VectorMA( targetReach.start, -16.0f, reachDir.data(), realReachStart );
 
 	const bool shouldReachStartPoint = !contactsTargetPoint( entityPhysicsState, Vec3( realReachStart ) ) &&
 		DistanceSquared( targetReach.end, entityPhysicsState.Origin() ) > DistanceSquared( targetReach.end, realReachStart );
@@ -260,7 +260,7 @@ void WalkToPointAction::afterPlanning() {
 
 void WalkToPointAction::onApplicationSequenceStarted( PredictionContext *context ) {
 	BaseAction::onApplicationSequenceStarted( context );
-	m_distanceFromStartToTarget = m_targetPoint.FastDistance2DTo( context->movementState->entityPhysicsState.Origin() );
+	m_distanceFromStartToTarget = m_targetPoint.fastDistance2DTo( context->movementState->entityPhysicsState.Origin() );
 	m_hasDashedOrWalljumped     = false;
 	m_hasJumped                 = false;
 }
@@ -295,19 +295,19 @@ auto WalkToPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 	auto *const botInput           = &context->record->botInput;
 
 	Vec3 viewOrigin( entityPhysicsState.Origin() );
-	viewOrigin.Z() += playerbox_stand_viewheight;
+	viewOrigin.z() += playerbox_stand_viewheight;
 
 	Vec3 dirToTargetPoint( Vec3( m_targetPoint ) - viewOrigin );
-	dirToTargetPoint.Z() = 0;
+	dirToTargetPoint.z() = 0;
 	const std::optional<float> maybeDistance2D = dirToTargetPoint.normalizeFast( { .minAcceptableLength = 1.0f } );
 	if( !maybeDistance2D ) {
 		return PredictionResult::Restart;
 	}
 
 	if( std::optional<Vec3> keptInFovPoint = m_subsystem->bot->GetKeptInFovPoint() ) {
-		if( keptInFovPoint->SquareDistance2DTo( entityPhysicsState.Origin() ) > wsw::square( 1.0f ) ) {
+		if( keptInFovPoint->squareDistance2DTo( entityPhysicsState.Origin() ) > wsw::square( 1.0f ) ) {
 			Vec3 lookVec( Vec3( entityPhysicsState.Origin() ) - *keptInFovPoint );
-			lookVec.Z() *= Z_NO_BEND_SCALE;
+			lookVec.z() *= Z_NO_BEND_SCALE;
 
 			if( entityPhysicsState.GroundEntity() ) {
 				int keyMoves[2] { 0, 0 };
@@ -345,7 +345,7 @@ auto WalkToPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 	if( !botInput->isUcmdSet ) {
 		botInput->SetIntendedLookDir( dirToTargetPoint, true );
 		botInput->isUcmdSet = true;
-		if( dirToTargetPoint.Dot( entityPhysicsState.ForwardDir() ) > 0.95f ) {
+		if( dirToTargetPoint.dot( entityPhysicsState.ForwardDir() ) > 0.95f ) {
 			botInput->SetForwardMovement( 1 );
 			if( *maybeDistance2D > m_walkProximityThreshold ) {
 				if( entityPhysicsState.GroundEntity() ) {
@@ -361,7 +361,7 @@ auto WalkToPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 								Vec3 velocityDir( entityPhysicsState.Velocity() );
 								velocityDir *= Q_Rcp( entityPhysicsState.Speed() );
 								// TODO: dirToTargetPoint is a 2D dir
-								if( velocityDir.Dot( dirToTargetPoint ) > 0.9f ) {
+								if( velocityDir.dot( dirToTargetPoint ) > 0.9f ) {
 									botInput->SetUpMovement( 1 );
 								}
 							}
@@ -404,7 +404,7 @@ auto WalkToPointAction::checkPredictionStepResults( PredictionContext *context )
 		}
 	}
 
-	const float squareDistance2D = m_targetPoint.FastDistance2DTo( entityPhysicsState.Origin() );
+	const float squareDistance2D = m_targetPoint.fastDistance2DTo( entityPhysicsState.Origin() );
 	// Stop wasting CPU cycles if we are definitely not going to hit the target point
 	if( squareDistance2D > wsw::square( m_distanceFromStartToTarget + 48.0f ) ) {
 		return PredictionResult::Restart;
@@ -478,20 +478,20 @@ auto LandOnPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 	auto *const botInput           = &context->record->botInput;
 
 	Vec3 viewOrigin( entityPhysicsState.Origin() );
-	viewOrigin.Z() += playerbox_stand_viewheight;
+	viewOrigin.z() += playerbox_stand_viewheight;
 
 	Vec3 intendedLookDir3D( m_targetPoint - viewOrigin );
 	if( intendedLookDir3D.normalizeFast( { .minAcceptableLength = 1.0f } ) ) {
-		Vec3 intendedLookDir2D( intendedLookDir3D.X(), intendedLookDir3D.Y(), 0.0f );
+		Vec3 intendedLookDir2D( intendedLookDir3D.x(), intendedLookDir3D.y(), 0.0f );
 		if( m_tryUsingDirectionKeys ) {
 			constexpr float dotThreshold = 0.9f;
 			if( intendedLookDir2D.normalizeFast( { .minAcceptableLength = 1.0f } ) ) {
-				const float intendedDotForward = intendedLookDir2D.Dot( entityPhysicsState.ForwardDir() );
+				const float intendedDotForward = intendedLookDir2D.dot( entityPhysicsState.ForwardDir() );
 				if( std::fabs( intendedDotForward ) > dotThreshold ) {
 					botInput->SetForwardMovement( intendedDotForward > 0.0f ? +1 : -1 );
 					botInput->SetIntendedLookDir( intendedLookDir2D );
 				} else {
-					const float intendedDotRight = intendedLookDir2D.Dot( entityPhysicsState.RightDir() );
+					const float intendedDotRight = intendedLookDir2D.dot( entityPhysicsState.RightDir() );
 					if( std::fabs( intendedDotRight ) > dotThreshold ) {
 						botInput->SetRightMovement( intendedDotRight > 0.0f ? +1 : -1 );
 						botInput->SetIntendedLookDir( intendedLookDir2D );
@@ -501,7 +501,7 @@ auto LandOnPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 		}
 		if( !( botInput->ForwardMovement() | botInput->RightMovement() ) ) {
 			botInput->SetIntendedLookDir( intendedLookDir3D, true );
-			if( intendedLookDir3D.Dot( entityPhysicsState.ForwardDir() ) > 0.3f ) {
+			if( intendedLookDir3D.dot( entityPhysicsState.ForwardDir() ) > 0.3f ) {
 				botInput->SetForwardMovement( 1 );
 			} else {
 				botInput->SetTurnSpeedMultiplier( 2.0f );
@@ -632,7 +632,7 @@ auto ClimbOntoBarrierAction::planPredictionStep( PredictionContext *context ) ->
 				botInput->SetIntendedLookDir( Vec3( 0, 0, 1 ), true );
 				// TODO: Ignore the speed limitation if we are facing the reachability in an optimal position
 				if( entityPhysicsState.Speed2D() < 10.0f ) {
-					if( entityPhysicsState.ForwardDir().Z() > 0.9f ) {
+					if( entityPhysicsState.ForwardDir().z() > 0.9f ) {
 						botInput->SetUpMovement( 1 );
 					} else {
 						botInput->SetTurnSpeedMultiplier( 5.0f );
@@ -646,12 +646,12 @@ auto ClimbOntoBarrierAction::planPredictionStep( PredictionContext *context ) ->
 		} else {
 			// If we appear to be standing on the barrier
 			Vec3 viewOrigin( entityPhysicsState.Origin() );
-			viewOrigin.Z() += playerbox_stand_viewheight;
+			viewOrigin.z() += playerbox_stand_viewheight;
 
 			Vec3 intendedLookDir( Vec3( aasWorld->getAreas()[targetReach.areanum].center ) - viewOrigin );
 			if( intendedLookDir.normalizeFast() ) {
 				botInput->SetIntendedLookDir( intendedLookDir, true );
-				if( intendedLookDir.Dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
+				if( intendedLookDir.dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
 					botInput->SetForwardMovement( 1 );
 				}
 			} else {
@@ -660,7 +660,7 @@ auto ClimbOntoBarrierAction::planPredictionStep( PredictionContext *context ) ->
 		}
 	} else {
 		Vec3 viewOrigin( entityPhysicsState.Origin() );
-		viewOrigin.Z() += playerbox_stand_viewheight;
+		viewOrigin.z() += playerbox_stand_viewheight;
 
 		Vec3 intendedLookDir( viewOrigin );
 		const auto &targetArea = aasWorld->getAreas()[targetReach.areanum];
@@ -671,12 +671,12 @@ auto ClimbOntoBarrierAction::planPredictionStep( PredictionContext *context ) ->
 		}
 
 		intendedLookDir *= -1;
-		if( intendedLookDir.Dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
+		if( intendedLookDir.dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
 			botInput->SetForwardMovement( 1 );
 		} else {
 			botInput->SetTurnSpeedMultiplier( 10.0f );
 		}
-		intendedLookDir.Z() *= 2.0f;
+		intendedLookDir.z() *= 2.0f;
 		botInput->SetIntendedLookDir( intendedLookDir, false );
 		botInput->SetUpMovement( 1 );
 	}
@@ -891,7 +891,7 @@ bool JumppadScript::setupFreeflyMovement( BotInput *input, const float *targetTr
 	// TODO: Check distance of origin to the reach segment
 
 	Vec3 viewOrigin( entityPhysicsState.Origin() );
-	viewOrigin.Z() += playerbox_stand_viewheight;
+	viewOrigin.z() += playerbox_stand_viewheight;
 	if( const auto maybePoint = m_subsystem->bot->GetKeptInFovPoint() ) {
 		Vec3 intendedLookDir( *maybePoint - viewOrigin );
 		if( intendedLookDir.normalizeFast() ) {
@@ -916,7 +916,7 @@ bool JumppadScript::setupFreeflyMovement( BotInput *input, const float *targetTr
 
 bool JumppadScript::setupRestartTriggerMovement( BotInput *input, const AiEntityPhysicsState &entityPhysicsState ) {
 	Vec3 viewOrigin( entityPhysicsState.Origin() );
-	viewOrigin.Z() += playerbox_stand_viewheight;
+	viewOrigin.z() += playerbox_stand_viewheight;
 
 	const auto *trigger = &game.edicts[m_triggerEntNum];
 	const Vec3 triggerOrigin( 0.5f * ( Vec3( trigger->r.absmin ) + Vec3( trigger->r.absmax ) ) );
@@ -945,7 +945,7 @@ bool ElevatorScript::produceBotInput( BotInput *input ) {
 		trace_t trace;
 		// TODO: Limit trace bounds
 		Vec3 traceEnd( Vec3( 0, 0, -99999 ) + entityPhysicsState.Origin() );
-		G_Trace( &trace, entityPhysicsState.Origin(), nullptr, nullptr, traceEnd.Data(),
+		G_Trace( &trace, entityPhysicsState.Origin(), nullptr, nullptr, traceEnd.data(),
 				 game.edicts + m_subsystem->bot->EntNum(), MASK_SOLID );
 		if( trace.fraction != 1.0f && !trace.allsolid && !trace.startsolid ) {
 			const edict_t *entity = game.edicts + trace.ent;
@@ -1009,12 +1009,12 @@ bool ElevatorScript::setupExitPlatformMovement( BotInput *input, const edict_t *
 				return true;
 			}
 			Vec3 viewOrigin( entityPhysicsState.Origin() );
-			viewOrigin.Z() += playerbox_stand_viewheight;
+			viewOrigin.z() += playerbox_stand_viewheight;
 			Vec3 intendedLookDir( reachEnd - viewOrigin );
 			if( intendedLookDir.normalizeFast() ) {
 				input->SetIntendedLookDir( intendedLookDir, true );
 				input->isUcmdSet = true;
-				if( intendedLookDir.Dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
+				if( intendedLookDir.dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
 					input->SetForwardMovement( 1 );
 				}
 				return true;
@@ -1057,15 +1057,15 @@ bool ElevatorScript::setupRidePlatformMovement( BotInput *input, const edict_t *
 			const Vec3 botMaxs( Vec3( playerbox_stand_maxs ) + entityPhysicsState.Origin() );
 			const edict_t *const triggerEntity = platformEntity->enemy;
 			assert( triggerEntity == game.edicts + m_triggerEntNum );
-			if( !GClip_EntityContact( botMins.Data(), botMaxs.Data(), triggerEntity ) ) {
+			if( !GClip_EntityContact( botMins.data(), botMaxs.data(), triggerEntity ) ) {
 				// TODO: Account for kept in fov point
 				Vec3 viewOrigin( entityPhysicsState.Origin() );
-				viewOrigin.Z() += playerbox_stand_viewheight;
+				viewOrigin.z() += playerbox_stand_viewheight;
 				Vec3 triggerOrigin( 0.5f * ( Vec3( triggerEntity->r.absmin ) + Vec3( triggerEntity->r.absmax ) ) );
 				Vec3 intendedLookDir( triggerOrigin - viewOrigin );
 				if( intendedLookDir.normalizeFast() ) {
 					input->SetIntendedLookDir( intendedLookDir, true );
-					if( intendedLookDir.Dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
+					if( intendedLookDir.dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
 						input->SetForwardMovement( true );
 					} else {
 						input->SetTurnSpeedMultiplier( 3.0f );
@@ -1084,7 +1084,7 @@ bool ElevatorScript::setupRidePlatformMovement( BotInput *input, const edict_t *
 		}
 	} else {
 		Vec3 viewOrigin( entityPhysicsState.Origin() );
-		viewOrigin.Z() += playerbox_stand_viewheight;
+		viewOrigin.z() += playerbox_stand_viewheight;
 		if( const std::optional<Vec3> maybeKeptInFovPoint = m_subsystem->bot->GetKeptInFovPoint() ) {
 			Vec3 intendedLookDir( *maybeKeptInFovPoint - viewOrigin );
 			if( intendedLookDir.normalizeFast() ) {

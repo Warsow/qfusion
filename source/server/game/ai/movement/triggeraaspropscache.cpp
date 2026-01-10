@@ -19,7 +19,7 @@ static auto findContactingEntNumForReach( int reachNum, [[maybe_unused]] int tra
 
 	for( const auto entNum: classEntNums ) {
 		const auto *const ent = gameEnts + entNum;
-		if( GClip_EntityContact( contactMins.Data(), contactMaxs.Data(), ent ) ) {
+		if( GClip_EntityContact( contactMins.data(), contactMaxs.data(), ent ) ) {
 			return entNum;
 		}
 	}

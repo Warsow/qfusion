@@ -18,7 +18,7 @@ PlannerNode *StartLostEnemyPursuitAction::TryApply( const WorldState &worldState
 	}
 
 	const Vec3 botOrigin = worldState.getVec3( WorldState::BotOrigin ).value();
-	const float distanceToEnemy = botOrigin.FastDistanceTo( *lostEnemyOrigin );
+	const float distanceToEnemy = botOrigin.fastDistanceTo( *lostEnemyOrigin );
 	if( distanceToEnemy < GOAL_PICKUP_ACTION_RADIUS ) {
 		Debug( "Bot is already close to the last seen enemy origin\n" );
 		return nullptr;
@@ -32,7 +32,7 @@ PlannerNode *StartLostEnemyPursuitAction::TryApply( const WorldState &worldState
 		return nullptr;
 	}
 
-	if( ( botOrigin - Self()->Origin() ).SquaredLength() > 1.0f ) {
+	if( ( botOrigin - Self()->Origin() ).squareLength() > 1.0f ) {
 		Debug( "The action can be applied only to the current bot origin\n" );
 		return nullptr;
 	}
@@ -78,12 +78,12 @@ PlannerNode *StopLostEnemyPursuitAction::TryApply( const WorldState &worldState 
 
 	const Vec3 botOrigin = worldState.getVec3( WorldState::BotOrigin ).value();
 
-	if( lostEnemyOrigin->SquareDistanceTo( *navTargetOrigin ) > 1.0f ) {
+	if( lostEnemyOrigin->squareDistanceTo( *navTargetOrigin ) > 1.0f ) {
 		Debug( "The lost enemy origin does not match nav target in the given world state\n" );
 		return nullptr;
 	}
 
-	if( botOrigin.SquareDistanceTo( *navTargetOrigin ) > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
+	if( botOrigin.squareDistanceTo( *navTargetOrigin ) > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
 		Debug( "The bot is way too far from nav target in the given world state\n" );
 		return nullptr;
 	}

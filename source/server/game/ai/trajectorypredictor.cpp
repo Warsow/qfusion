@@ -11,8 +11,8 @@ AiTrajectoryPredictor::StopEvent AiTrajectoryPredictor::Run( const Vec3 &startVe
 		results->trace = &this->localTrace;
 	}
 
-	startOrigin.CopyTo( this->prevOrigin );
-	startOrigin.CopyTo( results->origin );
+	startOrigin.copyTo( this->prevOrigin );
+	startOrigin.copyTo( results->origin );
 
 	this->traceFunc = Trace;
 	this->contentMask = CONTENTS_SOLID;
@@ -39,7 +39,7 @@ AiTrajectoryPredictor::StopEvent AiTrajectoryPredictor::Run( const Vec3 &startVe
 		}
 
 		results->millisAhead += stepMillis;
-		prevOrigin.Set( results->origin );
+		prevOrigin.set( results->origin );
 	}
 
 	if( extrapolateLastStep ) {
@@ -51,7 +51,7 @@ AiTrajectoryPredictor::StopEvent AiTrajectoryPredictor::Run( const Vec3 &startVe
 			return (StopEvent)flags;
 		} else {
 			// Restore the last origin overwritten by an extrapolated value that is very likely to be outside a map
-			lastOrigin.CopyTo( results->origin );
+			lastOrigin.copyTo( results->origin );
 			return StopEvent::DONE;
 		}
 	}
@@ -65,20 +65,20 @@ int AiTrajectoryPredictor::RunStep( const Vec3 &startOrigin, const Vec3 &startVe
 
 	int resultFlags = 0;
 
-	results->origin[0] = startOrigin.X() + startVelocity.X() * t;
-	results->origin[1] = startOrigin.Y() + startVelocity.Y() * t;
-	results->origin[2] = startOrigin.Z() + startVelocity.Z() * t - 0.5f * gravity * t * t;
+	results->origin[0] = startOrigin.x() + startVelocity.x() * t;
+	results->origin[1] = startOrigin.y() + startVelocity.y() * t;
+	results->origin[2] = startOrigin.z() + startVelocity.z() * t - 0.5f * gravity * t * t;
 
 	if( stopEventFlags & ( HIT_SOLID | HIT_LIQUID | LEAVE_LIQUID ) ) {
 		int stepMask = contentMask;
 		// Ignore water/lava/slime while leaving it
 		if( !( stopEventFlags & LEAVE_LIQUID ) ) {
-			if( startVelocity.Z() - gravity * t >= 0 ) {
+			if( startVelocity.z() - gravity * t >= 0 ) {
 				stepMask &= ~CONTENTS_WATER;
 			}
 		}
 
-		traceFunc( results->trace, prevOrigin.Data(), mins, maxs, results->origin, ignore, stepMask );
+		traceFunc( results->trace, prevOrigin.data(), mins, maxs, results->origin, ignore, stepMask );
 
 		if( results->trace->fraction != 1.0f ) {
 			resultFlags |= ( results->trace->ent > 0 ? HIT_ENTITY : HIT_SOLID );
@@ -99,7 +99,7 @@ int AiTrajectoryPredictor::RunStep( const Vec3 &startOrigin, const Vec3 &startVe
 		case 1: color = COLOR_RGB( 0, 255, 0 ); break;
 		case 2: color = COLOR_RGB( 0, 0, 255 ); break;
 	}
-	AITools_DrawColorLine( prevOrigin.Data(), results->origin, color, 0 );
+	AITools_DrawColorLine( prevOrigin.data(), results->origin, color, 0 );
 #endif
 
 	if( !OnPredictionStep( prevOrigin, results ) ) {
@@ -172,7 +172,7 @@ int AiTrajectoryPredictor::InspectAasWorldTrace( Results *results ) {
 	areasBuffer[1] = 1;
 	int *areaNums = areasBuffer + 2;
 
-	const auto numsSpan = aasWorld->traceAreas( prevOrigin.Data(), results->origin, areasBuffer + 2, 128 );
+	const auto numsSpan = aasWorld->traceAreas( prevOrigin.data(), results->origin, areasBuffer + 2, 128 );
 	results->lastAreaNum = areaNums[numsSpan.size() - 1];
 	// Even if there are areas in the trace, the last area might be zero if areas trace ends in solid
 	if( !results->lastAreaNum ) {

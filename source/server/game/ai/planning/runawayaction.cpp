@@ -23,7 +23,7 @@ bool RunAwayAction::checkCommonPreconditionsForStartingRunningAway( const WorldS
 		return false;
 	}
 
-	if( botOrigin->SquareDistanceTo( Self()->Origin() ) > 1.0f ) {
+	if( botOrigin->squareDistanceTo( Self()->Origin() ) > 1.0f ) {
 		Debug( "This action is only applicable to the current world state\n" );
 		return false;
 	}
@@ -46,7 +46,7 @@ bool RunAwayAction::checkCommonPreconditionsForStartingRunningAway( const WorldS
 		return true;
 	}
 
-	const float distanceToEnemy = botOrigin->FastDistanceTo( *enemyOriginVar );
+	const float distanceToEnemy = botOrigin->fastDistanceTo( *enemyOriginVar );
 	if( distanceToEnemy > kLasergunRange ) {
 		/*
 		 * TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

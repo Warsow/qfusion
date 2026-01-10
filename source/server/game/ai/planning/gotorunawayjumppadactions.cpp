@@ -57,7 +57,7 @@ AiActionRecord::Status DoRunAwayViaJumppadActionRecord::UpdateStatus( const Worl
 
 	// Use the same radius as for goal items pickups
 	// (running actions for picking up an item and running away might be shared)
-	if( ( navSpot.Origin() - Self()->Origin() ).LengthFast() > GOAL_PICKUP_ACTION_RADIUS ) {
+	if( ( navSpot.Origin() - Self()->Origin() ).fastLength() > GOAL_PICKUP_ACTION_RADIUS ) {
 		Debug( "Bot is too far from the jumppad trigger\n" );
 		return INVALID;
 	}
@@ -75,14 +75,14 @@ PlannerNode *DoRunAwayViaJumppadAction::TryApply( const WorldState &worldState )
 	const Vec3 navTargetOrigin = worldState.getVec3( WorldState::NavTargetOrigin ).value();
 	const Vec3 botOrigin = worldState.getVec3( WorldState::BotOrigin ).value();
 
-	if( botOrigin.FastDistanceTo( navTargetOrigin ) > GOAL_PICKUP_ACTION_RADIUS ) {
+	if( botOrigin.fastDistanceTo( navTargetOrigin ) > GOAL_PICKUP_ACTION_RADIUS ) {
 		Debug( "Bot is too far from the nav target (jumppad origin)" );
 		return nullptr;
 	}
 
 	const Vec3 &jumppadOrigin = navTargetOrigin;
 	// Use distance from jumppad origin to target as an estimation for travel time millis
-	const float cost = ( jumppadOrigin - *pendingOrigin ).LengthFast();
+	const float cost = ( jumppadOrigin - *pendingOrigin ).fastLength();
 
 	unsigned selectedEnemyInstanceId = Self()->GetSelectedEnemy().value().InstanceId();
 	DoRunAwayViaJumppadActionRecord *record = pool.New( Self(), jumppadOrigin, selectedEnemyInstanceId );

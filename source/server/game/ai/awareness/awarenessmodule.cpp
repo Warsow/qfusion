@@ -127,7 +127,7 @@ bool BotAwarenessModule::HurtEvent::IsValidFor( const Bot *bot_ ) const {
 	const Vec3 lookDir( bot_->EntityPhysicsState()->ForwardDir() );
 	Vec3 toThreat( Vec3( inflictor->s.origin ) - bot_->Origin() );
 	if( toThreat.normalizeFast() ) [[likely]] {
-		return toThreat.Dot( lookDir ) < bot_->FovDotFactor();
+		return toThreat.dot( lookDir ) < bot_->FovDotFactor();
 	}
 
 	// Assume that we can't turn to this direction in order to react to threat as it is not defined.
@@ -180,7 +180,7 @@ void BotAwarenessModule::OnHurtByNewThreat( const edict_t *newThreat, const AiCo
 
 	Vec3 botLookDir( bot->EntityPhysicsState()->ForwardDir() );
 	Vec3 toEnemyDir = Vec3( newThreat->s.origin ) - bot->Origin();
-	const float squareDistance = toEnemyDir.SquaredLength();
+	const float squareDistance = toEnemyDir.squareLength();
 	if( squareDistance < 1 ) {
 		return;
 	}
@@ -188,13 +188,13 @@ void BotAwarenessModule::OnHurtByNewThreat( const edict_t *newThreat, const AiCo
 	const float invDistance = Q_RSqrt( squareDistance );
 	toEnemyDir *= invDistance;
 	// TODO: Check against the actual bot fov
-	if( toEnemyDir.Dot( botLookDir ) >= 0 ) {
+	if( toEnemyDir.dot( botLookDir ) >= 0 ) {
 		return;
 	}
 
 	// Try guessing the enemy origin
-	toEnemyDir.X() += -0.25f + 0.50f * random();
-	toEnemyDir.Y() += -0.10f + 0.20f * random();
+	toEnemyDir.x() += -0.25f + 0.50f * random();
+	toEnemyDir.y() += -0.10f + 0.20f * random();
 	if( !toEnemyDir.normalizeFast() ) [[unlikely]] {
 		return;
 	}
@@ -243,10 +243,10 @@ static bool IsEnemyVisible( const edict_t *self, const edict_t *enemyEnt ) {
 	edict_t *ignore = gameEdicts + ENTNUM( self );
 
 	Vec3 traceStart( self->s.origin );
-	traceStart.Z() += self->viewheight;
+	traceStart.z() += self->viewheight;
 	Vec3 traceEnd( enemyEnt->s.origin );
 
-	G_Trace( &trace, traceStart.Data(), nullptr, nullptr, traceEnd.Data(), ignore, MASK_OPAQUE );
+	G_Trace( &trace, traceStart.data(), nullptr, nullptr, traceEnd.data(), ignore, MASK_OPAQUE );
 	if( trace.fraction == 1.0f || gameEdicts + trace.ent == enemyEnt ) {
 		return true;
 	}
@@ -261,8 +261,8 @@ static bool IsEnemyVisible( const edict_t *self, const edict_t *enemyEnt ) {
 
 		// If the view height makes a considerable spatial distinction
 		if( abs( enemyEnt->viewheight ) > 8 ) {
-			traceEnd.Z() += enemyEnt->viewheight;
-			G_Trace( &trace, traceStart.Data(), nullptr, nullptr, traceEnd.Data(), ignore, MASK_OPAQUE );
+			traceEnd.z() += enemyEnt->viewheight;
+			G_Trace( &trace, traceStart.data(), nullptr, nullptr, traceEnd.data(), ignore, MASK_OPAQUE );
 			if( trace.fraction == 1.0f || gameEdicts + trace.ent == enemyEnt ) {
 				return true;
 			}
@@ -296,7 +296,7 @@ static bool IsEnemyVisible( const edict_t *self, const edict_t *enemyEnt ) {
 	}
 
 	vec3_t right, up;
-	MakeNormalVectors( enemyToBotDir.Data(), right, up );
+	MakeNormalVectors( enemyToBotDir.data(), right, up );
 
 	// Add some inner margin to the hitbox (a real model is less than it and the computations are coarse).
 	const float sideOffset = ( 0.8f * wsw::min( dims[0], dims[1] ) ) / 2;
@@ -306,11 +306,11 @@ static bool IsEnemyVisible( const edict_t *self, const edict_t *enemyEnt ) {
 		// Switch Z offset
 		for( int j = 0; j < 2; j++ ) {
 			// traceEnd = Vec3( enemyEnt->s.origin ) + i * sideOffset * right;
-			traceEnd.Set( right );
+			traceEnd.set( right );
 			traceEnd *= i * sideOffset;
 			traceEnd += enemyEnt->s.origin;
-			traceEnd.Z() += zOffset[j];
-			G_Trace( &trace, traceStart.Data(), nullptr, nullptr, traceEnd.Data(), ignore, MASK_OPAQUE );
+			traceEnd.z() += zOffset[j];
+			G_Trace( &trace, traceStart.data(), nullptr, nullptr, traceEnd.data(), ignore, MASK_OPAQUE );
 			if( trace.fraction == 1.0f || gameEdicts + trace.ent == enemyEnt ) {
 				return true;
 			}
@@ -340,12 +340,12 @@ void BotAwarenessModule::RegisterVisibleEnemies() {
 		if( !bot->IsDefinitelyNotAFeasibleEnemy( ent ) ) {
 			// Reject targets quickly by fov
 			Vec3 toTarget( Vec3( ent->s.origin ) - bot->Origin() );
-			const float squareDistance = toTarget.SquaredLength();
+			const float squareDistance = toTarget.squareLength();
 
 			if( squareDistance > 1.0f || squareDistance < wsw::square( ent->aiVisibilityDistance ) ) [[likely]] {
 				const float rcpDistance = Q_RSqrt( squareDistance );
 				toTarget *= rcpDistance;
-				if( toTarget.Dot( lookDir ) >= dotFactor ) {
+				if( toTarget.dot( lookDir ) >= dotFactor ) {
 					candidateTargets.emplace_back( { .entNum = entNum, .distance = squareDistance * rcpDistance } );
 				}
 			}

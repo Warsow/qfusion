@@ -82,7 +82,7 @@ bool BotWeaponSelector::hasWeakOrStrong( int weapon ) const {
 }
 
 void BotWeaponSelector::selectWeapon() {
-	const float distanceToEnemy = bot->GetSelectedEnemy()->ActualOrigin().FastDistanceTo( bot->Origin() );
+	const float distanceToEnemy = bot->GetSelectedEnemy()->ActualOrigin().fastDistanceTo( bot->Origin() );
 	const auto timeout = weaponChoicePeriod;
 	// Use instagib selection code for quad bearers as well
 	// TODO: Select script weapon too
@@ -149,7 +149,7 @@ auto BotWeaponSelector::suggestFarOrSniperPositionalCombatWeapon( bool hasEB, bo
 		return std::nullopt;
 	}
 
-	if( bot->m_selectedEnemy->ActualVelocity().SquaredLength() > dodgeThreshold * dodgeThreshold ) {
+	if( bot->m_selectedEnemy->ActualVelocity().squareLength() > dodgeThreshold * dodgeThreshold ) {
 		return std::nullopt;
 	}
 
@@ -585,7 +585,7 @@ auto BotWeaponSelector::suggestFinishWeapon() -> std::optional<int> {
 	}
 
 	const float damageToBeKilled = DamageToKill( (float)bot->Health(), (float)bot->Armor() );
-	const float distanceToEnemy  = selectedEnemy->ActualOrigin().FastDistanceTo( bot->Origin() );
+	const float distanceToEnemy  = selectedEnemy->ActualOrigin().fastDistanceTo( bot->Origin() );
 
 	const auto *const inventory  = bot->Inventory();
 	if( distanceToEnemy < 0.33f * kLasergunRange ) {
@@ -594,7 +594,7 @@ auto BotWeaponSelector::suggestFinishWeapon() -> std::optional<int> {
 				Vec3 dirToEnemy( selectedEnemy->ActualOrigin() );
 				dirToEnemy *= Q_Rcp( distanceToEnemy );
 				Vec3 lookDir( bot->EntityPhysicsState()->ForwardDir() );
-				if ( lookDir.Dot( dirToEnemy ) > 0.7f ) {
+				if ( lookDir.dot( dirToEnemy ) > 0.7f ) {
 					return WEAP_GUNBLADE;
 				}
 			}

@@ -23,11 +23,11 @@ void BotPlanner::PrepareCurrWorldState( WorldState *worldState ) {
 		worldState->setVec3( WorldState::LostEnemyLastSeenOrigin, enemyOrigin );
 		Vec3 toEnemiesDir( enemyOrigin - bot->Origin() );
 		if( toEnemiesDir.normalizeFast() ) {
-			if( toEnemiesDir.Dot( bot->EntityPhysicsState()->ForwardDir() ) < bot->FovDotFactor() ) {
+			if( toEnemiesDir.dot( bot->EntityPhysicsState()->ForwardDir() ) < bot->FovDotFactor() ) {
 				edict_t *self = game.edicts + bot->EntNum();
 				if( EntitiesPvsCache::Instance()->AreInPvs( self, lostEnemies->TraceKey() ) ) {
 					trace_t trace;
-					G_Trace( &trace, self->s.origin, nullptr, nullptr, enemyOrigin.Data(), self, MASK_AISOLID );
+					G_Trace( &trace, self->s.origin, nullptr, nullptr, enemyOrigin.data(), self, MASK_AISOLID );
 					if( trace.fraction == 1.0f || game.edicts + trace.ent == lostEnemies->TraceKey() ) {
 						worldState->setBool( WorldState::MightSeeLostEnemyAfterTurn, true );
 					}
@@ -64,7 +64,7 @@ void BotPlanner::PrepareCurrWorldState( WorldState *worldState ) {
 		// HACK! If there is no selected nav entity, set the value to the roaming spot origin.
 		if( bot->ShouldUseRoamSpotAsNavTarget() ) {
 			Vec3 spot( module->roamingManager.GetCachedRoamingSpot() );
-			Debug( "Using a roaming spot @ %.1f %.1f %.1f as a world state nav target var\n", spot.X(), spot.Y(), spot.Z() );
+			Debug( "Using a roaming spot @ %.1f %.1f %.1f as a world state nav target var\n", spot.x(), spot.y(), spot.z() );
 			worldState->setVec3( WorldState::NavTargetOrigin, spot );
 		}
 	}

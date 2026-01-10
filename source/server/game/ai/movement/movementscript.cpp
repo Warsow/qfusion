@@ -188,7 +188,7 @@ bool PredictingAndCachingMovementScript::checkPredictedVelocity( PredictedMoveme
 	Vec3 actualVelocityDir( m_subsystem->bot->Velocity() );
 	actualVelocityDir.normalizeFastOrThrow();
 
-	float cosine = expectedVelocityDir.Dot( actualVelocityDir );
+	float cosine = expectedVelocityDir.dot( actualVelocityDir );
 	static const float MIN_COSINE = std::cos( (float) DEG2RAD( 3.0f ) );
 	if( cosine > MIN_COSINE ) {
 		return true;
@@ -212,18 +212,18 @@ bool PredictingAndCachingMovementScript::checkPredictedAngles( PredictedMovement
 
 	vec3_t expectedAngles;
 	for( int i : { YAW, ROLL } ) {
-		expectedAngles[i] = LerpAngle( prevStateAngles.Data()[i], nextStateAngles.Data()[i], checkLerpFrac );
+		expectedAngles[i] = LerpAngle( prevStateAngles.data()[i], nextStateAngles.data()[i], checkLerpFrac );
 	}
 
 	if( !nextAction->record.botInput.canOverridePitch ) {
-		expectedAngles[PITCH] = LerpAngle( prevStateAngles.Data()[PITCH], nextStateAngles.Data()[PITCH], checkLerpFrac );
+		expectedAngles[PITCH] = LerpAngle( prevStateAngles.data()[PITCH], nextStateAngles.data()[PITCH], checkLerpFrac );
 	} else {
 		expectedAngles[PITCH] = game.edicts[m_subsystem->bot->EntNum()].s.angles[PITCH];
 	}
 
 	vec3_t expectedLookDir;
 	AngleVectors( expectedAngles, expectedLookDir, nullptr, nullptr );
-	float cosine = m_subsystem->bot->EntityPhysicsState()->ForwardDir().Dot( expectedLookDir );
+	float cosine = m_subsystem->bot->EntityPhysicsState()->ForwardDir().dot( expectedLookDir );
 	static const float MIN_COSINE = std::cos( (float)DEG2RAD( 3.0f ) );
 	if( cosine > MIN_COSINE ) {
 		return true;
@@ -259,7 +259,7 @@ auto PredictingAndCachingMovementScript::lerpActionRecords( PredictedMovementAct
 	if( !record_->botInput.canOverrideLookVec ) {
 		Vec3 actualLookDir( m_subsystem->bot->EntityPhysicsState()->ForwardDir() );
 		Vec3 intendedLookVec( record_->botInput.IntendedLookDir() );
-		VectorLerp( actualLookDir.Data(), inputLerpFrac, intendedLookVec.Data(), intendedLookVec.Data() );
+		VectorLerp( actualLookDir.data(), inputLerpFrac, intendedLookVec.data(), intendedLookVec.data() );
 		record_->botInput.SetIntendedLookDir( intendedLookVec );
 	}
 

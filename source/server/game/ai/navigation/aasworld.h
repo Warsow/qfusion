@@ -393,7 +393,7 @@ public:
 
 	[[nodiscard]]
 	auto traceAreas( const Vec3 &start, const Vec3 &end, int *areas_, int maxareas ) const -> std::span<const int> {
-		return traceAreas( start.Data(), end.Data(), areas_, nullptr, maxareas );
+		return traceAreas( start.data(), end.data(), areas_, nullptr, maxareas );
 	}
 
 	[[nodiscard]]
@@ -409,7 +409,7 @@ public:
 	[[nodiscard]]
 	auto findAreasInBox( const Vec3 &absMins, const Vec3 &absMaxs, int *areaNums,
 						 int maxAreas, int topNodeHint = 1 ) const -> std::span<const int> {
-		return findAreasInBox( absMins.Data(), absMaxs.Data(), areaNums, maxAreas, topNodeHint );
+		return findAreasInBox( absMins.data(), absMaxs.data(), areaNums, maxAreas, topNodeHint );
 	}
 
 	//returns the areas the bounding box is in
@@ -432,7 +432,7 @@ public:
 	// If an area is not found, tries to adjust the origin a bit
 	[[nodiscard]]
 	auto findAreaNum( const Vec3 &origin ) const -> int {
-		return findAreaNum( origin.Data() );
+		return findAreaNum( origin.data() );
 	}
 
 	// If an area is not found, tries to adjust the origin a bit

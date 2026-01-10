@@ -14,7 +14,7 @@ public:
 		}
 
 		explicit ProblemParams( const Vec3 &keepVisibleOrigin_ ) {
-			keepVisibleOrigin_.CopyTo( this->keepVisibleOrigin );
+			keepVisibleOrigin_.copyTo( this->keepVisibleOrigin );
 		}
 	};
 private:

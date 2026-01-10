@@ -48,7 +48,7 @@ public:
 bool ClosestFacePointSolver::ProcessAreaTransition( int currArea, int nextArea, const aas_face_t *face ) {
 	const auto &__restrict facePlane = aasPlanes[face->planenum];
 	// Check whether the face is within the splash radius
-	if( std::fabs( fireTarget.Dot( facePlane.normal ) - facePlane.dist ) > splashRadius ) {
+	if( std::fabs( fireTarget.dot( facePlane.normal ) - facePlane.dist ) > splashRadius ) {
 		return true;
 	}
 
@@ -68,20 +68,20 @@ bool ClosestFacePointSolver::ProcessAreaTransition( int currArea, int nextArea, 
 	testedPoint += fireTarget;
 
 	trace_t trace;
-	SolidWorldTrace( &trace, fireTarget.Data(), testedPoint.Data() );
+	SolidWorldTrace( &trace, fireTarget.data(), testedPoint.data() );
 	// If we can't find a point on a face in the solid world
 	if( trace.fraction == 1.0f ) {
 		return true;
 	}
 
-	candidatePoint.Set( testedOffsetVec );
+	candidatePoint.set( testedOffsetVec );
 	candidatePoint *= trace.fraction;
 	candidatePoint += fireTarget;
 
 	// Set result as defined by default
-	result = candidatePoint.Data();
+	result = candidatePoint.data();
 
-	G_Trace( &trace, fireOrigin.Data(), nullptr, nullptr, candidatePoint.Data(), ignoreEnt, MASK_AISOLID );
+	G_Trace( &trace, fireOrigin.data(), nullptr, nullptr, candidatePoint.data(), ignoreEnt, MASK_AISOLID );
 
 	// If there's no obstacles between the fire target and the candidate point
 	if( trace.fraction == 1.0f ) {
@@ -95,7 +95,7 @@ bool ClosestFacePointSolver::ProcessAreaTransition( int currArea, int nextArea, 
 
 	// We might hit solid as the suggested point is probably at a solid surface.
 	// Make sure we really have hit the solid world closely to the suggested point.
-	if( candidatePoint.SquareDistanceTo( trace.endpos ) < 8 * 8 ) {
+	if( candidatePoint.squareDistanceTo( trace.endpos ) < 8 * 8 ) {
 		return false;
 	}
 
@@ -160,7 +160,7 @@ void BotFireTargetCache::AdjustPredictionExplosiveAimTypeParams( const SelectedE
 		// First, modify temporary `target` value
 		AdjustForShootableEnvironment( selectedEnemy, fireDef.SplashRadius(), aimParams );
 		// Copy modified `target` value to cached value
-		cachedFireTarget.origin.Set( aimParams->fireTarget );
+		cachedFireTarget.origin.set( aimParams->fireTarget );
 	}
 	aimParams->suggestedCoordError = 0.0f;
 	if( bot->Skill() < 0.66f ) {
@@ -196,8 +196,8 @@ void BotFireTargetCache::AdjustDropAimTypeParams( const SelectedEnemy &selectedE
 	// If new generic predicted target origin has been computed, adjust it for gravity (changes will be cached)
 	// This is not very accurate but satisfactory
 	Vec3 fireOriginToTarget = Vec3( aimParams->fireTarget ) - aimParams->fireOrigin;
-	Vec3 fireOriginToTarget2D( fireOriginToTarget.X(), fireOriginToTarget.Y(), 0 );
-	const float squareDistance2D = fireOriginToTarget2D.SquaredLength();
+	Vec3 fireOriginToTarget2D( fireOriginToTarget.x(), fireOriginToTarget.y(), 0 );
+	const float squareDistance2D = fireOriginToTarget2D.squareLength();
 	if( squareDistance2D < 8 * 8 ) {
 		return;
 	}
@@ -205,8 +205,8 @@ void BotFireTargetCache::AdjustDropAimTypeParams( const SelectedEnemy &selectedE
 	Vec3 velocity2DVec( fireOriginToTarget );
 	velocity2DVec.normalizeFastOrThrow();
 	velocity2DVec *= fireDef.ProjectileSpeed();
-	velocity2DVec.Z() = 0;
-	const float squareVelocity2D = velocity2DVec.SquaredLength();
+	velocity2DVec.z() = 0;
+	const float squareVelocity2D = velocity2DVec.squareLength();
 	if( squareVelocity2D < 32 * 32 ) {
 		return;
 	}
@@ -217,7 +217,7 @@ void BotFireTargetCache::AdjustDropAimTypeParams( const SelectedEnemy &selectedE
 	const float height = wsw::max( 0.0f, 0.5f * level.gravity * time * time - 32.0f );
 
 	// Modify both cached and temporary values
-	cachedFireTarget.origin.Z() += height;
+	cachedFireTarget.origin.z() += height;
 	aimParams->fireTarget[2] += height;
 }
 
@@ -233,9 +233,9 @@ void BotFireTargetCache::SetupCoarseFireTarget( const SelectedEnemy &selectedEne
 	// For hard bots use actual enemy origin
 	// (last seen one may be outdated up to 3 frames, and it matter a lot for fast-moving enemies)
 	if( bot->Skill() < 0.66f ) {
-		VectorCopy( selectedEnemy.LastSeenOrigin().Data(), target );
+		VectorCopy( selectedEnemy.LastSeenOrigin().data(), target );
 	} else {
-		VectorCopy( selectedEnemy.ActualOrigin().Data(), target );
+		VectorCopy( selectedEnemy.ActualOrigin().data(), target );
 	}
 
 	const edict_t *self = game.edicts + bot->EntNum();
@@ -251,10 +251,10 @@ bool PredictProjectileNoClip( const Vec3 &fireOrigin, float projectileSpeed, vec
 	constexpr float EPSILON = 0.0001f;
 
 	float projectileSpeedSq = projectileSpeed * projectileSpeed;
-	float targetSpeedSq = targetVelocity.SquaredLength();
+	float targetSpeedSq = targetVelocity.squareLength();
 	float targetSpeed = sqrtf( targetSpeedSq );
 	Vec3 targetToFire = fireOrigin - target;
-	float targetToFireDistSq = targetToFire.SquaredLength();
+	float targetToFireDistSq = targetToFire.squareLength();
 	float targetToFireDist = sqrtf( targetToFireDistSq );
 	Vec3 targetToFireDir( targetToFire );
 	if( !targetToFireDir.normalize() ) {
@@ -266,7 +266,7 @@ bool PredictProjectileNoClip( const Vec3 &fireOrigin, float projectileSpeed, vec
 		return false;
 	}
 
-	float cosTheta = targetToFireDir.Dot( targetVelocityDir );
+	float cosTheta = targetToFireDir.dot( targetVelocityDir );
 
 	float t;
 	if( fabsf( projectileSpeedSq - targetSpeedSq ) < EPSILON ) {
@@ -299,7 +299,7 @@ bool PredictProjectileNoClip( const Vec3 &fireOrigin, float projectileSpeed, vec
 	}
 
 	Vec3 move = targetVelocity * t;
-	VectorAdd( target, move.Data(), target );
+	VectorAdd( target, move.data(), target );
 	return true;
 }
 
@@ -312,7 +312,7 @@ void BotFireTargetCache::GetPredictedTargetOrigin( const SelectedEnemy &selected
 
 	// Check whether we are shooting the same enemy and cached predicted origin is not outdated
 	if( cachedFireTarget.IsValidFor( selectedEnemy, selectedWeapons ) ) {
-		VectorCopy( cachedFireTarget.origin.Data(), aimParams->fireTarget );
+		VectorCopy( cachedFireTarget.origin.data(), aimParams->fireTarget );
 	} else {
 		PredictProjectileShot( selectedEnemy, projectileSpeed, aimParams, true );
 		cachedFireTarget.invalidAt = level.time + 66;
@@ -324,7 +324,7 @@ static inline void TryAimingAtGround( trace_t *trace, AimParams *aimParams, edic
 	// In this case try fallback to the ground below the target.
 	Vec3 endPoint( 0, 0, -128 );
 	endPoint += aimParams->fireTarget;
-	G_Trace( trace, aimParams->fireTarget, nullptr, nullptr, endPoint.Data(), traceKey, MASK_AISOLID );
+	G_Trace( trace, aimParams->fireTarget, nullptr, nullptr, endPoint.data(), traceKey, MASK_AISOLID );
 	if( trace->fraction != 1.0f ) {
 		VectorCopy( trace->endpos, aimParams->fireTarget );
 		// Add some offset from the ground (enviroment tests probably expect this input).
@@ -402,8 +402,8 @@ bool HitPointPredictor::OnPredictionStep( const Vec3 &segmentStart, const Result
 
 	// const float zPartAtSegmentStart = 0.001f * ( results->millisAhead - stepMillis ) * level.gravity;
 	// const float zPartAtSegmentEnd = 0.001f * results->millisAhead * level.gravity;
-	// segmentTargetVelocity.Z() -= 0.5f * ( zPartAtSegmentStart + zPartAtSegmentEnd );
-	float newTargetZSpeed = problemParams.targetVelocity.Z();
+	// segmentTargetVelocity.z() -= 0.5f * ( zPartAtSegmentStart + zPartAtSegmentEnd );
+	float newTargetZSpeed = problemParams.targetVelocity.z();
 	newTargetZSpeed -= 0.5f * 0.001f * ( 2.0f * results->millisAhead - stepMillis ) * level.gravity;
 
 	// Wait for a negative target velocity or for hitting a solid.
@@ -413,7 +413,7 @@ bool HitPointPredictor::OnPredictionStep( const Vec3 &segmentStart, const Result
 	}
 
 	Vec3 segmentTargetVelocity( problemParams.targetVelocity );
-	segmentTargetVelocity.Z() = newTargetZSpeed;
+	segmentTargetVelocity.z() = newTargetZSpeed;
 
 	// TODO: Projectile speed used in PredictProjectileNoClip() needs correction
 	// We can't offset fire origin since we do not know direction to target yet
@@ -421,7 +421,7 @@ bool HitPointPredictor::OnPredictionStep( const Vec3 &segmentStart, const Result
 	// Exact formula is to be proven yet
 	Vec3 predictedTarget( segmentStart );
 	if( !PredictProjectileNoClip( problemParams.fireOrigin, problemParams.projectileSpeed,
-								  predictedTarget.Data(), segmentTargetVelocity ) ) {
+								  predictedTarget.data(), segmentTargetVelocity ) ) {
 		tryHitInAir = false;
 		// Wait for hitting a solid
 		return true;
@@ -437,9 +437,9 @@ bool HitPointPredictor::OnPredictionStep( const Vec3 &segmentStart, const Result
 	Vec3 predictedTargetToStartVec( segmentStart );
 	predictedTargetToStartVec -= predictedTarget;
 
-	if( segmentVec.Dot( predictedTargetToEndVec ) >= 0 && segmentVec.Dot( predictedTargetToStartVec ) <= 0 ) {
+	if( segmentVec.dot( predictedTargetToEndVec ) >= 0 && segmentVec.dot( predictedTargetToStartVec ) <= 0 ) {
 		// Can hit in air
-		predictedTarget.CopyTo( fireTarget );
+		predictedTarget.copyTo( fireTarget );
 		// Interrupt the base trajectory prediction
 		return false;
 	}
@@ -462,7 +462,7 @@ void BotFireTargetCache::PredictProjectileShot( const SelectedEnemy &selectedEne
 	if( applyTargetGravity ) {
 		typedef HitPointPredictor::ProblemParams ProblemParams;
 		ProblemParams predictionParams( aimParams->fireOrigin,
-										selectedEnemy.LastSeenVelocity().Data(),
+										selectedEnemy.LastSeenVelocity().data(),
 										selectedEnemy.TraceKey(),
 										projectileSpeed );
 
@@ -475,7 +475,7 @@ void BotFireTargetCache::PredictProjectileShot( const SelectedEnemy &selectedEne
 	Vec3 predictedTarget( aimParams->fireTarget );
 	if( !PredictProjectileNoClip( Vec3( aimParams->fireOrigin ),
 								  projectileSpeed,
-								  predictedTarget.Data(),
+								  predictedTarget.data(),
 								  selectedEnemy.LastSeenVelocity() ) ) {
 		TryAimingAtGround( &trace, aimParams, traceKey );
 		return;
@@ -484,9 +484,9 @@ void BotFireTargetCache::PredictProjectileShot( const SelectedEnemy &selectedEne
 	// Test a segment between predicted target and initial target
 	// Aim at the trace hit point if there is an obstacle.
 	// Aim at the predicted target otherwise.
-	G_Trace( &trace, aimParams->fireTarget, nullptr, nullptr, predictedTarget.Data(), traceKey, MASK_AISOLID );
+	G_Trace( &trace, aimParams->fireTarget, nullptr, nullptr, predictedTarget.data(), traceKey, MASK_AISOLID );
 	if( trace.fraction == 1.0f ) {
-		VectorCopy( predictedTarget.Data(), aimParams->fireTarget );
+		VectorCopy( predictedTarget.data(), aimParams->fireTarget );
 	} else {
 		VectorCopy( trace.endpos, aimParams->fireTarget );
 		if( ISWALKABLEPLANE( &trace.plane ) ) {

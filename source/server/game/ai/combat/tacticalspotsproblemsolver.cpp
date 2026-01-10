@@ -21,7 +21,7 @@ void TacticalSpotsProblemSolver::selectCandidateSpots( const SpotsQueryVector &s
 			continue;
 		}
 
-		float squareDistanceToOrigin = DistanceSquared( origin.Data(), spot.origin );
+		float squareDistanceToOrigin = DistanceSquared( origin.data(), spot.origin );
 		if( squareDistanceToOrigin > searchRadius * searchRadius ) {
 			continue;
 		}
@@ -197,10 +197,10 @@ void TacticalSpotsProblemSolver::applyEnemiesInfluence( SpotsAndScoreVector &can
 		CachedEnemyData *const enemyData = cachedEnemyData.unsafe_grow_back();
 
 		Vec3 enemyOrigin( enemy->LastSeenOrigin() );
-		enemyOrigin.CopyTo( enemyData->viewOrigin );
+		enemyOrigin.copyTo( enemyData->viewOrigin );
 		enemyData->viewOrigin[2] += playerbox_stand_viewheight;
-		enemy->LookDir().CopyTo( enemyData->lookDir );
-		enemy->LastSeenVelocity().CopyTo( enemyData->velocityDir2D );
+		enemy->LookDir().copyTo( enemyData->lookDir );
+		enemy->LastSeenVelocity().copyTo( enemyData->velocityDir2D );
 		enemyData->velocityDir2D[2] = 0;
 		enemyData->speed2D = VectorLengthSquared( enemyData->velocityDir2D );
 		if( enemyData->speed2D > 0.001f ) {
@@ -217,7 +217,7 @@ void TacticalSpotsProblemSolver::applyEnemiesInfluence( SpotsAndScoreVector &can
 			enemyData->groundedAreaNum = areaNums[0];
 		} else {
 			vec3_t tmpOrigin;
-			const float *testedOrigin = enemyOrigin.Data();
+			const float *testedOrigin = enemyOrigin.data();
 			if( AiGroundTraceCache::Instance()->TryDropToFloor( enemy->m_ent, 64.0f, tmpOrigin ) ) {
 				testedOrigin = tmpOrigin;
 			}
@@ -251,7 +251,7 @@ void TacticalSpotsProblemSolver::applyEnemiesInfluence( SpotsAndScoreVector &can
 		for( const CachedEnemyData &enemyData: cachedEnemyData ) {
 			Vec3 toSpotDir( spot.origin );
 			toSpotDir -= enemyData.viewOrigin;
-			float squareDistanceToSpot = toSpotDir.SquaredLength();
+			float squareDistanceToSpot = toSpotDir.squareLength();
 			// Skip far enemies
 			if( squareDistanceToSpot > 1000 * 1000 ) {
 				continue;
@@ -259,9 +259,9 @@ void TacticalSpotsProblemSolver::applyEnemiesInfluence( SpotsAndScoreVector &can
 			// Skip not very close enemies that are seemingly running away from spot
 			if( squareDistanceToSpot > 384 * 384 ) {
 				toSpotDir *= Q_RSqrt( squareDistanceToSpot );
-				if( toSpotDir.Dot( enemyData.lookDir ) < 0 ) {
+				if( toSpotDir.dot( enemyData.lookDir ) < 0 ) {
 					if( enemyData.speed2D >= GS_DefaultPlayerSpeed( *ggs ) ) {
-						if( toSpotDir.Dot( enemyData.velocityDir2D ) < 0 ) {
+						if( toSpotDir.dot( enemyData.velocityDir2D ) < 0 ) {
 							continue;
 						}
 					}

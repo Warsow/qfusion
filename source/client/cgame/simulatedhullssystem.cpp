@@ -1364,8 +1364,8 @@ void SimulatedHullsSystem::submitToScene( int64_t currTime, DrawSceneRequest *dr
 					submittedMeshesBuffer     -= numAddedToonMeshes;
 					submittedOrderDesignators -= numAddedToonMeshes;
 
-					combinedBoundsBuilder.addPoint( boundsForPairs[*pairIndex].first.Data() );
-					combinedBoundsBuilder.addPoint( boundsForPairs[*pairIndex].second.Data() );
+					combinedBoundsBuilder.addPoint( boundsForPairs[*pairIndex].first.data() );
+					combinedBoundsBuilder.addPoint( boundsForPairs[*pairIndex].second.data() );
 				}
 
 				vec4_t combinedMins, combinedMaxs;

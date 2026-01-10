@@ -104,14 +104,14 @@ public:
 
 	const float *Origin() const { return origin; }
 	void SetOrigin( const vec3_t origin_ ) { VectorCopy( origin_, this->origin ); }
-	void SetOrigin( const Vec3 &origin_ ) { SetOrigin( origin_.Data() ); }
+	void SetOrigin( const Vec3 &origin_ ) { SetOrigin( origin_.data() ); }
 
 	const float *Velocity() const { return velocity; }
 	void SetVelocity( const vec3_t velocity_ ) {
 		VectorCopy( velocity_, this->velocity );
 		SetSpeed( velocity_ );
 	}
-	void SetVelocity( const Vec3 &velocity_ ) { SetVelocity( velocity_.Data() ); }
+	void SetVelocity( const Vec3 &velocity_ ) { SetVelocity( velocity_.data() ); }
 
 	float Speed() const { return speed; }
 	float Speed2D() const { return speed2D; }

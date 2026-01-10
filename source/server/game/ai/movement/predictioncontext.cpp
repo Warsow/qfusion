@@ -606,12 +606,12 @@ bool PredictionContext::BuildPlan( std::span<BaseAction *> actionsToUse ) {
 	}
 
 	// Ensure that the entity state is not modified by any remnants of old code that used to do that
-	Assert( VectorCompare( origin.Data(),  self->s.origin ) );
-	Assert( VectorCompare( velocity.Data(), self->velocity ) );
-	Assert( VectorCompare( angles.Data(), self->s.angles ) );
+	Assert( VectorCompare( origin.data(),  self->s.origin ) );
+	Assert( VectorCompare( velocity.data(), self->velocity ) );
+	Assert( VectorCompare( angles.data(), self->s.angles ) );
 	Assert( self->viewheight == viewHeight );
-	Assert( VectorCompare( mins.Data(), self->r.mins ) );
-	Assert( VectorCompare( maxs.Data(), self->r.maxs ) );
+	Assert( VectorCompare( mins.data(), self->r.mins ) );
+	Assert( VectorCompare( maxs.data(), self->r.maxs ) );
 	Assert( self->waterlevel == waterLevel );
 	Assert( self->watertype == waterType );
 	Assert( self->groundentity == groundEntity );
@@ -726,7 +726,7 @@ void PredictionContext::NextMovementStep( BaseAction *action ) {
 	const Vec3 angles( botInput->AlreadyComputedAngles() );
 	VectorCopy( entityPhysicsState->Origin(), playerStateForPmove.pmove.origin );
 	VectorCopy( entityPhysicsState->Velocity(), playerStateForPmove.pmove.velocity );
-	angles.CopyTo( playerStateForPmove.viewangles );
+	angles.copyTo( playerStateForPmove.viewangles );
 
 	pmove_t pm;
 	// TODO: Eliminate this call?
@@ -744,8 +744,8 @@ void PredictionContext::NextMovementStep( BaseAction *action ) {
 	}
 #endif
 
-	pm.cmd.angles[PITCH] = (short)ANGLE2SHORT( angles.Data()[PITCH] );
-	pm.cmd.angles[YAW]   = (short)ANGLE2SHORT( angles.Data()[YAW] );
+	pm.cmd.angles[PITCH] = (short)ANGLE2SHORT( angles.data()[PITCH] );
+	pm.cmd.angles[YAW]   = (short)ANGLE2SHORT( angles.data()[YAW] );
 
 	VectorSet( playerStateForPmove.pmove.delta_angles, 0, 0, 0 );
 
@@ -905,9 +905,9 @@ void PredictionContext::CheatingAccelerate( float frac ) {
 	// This used to produce very spectacular bot movement but it leads to
 	// an increased rate of movement rejection by the prediction system
 	// once much stricter bunny-hopping tests were implemented.
-	const float oldVelocityZ = newVelocity.Z();
+	const float oldVelocityZ = newVelocity.z();
 	// Nullify the boost Z velocity
-	newVelocity.Z() = 0;
+	newVelocity.z() = 0;
 	// Normalize the velocity boost direction
 	newVelocity *= Q_Rcp( entityPhysicsState.Speed2D() );
 	// Make the velocity boost vector
@@ -915,7 +915,7 @@ void PredictionContext::CheatingAccelerate( float frac ) {
 	// Add velocity boost to the entity velocity in the given physics state
 	newVelocity += entityPhysicsState.Velocity();
 	// Preserve the old velocity Z
-	newVelocity.Z() = oldVelocityZ;
+	newVelocity.z() = oldVelocityZ;
 
 	record->SetModifiedVelocity( newVelocity );
 }
@@ -925,13 +925,13 @@ void PredictionContext::CheatingCorrectVelocity( const vec3_t target ) {
 
 	Vec3 toTargetDir2D( target );
 	toTargetDir2D -= entityPhysicsState.Origin();
-	toTargetDir2D.Z() = 0;
+	toTargetDir2D.z() = 0;
 	if( toTargetDir2D.normalizeFast() && entityPhysicsState.Speed2D() > 1 ) {
 		Vec3 velocity2DDir( entityPhysicsState.Velocity() );
-		velocity2DDir.Z() = 0;
+		velocity2DDir.z() = 0;
 		velocity2DDir *= Q_Rcp( entityPhysicsState.Speed2D() );
 
-		CheatingCorrectVelocity( velocity2DDir.Dot( toTargetDir2D ), toTargetDir2D );
+		CheatingCorrectVelocity( velocity2DDir.dot( toTargetDir2D ), toTargetDir2D );
 	}
 }
 
@@ -948,10 +948,10 @@ void PredictionContext::CheatingCorrectVelocity( float velocity2DDirDotToTarget2
 	}
 
 	// Check whether the direction to the target is normalized
-	Assert( toTargetDir2D.LengthFast() > 0.99f && toTargetDir2D.LengthFast() < 1.01f );
+	Assert( toTargetDir2D.fastLength() > 0.99f && toTargetDir2D.fastLength() < 1.01f );
 
 	Vec3 newVelocity( entityPhysicsState.Velocity() );
-	const float oldVelocityZ = newVelocity.Z();
+	const float oldVelocityZ = newVelocity.z();
 	// Normalize the current velocity direction
 	newVelocity *= Q_Rcp( speed );
 	// Modify the velocity direction
@@ -964,8 +964,8 @@ void PredictionContext::CheatingCorrectVelocity( float velocity2DDirDotToTarget2
 	// Restore the velocity magnitude
 	newVelocity *= speed;
 	// Disallow boosting Z velocity
-	if( newVelocity.Z() > oldVelocityZ ) {
-		newVelocity.Z() = oldVelocityZ;
+	if( newVelocity.z() > oldVelocityZ ) {
+		newVelocity.z() = oldVelocityZ;
 		// Try normalizing again
 		if( !newVelocity.normalizeFast() ) {
 			return;

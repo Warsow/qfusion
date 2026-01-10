@@ -192,7 +192,7 @@ void BotWeaponsUsageModule::LookAtEnemy( float coordError, const vec_t *fire_ori
 	// These angles can be required to hit the target
 	Vec3 targetAimAngles = bot->GetNewViewAngles( entAngles, toTargetDir, game.frametime, multiplier );
 	// Override pitch in hope this will be sufficient for hitting a target
-	intendedAngles.Data()[PITCH] = targetAimAngles.Data()[PITCH];
+	intendedAngles.data()[PITCH] = targetAimAngles.data()[PITCH];
 	input->SetAlreadyComputedAngles( intendedAngles );
 }
 
@@ -220,7 +220,7 @@ bool BotWeaponsUsageModule::TryTraceShot( trace_t *tr,
 		Vec3 traceEnd( newLookDir );
 		traceEnd *= 999999.0f;
 		traceEnd += aimParams.fireOrigin;
-		G_Trace( tr, const_cast<float*>( aimParams.fireOrigin ), nullptr, nullptr, traceEnd.Data(), self, MASK_AISOLID );
+		G_Trace( tr, const_cast<float*>( aimParams.fireOrigin ), nullptr, nullptr, traceEnd.data(), self, MASK_AISOLID );
 		return true;
 	}
 
@@ -238,7 +238,7 @@ bool BotWeaponsUsageModule::TryTraceShot( trace_t *tr,
 	// We can supply a custom trace so there is no need to copy results after Run() call
 	predictionResults.trace = tr;
 
-	auto stopEvents = predictor.Run( projectileVelocity.Data(), aimParams.fireOrigin, &predictionResults );
+	auto stopEvents = predictor.Run( projectileVelocity.data(), aimParams.fireOrigin, &predictionResults );
 	return ( stopEvents & ( AiTrajectoryPredictor::HIT_SOLID | AiTrajectoryPredictor::HIT_ENTITY ) ) != 0;
 }
 
@@ -276,7 +276,7 @@ bool BotWeaponsUsageModule::CheckSplashTeamDamage( const vec3_t hitOrigin,
 			continue;
 		}
 		// Very coarse but satisfiable
-		SolidWorldTrace( &trace, traceStart.Data(), ent->s.origin );
+		SolidWorldTrace( &trace, traceStart.data(), ent->s.origin );
 		if( trace.fraction != 1.0f ) {
 			continue;
 		}
@@ -311,7 +311,7 @@ bool BotWeaponsUsageModule::IsShotBlockedBySolidWall( trace_t *tr,
 
 	adjustedParams.fireTarget[0] += 40.0f;
 	adjustedParams.fireTarget[1] += 40.0f;
-	adjustedLookDir.Set( adjustedParams.fireTarget );
+	adjustedLookDir.set( adjustedParams.fireTarget );
 	adjustedLookDir -= adjustedParams.fireOrigin;
 	if( !adjustedLookDir.normalizeFast() ) {
 		return true;
@@ -332,7 +332,7 @@ bool BotWeaponsUsageModule::CheckShot( const AimParams &aimParams,
 
 	// Convert modified angles to direction back (due to limited view speed it rarely will match given direction)
 	Vec3 newLookDir( 0, 0, 0 );
-	AngleVectors( input->AlreadyComputedAngles().Data(), newLookDir.Data(), nullptr, nullptr );
+	AngleVectors( input->AlreadyComputedAngles().data(), newLookDir.data(), nullptr, nullptr );
 
 	Vec3 toTarget( aimParams.fireTarget );
 	toTarget -= aimParams.fireOrigin;
@@ -340,7 +340,7 @@ bool BotWeaponsUsageModule::CheckShot( const AimParams &aimParams,
 		return true;
 	}
 
-	float toTargetDotLookDir = toTarget.Dot( newLookDir );
+	float toTargetDotLookDir = toTarget.dot( newLookDir );
 
 	// Precache this result, it is not just a value getter
 	const auto aimType = fireDef.AimType();
@@ -447,7 +447,7 @@ bool BotWeaponsUsageModule::CheckShot( const AimParams &aimParams,
 				// We use the minimal feasible radius, this is enough.
 				// The fire target is not intended to match actual origin
 				// as it as a result of interpolation/extrapolation + enemy movement prediction.
-				return BoundsAndSphereIntersect( absMins.Data(), absMaxs.Data(), tr.endpos, 1.0f );
+				return BoundsAndSphereIntersect( absMins.data(), absMaxs.data(), tr.endpos, 1.0f );
 			}
 		}
 
@@ -503,7 +503,7 @@ bool BotWeaponsUsageModule::CheckShot( const AimParams &aimParams,
 				}
 
 				float radius = 1.0f + skillFactor * 64.0f + ( 1.0f - velocityFactor ) * 48.0f;
-				return BoundsAndSphereIntersect( absMins.Data(), absMaxs.Data(), tr.endpos, radius );
+				return BoundsAndSphereIntersect( absMins.data(), absMaxs.data(), tr.endpos, radius );
 			}
 		}
 	}

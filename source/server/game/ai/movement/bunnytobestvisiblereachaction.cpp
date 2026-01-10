@@ -34,7 +34,7 @@ auto BunnyToBestVisibleReachAction::planPredictionStep( PredictionContext *conte
 	walker.SetAreaNums( entityPhysicsState, context->NavTargetAasAreaNum() );
 	Vec3 intendedLookDir( entityPhysicsState.ForwardDir() );
     if( walker.Exec() ) {
-    	walker.result.CopyTo( intendedLookDir );
+        walker.result.copyTo( intendedLookDir );
     }
 
     if( !setupBunnyHopping( intendedLookDir, context ) ) {
@@ -86,10 +86,10 @@ bool Walker::PerformRaycast( const aas_reachability_t &reach, float playerZOffse
 	// Calling TraceArcInSolidWorld() seems to be way too expensive.
 	// The reach chain gets straightened every prediction frame.
 	Vec3 traceStart( botOrigin );
-	traceStart.Z() += playerZOffset;
+	traceStart.z() += playerZOffset;
 	Vec3 traceEnd( reach.start );
-	traceEnd.Z() += reachZOffset;
-	SolidWorldTrace( &trace, traceStart.Data(), traceEnd.Data() );
+	traceEnd.z() += reachZOffset;
+	SolidWorldTrace( &trace, traceStart.data(), traceEnd.data() );
 	return trace.fraction == 1.0f;
 }
 
@@ -125,7 +125,7 @@ bool Walker::TestReachVis( const aas_reachability_t &reach, float playerZOffset,
 
 bool Walker::Exec() {
 	if( ReachChainWalker::Exec() && foundReach ) {
-		result.Set( foundReach->start );
+		result.set( foundReach->start );
 		result -= botOrigin;
 		return (bool)result.normalizeFast();
 	}

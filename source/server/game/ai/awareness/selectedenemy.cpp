@@ -73,7 +73,7 @@ float SelectedEnemy::ComputeThreatFactor( const Bot *bot, const edict_t *ent, co
 	} else {
 		vec3_t enemyLookDir;
 		AngleVectors( ent->s.angles, enemyLookDir, nullptr, nullptr );
-		dot = enemyToBotDir.Dot( enemyLookDir );
+		dot = enemyToBotDir.dot( enemyLookDir );
 	}
 
 	// Check whether the enemy is itself a bot.
@@ -148,8 +148,8 @@ bool SelectedEnemy::TestIsPotentiallyHittable() const {
 
 	trace_t trace;
 	Vec3 viewPoint( self->s.origin );
-	viewPoint.Z() += self->viewheight;
-	SolidWorldTrace( &trace, viewPoint.Data(), m_enemy->m_ent->s.origin );
+	viewPoint.z() += self->viewheight;
+	SolidWorldTrace( &trace, viewPoint.data(), m_enemy->m_ent->s.origin );
 	return trace.fraction == 1.0f;
 }
 
@@ -183,9 +183,9 @@ bool SelectedEnemy::TestCanHit( const edict_t *attacker, const edict_t *victim, 
 	trace_t trace;
 	auto *enemyEnt = const_cast<edict_t *>( victim );
 	Vec3 traceStart( enemyEnt->s.origin );
-	traceStart.Z() += enemyEnt->viewheight;
+	traceStart.z() += enemyEnt->viewheight;
 
-	G_Trace( &trace, traceStart.Data(), nullptr, nullptr, targetEnt->s.origin, enemyEnt, MASK_AISOLID );
+	G_Trace( &trace, traceStart.data(), nullptr, nullptr, targetEnt->s.origin, enemyEnt, MASK_AISOLID );
 	if( trace.fraction != 1.0f && game.edicts + trace.ent == targetEnt ) {
 		return true;
 	}
@@ -193,8 +193,8 @@ bool SelectedEnemy::TestCanHit( const edict_t *attacker, const edict_t *victim, 
 	// If there is a distinct chest point (we call it chest since it is usually on chest position)
 	if( std::abs( targetEnt->viewheight ) > 8 ) {
 		Vec3 targetPoint( targetEnt->s.origin );
-		targetPoint.Z() += targetEnt->viewheight;
-		G_Trace( &trace, traceStart.Data(), nullptr, nullptr, targetPoint.Data(), enemyEnt, MASK_AISOLID );
+		targetPoint.z() += targetEnt->viewheight;
+		G_Trace( &trace, traceStart.data(), nullptr, nullptr, targetPoint.data(), enemyEnt, MASK_AISOLID );
 		if( trace.fraction != 1.0f && game.edicts + trace.ent == targetEnt ) {
 			return true;
 		}
@@ -232,10 +232,10 @@ float SelectedEnemy::GetBotViewDirDotToEnemyDir() const {
 		const float viewHeight = playerbox_stand_viewheight;
 		Vec3 botViewDir( m_bot->EntityPhysicsState()->ForwardDir() );
 		Vec3 botToEnemyDir( m_enemy->LastSeenOrigin());
-		botToEnemyDir.Z() -= viewHeight;
+		botToEnemyDir.z() -= viewHeight;
 		botToEnemyDir -= m_bot->Origin();
 		if( botToEnemyDir.normalizeFast() ) {
-			m_botViewDirDotToEnemyDir.value = botViewDir.Dot( botToEnemyDir );
+			m_botViewDirDotToEnemyDir.value = botViewDir.dot( botToEnemyDir );
 		} else {
 			m_botViewDirDotToEnemyDir.value = 1.0f;
 		}
@@ -251,10 +251,10 @@ float SelectedEnemy::GetEnemyViewDirDotToBotDir() const {
 
 		const float viewHeight = playerbox_stand_viewheight;
 		Vec3 enemyToBotDir( m_bot->Origin() );
-		enemyToBotDir.Z() -= viewHeight;
+		enemyToBotDir.z() -= viewHeight;
 		enemyToBotDir -= m_enemy->LastSeenOrigin();
 		if( enemyToBotDir.normalizeFast() ) {
-			m_enemyViewDirDotToBotDir.value = m_enemy->LookDir().Dot( enemyToBotDir );
+			m_enemyViewDirDotToBotDir.value = m_enemy->LookDir().dot( enemyToBotDir );
 		} else {
 			m_enemyViewDirDotToBotDir.value = 1.0f;
 		}
@@ -285,7 +285,7 @@ bool SelectedEnemy::TestAboutToHitEBorIG( int64_t levelTime ) const {
 	}
 
 	const Vec3 enemyOrigin( m_enemy->LastSeenOrigin() );
-	const float distance = Q_Sqrt( enemyOrigin.SquareDistanceTo( m_bot->Origin() ) );
+	const float distance = Q_Sqrt( enemyOrigin.squareDistanceTo( m_bot->Origin() ) );
 
 	float dotThreshold = 0.95f;
 	// Check whether the enemy is really holding the weapon (so its not the mere pending one)
@@ -301,7 +301,7 @@ bool SelectedEnemy::TestAboutToHitEBorIG( int64_t levelTime ) const {
 		return false;
 	}
 
-	const float squareSpeed = m_enemy->LastSeenVelocity().SquaredLength();
+	const float squareSpeed = m_enemy->LastSeenVelocity().squareLength();
 	// Hitting at this speed is unlikely
 	if( squareSpeed > wsw::square( 650.0f ) ) {
 		return false;
@@ -330,8 +330,8 @@ bool SelectedEnemy::TestAboutToHitEBorIG( int64_t levelTime ) const {
 
 	trace_t trace;
 	Vec3 traceStart( enemyOrigin );
-	traceStart.Z() += playerbox_stand_viewheight;
-	SolidWorldTrace( &trace, traceStart.Data(), m_bot->Origin() );
+	traceStart.z() += playerbox_stand_viewheight;
+	SolidWorldTrace( &trace, traceStart.data(), m_bot->Origin() );
 	if( trace.fraction != 1.0f ) {
 		return false;
 	}
@@ -344,7 +344,7 @@ bool SelectedEnemy::TestAboutToHitLGorPG( int64_t levelTime ) const {
 	const Vec3 enemyOrigin( m_enemy->LastSeenOrigin() );
 
 	// Skip enemies that are out of LG range. (Consider PG to be inefficient outside of this range too)
-	const float squareDistance = enemyOrigin.SquareDistanceTo( botOrigin );
+	const float squareDistance = enemyOrigin.squareDistanceTo( botOrigin );
 	if( squareDistance > wsw::square( kLasergunRange ) ) {
 		return false;
 	}
@@ -421,7 +421,7 @@ bool SelectedEnemy::TestAboutToHitLGorPG( int64_t levelTime ) const {
 			}
 
 			// Actually make a dir on demand
-			botVelocity2DDir.Z() = 0;
+			botVelocity2DDir.z() = 0;
 			botVelocity2DDir *= Q_Rcp( botSpeed2D );
 
 			// Check whether we're going to hit an obstacle on knockback
@@ -430,7 +430,7 @@ bool SelectedEnemy::TestAboutToHitLGorPG( int64_t levelTime ) const {
 			edict_t *self = game.edicts + m_bot->EntNum();
 			trace_t trace;
 			// Let's check against other players as well to prevent blocking of teammates
-			G_Trace( &trace, self->s.origin, nullptr, nullptr, testedPoint.Data(), self, MASK_PLAYERSOLID );
+			G_Trace( &trace, self->s.origin, nullptr, nullptr, testedPoint.data(), self, MASK_PLAYERSOLID );
 			if( trace.fraction != 1.0f ) {
 				break;
 			}
@@ -464,7 +464,7 @@ bool SelectedEnemy::TestAboutToHitLGorPG( int64_t levelTime ) const {
 			// Besides it this is a quite rarely executed code path
 
 			// If the knockback is going to assist a leap back
-			if( m_enemy->LookDir().Dot( botVelocity2DDir ) > 0.90f - 0.20f * speedFactor ) {
+			if( m_enemy->LookDir().dot( botVelocity2DDir ) > 0.90f - 0.20f * speedFactor ) {
 				return false;
 			}
 		}
@@ -481,12 +481,12 @@ bool SelectedEnemy::TestAboutToHitLGorPG( int64_t levelTime ) const {
 
 	trace_t trace;
 	Vec3 traceStart( enemyOrigin );
-	traceStart.Z() += playerbox_stand_viewheight;
-	SolidWorldTrace( &trace, traceStart.Data(), botOrigin );
+	traceStart.z() += playerbox_stand_viewheight;
+	SolidWorldTrace( &trace, traceStart.data(), botOrigin );
 	if( trace.fraction != 1.0f ) {
 		for( float deltaZ: { playerbox_stand_maxs[2] - 2.0f, playerbox_stand_mins[2] + 2.0f } ) {
 			Vec3 traceEnd( botOrigin[0], botOrigin[1], botOrigin[2] + deltaZ );
-			SolidWorldTrace( &trace, traceStart.Data(), traceEnd.Data() );
+			SolidWorldTrace( &trace, traceStart.data(), traceEnd.data() );
 			if( trace.fraction == 1.0f ) {
 				return true;
 			}
@@ -507,14 +507,14 @@ bool SelectedEnemy::TestAboutToHitRLorSW( int64_t levelTime ) const {
 
 	float distanceThreshold = 512.0f;
 	// Ideally should check the bot environment too
-	const float deltaZ = m_enemy->LastSeenOrigin().Z() - botOrigin[2];
+	const float deltaZ = m_enemy->LastSeenOrigin().z() - botOrigin[2];
 	if( deltaZ > 16.0f ) {
 		distanceThreshold += 2.0f * BoundedFraction( deltaZ, 128.0f );
 	} else if( deltaZ < -16.0f ) {
 		distanceThreshold -= BoundedFraction( deltaZ, 128.0f );
 	}
 
-	const float squareDistance = m_enemy->LastSeenOrigin().SquareDistanceTo( botOrigin );
+	const float squareDistance = m_enemy->LastSeenOrigin().squareDistanceTo( botOrigin );
 	if( squareDistance > distanceThreshold * distanceThreshold ) {
 		return false;
 	}
@@ -547,8 +547,8 @@ bool SelectedEnemy::TestAboutToHitRLorSW( int64_t levelTime ) const {
 	trace_t trace;
 	// TODO: Check view dot and derive direction?
 	Vec3 enemyViewOrigin( m_enemy->LastSeenOrigin() );
-	enemyViewOrigin.Z() += playerbox_stand_viewheight;
-	SolidWorldTrace( &trace, enemyViewOrigin.Data(), botOrigin );
+	enemyViewOrigin.z() += playerbox_stand_viewheight;
+	SolidWorldTrace( &trace, enemyViewOrigin.data(), botOrigin );
 	if( trace.fraction == 1.0f ) {
 		return true;
 	}
@@ -558,16 +558,16 @@ bool SelectedEnemy::TestAboutToHitRLorSW( int64_t levelTime ) const {
 	for( int x = -1; x <= 1; x += 2 ) {
 		for( int y = -1; y <= 1; y += 2 ) {
 			Vec3 sidePoint( botOrigin );
-			sidePoint.X() += 64.0f * x;
-			sidePoint.Y() += 64.0f * y;
-			SolidWorldTrace( &trace, botOrigin, sidePoint.Data() );
+			sidePoint.x() += 64.0f * x;
+			sidePoint.y() += 64.0f * y;
+			SolidWorldTrace( &trace, botOrigin, sidePoint.data() );
 			if( trace.fraction == 1.0f || ( trace.surfFlags & SURF_NOIMPACT ) ) {
 				continue;
 			}
 			const Vec3 oldImpact( trace.endpos );
 			// Notice the order: we trace a ray from enemy to impact point to avoid having to offset start point
-			SolidWorldTrace( &trace, enemyViewOrigin.Data(), oldImpact.Data() );
-			if( trace.fraction == 1.0f || oldImpact.SquareDistanceTo( trace.endpos ) < 8 * 8 ) {
+			SolidWorldTrace( &trace, enemyViewOrigin.data(), oldImpact.data() );
+			if( trace.fraction == 1.0f || oldImpact.squareDistanceTo( trace.endpos ) < 8 * 8 ) {
 				return true;
 			}
 		}

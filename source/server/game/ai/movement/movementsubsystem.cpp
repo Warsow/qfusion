@@ -121,7 +121,7 @@ void MovementSubsystem::Frame( BotInput *input ) {
 			} else {
 				Vec3 v1( movementState.entityPhysicsState.Origin() );
 				Vec3 v2( Vec3( 0, 0, 72 ) + v1 );
-				AITools_DrawColorLine( v1.Data(), v2.Data(), COLOR_RGB( 192, 0, 192 ), 0 );
+				AITools_DrawColorLine( v1.data(), v2.data(), COLOR_RGB( 192, 0, 192 ), 0 );
 				input->SetIntendedLookDir( movementState.entityPhysicsState.ForwardDir() );
 				input->ClearMovementDirections();
 				input->isUcmdSet = true;
@@ -238,7 +238,7 @@ void MovementSubsystem::ApplyPendingTurnToLookAtPoint( BotInput *botInput, Predi
 	botInput->isLookDirSet = true;
 
 	float turnSpeedMultiplier = pendingLookAtPoint.TurnSpeedMultiplier();
-	Vec3 newAngles = bot->GetNewViewAngles( entityPhysicsState_->Angles().Data(), toPointDir, frameTime, turnSpeedMultiplier );
+	Vec3 newAngles = bot->GetNewViewAngles( entityPhysicsState_->Angles().data(), toPointDir, frameTime, turnSpeedMultiplier );
 	botInput->SetAlreadyComputedAngles( newAngles );
 
 	botInput->canOverrideLookVec = false;
@@ -277,7 +277,7 @@ void MovementSubsystem::ApplyInput( BotInput *input, PredictionContext *context 
 	if( context ) {
 		auto *entityPhysicsState_ = &context->movementState->entityPhysicsState;
 		if( !input->hasAlreadyComputedAngles ) {
-			Vec3 newAngles( bot->GetNewViewAngles( entityPhysicsState_->Angles().Data(), input->IntendedLookDir(),
+			Vec3 newAngles( bot->GetNewViewAngles( entityPhysicsState_->Angles().data(), input->IntendedLookDir(),
 												   context->predictionStepMillis, input->TurnSpeedMultiplier() ) );
 			input->SetAlreadyComputedAngles( newAngles );
 		}
@@ -292,7 +292,7 @@ void MovementSubsystem::ApplyInput( BotInput *input, PredictionContext *context 
 												   game.frametime, input->TurnSpeedMultiplier() ) );
 			input->SetAlreadyComputedAngles( newAngles );
 		}
-		input->AlreadyComputedAngles().CopyTo( self->s.angles );
+		input->AlreadyComputedAngles().copyTo( self->s.angles );
 	}
 }
 

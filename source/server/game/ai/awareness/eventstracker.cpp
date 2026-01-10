@@ -72,7 +72,7 @@ void EventsTracker::ComputeTeammatesVisData( const vec3_t forwardDir, float fovD
 			Vec3 dir( Vec3( teammate->s.origin ) - botEnt->s.origin );
 			float dot, distance;
 			if( const auto maybeDistance = dir.normalizeFast( { .minAcceptableLength = 48.0f } ) ) {
-				dot      = dir.Dot( forwardDir );
+				dot      = dir.dot( forwardDir );
 				distance = *maybeDistance;
 			} else {
 				dot      = 1.0f;
@@ -112,10 +112,10 @@ bool EventsTracker::CanDistinguishGenericEnemySoundsFromTeammates( const Guessed
 	// Compute vis data lazily
 	if( m_teammatesVisDataComputedAt != level.time ) {
 		m_teammatesVisDataComputedAt = level.time;
-		ComputeTeammatesVisData( forwardDir.Data(), fovDotFactor );
+		ComputeTeammatesVisData( forwardDir.data(), fovDotFactor );
 	}
 
-	const float botViewDitDotToEnemyDir = forwardDir.Dot( toEnemyDir );
+	const float botViewDitDotToEnemyDir = forwardDir.dot( toEnemyDir );
 
 	// If the bot can't see the guessed enemy origin
 	if( botViewDitDotToEnemyDir < fovDotFactor ) {
@@ -179,9 +179,9 @@ bool EventsTracker::CanDistinguishGenericEnemySoundsFromTeammates( const Guessed
 				teammateEntry.visStatus = TeammateVisStatus::Invisible;
 				if( pvsCache->AreInPvs( botEnt, teammate ) ) {
 					Vec3 viewOrigin( botEnt->s.origin );
-					viewOrigin.Z() += (float)botEnt->viewheight;
+					viewOrigin.z() += (float)botEnt->viewheight;
 					trace_t trace;
-					SolidWorldTrace( &trace, viewOrigin.Data(), teammate->s.origin );
+					SolidWorldTrace( &trace, viewOrigin.data(), teammate->s.origin );
 					if( trace.fraction == 1.0f ) {
 						teammateEntry.visStatus = TeammateVisStatus::Visible;
 					}
@@ -274,10 +274,10 @@ void EventsTracker::AddPendingGuessedEnemyOrigin( const edict_t *enemy, const ve
 			// Just overwrite by the most recent one guess.
 			// Hacks: Don't let overwriting by a more coarse guess.
 			// TODO: Use more sophisticated checks?
-			const float actualToOldOrigin = DistanceSquared( enemy->s.origin, pendingGuessedOrigin.origin.Data() );
+			const float actualToOldOrigin = DistanceSquared( enemy->s.origin, pendingGuessedOrigin.origin.data() );
 			const float actualToNewOrigin = DistanceSquared( enemy->s.origin, origin );
 			if( actualToOldOrigin > actualToNewOrigin ) {
-				pendingGuessedOrigin.origin.Set( origin );
+				pendingGuessedOrigin.origin.set( origin );
 			}
 			return;
 		}
@@ -365,7 +365,7 @@ void EventsTracker::Update() {
 		for( const auto &[origin, entNum]: m_guessedEnemyOriginsQueue ) {
 			const edict_t *ent = gameEdicts + entNum;
 			if( !m_bot->IsDefinitelyNotAFeasibleEnemy( ent ) ) {
-				m_bot->OnEnemyOriginGuessed( ent, 96, origin.Data() );
+				m_bot->OnEnemyOriginGuessed( ent, 96, origin.data() );
 			}
 		}
 

@@ -38,7 +38,7 @@ AiActionRecord::Status WaitForNavEntityActionRecord::UpdateStatus( const WorldSt
 		return INVALID;
 	}
 
-	if( navEntity->Origin().SquareDistanceTo( Self()->Origin() ) > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
+	if( navEntity->Origin().squareDistanceTo( Self()->Origin() ) > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
 		Debug( "Distance to the item is too large to wait for it\n" );
 		return INVALID;
 	}
@@ -59,7 +59,7 @@ PlannerNode *WaitForNavEntityAction::TryApply( const WorldState &worldState ) {
 	}
 
 	const Vec3 botOrigin = worldState.getVec3( WorldState::BotOrigin ).value();
-	if( navTargetOrigin->SquareDistanceTo( botOrigin ) > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
+	if( navTargetOrigin->squareDistanceTo( botOrigin ) > wsw::square( GOAL_PICKUP_ACTION_RADIUS ) ) {
 		Debug( "Distance to goal item nav target is too large to wait for an item in the given world state\n" );
 		return nullptr;
 	}

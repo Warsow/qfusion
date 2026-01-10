@@ -60,7 +60,7 @@ auto BunnyHopAction::checkCommonBunnyHopPreconditions( PredictionContext *contex
 }
 
 bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionContext *context ) {
-	assert( intendedLookDir.LengthFast() - 1.0f < 0.01f );
+	assert( intendedLookDir.fastLength() - 1.0f < 0.01f );
 
 	const auto *const pmoveStats   = context->currMinimalPlayerState->pmove.stats;
 	auto *const botInput           = &context->record->botInput;
@@ -78,7 +78,7 @@ bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionC
 	botInput->canOverrideLookVec = false;
 	botInput->canOverridePitch   = false;
 
-	const float intendedLookDirDotForward = entityPhysicsState.ForwardDir().Dot( intendedLookDir );
+	const float intendedLookDirDotForward = entityPhysicsState.ForwardDir().dot( intendedLookDir );
 	if( entityPhysicsState.GroundEntity() ) {
 		if( entityPhysicsState.Speed2D() <= context->GetRunSpeed() ) {
 			int forwardMovement = 0;
@@ -94,7 +94,7 @@ bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionC
 					forwardMovement = -1;
 				}
 			} else {
-				const float intendedLookDirDotRight = entityPhysicsState.RightDir().Dot( intendedLookDir );
+				const float intendedLookDirDotRight = entityPhysicsState.RightDir().dot( intendedLookDir );
 				if( std::fabs( intendedLookDirDotRight ) > dashDotThreshold ) {
 					if( intendedLookDirDotRight > 0.0f ) {
 						dashQuery     = EnvironmentTraceCache::Query::right();
@@ -138,7 +138,7 @@ bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionC
 			botInput->canOverridePitch   = true;
 		}
 	} else {
-		Vec3 toTargetDir2D( intendedLookDir.X(), intendedLookDir.Y(), 0.0f );
+		Vec3 toTargetDir2D( intendedLookDir.x(), intendedLookDir.y(), 0.0f );
 		Vec3 velocityDir2D( entityPhysicsState.Velocity()[0], entityPhysicsState.Velocity()[1], 0.0f );
 		bool have2DDirsBeenNormalized = false;
 		// This check is not that cheap, hence we compute the result on demand
@@ -148,11 +148,11 @@ bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionC
 		if( const float squareSpeed2D = entityPhysicsState.SquareSpeed2D(); squareSpeed2D > 1.0f ) {
 			velocityDir2D *= Q_RSqrt( squareSpeed2D );
 
-			if( const float toTargetDir2DSqLen = toTargetDir2D.SquaredLength(); toTargetDir2DSqLen > 0.1f ) {
+			if( const float toTargetDir2DSqLen = toTargetDir2D.squareLength(); toTargetDir2DSqLen > 0.1f ) {
 				toTargetDir2D *= Q_RSqrt( toTargetDir2DSqLen );
 				have2DDirsBeenNormalized = true;
 
-				const float velocityDir2DDotToTargetDir2D = velocityDir2D.Dot( toTargetDir2D );
+				const float velocityDir2DDotToTargetDir2D = velocityDir2D.dot( toTargetDir2D );
 				if( velocityDir2DDotToTargetDir2D > 0.0f ) {
 					hasCheckedRiskyMovement = true;
 					isRiskyMovementAllowed  = checkRiskyMovementAllowed( context );
@@ -272,7 +272,7 @@ bool BunnyHopAction::canSetWalljump( PredictionContext *context, const Vec3 &vel
 		return false;
 	}
 
-	return velocity2DDir.Dot( entityPhysicsState.ForwardDir() ) > 0.7f && velocity2DDir.Dot( intended2DLookDir ) > 0.7f;
+	return velocity2DDir.dot( entityPhysicsState.ForwardDir() ) > 0.7f && velocity2DDir.dot( intended2DLookDir ) > 0.7f;
 }
 
 bool BunnyHopAction::checkStepSpeedGainOrLoss( PredictionContext *context ) {
@@ -293,7 +293,7 @@ bool BunnyHopAction::checkStepSpeedGainOrLoss( PredictionContext *context ) {
 			oldVelocity2DDir *= Q_Rcp( oldEntityPhysicsState.Speed2D() );
 			Vec3 newVelocity2DDir( newVelocity[0], newVelocity[1], 0 );
 			newVelocity2DDir *= Q_Rcp( newEntityPhysicsState.Speed2D() );
-			if( oldVelocity2DDir.Dot( newVelocity2DDir ) < 0.3f ) {
+			if( oldVelocity2DDir.dot( newVelocity2DDir ) < 0.3f ) {
 				Debug( "A prediction step has lead to an unintended bouncing back\n" );
 				return false;
 			}
@@ -477,7 +477,7 @@ bool BunnyHopAction::checkNavTargetAreaTransition( PredictionContext *context ) 
 
 	Vec3 velocityDir( entityPhysicsState.Velocity() );
 	velocityDir *= Q_Rcp( entityPhysicsState.Speed() );
-	if( velocityDir.Dot( toTargetDir ) > 0.7f ) {
+	if( velocityDir.dot( toTargetDir ) > 0.7f ) {
 		return true;
 	}
 
@@ -507,7 +507,7 @@ bool BunnyHopAction::hasMadeAnAdvancementPriorToLanding( PredictionContext *cont
 	std::optional<float> initial2DDistance;
 	if( m_reachAtSequenceStart ) {
 		if( const auto reachNum = context->NextReachNum(); reachNum == m_reachAtSequenceStart ) {
-			targetPoint.Set( AiAasWorld::instance()->getReaches()[reachNum].start );
+			targetPoint.set( AiAasWorld::instance()->getReaches()[reachNum].start );
 			initial2DDistance = m_distanceToReachAtStart;
 		}
 	} else if( context->IsInNavTargetArea() ) {
@@ -526,7 +526,7 @@ bool BunnyHopAction::hasMadeAnAdvancementPriorToLanding( PredictionContext *cont
 	}
 
 	const auto &newEntityPhysicsState = context->movementState->entityPhysicsState;
-	const float distance2DToTarget = targetPoint.FastDistance2DTo( newEntityPhysicsState.Origin() );
+	const float distance2DToTarget = targetPoint.fastDistance2DTo( newEntityPhysicsState.Origin() );
 	// If the advancement was insufficient
 	if( distance2DToTarget + min2DAdvancementToTarget > initial2DDistance ) {
 		return false;
@@ -549,7 +549,7 @@ bool BunnyHopAction::hasMadeAnAdvancementPriorToLanding( PredictionContext *cont
 		assert( distance2DFrac >= -0.01 && distance2DFrac <= 1.01f );
 		// Require a better velocity conformance for landing closer to the target
 		const float dotThreshold = 0.9f - 0.2f * distance2DFrac;
-		if( velocityDir.Dot( dirToReach ) > dotThreshold ) {
+		if( velocityDir.dot( dirToReach ) > dotThreshold ) {
 			return true;
 		}
 	}
@@ -584,7 +584,7 @@ auto BunnyHopAction::checkPredictionStepResults( PredictionContext *context ) ->
 	// Reset unreachable target timer
 	m_currentUnreachableTargetSequentialMillis = 0;
 
-	const float squareDistanceFromStart = m_originAtSequenceStart.SquareDistanceTo( newEntityPhysicsState.Origin() );
+	const float squareDistanceFromStart = m_originAtSequenceStart.squareDistanceTo( newEntityPhysicsState.Origin() );
 	const int groundedAreaNum = context->CurrGroundedAasAreaNum();
 	if( currTravelTimeToTarget <= m_minTravelTimeToNavTargetSoFar ) {
 		m_minTravelTimeToNavTargetSoFar = currTravelTimeToTarget;
@@ -612,7 +612,7 @@ auto BunnyHopAction::checkPredictionStepResults( PredictionContext *context ) ->
 				// Check for completion if we have already made a hop before
 				if( m_hopCounter ) {
 					// Try a "direct" completion if we've landed some sufficient units ahead of the last hop origin
-					if( m_latchedHopOrigin.SquareDistance2DTo( newEntityPhysicsState.Origin() ) > wsw::square( 72 ) ) {
+					if( m_latchedHopOrigin.squareDistance2DTo( newEntityPhysicsState.Origin() ) > wsw::square( 72 ) ) {
 						if( m_sequencePathPenalty == 0 && m_hopCounter == 2 ) {
 							return PredictionResult::Complete;
 						}
@@ -621,7 +621,7 @@ auto BunnyHopAction::checkPredictionStepResults( PredictionContext *context ) ->
 					// Set the latched hop state if it's needed
 					if( !m_hasALatchedHop ) {
 						m_hasALatchedHop = true;
-						m_latchedHopOrigin.Set( newEntityPhysicsState.Origin() );
+						m_latchedHopOrigin.set( newEntityPhysicsState.Origin() );
 						// Save an "good enough" path that is going to be used if the direct completion fails
 						unsigned advancement = 0;
 						if( m_travelTimeAtSequenceStart ) {
@@ -680,12 +680,12 @@ void BunnyHopAction::onApplicationSequenceStarted( PredictionContext *context ) 
 	m_travelTimeAtSequenceStart = 0;
 	m_reachAtSequenceStart      = 0;
 
-	m_latchedHopOrigin.Set( 0, 0, 0 );
+	m_latchedHopOrigin.set( 0, 0, 0 );
 
 	m_sequencePathPenalty = 0;
 
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
-	m_originAtSequenceStart.Set( entityPhysicsState.Origin() );
+	m_originAtSequenceStart.set( entityPhysicsState.Origin() );
 
 	m_distanceToReachAtStart = std::numeric_limits<float>::infinity();
 	m_distanceInNavTargetAreaAtStart = std::numeric_limits<float>::infinity();
@@ -699,9 +699,9 @@ void BunnyHopAction::onApplicationSequenceStarted( PredictionContext *context ) 
 			m_reachAtSequenceStart          = reachNum;
 			if( reachNum ) {
 				const auto &reach = AiAasWorld::instance()->getReaches()[reachNum];
-				m_distanceToReachAtStart = m_originAtSequenceStart.Distance2DTo( reach.start );
+				m_distanceToReachAtStart = m_originAtSequenceStart.distance2DTo( reach.start );
 			} else {
-				m_distanceInNavTargetAreaAtStart = m_originAtSequenceStart.Distance2DTo( context->NavTargetOrigin() );
+				m_distanceInNavTargetAreaAtStart = m_originAtSequenceStart.distance2DTo( context->NavTargetOrigin() );
 			}
 		}
 	}

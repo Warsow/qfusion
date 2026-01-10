@@ -131,7 +131,7 @@ public:
 
 		static OriginAndScore ForArea( std::span<const aas_area_t> aasAreas, int areaNum, uint16_t scoreIndex ) {
 			Vec3 origin( aasAreas[areaNum].center );
-			origin.Z() = aasAreas[areaNum].mins[2] + 8.0f;
+			origin.z() = aasAreas[areaNum].mins[2] + 8.0f;
 			OriginAndScore result( origin, 1.0f );
 			result.tag = areaNum;
 			result.scoreIndex = scoreIndex;

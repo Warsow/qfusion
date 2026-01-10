@@ -112,9 +112,9 @@ bool BestJumpableSpotDetector::InspectBumpingPoint( const SpotAndScore *spotAndS
 		traceStart *= 4.0f;
 		traceStart += predictionResults.trace->endpos;
 		Vec3 traceEnd( traceStart );
-		traceEnd.Z() -= 64.0f;
+		traceEnd.z() -= 64.0f;
 
-		StaticWorldTrace( &trace, traceStart.Data(), traceEnd.Data(), MASK_SOLID | MASK_WATER );
+		StaticWorldTrace( &trace, traceStart.data(), traceEnd.data(), MASK_SOLID | MASK_WATER );
 
 		if( trace.fraction == 1.0f ) {
 			return false;

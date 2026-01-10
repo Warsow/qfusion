@@ -621,7 +621,7 @@ void TacticalSpotsBuilder::FindCandidatePoints() {
 	for( int i = 0; i < numCandidateAreas; i++ ) {
 		const auto &area = aasAreas[i];
 		Vec3 areaPoint( area.center );
-		areaPoint.Z() = area.mins[2];
+		areaPoint.z() = area.mins[2];
 		AddCandidatePoint( areaPoint );
 	}
 
@@ -640,11 +640,11 @@ void TacticalSpotsBuilder::FindCandidatePoints() {
 		}
 
 		Vec3 areaPoint( area.center );
-		areaPoint.Z() = area.mins[2];
+		areaPoint.z() = area.mins[2];
 		for( int xi = 0; xi < xSteps; ++xi ) {
 			for( int yi = 0; yi < ySteps; ++yi ) {
-				areaPoint.X() = area.mins[0] + xi * step;
-				areaPoint.Y() = area.mins[1] + yi * step;
+				areaPoint.x() = area.mins[0] + xi * step;
+				areaPoint.y() = area.mins[1] + yi * step;
 				AddCandidatePoint( areaPoint );
 			}
 		}
@@ -714,7 +714,7 @@ static const vec3_t testedMins = { -36, -36, 0 };
 static const vec3_t testedMaxs = { +36, +36, 72 };
 
 void TacticalSpotsBuilder::TryAddSpotFromPoint( const Vec3 &point ) {
-	TacticalSpotsRegistry::OriginParams originParams( point.Data(), 1024.0f, AiAasRouteCache::Shared() );
+	TacticalSpotsRegistry::OriginParams originParams( point.data(), 1024.0f, AiAasRouteCache::Shared() );
 
 	uint16_t insideSpotNum;
 	const SpotsQueryVector &nearbySpots = gridBuilder.FindSpotsInRadius( originParams, &insideSpotNum );
@@ -725,12 +725,12 @@ void TacticalSpotsBuilder::TryAddSpotFromPoint( const Vec3 &point ) {
 	for( int i = -3; i < 3; ++i ) {
 		for( int j = -3; j < 3; ++j ) {
 			Vec3 spotOrigin( point );
-			spotOrigin.X() += i * 24.0f;
-			spotOrigin.Y() += j * 24.0f;
+			spotOrigin.x() += i * 24.0f;
+			spotOrigin.y() += j * 24.0f;
 			// Usually spots are picked on ground, add an offset to avoid being qualified as starting in solid
-			spotOrigin.Z() += 1.0f;
+			spotOrigin.z() += 1.0f;
 			int numVisNearbySpots, areaNum;
-			if( IsAGoodSpotPosition( nearbySpots, spotOrigin.Data(), &numVisNearbySpots, &areaNum ) ) {
+			if( IsAGoodSpotPosition( nearbySpots, spotOrigin.data(), &numVisNearbySpots, &areaNum ) ) {
 				if( numVisNearbySpots > bestNumVisNearbySpots ) {
 					bestNumVisNearbySpots = numVisNearbySpots;
 					bestSpotOrigin = spotOrigin;
@@ -749,13 +749,13 @@ void TacticalSpotsBuilder::TryAddSpotFromPoint( const Vec3 &point ) {
 	}
 
 	TacticalSpot *newSpot = AllocSpot();
-	bestSpotOrigin.CopyTo( newSpot->origin );
+	bestSpotOrigin.copyTo( newSpot->origin );
 	newSpot->aasAreaNum = bestSpotAreaNum;
 	VectorCopy( spotMins, newSpot->absMins );
 	VectorCopy( spotMaxs, newSpot->absMaxs );
 
 	gridBuilder.AttachSpots( spots, (unsigned)numSpots );
-	gridBuilder.AddSpot( bestSpotOrigin.Data(), (uint16_t)( numSpots - 1 ) );
+	gridBuilder.AddSpot( bestSpotOrigin.data(), (uint16_t)( numSpots - 1 ) );
 }
 
 static constexpr float SPOT_SQUARE_PROXIMITY_THRESHOLD = 108 * 108;
@@ -819,8 +819,8 @@ bool TacticalSpotsBuilder::IsAGoodSpotPosition( const SpotsQueryVector &nearbySp
 
 	// Check whether there is really a ground below
 	Vec3 groundedPoint( point );
-	groundedPoint.Z() -= 32.0f;
-	SolidWorldTrace( &trace, point, groundedPoint.Data() );
+	groundedPoint.z() -= 32.0f;
+	SolidWorldTrace( &trace, point, groundedPoint.data() );
 	if( trace.fraction == 1.0f || trace.startsolid || trace.allsolid ) {
 		return false;
 	}
@@ -988,16 +988,16 @@ SpotsQueryVector &TacticalSpotsRegistry::BaseSpotsGrid::FindSpotsInRadius( const
 				for( uint16_t spotNumIndex = 0; spotNumIndex < numGridSpots; ++spotNumIndex ) {
 					uint16_t spotNum = spotsList[spotNumIndex];
 					const TacticalSpot &spot = spots[spotNum];
-					if( DistanceSquared( spot.origin, searchOrigin.Data() ) < squareRadius ) {
+					if( DistanceSquared( spot.origin, searchOrigin.data() ) < squareRadius ) {
 						result.push_back( spotNum );
 						// Test whether search origin is inside the spot
-						if( searchOrigin.X() < spot.absMins[0] || searchOrigin.X() > spot.absMaxs[0] ) {
+						if( searchOrigin.x() < spot.absMins[0] || searchOrigin.x() > spot.absMaxs[0] ) {
 							continue;
 						}
-						if( searchOrigin.Y() < spot.absMins[1] || searchOrigin.Y() > spot.absMaxs[1] ) {
+						if( searchOrigin.y() < spot.absMins[1] || searchOrigin.y() > spot.absMaxs[1] ) {
 							continue;
 						}
-						if( searchOrigin.Z() < spot.absMins[2] || searchOrigin.Z() > spot.absMaxs[2] ) {
+						if( searchOrigin.z() < spot.absMins[2] || searchOrigin.z() > spot.absMaxs[2] ) {
 							continue;
 						}
 						// Spots should not overlap. But if spots overlap, last matching spot will be returned

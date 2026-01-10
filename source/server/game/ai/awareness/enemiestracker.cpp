@@ -48,8 +48,8 @@ void TrackedEnemy::OnViewed( const float *overrideEntityOrigin ) {
 	// Put the likely case first
 	const float *origin = !overrideEntityOrigin ? m_ent->s.origin : overrideEntityOrigin;
 	// Set members for faster access
-	VectorCopy( origin, m_lastSeenOrigin.Data() );
-	VectorCopy( m_ent->velocity, m_lastSeenVelocity.Data() );
+	VectorCopy( origin, m_lastSeenOrigin.data() );
+	VectorCopy( m_ent->velocity, m_lastSeenVelocity.data() );
 	m_lastSeenAt = level.time;
 	// Store in a queue then for history
 	m_lastSeenSnapshots.emplace_back( Snapshot( m_ent->s.origin, m_ent->velocity, m_ent->s.angles, level.time ) );
@@ -60,7 +60,7 @@ Vec3 TrackedEnemy::LookDir() const {
 	if( m_lookDirComputedAt != levelTime ) {
 		m_lookDirComputedAt = levelTime;
 		if ( const Bot *bot = m_ent->bot ) {
-			bot->EntityPhysicsState()->ForwardDir().CopyTo( m_lookDir );
+			bot->EntityPhysicsState()->ForwardDir().copyTo( m_lookDir );
 		} else {
 			AngleVectors( m_ent->s.angles, m_lookDir, nullptr, nullptr );
 		}
@@ -120,9 +120,9 @@ bool TrackedEnemy::TriesToKeepUnderXhair( const float *origin ) const {
 		prevDot = lastDot;
 
 		Vec3 toOriginDir( snapshot.Origin() );
-		toOriginDir.Z() += playerbox_stand_viewheight;
+		toOriginDir.z() += playerbox_stand_viewheight;
 		toOriginDir -= origin;
-		float squareDistance = toOriginDir.SquaredLength();
+		float squareDistance = toOriginDir.squareLength();
 		if( squareDistance < 1 ) {
 			lastDot = bestDot = 1.0f;
 			continue;
@@ -130,9 +130,9 @@ bool TrackedEnemy::TriesToKeepUnderXhair( const float *origin ) const {
 
 		toOriginDir *= -1.0f * Q_RSqrt( squareDistance );
 		vec3_t lookDir;
-		AngleVectors( snapshot.Angles().Data(), lookDir, nullptr, nullptr );
+		AngleVectors( snapshot.Angles().data(), lookDir, nullptr, nullptr );
 
-		const float dot = toOriginDir.Dot( lookDir );
+		const float dot = toOriginDir.dot( lookDir );
 		if( dot > bestDot ) {
 			// Return immediately in this case
 			if( dot > 0.995f ) {
@@ -472,7 +472,7 @@ const TrackedEnemy *EnemiesTracker::ChooseVisibleEnemy() {
 			// For far enemies distance factor is lower
 			const float distanceFactor = 1.0f - 0.7f * BoundedFraction( *maybeDistance, distanceBounds );
 			// Should affect the score only a bit (otherwise bot will miss a dangerous enemy that he is not looking at).
-			const float directionFactor = 0.7f + 0.3f * botToEnemy.Dot( forward );
+			const float directionFactor = 0.7f + 0.3f * botToEnemy.dot( forward );
 
 			const float currScore = enemy->m_lastSelectionWeight * distanceFactor * directionFactor;
 			if( bestEnemyScore < currScore ) {
@@ -521,7 +521,7 @@ const TrackedEnemy *EnemiesTracker::ChooseLostOrHiddenEnemy( std::optional<unsig
 		float directionFactor = 0.5f, distanceFactor = 1.0f;
 		Vec3 botToSpotDirection = enemy->LastSeenOrigin() - botEnt->s.origin;
 		if( const auto maybeDistance = botToSpotDirection.normalizeFast( { .minAcceptableLength = 48.0f } ) ) {
-			directionFactor = 0.3f + 0.7f * botToSpotDirection.Dot( forward );
+			directionFactor = 0.3f + 0.7f * botToSpotDirection.dot( forward );
 			distanceFactor = 1.0f - 0.9f * BoundedFraction( *maybeDistance, 2000.0f );
 		}
 
