@@ -418,12 +418,37 @@ auto WalkToPointAction::checkPredictionStepResults( PredictionContext *context )
 }
 
 bool WalkToPointScript::produceBotInput( BotInput *input ) {
-	// TODO: Invalidate explicitly?
-	if( contactsTargetPoint( m_subsystem->getMovementState().entityPhysicsState, m_targetPoint ) ) {
+	const auto &entityPhysicsState = m_subsystem->getMovementState().entityPhysicsState;
+	m_subsystem->bot->RouteCache();
+
+	if( contactsTargetPoint( entityPhysicsState, m_targetPoint ) ) {
 		return false;
 	}
 
+	if( m_travelTimeFromTargetPoint && entityPhysicsState.GroundEntity() ) {
+		// TODO: Implement subroutines which are similar to PredictionContext::TravelTimeToTarget()
+		// for the movement subsystem itself so we don't have to copy-paste this code
+		const Bot *bot = m_subsystem->bot;
+		if( const int navTargetAreaNum = bot->NavTargetAasAreaNum() ) {
+			int fromAreaNums[2] { 0, 0 };
+			const int numFromAreas = entityPhysicsState.PrepareRoutingStartAreas( fromAreaNums );
+			if( const int travelTime = bot->RouteCache()->FindRoute( fromAreaNums, numFromAreas,
+																	 navTargetAreaNum, bot->TravelFlags() ) ) {
+				// Invalidate the script, allowing further replanning
+				if( travelTime < m_travelTimeFromTargetPoint ) {
+					return false;
+				}
+			}
+		}
+	}
+
 	m_walkToPointAction.setTargetPoint( m_targetPoint );
+	if( m_travelTimeFromTargetPoint ) {
+		// Don't actually try walking. We aim for advancement to target, not precise positioning.
+		m_walkToPointAction.setWalkProximityThreshold( 0.1f );
+	} else {
+		m_walkToPointAction.setWalkProximityThreshold( WalkToPointAction::kDefaultWalkProximityThreshold );
+	}
 
 	if( PredictingAndCachingMovementScript::produceBotInput( input ) ) {
 		const auto lastRecordTimestamp = m_predictedMovementActions.back().timestamp;

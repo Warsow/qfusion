@@ -273,9 +273,22 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 			}
 		} else {
 			int reachNum = 0;
-			if( bot->RouteCache()->FindRoute( botAreas, numBotAreas, navTargetAreaNum, bot->TravelFlags(), &reachNum ) ) {
+			const auto *routeCache = bot->RouteCache();
+			const auto travelFlags = bot->TravelFlags();
+			if( routeCache->FindRoute( botAreas, numBotAreas, navTargetAreaNum, travelFlags, &reachNum ) ) {
 				const auto &reach = aasWorld->getReaches()[reachNum];
-				if( reach.traveltype == TRAVEL_WALK || reach.traveltype == TRAVEL_JUMPPAD ||
+				if( reach.traveltype == TRAVEL_WALK ) {
+					int travelTimeFromPoint = 0;
+					// Note: We don't care of travel time inside area (that's what the current routing system does)
+					// Note: We don't really need to check this condition but it slightly reduces CPU load in target areas
+					if( reach.areanum != navTargetAreaNum ) {
+						travelTimeFromPoint = routeCache->FindRoute( reach.areanum, navTargetAreaNum, travelFlags );
+					}
+					walkToPointScript.setTargetPoint( Vec3( reach.end ), travelTimeFromPoint );
+					if( produceBotInput( &walkToPointScript, input ) ) {
+						return &walkToPointScript;
+					}
+				} else if( reach.traveltype == TRAVEL_JUMPPAD ||
 					reach.traveltype == TRAVEL_TELEPORT || reach.traveltype == TRAVEL_ELEVATOR ) {
 					walkToPointScript.setTargetPoint( Vec3( reach.start ) );
 					if( produceBotInput( &walkToPointScript, input ) ) {

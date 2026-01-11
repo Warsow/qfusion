@@ -33,6 +33,9 @@ public:
 	[[nodiscard]]
 	auto checkPredictionStepResults( PredictionContext *context ) -> PredictionResult override;
 
+	static constexpr float kDefaultWalkProximityThreshold { 8.0f };
+	static constexpr float kDefaultMaxAllowed2DSpeedAtTargetPoint { DEFAULT_PLAYERSPEED_STANDARD };
+
 	[[nodiscard]]
 	auto getTargetPoint() const -> const Vec3 & { return m_targetPoint; }
 	void setTargetPoint( const Vec3 &targetPoint ) { m_targetPoint = targetPoint; }
@@ -57,8 +60,8 @@ private:
 	float m_minDistanceFromTargetToJump { 0.0f };
 	float m_minDistanceFromTargetToDash { 0.0f };
 	float m_distanceFromStartToTarget { 0.0f };
-	float m_walkProximityThreshold { 8.0f };
-	float m_maxAllowed2DSpeedAtTargetPoint { DEFAULT_PLAYERSPEED_STANDARD + 1.0f };
+	float m_walkProximityThreshold { kDefaultWalkProximityThreshold };
+	float m_maxAllowed2DSpeedAtTargetPoint { kDefaultMaxAllowed2DSpeedAtTargetPoint };
 	bool m_allowToReachThePointInAir { false };
 	bool m_isDashingAllowed { false };
 	bool m_isJumpingAllowed { false };
@@ -77,15 +80,17 @@ public:
 	[[nodiscard]]
 	bool produceBotInput( BotInput *input ) override;
 
-	void setTargetPoint( const Vec3 &targetPoint ) {
+	void setTargetPoint( const Vec3 &targetPoint, int travelTimeFromTagretPoint = 0 ) {
 		m_predictedMovementActions.clear();
-		m_targetPoint = targetPoint;
+		m_targetPoint               = targetPoint;
+		m_travelTimeFromTargetPoint = travelTimeFromTagretPoint;
 	}
 private:
 	WalkToPointAction m_walkToPointAction;
 	BaseAction *m_storageOfActionPtrs[1] { &m_walkToPointAction };
 
 	Vec3 m_targetPoint { 0.0f, 0.0f, 0.0f };
+	int m_travelTimeFromTargetPoint { 0 };
 };
 
 class JumpToPointAction : public BaseAction {
