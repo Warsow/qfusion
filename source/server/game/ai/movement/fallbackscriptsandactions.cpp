@@ -1173,3 +1173,159 @@ bool ElevatorScript::tryMovingToAreas( BaseAction *appropriateAction, std::span<
 	}
 	return false;
 }
+
+void WaitForLandingRelaxedAction::onApplicationSequenceStarted( PredictionContext *context ) {
+	BaseAction::onApplicationSequenceStarted( context );
+	m_travelTimeAtSequenceStart = context->TravelTimeToNavTarget();
+}
+
+void WaitForLandingRelaxedAction::onApplicationSequenceStopped( PredictionContext *context,
+																SequenceStopReason sequenceStopReason,
+																unsigned stoppedAtFrameIndex ) {
+	BaseAction::onApplicationSequenceStopped( context, sequenceStopReason, stoppedAtFrameIndex );
+	if( sequenceStopReason != SUCCEEDED ) {
+		m_isDisabledForPlanning = true;
+	}
+}
+
+[[nodiscard]]
+auto WaitForLandingRelaxedAction::planPredictionStep( PredictionContext *context ) -> PredictionResult {
+	if( m_isDisabledForPlanning ) {
+		return PredictionResult::Abort;
+	}
+
+	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
+	auto *const botInput           = &context->record->botInput;
+
+	if( const std::optional<Vec3> maybeKeptInFovPoint = m_bot->GetKeptInFovPoint() ) {
+		Vec3 viewOrigin( entityPhysicsState.Origin() );
+		viewOrigin.z() += playerbox_stand_viewheight;
+		Vec3 intendedLookDir( *maybeKeptInFovPoint - viewOrigin );
+		if( intendedLookDir.normalizeFast() ) {
+			botInput->SetIntendedLookDir( intendedLookDir, true );
+		}
+	}
+
+	if( !botInput->isLookDirSet ) {
+		botInput->SetIntendedLookDir( entityPhysicsState.ForwardDir(), true );
+	}
+
+	botInput->canOverridePitch = true;
+	botInput->canOverrideUcmd  = true;
+	botInput->isUcmdSet        = true;
+
+	return PredictionResult::Continue;
+}
+
+[[nodiscard]]
+auto WaitForLandingRelaxedAction::checkPredictionStepResults( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = BaseAction::checkPredictionStepResults( context ); result != PredictionResult::Continue ) {
+		return result;
+	}
+
+	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
+	// This condition accounts for landing in lava/slime as well
+	// TODO: Does the base method account for this?
+	if( entityPhysicsState.waterLevel > 1 ) {
+		return PredictionResult::Abort;
+	}
+
+	if( entityPhysicsState.GroundEntity() ) {
+		if( m_travelTimeAtSequenceStart ) {
+			const int currTravelTimeToTarget = context->TravelTimeToNavTarget();
+			if( !currTravelTimeToTarget ) {
+				return PredictionResult::Abort;
+			}
+			if( currTravelTimeToTarget > m_travelTimeAtSequenceStart ) {
+				return PredictionResult::Abort;
+			}
+		}
+		return PredictionResult::Complete;
+	} else {
+		// Try detecting bumping into obstactles
+		const auto &oldEntityPhysicsState = context->PhysicsStateBeforeStep();
+		if( oldEntityPhysicsState.Speed2D() > 100 && entityPhysicsState.Speed2D() < 50 ) {
+			return PredictionResult::Abort;
+		}
+	}
+
+	if( context->topOfStackIndex + 2 < MAX_PREDICTED_STATES ) {
+		return PredictionResult::Continue;
+	}
+
+	return PredictionResult::Abort;
+}
+
+bool WaitForLandingRelaxedScript::produceBotInput( BotInput *input ) {
+	const auto &entityPhysicsState = m_subsystem->getMovementState().entityPhysicsState;
+	if( entityPhysicsState.GroundEntity() ) {
+		return false;
+	}
+
+	return produceNonCachedInputUsingAction( &m_waitForLandingRelaxedAction, input );
+}
+
+bool LandToPreventFallingScript::produceBotInput( BotInput *input ) {
+	const auto &entityPhysicsState = m_subsystem->getMovementState().entityPhysicsState;
+	if( entityPhysicsState.GroundEntity() ) {
+		return false;
+	}
+
+	Bot *const bot = m_subsystem->bot;
+	if( const int navTargetAreaNum = bot->NavTargetAasAreaNum() ) {
+		struct Walker : public ReachChainWalker {
+			Walker( const AiAasRouteCache *routeCache_, int targetAreaNum_, const float *currOrigin_ ) :
+				ReachChainWalker( routeCache_, targetAreaNum_ ), currOrigin( currOrigin_ ) {}
+			bool Accept( int reachNum, const aas_reachability_t &reach, int travelTime ) override {
+				if( !collectedPointsAndAreas.full() && numHops < 16 ) {
+					const auto &area = AiAasWorld::instance()->getAreas()[reach.areanum];
+					// TODO: Check whether we can really land using basic physics
+					constexpr float squareDistanceThreshold = wsw::square( 512.0f );
+					if( area.mins[2] < currOrigin.z() ) {
+						if( currOrigin.squareDistance2DTo( reach.start ) < squareDistanceThreshold ) {
+							collectedPointsAndAreas.push_back( { Vec3( reach.start ), reach.areanum } );
+						}
+						if( !collectedPointsAndAreas.full() ) {
+							const Vec3 areaPoint( area.center[0], area.center[1], area.mins[2] + 32 );
+							if( currOrigin.squareDistance2DTo( areaPoint ) < squareDistanceThreshold ) {
+								collectedPointsAndAreas.push_back( { areaPoint, reach.areanum } );
+							}
+						}
+					}
+					numHops++;
+					return true;
+				}
+				return false;
+			}
+			wsw::StaticVector<std::pair<Vec3, int>, 20> collectedPointsAndAreas;
+			unsigned numHops { 0 };
+			Vec3 currOrigin;
+		};
+
+		Walker walker( bot->RouteCache(), bot->TravelFlags(), entityPhysicsState.Origin() );
+		walker.SetAreaNums( entityPhysicsState, navTargetAreaNum );
+		if( walker.Exec() ) {
+			for( const auto &[areaPoint, areaNum]: walker.collectedPointsAndAreas ) {
+				m_landOnPointAction.setTarget( areaPoint, areaNum );
+				// TODO: Let the land action be capable of handling multiple points using restarts
+				if( produceNonCachedInputUsingAction( &m_landOnPointAction, input ) ) {
+					return true;
+				}
+			}
+		}
+	}
+
+	if( const int areaNum = entityPhysicsState.DroppedToFloorAasAreaNum() ) {
+		// TODO: Is this check needed?
+		if( AiAasWorld::instance()->getAreaSettings()[areaNum].areaflags & AREA_GROUNDED ) {
+			const auto &area = AiAasWorld::instance()->getAreas()[areaNum];
+			// Helps with the quad ramp @ wdm6
+			m_landOnPointAction.setTarget( Vec3( area.center[0], area.center[1], area.mins[2] + 32 ), areaNum );
+			if( produceNonCachedInputUsingAction( &m_landOnPointAction, input ) ) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}

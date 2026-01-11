@@ -84,6 +84,7 @@ class MovementSubsystem {
 	friend class WalkToPointScript;
 	friend class ElevatorScript;
 	friend class JumppadScript;
+	friend class LandToPreventFallingScript;
 	friend class BunnyToBestFloorClusterPointAction;
 	friend class PredictingAndCachingMovementScript;
 
@@ -142,11 +143,14 @@ class MovementSubsystem {
 
 	MovementScript *activeScript { nullptr };
 	MovementScript *testedScript { nullptr };
+	MovementScript *prevActiveScript { nullptr };
 
 	JumppadScript jumppadScript { this };
 	ElevatorScript elevatorScript { this };
 	BunnyHopScript bunnyHopScript { this };
 	WalkToPointScript walkToPointScript { this };
+	LandToPreventFallingScript landToPreventFallingScript { this };
+	WaitForLandingRelaxedScript waitForLandingRelaxedScript { this };
 	TraverseJumpReachScript traverseJumpReachScript { this };
 	TraverseBarrierJumpReachScript traverseBarrierJumpReachScript { this };
 	TraverseWalkOffLedgeReachScript traverseWalkOffLedgeReachScript { this };
@@ -172,6 +176,8 @@ class MovementSubsystem {
 	[[nodiscard]]
 	auto findTriggerReachNumForScriptActivation( int triggerEntNum, int desiredTravelType,
 												 const CachedLastNearbyTriggerReach &cached ) -> int;
+
+	void setActiveScript( MovementScript *script );
 public:
 	explicit MovementSubsystem( Bot *bot_ );
 
@@ -220,6 +226,8 @@ public:
 
 	void Reset() {
 		ResetPendingLookAtPoint();
+		activeScript     = nullptr;
+		prevActiveScript = nullptr;
 		lastNearbyElevatorReach.entNum = 0;
 		lastNearbyJumppadReach.entNum  = 0;
 	}

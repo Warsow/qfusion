@@ -36,6 +36,32 @@ void PredictingMovementScript::onInterceptedPMoveTouchTriggers( pmove_t *pm, vec
 	m_testedContext->OnInterceptedPMoveTouchTriggers( pm, previousOrigin );
 }
 
+bool PredictingMovementScript::buildPlan( std::span<BaseAction *> movementActions,
+										  wsw::StaticVector<PredictedMovementAction, MAX_PREDICTED_STATES> *predictedTape ) {
+	assert( !movementActions.empty() );
+	predictedTape->clear();
+
+	PredictionContext context( m_subsystem, predictedTape );
+
+	m_testedContext   = &context;
+	const bool result = context.BuildPlan( movementActions );
+	m_testedContext   = nullptr;
+
+	return result;
+}
+
+bool PredictingMovementScript::produceNonCachedInputUsingAction( BaseAction *action, BotInput *input ) {
+	wsw::StaticVector<PredictedMovementAction, MAX_PREDICTED_STATES> predictedTape;
+	BaseAction *actions[1] { action };
+	if( !buildPlan( actions, &predictedTape ) ) {
+		return false;
+	}
+	assert( !predictedTape.empty() );
+	assert( predictedTape.front().action );
+	predictedTape.front().action->execActionRecord( &predictedTape.front().record, input );
+	return true;
+}
+
 void PredictingAndCachingMovementScript::Debug( const char *format, ... ) const {
 	va_list va;
 	va_start( va, format );
@@ -50,14 +76,7 @@ bool PredictingAndCachingMovementScript::produceBotInput( BotInput *input ) {
 		return true;
 	}
 
-	assert( !m_movementActions.empty() );
-	m_predictedMovementActions.clear();
-
-	PredictionContext context( m_subsystem, &m_predictedMovementActions );
-	m_testedContext = &context;
-	const bool succeeded = context.BuildPlan( m_movementActions );
-	m_testedContext = nullptr;
-
+	const bool succeeded = buildPlan( m_movementActions, &m_predictedMovementActions );
 	if( succeeded ) {
 		assert( !m_predictedMovementActions.empty() );
 		BaseAction *action = getCachedActionAndRecordForCurrTime( &movementActionRecord );

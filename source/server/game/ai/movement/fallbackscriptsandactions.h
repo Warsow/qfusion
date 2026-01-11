@@ -335,4 +335,46 @@ private:
 	Vec3 m_lastGoodExitOrigin { 0, 0, 0 };
 };
 
+class WaitForLandingRelaxedAction : public BaseAction {
+public:
+	explicit WaitForLandingRelaxedAction( MovementSubsystem *movementSubsystem )
+		: BaseAction( movementSubsystem, "WaitForLandingRelaxedAction", COLOR_RGB( 0, 128, 0 ) ) {}
+
+	void onApplicationSequenceStarted( PredictionContext *context ) override;
+	void onApplicationSequenceStopped( PredictionContext *context, SequenceStopReason, unsigned ) override;
+
+	[[nodiscard]]
+	auto planPredictionStep( PredictionContext *context ) -> PredictionResult override;
+	[[nodiscard]]
+	auto checkPredictionStepResults( PredictionContext *context ) -> PredictionResult override;
+private:
+	int m_travelTimeAtSequenceStart { 0 };
+};
+
+class WaitForLandingRelaxedScript : public PredictingMovementScript {
+public:
+	explicit WaitForLandingRelaxedScript( MovementSubsystem *movementSubsystem )
+		: PredictingMovementScript( movementSubsystem ), m_waitForLandingRelaxedAction( movementSubsystem ) {
+		m_timeoutAt = std::numeric_limits<int64_t>::max();
+	}
+
+	[[nodiscard]]
+	bool produceBotInput( BotInput *input ) override;
+private:
+	WaitForLandingRelaxedAction m_waitForLandingRelaxedAction;
+};
+
+class LandToPreventFallingScript : public PredictingMovementScript {
+public:
+	explicit LandToPreventFallingScript( MovementSubsystem *movementSubsystem )
+		: PredictingMovementScript( movementSubsystem ), m_landOnPointAction( movementSubsystem ) {
+		m_timeoutAt = std::numeric_limits<int64_t>::max();
+	}
+
+	[[nodiscard]]
+	bool produceBotInput( BotInput *input ) override;
+private:
+	LandOnPointAction m_landOnPointAction;
+};
+
 #endif

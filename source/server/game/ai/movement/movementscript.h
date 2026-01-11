@@ -131,6 +131,13 @@ public:
 	void onInterceptedPredictedEvent( int ev, int parm );
 	void onInterceptedPMoveTouchTriggers( pmove_t *pm, vec3_t const previousOrigin );
 protected:
+	[[nodiscard]]
+	bool buildPlan( std::span<BaseAction *> movementActions,
+					wsw::StaticVector<PredictedMovementAction, MAX_PREDICTED_STATES> *predictedTape );
+
+	[[nodiscard]]
+	bool produceNonCachedInputUsingAction( BaseAction *action, BotInput *input );
+private:
 	PredictionContext *m_testedContext { nullptr };
 };
 

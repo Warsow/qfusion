@@ -113,7 +113,7 @@ void MovementSubsystem::ActivateJumppadState( const edict_t *jumppadEnt ) {
 	const int entNum   = ENTNUM( jumppadEnt );
 	const int reachNum = findTriggerReachNumForScriptActivation( entNum, TRAVEL_JUMPPAD, lastNearbyJumppadReach );
 	jumppadScript.setTarget( entNum, reachNum );
-	activeScript = &jumppadScript;
+	setActiveScript( &jumppadScript );
 }
 
 void MovementSubsystem::ActivateElevatorState( const edict_t *triggerEnt ) {
@@ -121,7 +121,7 @@ void MovementSubsystem::ActivateElevatorState( const edict_t *triggerEnt ) {
 		const int entNum   = ENTNUM( triggerEnt );
 		const int reachNum = findTriggerReachNumForScriptActivation( entNum, TRAVEL_ELEVATOR, lastNearbyElevatorReach );
 		elevatorScript.setTarget( entNum, reachNum );
-		activeScript = &elevatorScript;
+		setActiveScript( &elevatorScript );
 	}
 }
 
@@ -160,14 +160,14 @@ void MovementSubsystem::Frame( BotInput *input ) {
 
 	if( activeScript ) {
 		if( activeScript->getTimeoutAt() <= level.time ) {
-			activeScript = nullptr;
+			setActiveScript( nullptr );
 		}
 	}
 
 	if( const auto *groundEntity = movementState.entityPhysicsState.GroundEntity() ) {
 		if( groundEntity->use == Use_Plat ) {
 			if( activeScript != &elevatorScript ) {
-				activeScript = &elevatorScript;
+				setActiveScript( &elevatorScript );
 				const int entNum   = ENTNUM( groundEntity->enemy );
 				const int reachNum = findTriggerReachNumForScriptActivation( entNum, TRAVEL_ELEVATOR, lastNearbyElevatorReach );
 				elevatorScript.setTarget( entNum, reachNum );
@@ -177,7 +177,7 @@ void MovementSubsystem::Frame( BotInput *input ) {
 
 	if( activeScript ) {
 		if( !produceBotInput( activeScript, input ) ) {
-			activeScript = nullptr;
+			setActiveScript( nullptr );
 		}
 	}
 
@@ -185,20 +185,38 @@ void MovementSubsystem::Frame( BotInput *input ) {
 	if( shouldSelectNewScript ) {
 		if( bot->Skill() >= 0.33f ) {
 			if( produceBotInput( &bunnyHopScript, input ) ) {
-				activeScript = &bunnyHopScript;
+				setActiveScript( &bunnyHopScript );
 			}
 		}
 		if( !activeScript ) {
 			// TODO: Check for immediate recovery in case of a dangerous failure
 			if( movementState.entityPhysicsState.GroundEntity() ) {
-				activeScript = findFallbackScript( input );
+				setActiveScript( findFallbackScript( input ) );
 			} else {
-				Vec3 v1( movementState.entityPhysicsState.Origin() );
-				Vec3 v2( Vec3( 0, 0, 72 ) + v1 );
-				AITools_DrawColorLine( v1.data(), v2.data(), COLOR_RGB( 192, 0, 192 ), 0 );
-				input->SetIntendedLookDir( movementState.entityPhysicsState.ForwardDir() );
-				input->ClearMovementDirections();
-				input->isUcmdSet = true;
+				int beaconColor = 0;
+				// Other scripts should recover on their own (should be sufficiently robust)
+				if( prevActiveScript == &walkToPointScript || prevActiveScript == &bunnyHopScript ) {
+					if( produceBotInput( &waitForLandingRelaxedScript, input ) ) {
+						beaconColor = COLOR_RGB( 0, 192, 0 );
+						setActiveScript( &waitForLandingRelaxedScript );
+					} else if( produceBotInput( &landToPreventFallingScript, input ) ) {
+						beaconColor = COLOR_RGB( 0, 0, 255 );
+						setActiveScript( &landToPreventFallingScript );
+					}
+				}
+				if( !activeScript ) {
+					beaconColor = COLOR_RGB( 192, 0, 0 );
+					input->SetIntendedLookDir( movementState.entityPhysicsState.ForwardDir() );
+					input->ClearMovementDirections();
+					input->isUcmdSet          = true;
+					input->canOverrideLookVec = true;
+					input->canOverridePitch   = true;
+				}
+				if( beaconColor ) {
+					Vec3 v1( movementState.entityPhysicsState.Origin() );
+					Vec3 v2( Vec3( 0, 0, 72 ) + v1 );
+					AITools_DrawColorLine( v1.data(), v2.data(), beaconColor, 0 );
+				}
 			}
 		}
 	}
@@ -214,6 +232,13 @@ bool MovementSubsystem::produceBotInput( MovementScript *script, BotInput *input
 	bool result  = script->produceBotInput( input );
 	testedScript = nullptr;
 	return result;
+}
+
+void MovementSubsystem::setActiveScript( MovementScript *script ) {
+	if( activeScript ) {
+		prevActiveScript = activeScript;
+	}
+	activeScript = script;
 }
 
 auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript * {
