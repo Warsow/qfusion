@@ -284,6 +284,14 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 					if( reach.areanum != navTargetAreaNum ) {
 						travelTimeFromPoint = routeCache->FindRoute( reach.areanum, navTargetAreaNum, travelFlags );
 					}
+					const auto &nextArea = aasWorld->getAreas()[reach.areanum];
+					Vec3 nextAreaPoint( nextArea.center[0], nextArea.center[1], nextArea.mins[2] + 32.0f );
+					// Note: The travel time value is equal for the area center and the reach end, as pointed above
+					walkToPointScript.setTargetPoint( nextAreaPoint, travelTimeFromPoint );
+					if( produceBotInput( &walkToPointScript, input ) ) {
+						return &walkToPointScript;
+					}
+					// TODO: Allow testing multiple points at once
 					walkToPointScript.setTargetPoint( Vec3( reach.end ), travelTimeFromPoint );
 					if( produceBotInput( &walkToPointScript, input ) ) {
 						return &walkToPointScript;
