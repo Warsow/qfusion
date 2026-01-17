@@ -54,7 +54,7 @@ private:
 	void bumpJumpDistance();
 
 	static constexpr float kBaseMinDistanceFromTargetToDash { 108.0f };
-	static constexpr float kBaseMinDistanceFromTargetToJump { 96.0f };
+	static constexpr float kBaseMinDistanceFromTargetToJump { 108.0f };
 
 	Vec3 m_targetPoint { 0.0f, 0.0f, 0.0f };
 	float m_minDistanceFromTargetToJump { 0.0f };
@@ -65,9 +65,11 @@ private:
 	bool m_allowToReachThePointInAir { false };
 	bool m_isDashingAllowed { false };
 	bool m_isJumpingAllowed { false };
+	bool m_isKeyDrivenMovementAllowed { false };
 	bool m_hasJumped { false };
 	bool m_hasDashedOrWalljumped { false };
 	bool m_isDisabledForPlanning { false };
+	bool m_hasUsedKeyDrivenMovement { false };
 };
 
 class WalkToPointScript : public PredictingAndCachingMovementScript {

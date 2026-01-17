@@ -237,6 +237,7 @@ void WalkToPointAction::beforePlanning() {
 		m_isJumpingAllowed = false;
 		m_isDashingAllowed = false;
 	}
+	m_isKeyDrivenMovementAllowed = true;
 }
 
 void WalkToPointAction::bumpDashDistance() {
@@ -263,23 +264,29 @@ void WalkToPointAction::onApplicationSequenceStarted( PredictionContext *context
 	m_distanceFromStartToTarget = m_targetPoint.fastDistance2DTo( context->movementState->entityPhysicsState.Origin() );
 	m_hasDashedOrWalljumped     = false;
 	m_hasJumped                 = false;
+	m_hasUsedKeyDrivenMovement  = false;
 }
 
 void WalkToPointAction::onApplicationSequenceStopped( PredictionContext *context, SequenceStopReason sequenceStopReason,
 													  unsigned stoppedAtFrameIndex ) {
 	BaseAction::onApplicationSequenceStopped( context, sequenceStopReason, stoppedAtFrameIndex );
 	if( sequenceStopReason == FAILED ) {
-		// Note: Looks like sometimes we're unable to detect events
-		if( m_hasJumped && m_isJumpingAllowed ) {
-			bumpJumpDistance();
-		} else if( m_hasDashedOrWalljumped && m_isDashingAllowed ) {
-			bumpDashDistance();
-		} else if( m_isJumpingAllowed ) {
-			bumpJumpDistance();
-		} else if( m_isDashingAllowed ) {
-			bumpDashDistance();
+		if( m_isKeyDrivenMovementAllowed && m_hasUsedKeyDrivenMovement ) {
+			m_isKeyDrivenMovementAllowed = false;
 		} else {
-			m_isDisabledForPlanning = true;
+			m_isKeyDrivenMovementAllowed = true;
+			// Note: Looks like sometimes we're unable to detect events
+			if( m_hasJumped && m_isJumpingAllowed ) {
+				bumpJumpDistance();
+			} else if( m_hasDashedOrWalljumped && m_isDashingAllowed ) {
+				bumpDashDistance();
+			} else if( m_isJumpingAllowed ) {
+				bumpJumpDistance();
+			} else if( m_isDashingAllowed ) {
+				bumpDashDistance();
+			} else {
+				m_isDisabledForPlanning = true;
+			}
 		}
 	}
 }
@@ -304,49 +311,66 @@ auto WalkToPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 		return PredictionResult::Restart;
 	}
 
+	int forwardKeySign = +1;
 	if( std::optional<Vec3> keptInFovPoint = m_subsystem->bot->GetKeptInFovPoint() ) {
 		if( keptInFovPoint->squareDistance2DTo( entityPhysicsState.Origin() ) > wsw::square( 1.0f ) ) {
-			Vec3 lookVec( Vec3( entityPhysicsState.Origin() ) - *keptInFovPoint );
+			Vec3 lookVec( *keptInFovPoint - viewOrigin );
 			lookVec.z() *= Z_NO_BEND_SCALE;
-
-			if( entityPhysicsState.GroundEntity() ) {
-				int keyMoves[2] { 0, 0 };
-				context->TraceCache().makeKeyMovesToTarget( context, dirToTargetPoint, keyMoves );
-				if( keyMoves[0] | keyMoves[1] ) {
-					botInput->SetForwardMovement( keyMoves[0] );
-					botInput->SetRightMovement( keyMoves[1] );
-					if( *maybeDistance2D > m_walkProximityThreshold ) {
-						if( std::abs( keyMoves[0] ) + std::abs( keyMoves[1] ) == 1 ) {
-							if( m_isDashingAllowed && *maybeDistance2D >= m_minDistanceFromTargetToDash ) {
-								if( entityPhysicsState.Speed2D() < context->GetDashSpeed() ) {
-									botInput->SetSpecialButton( true );
-								}
-							} else if( m_isJumpingAllowed && *maybeDistance2D >= m_minDistanceFromTargetToJump ) {
-								if( entityPhysicsState.Speed2D() > context->GetRunSpeed() - 1.0f ) {
-									botInput->SetUpMovement( 1 );
+			if( m_isKeyDrivenMovementAllowed ) {
+				if( entityPhysicsState.GroundEntity() ) {
+					int keyMoves[2] { 0, 0 };
+					context->TraceCache().makeKeyMovesToTarget( context, dirToTargetPoint, keyMoves );
+					if( keyMoves[0] | keyMoves[1] ) {
+						botInput->SetForwardMovement( keyMoves[0] );
+						botInput->SetRightMovement( keyMoves[1] );
+						m_hasUsedKeyDrivenMovement = true;
+						if( *maybeDistance2D > m_walkProximityThreshold ) {
+							if( std::abs( keyMoves[0] ) + std::abs( keyMoves[1] ) == 1 ) {
+								if( m_isDashingAllowed && *maybeDistance2D >= m_minDistanceFromTargetToDash ) {
+									if( entityPhysicsState.Speed2D() < context->GetDashSpeed() ) {
+										botInput->SetSpecialButton( true );
+									}
+								} else if( m_isJumpingAllowed && *maybeDistance2D >= m_minDistanceFromTargetToJump ) {
+									if( entityPhysicsState.Speed2D() > context->GetRunSpeed() - 1.0f ) {
+										botInput->SetUpMovement( 1 );
+									}
 								}
 							}
+						} else {
+							botInput->SetWalkButton( true );
 						}
+						botInput->SetIntendedLookDir( lookVec );
+						botInput->isUcmdSet          = true;
+						botInput->canOverrideLookVec = true;
+						botInput->canOverridePitch   = true;
 					}
+				} else {
 					botInput->SetIntendedLookDir( lookVec );
 					botInput->isUcmdSet          = true;
 					botInput->canOverrideLookVec = true;
 					botInput->canOverridePitch   = true;
 				}
 			} else {
-				botInput->SetIntendedLookDir( lookVec );
-				botInput->isUcmdSet          = true;
-				botInput->canOverrideLookVec = true;
-				botInput->canOverridePitch   = true;
+				// Caution: lookVec is not normalized
+				if( lookVec.dot( entityPhysicsState.ForwardDir() ) <= 0 ) {
+					forwardKeySign = -1;
+				}
 			}
 		}
 	}
 
 	if( !botInput->isUcmdSet ) {
-		botInput->SetIntendedLookDir( dirToTargetPoint, true );
-		botInput->isUcmdSet = true;
-		if( dirToTargetPoint.dot( entityPhysicsState.ForwardDir() ) > 0.95f ) {
-			botInput->SetForwardMovement( 1 );
+		const float forwardDirDotTargetDir = dirToTargetPoint.dot( entityPhysicsState.ForwardDir() );
+		// If we're not requested to move backwards but it's quicker to do it instead of waiting for turning
+		if( forwardKeySign > 0 && forwardDirDotTargetDir < 0 ) {
+			// Disallow doing it for easy bots, as the action is their primary action and it looks weird when oftenly used
+			if( m_bot->Skill() >= 0.33f ) {
+				forwardKeySign = -1;
+			}
+		}
+		if( std::fabs( forwardDirDotTargetDir ) > 0.95f ) {
+			botInput->SetIntendedLookDir( (float)forwardKeySign * dirToTargetPoint, true );
+			botInput->SetForwardMovement( forwardKeySign );
 			if( *maybeDistance2D > m_walkProximityThreshold ) {
 				if( entityPhysicsState.GroundEntity() ) {
 					if( m_isDashingAllowed && !pmoveStats[PM_STAT_DASHTIME] ) {
@@ -371,7 +395,36 @@ auto WalkToPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 			} else {
 				botInput->SetWalkButton( true );
 			}
+			botInput->isUcmdSet = true;
+		} else {
+			// Try using lateral movement for small readjustments, so we don't spin around targets
+			static_assert( kBaseMinDistanceFromTargetToDash > 32.0f && kBaseMinDistanceFromTargetToJump > 32.0f );
+			constexpr float distanceLimit = wsw::min( kBaseMinDistanceFromTargetToJump, kBaseMinDistanceFromTargetToJump );
+			if( entityPhysicsState.GroundEntity() && m_isKeyDrivenMovementAllowed ) {
+				// The second condition prevents problems with TRAVEL_WALKOFFLEDGE/TRAVEL_(STRAFE)JUMP start points
+				if( *maybeDistance2D < distanceLimit && ( !m_allowToReachThePointInAir || *maybeDistance2D > 32.0f ) ) {
+					int keyMoves[2] { 0, 0 };
+					context->TraceCache().makeKeyMovesToTarget( context, dirToTargetPoint, keyMoves );
+					// If we're going to press lateral keys
+					if( keyMoves[1] ) {
+						m_hasUsedKeyDrivenMovement = true;
+						botInput->SetIntendedLookDir( entityPhysicsState.ForwardDir(), true );
+						botInput->SetForwardMovement( keyMoves[0] );
+						botInput->SetRightMovement( keyMoves[1] );
+						if( *maybeDistance2D < m_walkProximityThreshold ) {
+							botInput->SetWalkButton( true );
+						}
+						botInput->isUcmdSet = true;
+					}
+				}
+			}
+			// Fall back to spinning to the target
+			if( !botInput->isUcmdSet ) {
+				botInput->SetIntendedLookDir( (float)forwardKeySign * dirToTargetPoint, true );
+				botInput->isUcmdSet = true;
+			}
 		}
+		assert( botInput->isUcmdSet && botInput->isLookDirSet );
 		if( m_subsystem->bot->ShouldAttack() ) {
 			if( !entityPhysicsState.GroundEntity() ) {
 				botInput->ClearMovementDirections();
