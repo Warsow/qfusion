@@ -59,15 +59,33 @@ auto BunnyHopAction::checkCommonBunnyHopPreconditions( PredictionContext *contex
 	return PredictionResult::Continue;
 }
 
-bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionContext *context ) {
-	assert( intendedLookDir.fastLength() - 1.0f < 0.01f );
+bool BunnyHopAction::setupBunnyHopping( const Vec3 &givenIntendedLookDir, PredictionContext *context ) {
+	assert( givenIntendedLookDir.fastLength() - 1.0f < 0.01f );
 
 	const auto *const pmoveStats   = context->currMinimalPlayerState->pmove.stats;
 	auto *const botInput           = &context->record->botInput;
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 
-	botInput->SetIntendedLookDir( intendedLookDir, true );
-	assert( botInput->isLookDirSet );
+	// Note: We have to make a decision once per application sequence,
+	// so inversion status stays stable during prediction.
+	// Otherwise, it does not produce satisfying results.
+	// TODO: Check whether the default walk action is affected by this issue
+	// TODO: It could be more correctly controlled by some high-level bot logic code
+	if( !m_hasCheckedForInputInversion ) [[unlikely]] {
+		m_hasCheckedForInputInversion = true;
+		assert( !m_shouldUseInputInversion );
+		if( const std::optional<Vec3> &keptInFovPoint = m_bot->GetKeptInFovPoint() ) {
+			Vec3 viewOrigin( entityPhysicsState.Origin() );
+			viewOrigin.z() += playerbox_stand_viewheight;
+			if( Vec3 dirToPoint( *keptInFovPoint - viewOrigin ); dirToPoint.normalizeFast() ) {
+				if( dirToPoint.dot( givenIntendedLookDir ) < 0.0f ) {
+					m_shouldUseInputInversion = true;
+				}
+			}
+		}
+	}
+
+	botInput->SetIntendedLookDir( ( m_shouldUseInputInversion ? -1.0f : +1.0f ) * givenIntendedLookDir, true );
 	botInput->isUcmdSet = true;
 	assert( botInput->ForwardMovement() == 0 );
 	assert( botInput->RightMovement() == 0 );
@@ -78,15 +96,15 @@ bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionC
 	botInput->canOverrideLookVec = false;
 	botInput->canOverridePitch   = false;
 
-	const float intendedLookDirDotForward = entityPhysicsState.ForwardDir().dot( intendedLookDir );
+	const float givenIntendedLookDirDotForward = entityPhysicsState.ForwardDir().dot( givenIntendedLookDir );
 	if( entityPhysicsState.GroundEntity() ) {
 		if( entityPhysicsState.Speed2D() <= context->GetRunSpeed() ) {
 			int forwardMovement = 0;
 			int rightMovement   = 0;
 			EnvironmentTraceCache::Query dashQuery {};
 			constexpr float dashDotThreshold = 0.87f;
-			if( std::fabs( intendedLookDirDotForward ) > dashDotThreshold ) {
-				if( intendedLookDirDotForward > 0.0f ) {
+			if( std::fabs( givenIntendedLookDirDotForward ) > dashDotThreshold ) {
+				if( givenIntendedLookDirDotForward > 0.0f ) {
 					dashQuery       = EnvironmentTraceCache::Query::front();
 					forwardMovement = +1;
 				} else {
@@ -94,7 +112,7 @@ bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionC
 					forwardMovement = -1;
 				}
 			} else {
-				const float intendedLookDirDotRight = entityPhysicsState.RightDir().dot( intendedLookDir );
+				const float intendedLookDirDotRight = entityPhysicsState.RightDir().dot( givenIntendedLookDir );
 				if( std::fabs( intendedLookDirDotRight ) > dashDotThreshold ) {
 					if( intendedLookDirDotRight > 0.0f ) {
 						dashQuery     = EnvironmentTraceCache::Query::right();
@@ -130,15 +148,12 @@ bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionC
 				botInput->SetTurnSpeedMultiplier( 3.0f );
 			}
 		} else {
-			if( intendedLookDirDotForward > 0.0f ) {
-				botInput->SetForwardMovement( 1 );
-			}
 			botInput->SetUpMovement( 1 );
 			botInput->canOverrideLookVec = true;
 			botInput->canOverridePitch   = true;
 		}
 	} else {
-		Vec3 toTargetDir2D( intendedLookDir.x(), intendedLookDir.y(), 0.0f );
+		Vec3 toTargetDir2D( givenIntendedLookDir.x(), givenIntendedLookDir.y(), 0.0f );
 		Vec3 velocityDir2D( entityPhysicsState.Velocity()[0], entityPhysicsState.Velocity()[1], 0.0f );
 		bool have2DDirsBeenNormalized = false;
 		// This check is not that cheap, hence we compute the result on demand
@@ -186,8 +201,15 @@ bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionC
 			botInput->canOverrideLookVec = true;
 			botInput->canOverridePitch   = true;
 		} else {
-			if( intendedLookDirDotForward > 0.0f ) {
-				botInput->SetForwardMovement( 1 );
+			// Note: Setting forward movement is quite important here
+			if( m_shouldUseInputInversion ) {
+				if( givenIntendedLookDirDotForward < 0 ) {
+					botInput->SetForwardMovement( -1 );
+				}
+			} else {
+				if( givenIntendedLookDirDotForward > 0 ) {
+					botInput->SetForwardMovement( +1 );
+				}
 			}
 		}
 
@@ -199,6 +221,7 @@ bool BunnyHopAction::setupBunnyHopping( const Vec3 &intendedLookDir, PredictionC
 		if( isRiskyMovementAllowed ) {
 			// Make sure that we provide valid input
 			if( have2DDirsBeenNormalized ) {
+				// TODO: Should we pass the sign? It looks safer to ignore inversion here
 				if( canSetWalljump( context, velocityDir2D, toTargetDir2D ) ) {
 					botInput->ClearMovementDirections();
 					botInput->SetSpecialButton( true );
@@ -272,6 +295,7 @@ bool BunnyHopAction::canSetWalljump( PredictionContext *context, const Vec3 &vel
 		return false;
 	}
 
+	// TODO: Should we account for input inversion?
 	return velocity2DDir.dot( entityPhysicsState.ForwardDir() ) > 0.7f && velocity2DDir.dot( intended2DLookDir ) > 0.7f;
 }
 
@@ -715,6 +739,9 @@ void BunnyHopAction::onApplicationSequenceStarted( PredictionContext *context ) 
 	m_hasALatchedHop   = false;
 	m_didTheLatchedHop = false;
 	m_hopCounter       = 0;
+
+	m_hasCheckedForInputInversion = false;
+	m_shouldUseInputInversion     = false;
 }
 
 void BunnyHopAction::onApplicationSequenceStopped( PredictionContext *context,

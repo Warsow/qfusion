@@ -66,6 +66,9 @@ protected:
 	bool m_hasALatchedHop { false };
 	bool m_didTheLatchedHop { false };
 
+	bool m_hasCheckedForInputInversion { false };
+	bool m_shouldUseInputInversion { false };
+
 	unsigned m_hopCounter { 0 };
 
 	// TODO: Mark as virtual in base class and mark as final here to avoid a warning about hiding parent member?
