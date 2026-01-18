@@ -672,15 +672,31 @@ bool TraverseWalkOffLedgeReachScript::produceBotInput( BotInput *input ) {
 void ClimbOntoBarrierAction::beforePlanning() {
 	BaseAction::beforePlanning();
 	m_isDisabledForPlanning = false;
+	m_savedIntendedLookDir  = Vec3( 0.0f, 0.0f, 0.0f );
 }
 
 void ClimbOntoBarrierAction::afterPlanning() {
 	BaseAction::afterPlanning();
 	m_isDisabledForPlanning = false;
+	m_savedIntendedLookDir  = Vec3( 0.0f, 0.0f, 0.0f );
 }
 
 void ClimbOntoBarrierAction::onApplicationSequenceStarted( PredictionContext *context ) {
 	BaseAction::onApplicationSequenceStarted( context );
+	// Save the fixed intended look dir
+	if( m_savedIntendedLookDir.squareLength() < 1e-3f ) {
+		const auto *aasWorld           = AiAasWorld::instance();
+		const auto &targetReach        = aasWorld->getReaches()[m_targetReachNum];
+		const auto &targetArea         = aasWorld->getAreas()[targetReach.areanum];
+
+		// Hacks, use the fixed positon as a view origin
+		m_savedIntendedLookDir = Vec3( targetArea.center ) - Vec3( targetReach.start );
+		m_savedIntendedLookDir.z() = 0.0f;
+		m_savedIntendedLookDir.normalizeFastOrThrow();
+		// Look 60 degrees upwards (the current length is the unit length)
+		m_savedIntendedLookDir.z() = 2.0f;
+		m_savedIntendedLookDir.normalizeFastOrThrow();
+	}
 }
 
 void ClimbOntoBarrierAction::onApplicationSequenceStopped( PredictionContext *context,
@@ -702,61 +718,44 @@ auto ClimbOntoBarrierAction::planPredictionStep( PredictionContext *context ) ->
 	const auto *aasWorld           = AiAasWorld::instance();
 	const auto &targetReach        = aasWorld->getReaches()[m_targetReachNum];
 
+	const Vec3 &intendedLookDir = m_savedIntendedLookDir;
+	botInput->SetIntendedLookDir( intendedLookDir, true );
+
 	if( entityPhysicsState.GroundEntity() ) {
 		const float feetZ = entityPhysicsState.Origin()[2] + playerbox_stand_mins[2];
 		// If we are closer to start
 		if( std::fabs( targetReach.start[2] - feetZ ) < std::fabs( targetReach.end[2] - feetZ ) ) {
 			if( contactsTargetPoint( entityPhysicsState, Vec3( targetReach.start ) ) ) {
-				botInput->SetIntendedLookDir( Vec3( 0, 0, 1 ), true );
-				// TODO: Ignore the speed limitation if we are facing the reachability in an optimal position
-				if( entityPhysicsState.Speed2D() < 10.0f ) {
-					if( entityPhysicsState.ForwardDir().z() > 0.9f ) {
+				if( entityPhysicsState.Speed2D() < 100.0f ) {
+					if( intendedLookDir.dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
 						botInput->SetUpMovement( 1 );
 					} else {
-						botInput->SetTurnSpeedMultiplier( 5.0f );
+						botInput->SetTurnSpeedMultiplier( 3.0f );
 					}
 				} else {
-					botInput->SetTurnSpeedMultiplier( 5.0f );
+					botInput->SetTurnSpeedMultiplier( 3.0f );
 				}
 			} else {
 				return PredictionResult::Restart;
 			}
 		} else {
 			// If we appear to be standing on the barrier
-			Vec3 viewOrigin( entityPhysicsState.Origin() );
-			viewOrigin.z() += playerbox_stand_viewheight;
-
-			Vec3 intendedLookDir( Vec3( aasWorld->getAreas()[targetReach.areanum].center ) - viewOrigin );
-			if( intendedLookDir.normalizeFast() ) {
-				botInput->SetIntendedLookDir( intendedLookDir, true );
-				if( intendedLookDir.dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
-					botInput->SetForwardMovement( 1 );
-				}
+			if( intendedLookDir.dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
+				botInput->SetForwardMovement( 1 );
 			} else {
-				return PredictionResult::Restart;
+				botInput->SetTurnSpeedMultiplier( 3.0f );
 			}
 		}
 	} else {
-		Vec3 viewOrigin( entityPhysicsState.Origin() );
-		viewOrigin.z() += playerbox_stand_viewheight;
-
-		Vec3 intendedLookDir( viewOrigin );
-		const auto &targetArea = aasWorld->getAreas()[targetReach.areanum];
-		intendedLookDir -= targetArea.center;
-		if( !intendedLookDir.normalizeFast() ) {
-			intendedLookDir = viewOrigin - Vec3( targetArea.center[0], targetArea.center[1], targetArea.mins[2] );
-			intendedLookDir.normalizeFastOrThrow();
-		}
-
-		intendedLookDir *= -1;
 		if( intendedLookDir.dot( entityPhysicsState.ForwardDir() ) > 0.9f ) {
 			botInput->SetForwardMovement( 1 );
 		} else {
-			botInput->SetTurnSpeedMultiplier( 10.0f );
+			botInput->SetTurnSpeedMultiplier( 3.0f );
 		}
-		intendedLookDir.z() *= 2.0f;
-		botInput->SetIntendedLookDir( intendedLookDir, false );
-		botInput->SetUpMovement( 1 );
+		// Let us land if we start serious falling
+		if( entityPhysicsState.Velocity()[2] >= -30.0f ) {
+			botInput->SetUpMovement( 1 );
+		}
 	}
 
 	botInput->isUcmdSet = true;
@@ -802,10 +801,15 @@ bool TraverseBarrierJumpReachScript::produceBotInput( BotInput *input ) {
 	const auto &entityPhysicsState = m_subsystem->getMovementState().entityPhysicsState;
 	const auto &targetReach        = aasWorld->getReaches()[m_targetReachNum];
 
-	const bool shouldReachStartPoint = !contactsTargetPoint( entityPhysicsState, Vec3( targetReach.start ) );
-	if( shouldReachStartPoint ) {
-		m_walkToPointAction.setTargetPoint( Vec3( targetReach.start ) );
-		selectActiveAction( &m_walkToPointAction );
+	if( entityPhysicsState.GroundEntity() ) {
+		const bool shouldReachStartPoint = !contactsTargetPoint( entityPhysicsState, Vec3( targetReach.start ) );
+		if( shouldReachStartPoint ) {
+			m_walkToPointAction.setTargetPoint( Vec3( targetReach.start ) );
+			selectActiveAction( &m_walkToPointAction );
+		} else {
+			m_climbOntoBarrierAction.setTargetReachNum( m_targetReachNum );
+			selectActiveAction( &m_climbOntoBarrierAction );
+		}
 	} else {
 		m_climbOntoBarrierAction.setTargetReachNum( m_targetReachNum );
 		selectActiveAction( &m_climbOntoBarrierAction );

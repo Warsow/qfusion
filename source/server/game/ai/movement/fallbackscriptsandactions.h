@@ -236,6 +236,7 @@ private:
 	void onApplicationSequenceStopped( PredictionContext *context, SequenceStopReason sequenceStopReason,
 									   unsigned stoppedAtFrameIndex ) override;
 
+	Vec3 m_savedIntendedLookDir { 0.0f, 0.0f, 0.0f };
 	int m_targetReachNum { 0 };
 	bool m_isDisabledForPlanning { false };
 };
