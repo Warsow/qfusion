@@ -88,6 +88,9 @@ protected:
 	auto genericCheckIsActionEnabled( PredictionContext *context ) const -> PredictionResult;
 
 	[[nodiscard]]
+	bool checkNoBumpingOrBouncing( PredictionContext *context );
+
+	[[nodiscard]]
 	bool hasTouchedNavEntityThisFrame( PredictionContext *context );
 };
 

@@ -181,6 +181,37 @@ auto BaseAction::checkPredictionStepResults( PredictionContext *context ) -> Pre
 	return PredictionResult::Continue;
 }
 
+bool BaseAction::checkNoBumpingOrBouncing( PredictionContext *context ) {
+	const auto &newEntityPhysicsState = context->movementState->entityPhysicsState;
+	const auto &oldEntityPhysicsState = context->PhysicsStateBeforeStep();
+
+	// Test for a huge speed loss in case of hitting of an obstacle
+	const float *oldVelocity = oldEntityPhysicsState.Velocity();
+	const float *newVelocity = newEntityPhysicsState.Velocity();
+	const float oldSquare2DSpeed = oldEntityPhysicsState.SquareSpeed2D();
+	const float newSquare2DSpeed = newEntityPhysicsState.SquareSpeed2D();
+
+	// Check for unintended bouncing back (starting from some speed threshold)
+	if( oldSquare2DSpeed > wsw::square( 100.0f ) ) {
+		if( newSquare2DSpeed > wsw::square( 1.0f ) ) {
+			Vec3 oldVelocity2DDir( oldVelocity[0], oldVelocity[1], 0 );
+			// TODO: Cache the inverse speed
+			oldVelocity2DDir *= Q_Rcp( oldEntityPhysicsState.Speed2D() );
+			Vec3 newVelocity2DDir( newVelocity[0], newVelocity[1], 0 );
+			newVelocity2DDir *= Q_Rcp( newEntityPhysicsState.Speed2D() );
+			if( oldVelocity2DDir.dot( newVelocity2DDir ) < 0.3f ) {
+				Debug( "A prediction step has lead to an unintended bouncing back\n" );
+				return false;
+			}
+		} else {
+			Debug( "A prediction step has lead to close to zero 2D speed while it was significant\n" );
+			return false;
+		}
+	}
+
+	return true;
+}
+
 bool BaseAction::hasTouchedNavEntityThisFrame( PredictionContext *context ) {
 	const edict_t *gameEdicts = game.edicts;
 	const uint16_t *ents = context->frameEvents.otherTouchedTriggerEnts;

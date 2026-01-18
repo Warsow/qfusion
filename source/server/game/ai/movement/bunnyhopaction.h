@@ -87,7 +87,7 @@ protected:
 
 	// Can be overridden for finer control over tests
 	[[nodiscard]]
-	virtual bool checkStepSpeedGainOrLoss( PredictionContext *context );
+	bool checkStepSpeedGainOrLoss( PredictionContext *context );
 
 	[[nodiscard]]
 	bool checkNavTargetAreaTransition( PredictionContext *context );

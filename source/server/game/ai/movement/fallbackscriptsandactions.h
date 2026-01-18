@@ -53,8 +53,8 @@ private:
 	void bumpDashDistance();
 	void bumpJumpDistance();
 
-	static constexpr float kBaseMinDistanceFromTargetToDash { 108.0f };
-	static constexpr float kBaseMinDistanceFromTargetToJump { 108.0f };
+	static constexpr float kBaseMinDistanceFromTargetToDash { 72.0f };
+	static constexpr float kBaseMinDistanceFromTargetToJump { 72.0f };
 
 	Vec3 m_targetPoint { 0.0f, 0.0f, 0.0f };
 	float m_minDistanceFromTargetToJump { 0.0f };

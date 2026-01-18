@@ -447,6 +447,7 @@ auto WalkToPointAction::checkPredictionStepResults( PredictionContext *context )
 		return result;
 	}
 
+	// This check comes first as we allow bumping into the target if it happens to be close to an obstacle
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 	// TODO: Put limitations on 2D speed (it is important for WALKOFFLEDGE)
 	if( entityPhysicsState.GroundEntity() || m_allowToReachThePointInAir ) {
@@ -455,6 +456,10 @@ auto WalkToPointAction::checkPredictionStepResults( PredictionContext *context )
 				return PredictionResult::Complete;
 			}
 		}
+	}
+
+	if( !checkNoBumpingOrBouncing( context ) ) {
+		return PredictionResult::Restart;
 	}
 
 	const float squareDistance2D = m_targetPoint.fastDistance2DTo( entityPhysicsState.Origin() );
