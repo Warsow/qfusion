@@ -56,22 +56,22 @@ index cac68bdca..171ba74a4 100644
 
 +size_t qt_wswHeapSizeGCThreshold;
 +
-//#define MM_STATS
+ //#define MM_STATS
 
-#if !defined(MM_STATS) && !defined(QT_NO_DEBUG)
+ #if !defined(MM_STATS) && !defined(QT_NO_DEBUG)
 diff --git a/qtdeclarative/src/qml/memory/qv4mm_p.h b/qtdeclarative/src/qml/memory/qv4mm_p.h
 index 6dfdd81cb..f8099786b 100644
 --- a/qtdeclarative/src/qml/memory/qv4mm_p.h
 +++ b/qtdeclarative/src/qml/memory/qv4mm_p.h
 @@ -64,6 +64,8 @@
 
-#define MM_DEBUG 0
+ #define MM_DEBUG 0
 
 +extern size_t qt_wswHeapSizeGCThreshold;
 +
-QT_BEGIN_NAMESPACE
+ QT_BEGIN_NAMESPACE
 
-namespace QV4 {
+ namespace QV4 {
 @@ -296,36 +298,19 @@ private:
 
      HeapItem *allocate(BlockAllocator *allocator, std::size_t size)
@@ -115,7 +115,7 @@ namespace QV4 {
 +        }
 
          return allocator->allocate(size, true);
-  }
+     }
 ```
 </details>
 
