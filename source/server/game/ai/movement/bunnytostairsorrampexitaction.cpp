@@ -58,14 +58,14 @@ bool BunnyToStairsOrRampExitAction::tryFindingAndSavingLookDir( PredictionContex
 		return false;
 	}
 
-	const auto *exitAreaNum = TryFindBestStairsExitArea( context, stairsClusterNum );
-	if( !exitAreaNum ) {
+	int exitAreaNum = 0;
+	if( !findBestStairsExitProps( context->movementState->entityPhysicsState, stairsClusterNum, m_bot, &exitAreaNum ) ) {
 		Debug( "Can't find an exit area of the current stairs cluster\n" );
 		return false;
 	}
 
 	Debug( "Found a best exit area of an stairs cluster\n" );
-	m_lookDirStorage.set( aasWorld->getAreas()[*exitAreaNum].center );
+	m_lookDirStorage.set( aasWorld->getAreas()[exitAreaNum].center );
 	m_lookDirStorage -= context->movementState->entityPhysicsState.Origin();
 	if( !m_lookDirStorage.normalize() ) {
 		return false;
@@ -74,7 +74,7 @@ bool BunnyToStairsOrRampExitAction::tryFindingAndSavingLookDir( PredictionContex
 	m_intendedLookDir = m_lookDirStorage.data();
 
 	// Try find an area that is a boundary area of the exit area and is in a floor cluster
-	trySavingExitFloorCluster( context, *exitAreaNum );
+	trySavingExitFloorCluster( context, exitAreaNum );
 	return true;
 }
 

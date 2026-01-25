@@ -273,9 +273,10 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 				return &walkToPointScript;
 			}
 		} else {
+			// TODO: It is not necessarily the grounded area num
+			const int currGroundedAreaNum = entityPhysicsState.CurrAasAreaNum();
 			// TODO: Test all bot areas?
 			if( entityPhysicsState.GetGroundNormalZ() < 0.99f ) {
-				const int currGroundedAreaNum = entityPhysicsState.CurrAasAreaNum();
 				// TODO: Check AREA_GROUNDED (is it needed?)
 				if( aasWorld->getAreaSettings()[currGroundedAreaNum].areaflags & AREA_INCLINED_FLOOR ) {
 					if( const auto maybeReachNumAndTravelTime = findRampClusterExitReachNumAndTravelTime( entityPhysicsState, bot ) ) {
@@ -291,6 +292,28 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 						if( produceBotInput( &walkToPointScript, input ) ) {
 							return &walkToPointScript;
 						}
+					}
+				}
+			}
+			if( const int stairsClusterNum = aasWorld->stairsClusterNum( currGroundedAreaNum ) ) {
+				int exitStairsAreaNum = 0, exitReachNum = 0, exitTravelTime = 0;
+				if( findBestStairsExitProps( entityPhysicsState, stairsClusterNum, bot,
+											 &exitStairsAreaNum, &exitReachNum, &exitTravelTime ) ) {
+					// If it does not match the nav target area
+					if( exitReachNum ) {
+						const auto &area = aasWorld->getAreas()[aasWorld->getReaches()[exitReachNum].areanum];
+						const Vec3 areaPoint( area.center[0], area.center[1], area.mins[2] + 32.0f );
+						walkToPointScript.setTargetPoint( areaPoint, exitTravelTime );
+						if( produceBotInput( &walkToPointScript, input ) ) {
+							return &walkToPointScript;
+						}
+					}
+					const auto &area = aasWorld->getAreas()[exitStairsAreaNum];
+					const Vec3 areaPoint( area.center[0], area.center[1], area.mins[2] + 32.0f );
+					// TODO: Allow testing multiple points at once
+					walkToPointScript.setTargetPoint( areaPoint, exitTravelTime );
+					if( produceBotInput( &walkToPointScript, input ) ) {
+						return &walkToPointScript;
 					}
 				}
 			}

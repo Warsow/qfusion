@@ -52,6 +52,7 @@ class NextReachDirsCollector final : public ReachChainWalker {
 	friend class BunnyTestingNextReachDirsAction;
 
 	PredictionContext *const context;
+	const Bot *const bot;
 	const AiAasWorld *const aasWorld;
 	const std::span<const aas_area_t> aasAreas;
 	const std::span<const aas_areasettings_t> aasAreaSettings;
@@ -72,6 +73,7 @@ public:
 	NextReachDirsCollector( const Bot *bot_, PredictionContext *context_, AreaAndScore *candidates_, unsigned maxCandidates_ )
 		: ReachChainWalker( context_->RouteCache(), context_->TravelFlags() )
 		, context( context_ )
+		, bot( bot_ )
 		, aasWorld( AiAasWorld::instance() )
 		, aasAreas( aasWorld->getAreas() )
 		, aasAreaSettings( aasWorld->getAreaSettings() )
@@ -162,8 +164,9 @@ inline bool NextReachDirsCollector::CheckForStairsCluster( int areaNum ) {
 		return true;
 	}
 
-	if( const auto *exitAreaNum = TryFindBestStairsExitArea( context, stairsClusterNum ) ) {
-		stairsExitAreaNum = *exitAreaNum;
+	int exitAreaNum = 0;
+	if( findBestStairsExitProps( context->movementState->entityPhysicsState, stairsClusterNum, bot, &exitAreaNum ) ) {
+		stairsExitAreaNum = exitAreaNum;
 		return true;
 	}
 

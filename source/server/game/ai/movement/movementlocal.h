@@ -379,7 +379,9 @@ bool TraceArcInSolidWorld( const vec3_t from, const vec3_t to );
 
 void DirToKeyInput( const Vec3 &desiredDir, const vec3_t actualForwardDir, const vec3_t actualRightDir, BotInput *input );
 
-const uint16_t *TryFindBestStairsExitArea( PredictionContext *context, int stairsClusterNum );
+[[nodiscard]]
+bool findBestStairsExitProps( const AiEntityPhysicsState &entityPhysicsState, int stairsClusterNum, const Bot *bot,
+							  int *exitStairsAreaNum, int *exitReachNum = nullptr, int *exitTravelTime = nullptr );
 
 [[nodiscard]]
 auto findRampClusterExitReachNumAndTravelTime( const AiEntityPhysicsState &entityPhysicsState,

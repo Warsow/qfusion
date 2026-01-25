@@ -202,58 +202,62 @@ auto findRampClusterExitReachNumAndTravelTime( const AiEntityPhysicsState &entit
 	return std::nullopt;
 }
 
-const uint16_t *TryFindBestStairsExitArea( PredictionContext *context, int stairsClusterNum ) {
-	const int toAreaNum = context->NavTargetAasAreaNum();
-	if( !toAreaNum ) {
-		return nullptr;
+bool findBestStairsExitProps( const AiEntityPhysicsState &entityPhysicsState, int stairsClusterNum, const Bot *bot,
+							  int *exitStairsAreaNum, int *exitReachNum, int *exitTravelTime ) {
+	if( exitStairsAreaNum ) {
+		*exitStairsAreaNum = 0;
+	}
+	if( exitReachNum ) {
+		*exitReachNum = 0;
+	}
+	if( exitTravelTime ) {
+		*exitTravelTime = 0;
 	}
 
-	const int currTravelTimeToTarget = context->TravelTimeToNavTarget();
-	if( !currTravelTimeToTarget ) {
-		return nullptr;
-	}
+	const auto *aasWorld   = AiAasWorld::instance();
+	const auto *routeCache = bot->RouteCache();
+	const auto travelFlags = bot->TravelFlags();
 
-	const auto *aasWorld = AiAasWorld::instance();
-	const auto *routeCache = context->RouteCache();
-
-	const std::span<const uint16_t> stairsClusterAreaNums = aasWorld->stairsClusterData( stairsClusterNum );
+	int currBotAreaNums[2] { 0, 0 };
+	const int numCurrBotAreas  = entityPhysicsState.PrepareRoutingStartAreas( currBotAreaNums );
+	const int navTargetAreaNum = bot->NavTargetAasAreaNum();
+	const int currTravelTime   = routeCache->FindRoute( currBotAreaNums, numCurrBotAreas, navTargetAreaNum, travelFlags );
 
 	// TODO: Support curved stairs, here and from StairsClusterBuilder side
+	const std::span<const uint16_t> stairsClusterAreaNums = aasWorld->stairsClusterData( stairsClusterNum );
 
+	int bestTravelTime = std::numeric_limits<int>::max();
+	int bestAreaNum    = 0;
+	int bestReachNum   = 0;
 	// Determine whether highest or lowest area is closer to the nav target
-	const uint16_t *stairsBoundaryAreas[2];
-	stairsBoundaryAreas[0] = std::addressof( stairsClusterAreaNums.front() );
-	stairsBoundaryAreas[1] = std::addressof( stairsClusterAreaNums.back() );
-
-	int bestStairsAreaIndex = -1;
-	int bestTravelTimeOfStairsAreas = std::numeric_limits<int>::max();
-	for( int i = 0; i < 2; ++i ) {
-		// TODO: Eliminate the intermediate bestAreaTravelTime variable (this is a result of unrelated refactoring)
-		int bestAreaTravelTime = std::numeric_limits<int>::max();
-		int travelTime = routeCache->FindRoute( *stairsBoundaryAreas[i], toAreaNum, context->TravelFlags() );
-		if( travelTime && travelTime < bestAreaTravelTime ) {
-			bestAreaTravelTime = travelTime;
+	for( const int boundaryAreaNum : { stairsClusterAreaNums.front(), stairsClusterAreaNums.back() } ) {
+		int reachNum         = 0;
+		const int travelTime = routeCache->FindRoute( boundaryAreaNum, navTargetAreaNum, travelFlags );
+		// This means we can't compare travel times for boundary areas
+		if( !travelTime ) {
+			return false;
 		}
-		// The stairs boundary area is not reachable
-		if( bestAreaTravelTime == std::numeric_limits<int>::max() ) {
-			return nullptr;
-		}
-		// Make sure a stairs area is closer to the nav target than the current one
-		if( bestAreaTravelTime < currTravelTimeToTarget ) {
-			if( bestAreaTravelTime < bestTravelTimeOfStairsAreas ) {
-				bestTravelTimeOfStairsAreas = bestAreaTravelTime;
-				bestStairsAreaIndex = i;
-			}
+		if( travelTime < bestTravelTime && travelTime < currTravelTime ) {
+			bestTravelTime = travelTime;
+			bestAreaNum    = boundaryAreaNum;
+			bestReachNum   = reachNum;
 		}
 	}
 
-	if( bestStairsAreaIndex < 0 ) {
-		return nullptr;
+	if( bestTravelTime != std::numeric_limits<int>::max() ) {
+		if( exitStairsAreaNum ) {
+			*exitStairsAreaNum = bestAreaNum;
+		}
+		if( exitReachNum ) {
+			*exitReachNum = bestReachNum;
+		}
+		if( exitTravelTime ) {
+			*exitTravelTime = bestTravelTime;
+		}
+		return true;
 	}
 
-	// The value points to the cluster data that is persistent in memory
-	// during the entire match, so returning this address is legal.
-	return stairsBoundaryAreas[bestStairsAreaIndex];
+	return false;
 }
 
 bool TraceArcInSolidWorld( const vec3_t from, const vec3_t to ) {
