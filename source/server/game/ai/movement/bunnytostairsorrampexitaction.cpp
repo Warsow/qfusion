@@ -32,14 +32,15 @@ bool BunnyToStairsOrRampExitAction::tryFindingAndSavingLookDir( PredictionContex
 
 	const auto *aasWorld = AiAasWorld::instance();
 	if( aasWorld->getAreaSettings()[ groundedAreaNum ].areaflags & AREA_INCLINED_FLOOR ) {
-		const int *exitAreaNum = TryFindBestInclinedFloorExitArea( context, groundedAreaNum, groundedAreaNum );
-		if( !exitAreaNum ) {
+		const auto exitReachNumAndTravelTime = findRampClusterExitReachNumAndTravelTime(
+			context->movementState->entityPhysicsState, m_bot );
+		if( !exitReachNumAndTravelTime ) {
 			Debug( "Can't find an exit area of the current grouned inclined floor area\n" );
 			return false;
 		}
 
 		Debug( "Found a best exit area of an inclined floor area\n" );
-		m_lookDirStorage.set( aasWorld->getAreas()[*exitAreaNum].center );
+		m_lookDirStorage.set( aasWorld->getAreas()[exitReachNumAndTravelTime->first].center );
 		m_lookDirStorage -= context->movementState->entityPhysicsState.Origin();
 		if( !m_lookDirStorage.normalize() ) {
 			return false;
@@ -47,7 +48,7 @@ bool BunnyToStairsOrRampExitAction::tryFindingAndSavingLookDir( PredictionContex
 
 		m_intendedLookDir = m_lookDirStorage.data();
 
-		trySavingExitFloorCluster( context, *exitAreaNum );
+		trySavingExitFloorCluster( context, exitReachNumAndTravelTime->first );
 		return true;
 	}
 

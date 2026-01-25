@@ -380,7 +380,10 @@ bool TraceArcInSolidWorld( const vec3_t from, const vec3_t to );
 void DirToKeyInput( const Vec3 &desiredDir, const vec3_t actualForwardDir, const vec3_t actualRightDir, BotInput *input );
 
 const uint16_t *TryFindBestStairsExitArea( PredictionContext *context, int stairsClusterNum );
-const int *TryFindBestInclinedFloorExitArea( PredictionContext *context, int rampAreaNum, int forbiddenAreaNum );
+
+[[nodiscard]]
+auto findRampClusterExitReachNumAndTravelTime( const AiEntityPhysicsState &entityPhysicsState,
+											   Bot *bot ) -> std::optional<std::pair<int, int>>;
 
 /// \brief Contains signs of forward and right key values for 8 tested directions
 inline const int kSideDirSigns[8][2] = {

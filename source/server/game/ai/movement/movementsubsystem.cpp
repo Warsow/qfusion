@@ -243,10 +243,11 @@ void MovementSubsystem::setActiveScript( MovementScript *script ) {
 
 auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript * {
 	if( const int navTargetAreaNum = bot->NavTargetAasAreaNum() ) {
-		const auto *const aasWorld = AiAasWorld::instance();
+		const auto *const aasWorld     = AiAasWorld::instance();
+		const auto &entityPhysicsState = movementState.entityPhysicsState;
 
 		// Make sure that there's no areas below
-		assert( movementState.entityPhysicsState.GroundEntity() );
+		assert( entityPhysicsState.GroundEntity() );
 
 		// We have to retrieve all areas in the box of the bot.
 		// It's the correct approach for navigation.
@@ -254,11 +255,11 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 
 		int botAreas[32];
 		int numBotAreas = (int)aasWorld->findAreasInBox( bot->self->r.absmin, bot->self->r.absmax,
-														 botAreas, sizeof( botAreas ) ).size();
+														 botAreas, std::size( botAreas ) ).size();
 
-		// TODO: Is it needed?
-		for( const int areaNum: { movementState.entityPhysicsState.CurrAasAreaNum(),
-								  movementState.entityPhysicsState.DroppedToFloorAasAreaNum() } ) {
+		// TODO: Is this needed?
+		for( const int areaNum: { entityPhysicsState.CurrAasAreaNum(),
+								  entityPhysicsState.DroppedToFloorAasAreaNum() } ) {
 			if( areaNum && numBotAreas < (int)std::size( botAreas ) ) {
 				if( !wsw::contains( botAreas, botAreas + numBotAreas, areaNum ) ) {
 					botAreas[numBotAreas++] = areaNum;
@@ -272,6 +273,28 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 				return &walkToPointScript;
 			}
 		} else {
+			// TODO: Test all bot areas?
+			if( entityPhysicsState.GetGroundNormalZ() < 0.99f ) {
+				const int currGroundedAreaNum = entityPhysicsState.CurrAasAreaNum();
+				// TODO: Check AREA_GROUNDED (is it needed?)
+				if( aasWorld->getAreaSettings()[currGroundedAreaNum].areaflags & AREA_INCLINED_FLOOR ) {
+					if( const auto maybeReachNumAndTravelTime = findRampClusterExitReachNumAndTravelTime( entityPhysicsState, bot ) ) {
+						const auto &reach = aasWorld->getReaches()[maybeReachNumAndTravelTime->first];
+						const auto &exitArea = aasWorld->getAreas()[reach.areanum];
+						Vec3 exitAreaPoint( exitArea.center[0], exitArea.center[1], exitArea.mins[2] + 32.0f );
+						walkToPointScript.setTargetPoint( exitAreaPoint, maybeReachNumAndTravelTime->second );
+						if( produceBotInput( &walkToPointScript, input ) ) {
+							return &walkToPointScript;
+						}
+						// TODO: Allow testing multiple points at once
+						walkToPointScript.setTargetPoint( Vec3( reach.end ), maybeReachNumAndTravelTime->second );
+						if( produceBotInput( &walkToPointScript, input ) ) {
+							return &walkToPointScript;
+						}
+					}
+				}
+			}
+
 			int reachNum = 0;
 			const auto *routeCache = bot->RouteCache();
 			const auto travelFlags = bot->TravelFlags();
