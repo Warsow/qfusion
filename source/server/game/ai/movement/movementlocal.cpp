@@ -102,17 +102,27 @@ bool ReachChainWalker::Exec() {
 	assert( targetAreaNum >= 0 );
 	assert( numStartAreas >= 0 );
 
-	lastReachNum = 0;
-	startAreaNum = 0;
-	lastAreaNum = 0;
+	assert( targetAreaNum >= 0 );
+	assert( numStartAreas >= 0 );
 
-	// We have to handle the first reach. separately as we start from up to 2 alternative areas.
-	// Also we have to inline FindRoute() here to save the actual lastAreaNum for the initial step
+	lastAreaNum    = 0;
+	startAreaNum   = 0;
+	lastReachNum   = 0;
+	startReachNum  = 0;
+	lastTravelTime = 0;
+
+	// We have to handle the first reach. separately as we start from multiple alternative areas.
 	for( int i = 0; i < numStartAreas; ++i ) {
-		lastTravelTime = routeCache->FindRoute( startAreaNums[i], targetAreaNum, travelFlags, &lastReachNum );
-		if( lastTravelTime ) {
-			lastAreaNum = startAreaNum = startAreaNums[i];
-			break;
+		const int testedStartAreaNum = startAreaNums[i];
+		int reachNum                 = 0;
+		if( const int travelTime = routeCache->FindRoute( testedStartAreaNum, targetAreaNum, travelFlags, &reachNum ) ) {
+			if( !lastTravelTime || travelTime < lastTravelTime ) {
+				lastAreaNum    = testedStartAreaNum;
+				startAreaNum   = testedStartAreaNum;
+				lastReachNum   = reachNum;
+				startReachNum  = reachNum;
+				lastTravelTime = travelTime;
+			}
 		}
 	}
 

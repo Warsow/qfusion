@@ -346,6 +346,7 @@ protected:
 	// Step temporaries that might be useful
 	int lastTravelTime { 0 };
 	int startAreaNum { 0 };
+	int startReachNum { 0 };
 	int lastAreaNum { 0 };
 	int lastReachNum { 0 };
 
