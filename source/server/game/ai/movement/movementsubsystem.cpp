@@ -272,6 +272,10 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 			if( produceBotInput( &walkToPointScript, input ) ) {
 				return &walkToPointScript;
 			}
+			jumpToPointScript.setTargetPoint( bot->NavTargetOrigin() );
+			if( produceBotInput( &jumpToPointScript, input ) ) {
+				return &jumpToPointScript;
+			}
 		} else {
 			// TODO: It is not necessarily the grounded area num
 			const int currGroundedAreaNum = entityPhysicsState.CurrAasAreaNum();
@@ -280,17 +284,24 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 				// TODO: Check AREA_GROUNDED (is it needed?)
 				if( aasWorld->getAreaSettings()[currGroundedAreaNum].areaflags & AREA_INCLINED_FLOOR ) {
 					if( const auto maybeReachNumAndTravelTime = findRampClusterExitReachNumAndTravelTime( entityPhysicsState, bot ) ) {
-						const auto &reach = aasWorld->getReaches()[maybeReachNumAndTravelTime->first];
+						const auto &reach    = aasWorld->getReaches()[maybeReachNumAndTravelTime->first];
 						const auto &exitArea = aasWorld->getAreas()[reach.areanum];
-						Vec3 exitAreaPoint( exitArea.center[0], exitArea.center[1], exitArea.mins[2] + 32.0f );
-						walkToPointScript.setTargetPoint( exitAreaPoint, maybeReachNumAndTravelTime->second );
-						if( produceBotInput( &walkToPointScript, input ) ) {
-							return &walkToPointScript;
-						}
+						wsw::StaticVector<Vec3, 2> testedPoints;
+						testedPoints.push_back( Vec3( exitArea.center[0], exitArea.center[1], exitArea.mins[2] + 32.0f ) );
+						testedPoints.push_back( Vec3( reach.end ) );
 						// TODO: Allow testing multiple points at once
-						walkToPointScript.setTargetPoint( Vec3( reach.end ), maybeReachNumAndTravelTime->second );
-						if( produceBotInput( &walkToPointScript, input ) ) {
-							return &walkToPointScript;
+						for( const Vec3 &testedPoint: testedPoints ) {
+							walkToPointScript.setTargetPoint( testedPoint, maybeReachNumAndTravelTime->second );
+							if( produceBotInput( &walkToPointScript, input ) ) {
+								return &walkToPointScript;
+							}
+						}
+						// TODO: Do as a last resort when all other (regular reach traversal) scripts fail?
+						for( const Vec3 &testedPoint: testedPoints ) {
+							jumpToPointScript.setTargetPoint( testedPoint, reach.areanum );
+							if( produceBotInput( &jumpToPointScript, input ) ) {
+								return &jumpToPointScript;
+							}
 						}
 					}
 				}
@@ -299,21 +310,27 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 				int exitStairsAreaNum = 0, exitReachNum = 0, exitTravelTime = 0;
 				if( findBestStairsExitProps( entityPhysicsState, stairsClusterNum, bot,
 											 &exitStairsAreaNum, &exitReachNum, &exitTravelTime ) ) {
+					wsw::StaticVector<Vec3, 2> testedPoints;
 					// If it does not match the nav target area
 					if( exitReachNum ) {
 						const auto &area = aasWorld->getAreas()[aasWorld->getReaches()[exitReachNum].areanum];
-						const Vec3 areaPoint( area.center[0], area.center[1], area.mins[2] + 32.0f );
-						walkToPointScript.setTargetPoint( areaPoint, exitTravelTime );
+						testedPoints.push_back( Vec3( area.center[0], area.center[1], area.mins[2] + 32.0f ) );
+					}
+					const auto &area = aasWorld->getAreas()[exitStairsAreaNum];
+					testedPoints.push_back( Vec3( area.center[0], area.center[1], area.mins[2] + 32.0f ) );
+					for( const Vec3 &testedPoint: testedPoints ) {
+						// TODO: Allow testing multiple points at once
+						walkToPointScript.setTargetPoint( testedPoint, exitTravelTime );
 						if( produceBotInput( &walkToPointScript, input ) ) {
 							return &walkToPointScript;
 						}
 					}
-					const auto &area = aasWorld->getAreas()[exitStairsAreaNum];
-					const Vec3 areaPoint( area.center[0], area.center[1], area.mins[2] + 32.0f );
-					// TODO: Allow testing multiple points at once
-					walkToPointScript.setTargetPoint( areaPoint, exitTravelTime );
-					if( produceBotInput( &walkToPointScript, input ) ) {
-						return &walkToPointScript;
+					// TODO: Do as a last resort when all other (regular reach traversal) scripts fail?
+					for( const Vec3 &testedPoint: testedPoints ) {
+						jumpToPointScript.setTargetPoint( testedPoint, exitStairsAreaNum );
+						if( produceBotInput( &jumpToPointScript, input ) ) {
+							return &jumpToPointScript;
+						}
 					}
 				}
 			}
@@ -341,6 +358,11 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 					walkToPointScript.setTargetPoint( Vec3( reach.end ), travelTimeFromPoint );
 					if( produceBotInput( &walkToPointScript, input ) ) {
 						return &walkToPointScript;
+					}
+					// Switch to jumping as a last resort
+					jumpToPointScript.setTargetPoint( Vec3( reach.end ) );
+					if( produceBotInput( &jumpToPointScript, input ) ) {
+						return &jumpToPointScript;
 					}
 				} else if( reach.traveltype == TRAVEL_JUMPPAD ||
 					reach.traveltype == TRAVEL_TELEPORT || reach.traveltype == TRAVEL_ELEVATOR ) {

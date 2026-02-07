@@ -174,6 +174,10 @@ auto JumpToPointAction::checkPredictionStepResults( PredictionContext *context )
 		}
 	}
 
+	if( !checkNoBumpingOrBouncing( context ) ) {
+		return PredictionResult::Restart;
+	}
+
 	if( context->topOfStackIndex + 2 < MAX_PREDICTED_STATES ) {
 		return PredictionResult::Continue;
 	}
@@ -513,6 +517,24 @@ bool WalkToPointScript::produceBotInput( BotInput *input ) {
 		// game.realtime is the baseline for predicted entries
 		assert( lastRecordTimestamp >= game.realtime );
 		// TODO: Should we specify timeout in realtime as well?
+		m_timeoutAt = level.time + ( lastRecordTimestamp - game.realtime ) + 1;
+		return true;
+	}
+
+	return false;
+}
+
+bool JumpToPointScript::produceBotInput( BotInput *input ) {
+	const auto &entityPhysicsState = m_subsystem->getMovementState().entityPhysicsState;
+
+	if( contactsTargetPoint( entityPhysicsState, m_targetPoint ) ) {
+		return false;
+	}
+
+	m_jumpToPointAction.setTarget( m_targetPoint, m_targetAreaNum );
+	if( PredictingAndCachingMovementScript::produceBotInput( input ) ) {
+		const auto lastRecordTimestamp = m_predictedMovementActions.back().timestamp;
+		assert( lastRecordTimestamp >= game.realtime );
 		m_timeoutAt = level.time + ( lastRecordTimestamp - game.realtime ) + 1;
 		return true;
 	}

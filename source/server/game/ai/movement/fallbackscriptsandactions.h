@@ -128,6 +128,28 @@ private:
 	bool m_isDisabledForPlanning { false };
 };
 
+class JumpToPointScript : public PredictingAndCachingMovementScript {
+public:
+	explicit JumpToPointScript( MovementSubsystem *movementSubsystem ) :
+		PredictingAndCachingMovementScript( movementSubsystem ), m_jumpToPointAction( movementSubsystem ) {
+		m_movementActions = m_storageOfActionPtrs;
+	}
+
+	[[nodiscard]]
+	bool produceBotInput( BotInput *input ) override;
+
+	void setTargetPoint( const Vec3 &targetPoint, int targetAreaNum = 0 ) {
+		m_targetPoint   = targetPoint;
+		m_targetAreaNum = targetAreaNum;
+	}
+private:
+	Vec3 m_targetPoint { 0, 0, 0 };
+	int m_targetAreaNum { 0 };
+
+	JumpToPointAction m_jumpToPointAction;
+	BaseAction *m_storageOfActionPtrs[1] { &m_jumpToPointAction };
+};
+
 class SwitchingActionsForStateScript : public PredictingAndCachingMovementScript {
 public:
 	explicit SwitchingActionsForStateScript( MovementSubsystem *movementSubsystem )

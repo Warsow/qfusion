@@ -149,6 +149,7 @@ class MovementSubsystem {
 	ElevatorScript elevatorScript { this };
 	BunnyHopScript bunnyHopScript { this };
 	WalkToPointScript walkToPointScript { this };
+	JumpToPointScript jumpToPointScript { this };
 	LandToPreventFallingScript landToPreventFallingScript { this };
 	WaitForLandingRelaxedScript waitForLandingRelaxedScript { this };
 	TraverseJumpReachScript traverseJumpReachScript { this };
