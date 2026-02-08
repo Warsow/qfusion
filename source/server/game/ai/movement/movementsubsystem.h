@@ -145,6 +145,9 @@ class MovementSubsystem {
 	MovementScript *testedScript { nullptr };
 	MovementScript *prevActiveScript { nullptr };
 
+	int64_t noScriptOnGroundSinceLevelTime { 0 };
+	int64_t noScriptOnGroundSinceLevelFramenum { 0 };
+
 	JumppadScript jumppadScript { this };
 	ElevatorScript elevatorScript { this };
 	BunnyHopScript bunnyHopScript { this };
@@ -155,6 +158,7 @@ class MovementSubsystem {
 	TraverseJumpReachScript traverseJumpReachScript { this };
 	TraverseBarrierJumpReachScript traverseBarrierJumpReachScript { this };
 	TraverseWalkOffLedgeReachScript traverseWalkOffLedgeReachScript { this };
+	SingleFrameSideStepScript singleFrameSideStepScript { this };
 
 	struct CachedLastNearbyTriggerReach {
 		int64_t touchedAt { 0 };
@@ -167,6 +171,9 @@ class MovementSubsystem {
 
 	[[nodiscard]]
 	auto findFallbackScript( BotInput *input ) -> MovementScript *;
+
+	[[nodiscard]]
+	auto findLastResortGroundScript( BotInput *input ) -> MovementScript *;
 
 	[[nodiscard]]
 	bool produceBotInput( MovementScript *script, BotInput *input );

@@ -407,4 +407,40 @@ private:
 	LandOnPointAction m_landOnPointAction;
 };
 
+class SingleFrameSideStepAction : public BaseAction {
+public:
+	explicit SingleFrameSideStepAction( MovementSubsystem *movementSubsystem )
+		: BaseAction( movementSubsystem, "SingleFrameSideStepAction", COLOR_RGB( 255, 0, 0 ) ) {}
+
+	void beforePlanning() override;
+	void afterPlanning() override;
+
+	void onApplicationSequenceStarted( PredictionContext *context ) override;
+	void onApplicationSequenceStopped( PredictionContext *context, SequenceStopReason, unsigned ) override;
+
+	[[nodiscard]]
+	auto planPredictionStep( PredictionContext *context ) -> PredictionResult override;
+	[[nodiscard]]
+	auto checkPredictionStepResults( PredictionContext *context ) -> PredictionResult override;
+
+	void setAttemptOffset( unsigned offset ) { m_attemptOffset = offset; }
+private:
+	wsw::StaticVector<int, 2> m_savedAreaNums;
+	Vec3 m_originAtStart { 0, 0, 0 };
+	unsigned m_attemptOffset { 0 };
+	unsigned m_attemptCounter { 0 };
+};
+
+class SingleFrameSideStepScript : public PredictingMovementScript {
+public:
+	explicit SingleFrameSideStepScript( MovementSubsystem *movementSubsystem )
+		: PredictingMovementScript( movementSubsystem ), m_singleFrameSideStepAction( movementSubsystem ) {}
+
+	void setAttemptOffset( unsigned offset ) { m_singleFrameSideStepAction.setAttemptOffset( offset ); }
+	[[nodiscard]]
+	bool produceBotInput( BotInput *input ) override;
+private:
+	SingleFrameSideStepAction m_singleFrameSideStepAction;
+};
+
 #endif

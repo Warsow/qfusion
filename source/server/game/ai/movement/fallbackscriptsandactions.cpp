@@ -1438,3 +1438,105 @@ bool LandToPreventFallingScript::produceBotInput( BotInput *input ) {
 
 	return false;
 }
+
+void SingleFrameSideStepAction::beforePlanning() {
+	BaseAction::beforePlanning();
+	m_attemptOffset  = 0;
+	m_attemptCounter = 0;
+	m_savedAreaNums.clear();
+}
+
+void SingleFrameSideStepAction::afterPlanning() {
+	BaseAction::afterPlanning();
+	m_attemptOffset  = 0;
+	m_attemptCounter = 0;
+	m_savedAreaNums.clear();
+}
+
+void SingleFrameSideStepAction::onApplicationSequenceStarted( PredictionContext *context ) {
+	BaseAction::onApplicationSequenceStarted( context );
+	if( m_attemptCounter == 0 ) {
+		m_originAtSequenceStart.set( context->movementState->entityPhysicsState.Origin() );
+		int botAreaNums[2] { 0, 0 };
+		int numBotAreas = context->movementState->entityPhysicsState.PrepareRoutingStartAreas( botAreaNums );
+		for( int i = 0; i < numBotAreas; ++i ) {
+			m_savedAreaNums.push_back( botAreaNums[i] );
+		}
+		// TODO: Use sane RNG facilities
+		m_attemptOffset = (unsigned)( 8 * random() );
+	}
+}
+
+void SingleFrameSideStepAction::onApplicationSequenceStopped( PredictionContext *context,
+															  SequenceStopReason sequenceStopReason,
+															  unsigned stoppedAtFrameIndex ) {
+	BaseAction::onApplicationSequenceStopped( context, sequenceStopReason, stoppedAtFrameIndex );
+	if( sequenceStopReason == FAILED ) {
+		m_attemptCounter++;
+	}
+}
+
+auto SingleFrameSideStepAction::planPredictionStep( PredictionContext *context ) -> PredictionResult {
+	if( m_attemptCounter == 8 ) {
+		return PredictionResult::Abort;
+	}
+
+	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
+	BotInput *const input          = &context->record->botInput;
+
+	const auto attempt = ( m_attemptCounter + m_attemptOffset ) % 8;
+	if( attempt < 4 ) {
+		// Suppress a warning by using this operation
+		switch( attempt % 4 ) {
+			case 0: input->SetForwardMovement( +1 ); break; // f
+			case 1: input->SetForwardMovement( -1 ); break; // b
+			case 2: input->SetRightMovement( +1 );   break; // r
+			case 3: input->SetRightMovement( -1 );   break; // l
+		}
+	} else {
+		switch( ( attempt - 4 ) % 4 ) {
+			case 0: input->SetForwardMovement( +1 ); input->SetRightMovement( +1 ); break; // fr
+			case 1: input->SetForwardMovement( -1 ); input->SetRightMovement( +1 ); break; // br
+			case 2: input->SetForwardMovement( +1 ); input->SetRightMovement( -1 ); break; // fl
+			case 3: input->SetForwardMovement( -1 ); input->SetRightMovement( -1 ); break; // bl
+		}
+	}
+
+	input->SetIntendedLookDir( entityPhysicsState.ForwardDir() );
+	input->isUcmdSet = true;
+
+	// Otherwise we're unable to fullfill the completion conditions
+	context->predictionStepMillis = 32;
+
+	return PredictionResult::Continue;
+}
+
+[[nodiscard]]
+auto SingleFrameSideStepAction::checkPredictionStepResults( PredictionContext *context ) -> PredictionResult {
+	if( const auto result = BaseAction::checkPredictionStepResults( context ); result != PredictionResult::Continue ) {
+		return result;
+	}
+
+	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
+	if( !entityPhysicsState.GroundEntity() ) {
+		return PredictionResult::Restart;
+	}
+
+	if( m_originAtSequenceStart.squareDistance2DTo( entityPhysicsState.Origin() ) < wsw::square( 1.0f ) ) {
+		return PredictionResult::Restart;
+	}
+
+	if( !m_savedAreaNums.empty() ) [[likely]] {
+		int botAreaNums[2] { 0, 0 };
+		if( entityPhysicsState.PrepareRoutingStartAreas( botAreaNums ) == 0 ) {
+			Debug( "Current bot areas became undefined after the step\n" );
+			return PredictionResult::Restart;
+		}
+	}
+
+	return PredictionResult::Complete;
+}
+
+bool SingleFrameSideStepScript::produceBotInput( BotInput *input ) {
+	return produceNonCachedInputUsingAction( &m_singleFrameSideStepAction, input );
+}

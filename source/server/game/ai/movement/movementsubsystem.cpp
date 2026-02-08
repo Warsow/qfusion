@@ -158,6 +158,7 @@ void MovementSubsystem::Frame( BotInput *input ) {
 		lastNearbyElevatorReach.entNum    = ::triggerAasPropsCache.getTriggerEntNumForElevatorReach( reachNum ).value_or( 0 );
 	}
 
+	const bool hadActiveScript = activeScript != nullptr;
 	if( activeScript ) {
 		if( activeScript->getTimeoutAt() <= level.time ) {
 			setActiveScript( nullptr );
@@ -192,6 +193,14 @@ void MovementSubsystem::Frame( BotInput *input ) {
 			// TODO: Check for immediate recovery in case of a dangerous failure
 			if( movementState.entityPhysicsState.GroundEntity() ) {
 				setActiveScript( findFallbackScript( input ) );
+				if( !activeScript ) {
+					if( hadActiveScript ) {
+						noScriptOnGroundSinceLevelTime     = level.time;
+						noScriptOnGroundSinceLevelFramenum = level.framenum;
+					} else {
+						setActiveScript( findLastResortGroundScript( input ) );
+					}
+				}
 			} else {
 				int beaconColor = 0;
 				// Other scripts should recover on their own (should be sufficiently robust)
@@ -224,6 +233,11 @@ void MovementSubsystem::Frame( BotInput *input ) {
 	if( shouldSelectNewScript && activeScript ) {
 		// Make sure the script bumps its own timeout properly
 		assert( activeScript->getTimeoutAt() > level.time );
+	}
+
+	if( activeScript && movementState.entityPhysicsState.GroundEntity() ) {
+		noScriptOnGroundSinceLevelTime     = level.time + 1;
+		noScriptOnGroundSinceLevelFramenum = level.framenum + 1;
 	}
 }
 
@@ -396,6 +410,21 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 		}
 	}
 
+	return nullptr;
+}
+
+auto MovementSubsystem::findLastResortGroundScript( BotInput *input ) -> MovementScript * {
+	constexpr auto minDelta = 500;
+	constexpr auto maxDelta = ( 2 * Bot::BLOCKED_TIMEOUT ) / 3;
+	static_assert( minDelta < maxDelta );
+	// If we don't manage to unblock till we reach maxDelta, just let the bot respawn
+	if( const auto delta = level.time - noScriptOnGroundSinceLevelTime; delta > minDelta && delta < maxDelta ) {
+		if( ( level.framenum % MAX_CLIENTS ) == ( bot->EntNum() % MAX_CLIENTS ) ) {
+			singleFrameSideStepScript.setAttemptOffset( noScriptOnGroundSinceLevelFramenum + delta );
+			(void)produceBotInput( &singleFrameSideStepScript, input );
+			// Intentionally non returning anything (don't let the single-frame script become active)
+		}
+	}
 	return nullptr;
 }
 
