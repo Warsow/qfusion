@@ -58,10 +58,6 @@ void SNAP_FreeClientFrames( struct client_s *client );
 void SNAP_RecordDemoMessage( int demofile, struct msg_s *msg, int offset );
 int SNAP_ReadDemoMessage( int demofile, struct msg_s *msg );
 
-void SNAP_BeginDemoRecording( int demofile, unsigned int spawncount, unsigned int snapFrameTime,
-							  const char *sv_name, unsigned int sv_bitflags, struct purelist_s *purelist,
-							  char *configstrings, entity_state_t *baselines );
-
 namespace wsw { class ConfigStringStorage; }
 
 void SNAP_BeginDemoRecording( int demofile, unsigned int spawncount, unsigned int snapFrameTime,
