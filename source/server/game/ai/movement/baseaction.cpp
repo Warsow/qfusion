@@ -225,7 +225,7 @@ bool BaseAction::hasTouchedNavEntityThisFrame( PredictionContext *context ) {
 }
 
 void BaseAction::beforePlanning() {
-	m_bot                     = m_subsystem->bot;
+	m_bot                     = m_subsystem->m_bot;
 	m_isDisabledForPlanning   = false;
 	m_sequenceStartFrameIndex = std::numeric_limits<unsigned>::max();
 	m_sequenceEndFrameIndex   = std::numeric_limits<unsigned>::max();

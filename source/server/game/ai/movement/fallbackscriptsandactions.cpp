@@ -316,7 +316,7 @@ auto WalkToPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 	}
 
 	int forwardKeySign = +1;
-	if( std::optional<Vec3> keptInFovPoint = m_subsystem->bot->GetKeptInFovPoint() ) {
+	if( std::optional<Vec3> keptInFovPoint = m_subsystem->m_bot->GetKeptInFovPoint() ) {
 		if( keptInFovPoint->squareDistance2DTo( entityPhysicsState.Origin() ) > wsw::square( 1.0f ) ) {
 			Vec3 lookVec( *keptInFovPoint - viewOrigin );
 			lookVec.z() *= Z_NO_BEND_SCALE;
@@ -429,7 +429,7 @@ auto WalkToPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 			}
 		}
 		assert( botInput->isUcmdSet && botInput->isLookDirSet );
-		if( m_subsystem->bot->ShouldAttack() ) {
+		if( m_subsystem->m_bot->ShouldAttack() ) {
 			if( !entityPhysicsState.GroundEntity() ) {
 				botInput->ClearMovementDirections();
 				botInput->ClearButtons();
@@ -481,8 +481,6 @@ auto WalkToPointAction::checkPredictionStepResults( PredictionContext *context )
 
 bool WalkToPointScript::produceBotInput( BotInput *input ) {
 	const auto &entityPhysicsState = m_subsystem->getMovementState().entityPhysicsState;
-	m_subsystem->bot->RouteCache();
-
 	if( contactsTargetPoint( entityPhysicsState, m_targetPoint ) ) {
 		return false;
 	}
@@ -490,7 +488,7 @@ bool WalkToPointScript::produceBotInput( BotInput *input ) {
 	if( m_travelTimeFromTargetPoint && entityPhysicsState.GroundEntity() ) {
 		// TODO: Implement subroutines which are similar to PredictionContext::TravelTimeToTarget()
 		// for the movement subsystem itself so we don't have to copy-paste this code
-		const Bot *bot = m_subsystem->bot;
+		const Bot *bot = m_subsystem->m_bot;
 		if( const int navTargetAreaNum = bot->NavTargetAasAreaNum() ) {
 			int fromAreaNums[2] { 0, 0 };
 			const int numFromAreas = entityPhysicsState.PrepareRoutingStartAreas( fromAreaNums );
@@ -851,7 +849,7 @@ bool TraverseBarrierJumpReachScript::produceBotInput( BotInput *input ) {
 }
 
 bool JumppadScript::produceBotInput( BotInput *input ) {
-	const auto &entityPhysicsState = *m_subsystem->bot->EntityPhysicsState();
+	const auto &entityPhysicsState = *m_subsystem->m_bot->EntityPhysicsState();
 	// TODO: Is the jumppad entity considered to be "ground entity"?
 	// TODO: Is entityPhysicsState up-to-date when we activate this script?
 	if( entityPhysicsState.GroundEntity() ) {
@@ -1001,7 +999,7 @@ bool JumppadScript::setupFreeflyMovement( BotInput *input, const float *targetTr
 
 	Vec3 viewOrigin( entityPhysicsState.Origin() );
 	viewOrigin.z() += playerbox_stand_viewheight;
-	if( const auto maybePoint = m_subsystem->bot->GetKeptInFovPoint() ) {
+	if( const auto maybePoint = m_subsystem->m_bot->GetKeptInFovPoint() ) {
 		Vec3 intendedLookDir( *maybePoint - viewOrigin );
 		if( intendedLookDir.normalizeFast() ) {
 			input->SetIntendedLookDir( intendedLookDir, true );
@@ -1055,7 +1053,7 @@ bool ElevatorScript::produceBotInput( BotInput *input ) {
 		// TODO: Limit trace bounds
 		Vec3 traceEnd( Vec3( 0, 0, -99999 ) + entityPhysicsState.Origin() );
 		G_Trace( &trace, entityPhysicsState.Origin(), nullptr, nullptr, traceEnd.data(),
-				 game.edicts + m_subsystem->bot->EntNum(), MASK_SOLID );
+				 game.edicts + m_subsystem->m_bot->EntNum(), MASK_SOLID );
 		if( trace.fraction != 1.0f && !trace.allsolid && !trace.startsolid ) {
 			const edict_t *entity = game.edicts + trace.ent;
 			if( entity->use == Use_Plat ) {
@@ -1194,7 +1192,7 @@ bool ElevatorScript::setupRidePlatformMovement( BotInput *input, const edict_t *
 	} else {
 		Vec3 viewOrigin( entityPhysicsState.Origin() );
 		viewOrigin.z() += playerbox_stand_viewheight;
-		if( const std::optional<Vec3> maybeKeptInFovPoint = m_subsystem->bot->GetKeptInFovPoint() ) {
+		if( const std::optional<Vec3> maybeKeptInFovPoint = m_subsystem->m_bot->GetKeptInFovPoint() ) {
 			Vec3 intendedLookDir( *maybeKeptInFovPoint - viewOrigin );
 			if( intendedLookDir.normalizeFast() ) {
 				input->SetIntendedLookDir( intendedLookDir, true );
@@ -1380,7 +1378,7 @@ bool LandToPreventFallingScript::produceBotInput( BotInput *input ) {
 		return false;
 	}
 
-	Bot *const bot = m_subsystem->bot;
+	Bot *const bot = m_subsystem->m_bot;
 	if( const int navTargetAreaNum = bot->NavTargetAasAreaNum() ) {
 		struct Walker : public ReachChainWalker {
 			Walker( const AiAasRouteCache *routeCache_, int targetAreaNum_, const float *currOrigin_ ) :

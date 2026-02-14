@@ -3,6 +3,17 @@
 #include "triggeraaspropscache.h"
 #include "../classifiedentitiescache.h"
 
+PredictionContext::PredictionContext( MovementSubsystem *subsystem, PredictedPath *predictedMovementActions_ )
+	: bot( subsystem->m_bot )
+	, m_subsystem( subsystem )
+	, predictedMovementActions( predictedMovementActions_ )
+	, movementState( nullptr )
+	, record( nullptr )
+	, totalMillisAhead( 0 )
+	, predictionStepMillis( 0 )
+	, oldStepMillis( 0 )
+	, topOfStackIndex( 0 ) {}
+
 void PredictionContext::NextReachNumAndTravelTimeToNavTarget( int *reachNum, int *travelTimeToNavTarget ) {
 	*reachNum = 0;
 	*travelTimeToNavTarget = 0;
@@ -275,7 +286,7 @@ void PredictionContext::SetupStackForStep() {
 		*currMinimalPlayerState = minimalPlayerStateForFrame0;
 
 		// Push the actual bot movement state onto top of the stack
-		botMovementStatesStack.push_back( m_subsystem->movementState );
+		botMovementStatesStack.push_back( m_subsystem->m_movementState );
 
 		oldStepMillis = game.frametime;
 		totalMillisAhead = 0;
@@ -546,9 +557,9 @@ bool PredictionContext::BuildPlan( std::span<BaseAction *> actionsToUse ) {
 	const auto savedPlayerState = self->r.client->ps;
 	const auto savedPMove = self->r.client->old_pmove;
 
-	Assert( self->bot->entityPhysicsState == &m_subsystem->movementState.entityPhysicsState );
+	Assert( self->bot->entityPhysicsState == &m_subsystem->m_movementState.entityPhysicsState );
 	// Save current entity physics state (it will be modified even for a single prediction step)
-	const AiEntityPhysicsState currEntityPhysicsState = m_subsystem->movementState.entityPhysicsState;
+	const AiEntityPhysicsState currEntityPhysicsState = m_subsystem->m_movementState.entityPhysicsState;
 
 	// Get modified every NextMovementFrame() call
 	this->playerStateForPmove = self->r.client->ps;
@@ -623,11 +634,11 @@ bool PredictionContext::BuildPlan( std::span<BaseAction *> actionsToUse ) {
 	Assert( !std::memcmp( &self->r.client->old_pmove, &savedPMove, sizeof( savedPMove ) ) );
 
 	// Set first predicted movement state as the current bot movement state
-	m_subsystem->movementState = botMovementStatesStack[0];
+	m_subsystem->m_movementState = botMovementStatesStack[0];
 	// Even the first predicted movement state usually has modified physics state, restore it to a saved value
-	m_subsystem->movementState.entityPhysicsState = currEntityPhysicsState;
+	m_subsystem->m_movementState.entityPhysicsState = currEntityPhysicsState;
 	// Restore the current entity physics state reference in Ai subclass
-	self->bot->entityPhysicsState = &m_subsystem->movementState.entityPhysicsState;
+	self->bot->entityPhysicsState = &m_subsystem->m_movementState.entityPhysicsState;
 	// These assertions helped to find an annoying bug during development
 	Assert( VectorCompare( self->s.origin, self->bot->entityPhysicsState->Origin() ) );
 	Assert( VectorCompare( self->velocity, self->bot->entityPhysicsState->Velocity() ) );
@@ -701,11 +712,11 @@ void PredictionContext::NextMovementStep( BaseAction *action ) {
 	// Make sure we're modify botInput/entityPhysicsState before copying to ucmd
 
 	// Corresponds to Bot::Think();
-	m_subsystem->ApplyPendingTurnToLookAtPoint( botInput, this );
+	m_subsystem->applyPendingTurnToLookAtPoint( botInput, this );
 	// Corresponds to m_subsystem->Frame();
 	action->execActionRecord( this->record, botInput, this );
 	// Corresponds to Bot::Think();
-	m_subsystem->ApplyInput( botInput, this );
+	m_subsystem->applyInput( botInput, this );
 
 	const edict_t *self = game.edicts + bot->EntNum();
 

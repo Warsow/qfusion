@@ -87,18 +87,100 @@ class MovementSubsystem {
 	friend class LandToPreventFallingScript;
 	friend class BunnyToBestFloorClusterPointAction;
 	friend class PredictingAndCachingMovementScript;
+public:
+	explicit MovementSubsystem( Bot *bot_ );
 
-	Bot *const bot;
+	[[nodiscard]]
+	auto getMovementState() -> const MovementState & { return m_movementState; }
 
-	static constexpr unsigned MAX_SAVED_AREAS = PredictionContext::MAX_SAVED_LANDING_AREAS;
-	wsw::StaticVector<int, MAX_SAVED_AREAS> savedLandingAreas;
+	void onInterceptedPredictedEvent( int ev, int parm ) {
+		assert( m_testedScript );
+		static_cast<PredictingMovementScript *>( m_testedScript )->onInterceptedPredictedEvent( ev, parm );
+	}
+
+	void onInterceptedPMoveTouchTriggers( pmove_t *pm, const vec3_t previousOrigin ) {
+		assert( m_testedScript );
+		static_cast<PredictingMovementScript *>( m_testedScript )->onInterceptedPMoveTouchTriggers( pm, previousOrigin );
+	}
+
+	void setCampingSpot( const AiCampingSpot &campingSpot ) {
+		//movementState.campingSpotState.Activate( campingSpot );
+	}
+
+	void resetCampingSpot() {
+		//movementState.campingSpotState.Deactivate();
+	}
+
+	[[nodiscard]]
+	bool hasActiveCampingSpot() const {
+		return false;
+		//return movementState.campingSpotState.IsActive();
+	}
+
+	void setPendingLookAtPoint( const AiPendingLookAtPoint &lookAtPoint, unsigned timeoutPeriod ) {
+		m_pendingLookAtPointState.pendingLookAtPoint = lookAtPoint;
+		m_pendingLookAtPointState.timeoutAt          = level.time + timeoutPeriod;
+	}
+
+	void resetPendingLookAtPoint() {
+		m_pendingLookAtPointState.timeoutAt = 0;
+	}
+
+	[[nodiscard]]
+	bool hasPendingLookAtPoint() const {
+		return m_pendingLookAtPointState.timeoutAt > level.time;
+	}
+
+	void activateJumppadState( const edict_t *jumppadEnt );
+	void activateElevatorState( const edict_t *triggerEnt );
+
+	bool canChangeWeapons() const;
+
+	void reset() {
+		resetPendingLookAtPoint();
+		m_activeScript                   = nullptr;
+		m_prevActiveScript               = nullptr;
+		m_lastNearbyElevatorReach.entNum = 0;
+		m_lastNearbyJumppadReach.entNum  = 0;
+	}
+
+	[[nodiscard]]
+	bool canInterruptMovement() const;
+
+	void frame( BotInput *input );
+	void applyInput( BotInput *input, PredictionContext *context = nullptr );
+
+private:
+	struct CachedLastNearbyTriggerReach;
+
+	void applyPendingTurnToLookAtPoint( BotInput *input, PredictionContext *context = nullptr );
+
+	void setActiveScript( MovementScript *script );
+
+	[[nodiscard]]
+	auto findFallbackScript( BotInput *input ) -> MovementScript *;
+
+	[[nodiscard]]
+	auto findLastResortGroundScript( BotInput *input ) -> MovementScript *;
+
+	[[nodiscard]]
+	bool produceBotInput( MovementScript *script, BotInput *input );
+
+	[[nodiscard]]
+	auto findNextReachNumForTravelType( int desiredTravelType, int hopLimit ) -> int;
+
+	[[nodiscard]]
+	auto findTriggerReachNumForScriptActivation( int triggerEntNum, int desiredTravelType,
+												 const CachedLastNearbyTriggerReach &cached ) -> int;
+
+	Bot *const m_bot;
 
 	// Limits weapon jumps attempts per second
 	// (consequential attempts are allowed but no more than several frames,
 	// otherwise a bot might loop attempts forever)
-	RateLimiter weaponJumpAttemptsRateLimiter;
+	RateLimiter m_weaponJumpAttemptsRateLimiter;
 	// Is not for rate limiting but for preventing instant weapon switch for shooting after a failed attempt
-	Int64Align4 lastWeaponJumpTriggeringFailedAt { 0 };
+	Int64Align4 m_lastWeaponJumpTriggeringFailedAt { 0 };
 
 	class BunnyHopScript : public PredictingAndCachingMovementScript {
 	public:
@@ -129,36 +211,34 @@ class MovementSubsystem {
 		BaseAction *m_storageOfActionPtrs[6] {};
 	};
 
-	MovementState movementState;
+	MovementState m_movementState;
 
-	SameFloorClusterAreasCache sameFloorClusterAreasCache;
-	NextFloorClusterAreasCache nextFloorClusterAreasCache;
-
-	void ApplyPendingTurnToLookAtPoint( BotInput *input, PredictionContext *context = nullptr );
+	SameFloorClusterAreasCache m_sameFloorClusterAreasCache;
+	NextFloorClusterAreasCache m_nextFloorClusterAreasCache;
 
 	struct PendingLookAtPointState {
 		AiPendingLookAtPoint pendingLookAtPoint;
 		int64_t timeoutAt { 0 };
-	} pendingLookAtPointState;
+	} m_pendingLookAtPointState;
 
-	MovementScript *activeScript { nullptr };
-	MovementScript *testedScript { nullptr };
-	MovementScript *prevActiveScript { nullptr };
+	MovementScript *m_activeScript { nullptr };
+	MovementScript *m_testedScript { nullptr };
+	MovementScript *m_prevActiveScript { nullptr };
 
-	int64_t noScriptOnGroundSinceLevelTime { 0 };
-	int64_t noScriptOnGroundSinceLevelFramenum { 0 };
+	int64_t m_noScriptOnGroundSinceLevelTime { 0 };
+	int64_t m_noScriptOnGroundSinceLevelFramenum { 0 };
 
-	JumppadScript jumppadScript { this };
-	ElevatorScript elevatorScript { this };
-	BunnyHopScript bunnyHopScript { this };
-	WalkToPointScript walkToPointScript { this };
-	JumpToPointScript jumpToPointScript { this };
-	LandToPreventFallingScript landToPreventFallingScript { this };
-	WaitForLandingRelaxedScript waitForLandingRelaxedScript { this };
-	TraverseJumpReachScript traverseJumpReachScript { this };
-	TraverseBarrierJumpReachScript traverseBarrierJumpReachScript { this };
-	TraverseWalkOffLedgeReachScript traverseWalkOffLedgeReachScript { this };
-	SingleFrameSideStepScript singleFrameSideStepScript { this };
+	JumppadScript m_jumppadScript { this };
+	ElevatorScript m_elevatorScript { this };
+	BunnyHopScript m_bunnyHopScript { this };
+	WalkToPointScript m_walkToPointScript { this };
+	JumpToPointScript m_jumpToPointScript { this };
+	LandToPreventFallingScript m_landToPreventFallingScript { this };
+	WaitForLandingRelaxedScript m_waitForLandingRelaxedScript { this };
+	TraverseJumpReachScript m_traverseJumpReachScript { this };
+	TraverseBarrierJumpReachScript m_traverseBarrierJumpReachScript { this };
+	TraverseWalkOffLedgeReachScript m_traverseWalkOffLedgeReachScript { this };
+	SingleFrameSideStepScript m_singleFrameSideStepScript { this };
 
 	struct CachedLastNearbyTriggerReach {
 		int64_t touchedAt { 0 };
@@ -166,84 +246,8 @@ class MovementSubsystem {
 		int entNum { 0 };
 	};
 
-	CachedLastNearbyTriggerReach lastNearbyJumppadReach;
-	CachedLastNearbyTriggerReach lastNearbyElevatorReach;
-
-	[[nodiscard]]
-	auto findFallbackScript( BotInput *input ) -> MovementScript *;
-
-	[[nodiscard]]
-	auto findLastResortGroundScript( BotInput *input ) -> MovementScript *;
-
-	[[nodiscard]]
-	bool produceBotInput( MovementScript *script, BotInput *input );
-
-	[[nodiscard]]
-	auto findNextReachNumForTravelType( int desiredTravelType, int hopLimit ) -> int;
-
-	[[nodiscard]]
-	auto findTriggerReachNumForScriptActivation( int triggerEntNum, int desiredTravelType,
-												 const CachedLastNearbyTriggerReach &cached ) -> int;
-
-	void setActiveScript( MovementScript *script );
-public:
-	explicit MovementSubsystem( Bot *bot_ );
-
-	auto getMovementState() -> const MovementState & { return movementState; }
-
-	void OnInterceptedPredictedEvent( int ev, int parm ) {
-		assert( testedScript );
-		static_cast<PredictingMovementScript *>( testedScript )->onInterceptedPredictedEvent( ev, parm );
-	}
-
-	void OnInterceptedPMoveTouchTriggers( pmove_t *pm, const vec3_t previousOrigin ) {
-		assert( testedScript );
-		static_cast<PredictingMovementScript *>( testedScript )->onInterceptedPMoveTouchTriggers( pm, previousOrigin );
-	}
-
-	void SetCampingSpot( const AiCampingSpot &campingSpot ) {
-		//movementState.campingSpotState.Activate( campingSpot );
-	}
-
-	void ResetCampingSpot() {
-		//movementState.campingSpotState.Deactivate();
-	}
-
-	bool HasActiveCampingSpot() const {
-		return false;
-		//return movementState.campingSpotState.IsActive();
-	}
-
-	void SetPendingLookAtPoint( const AiPendingLookAtPoint &lookAtPoint, unsigned timeoutPeriod ) {
-		pendingLookAtPointState.pendingLookAtPoint = lookAtPoint;
-		pendingLookAtPointState.timeoutAt          = level.time + timeoutPeriod;
-	}
-
-	void ResetPendingLookAtPoint() {
-		pendingLookAtPointState.timeoutAt = 0;
-	}
-
-	bool HasPendingLookAtPoint() const {
-		return pendingLookAtPointState.timeoutAt > level.time;
-	}
-
-	void ActivateJumppadState( const edict_t *jumppadEnt );
-	void ActivateElevatorState( const edict_t *triggerEnt );
-
-	bool CanChangeWeapons() const;
-
-	void Reset() {
-		ResetPendingLookAtPoint();
-		activeScript     = nullptr;
-		prevActiveScript = nullptr;
-		lastNearbyElevatorReach.entNum = 0;
-		lastNearbyJumppadReach.entNum  = 0;
-	}
-
-	bool CanInterruptMovement() const;
-
-	void Frame( BotInput *input );
-	void ApplyInput( BotInput *input, PredictionContext *context = nullptr );
+	CachedLastNearbyTriggerReach m_lastNearbyJumppadReach;
+	CachedLastNearbyTriggerReach m_lastNearbyElevatorReach;
 };
 
 #endif

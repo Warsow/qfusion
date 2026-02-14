@@ -263,11 +263,11 @@ public:
 	BotWeightConfig &WeightConfig() { return weightConfig; }
 
 	void OnInterceptedPredictedEvent( int ev, int parm ) {
-		m_movementSubsystem.OnInterceptedPredictedEvent( ev, parm );
+		m_movementSubsystem.onInterceptedPredictedEvent( ev, parm );
 	}
 
 	void OnInterceptedPMoveTouchTriggers( pmove_t *pm, const vec3_t previousOrigin ) {
-		m_movementSubsystem.OnInterceptedPMoveTouchTriggers( pm, previousOrigin );
+		m_movementSubsystem.onInterceptedPMoveTouchTriggers( pm, previousOrigin );
 	}
 
 	const AiEntityPhysicsState *EntityPhysicsState() const {
@@ -364,26 +364,26 @@ public:
 	}
 
 	void SetCampingSpot( const AiCampingSpot &campingSpot ) {
-		m_movementSubsystem.SetCampingSpot( campingSpot );
+		m_movementSubsystem.setCampingSpot( campingSpot );
 	}
 	void ResetCampingSpot() {
-		m_movementSubsystem.ResetCampingSpot();
+		m_movementSubsystem.resetCampingSpot();
 	}
 	bool HasActiveCampingSpot() const {
-		return m_movementSubsystem.HasActiveCampingSpot();
+		return m_movementSubsystem.hasActiveCampingSpot();
 	}
 	void SetPendingLookAtPoint( const AiPendingLookAtPoint &lookAtPoint, unsigned timeoutPeriod ) {
-		return m_movementSubsystem.SetPendingLookAtPoint( lookAtPoint, timeoutPeriod );
+		return m_movementSubsystem.setPendingLookAtPoint( lookAtPoint, timeoutPeriod );
 	}
 	void ResetPendingLookAtPoint() {
-		m_movementSubsystem.ResetPendingLookAtPoint();
+		m_movementSubsystem.resetPendingLookAtPoint();
 	}
 	bool HasPendingLookAtPoint() const {
-		return m_movementSubsystem.HasPendingLookAtPoint();
+		return m_movementSubsystem.hasPendingLookAtPoint();
 	}
 
 	bool CanInterruptMovement() const {
-		return m_movementSubsystem.CanInterruptMovement();
+		return m_movementSubsystem.canInterruptMovement();
 	}
 
 	const std::optional<SelectedNavEntity> &GetSelectedNavEntity() const {
@@ -517,7 +517,7 @@ private:
 	}
 
 	bool CanChangeWeapons() const {
-		return m_movementSubsystem.CanChangeWeapons();
+		return m_movementSubsystem.canChangeWeapons();
 	}
 
 	void ChangeWeapons( const SelectedWeapons &selectedWeapons_ );

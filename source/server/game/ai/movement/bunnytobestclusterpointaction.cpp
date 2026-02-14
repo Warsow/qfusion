@@ -9,8 +9,8 @@ void BunnyToBestFloorClusterPointAction::onApplicationSequenceStarted( Predictio
 	Super::onApplicationSequenceStarted( context );
 
 	FloorClusterAreasCache *const caches[2] = {
-		&m_subsystem->sameFloorClusterAreasCache,
-		&m_subsystem->nextFloorClusterAreasCache
+		&m_subsystem->m_sameFloorClusterAreasCache,
+		&m_subsystem->m_nextFloorClusterAreasCache,
 	};
 
 	bool *const testedFlags[2] = { &m_hasTestedSameCluster, &m_hasTestedNextCluster };

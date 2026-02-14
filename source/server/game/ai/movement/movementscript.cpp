@@ -109,7 +109,7 @@ auto PredictingAndCachingMovementScript::getCachedActionAndRecordForCurrTime( Mo
 		// If there were no activated actions, the next state must be recently computed for current level time.
 		Assert( nextPredictedAction->timestamp == realTime );
 		// These assertions have already spotted a bug
-		const auto *self = game.edicts + m_subsystem->bot->EntNum();
+		const auto *self = game.edicts + m_subsystem->m_bot->EntNum();
 		Assert( VectorCompare( nextPredictedAction->entityPhysicsState.Origin(), self->s.origin ) );
 		Assert( VectorCompare( nextPredictedAction->entityPhysicsState.Velocity(), self->velocity ) );
 		// If there is a modified velocity, it will be copied with this record and then applied
@@ -142,7 +142,7 @@ auto PredictingAndCachingMovementScript::tryCheckingAndLerpingActions( Predicted
 
 	// Prevent cache invalidation on each frame if bot is being hit by a continuous fire weapon and knocked back.
 	// Perform misprediction test only on the 3rd frame after a last knockback timestamp.
-	if( level.time - m_subsystem->bot->LastKnockbackAt() <= 32 ) {
+	if( level.time - m_subsystem->m_bot->LastKnockbackAt() <= 32 ) {
 		return lerpActionRecords( prevAction, nextAction, record_ );
 	}
 
@@ -169,7 +169,7 @@ bool PredictingAndCachingMovementScript::checkPredictedOrigin( PredictedMovement
 
 	vec3_t expectedOrigin;
 	VectorLerp( prevPhysicsState.Origin(), checkLerpFrac, nextPhysicsState.Origin(), expectedOrigin );
-	float squareDistanceMismatch = DistanceSquared( m_subsystem->bot->Origin(), expectedOrigin );
+	float squareDistanceMismatch = DistanceSquared( m_subsystem->m_bot->Origin(), expectedOrigin );
 	if( squareDistanceMismatch < 3.0f * 3.0f ) {
 		return true;
 	}
@@ -187,7 +187,7 @@ bool PredictingAndCachingMovementScript::checkPredictedVelocity( PredictedMoveme
 	const auto &nextPhysicsState = nextAction->entityPhysicsState;
 
 	float expectedSpeed = ( 1.0f - checkLerpFrac ) * prevPhysicsState.Speed() + checkLerpFrac * nextPhysicsState.Speed();
-	float actualSpeed = m_subsystem->bot->EntityPhysicsState()->Speed();
+	float actualSpeed = m_subsystem->m_bot->EntityPhysicsState()->Speed();
 	float mismatch = std::abs( actualSpeed - expectedSpeed );
 
 	if( mismatch > 5.0f ) {
@@ -204,7 +204,7 @@ bool PredictingAndCachingMovementScript::checkPredictedVelocity( PredictedMoveme
 	VectorLerp( prevPhysicsState.Velocity(), checkLerpFrac, nextPhysicsState.Velocity(), expectedVelocity );
 	Vec3 expectedVelocityDir( expectedVelocity );
 	expectedVelocityDir.normalizeFastOrThrow();
-	Vec3 actualVelocityDir( m_subsystem->bot->Velocity() );
+	Vec3 actualVelocityDir( m_subsystem->m_bot->Velocity() );
 	actualVelocityDir.normalizeFastOrThrow();
 
 	float cosine = expectedVelocityDir.dot( actualVelocityDir );
@@ -237,12 +237,12 @@ bool PredictingAndCachingMovementScript::checkPredictedAngles( PredictedMovement
 	if( !nextAction->record.botInput.canOverridePitch ) {
 		expectedAngles[PITCH] = LerpAngle( prevStateAngles.data()[PITCH], nextStateAngles.data()[PITCH], checkLerpFrac );
 	} else {
-		expectedAngles[PITCH] = game.edicts[m_subsystem->bot->EntNum()].s.angles[PITCH];
+		expectedAngles[PITCH] = game.edicts[m_subsystem->m_bot->EntNum()].s.angles[PITCH];
 	}
 
 	vec3_t expectedLookDir;
 	AngleVectors( expectedAngles, expectedLookDir, nullptr, nullptr );
-	float cosine = m_subsystem->bot->EntityPhysicsState()->ForwardDir().dot( expectedLookDir );
+	float cosine = m_subsystem->m_bot->EntityPhysicsState()->ForwardDir().dot( expectedLookDir );
 	static const float MIN_COSINE = std::cos( (float)DEG2RAD( 3.0f ) );
 	if( cosine > MIN_COSINE ) {
 		return true;
@@ -276,7 +276,7 @@ auto PredictingAndCachingMovementScript::lerpActionRecords( PredictedMovementAct
 	record_->hasModifiedVelocity = false;
 
 	if( !record_->botInput.canOverrideLookVec ) {
-		Vec3 actualLookDir( m_subsystem->bot->EntityPhysicsState()->ForwardDir() );
+		Vec3 actualLookDir( m_subsystem->m_bot->EntityPhysicsState()->ForwardDir() );
 		Vec3 intendedLookVec( record_->botInput.IntendedLookDir() );
 		VectorLerp( actualLookDir.data(), inputLerpFrac, intendedLookVec.data(), intendedLookVec.data() );
 		record_->botInput.SetIntendedLookDir( intendedLookVec );

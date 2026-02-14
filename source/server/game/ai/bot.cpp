@@ -17,7 +17,7 @@ Bot::Bot( edict_t *self_, float skillLevel_ )
 	, planner( &planningModule.planner )
 	, routeCache( AiAasRouteCache::NewInstance() )
 	, aasWorld( AiAasWorld::instance() )
-	, entityPhysicsState( &m_movementSubsystem.movementState.entityPhysicsState )
+	, entityPhysicsState( &m_movementSubsystem.m_movementState.entityPhysicsState )
 	, blockedTimeoutAt( level.time + BLOCKED_TIMEOUT )
 	, skillLevel( skillLevel_ )
 	, m_movementSubsystem( this )
@@ -137,7 +137,7 @@ void Bot::TouchedOtherEntity( const edict_t *entity ) {
 
 	if( !Q_stricmp( entity->classname, "trigger_push" ) ) {
 		m_lastTouchedJumppadAt = level.time;
-		m_movementSubsystem.ActivateJumppadState( entity );
+		m_movementSubsystem.activateJumppadState( entity );
 		return;
 	}
 
@@ -148,7 +148,7 @@ void Bot::TouchedOtherEntity( const edict_t *entity ) {
 
 	if( !Q_stricmp( entity->classname, "trigger_platform" ) ) {
 		m_lastTouchedElevatorAt = level.time;
-		m_movementSubsystem.ActivateElevatorState( entity );
+		m_movementSubsystem.activateElevatorState( entity );
 		return;
 	}
 }
@@ -294,7 +294,7 @@ void Bot::OnRespawn() {
 	m_lostEnemy     = std::nullopt;
 
 	planningModule.ClearGoalAndPlan();
-	m_movementSubsystem.Reset();
+	m_movementSubsystem.reset();
 	blockedTimeoutAt = level.time + BLOCKED_TIMEOUT;
 	navTarget = nullptr;
 	m_selectedNavEntity = std::nullopt;
@@ -333,7 +333,7 @@ void Bot::Update() {
 
 		planningModule.ClearGoalAndPlan();
 
-		m_movementSubsystem.Reset();
+		m_movementSubsystem.reset();
 
 		navTarget           = nullptr;
 		m_selectedNavEntity = std::nullopt;
@@ -376,7 +376,7 @@ void Bot::Update() {
 		m_pendingClientThinkInput = BotInput {};
 
 		// Might modify botInput
-		m_movementSubsystem.Frame( std::addressof( *m_pendingClientThinkInput ) );
+		m_movementSubsystem.frame( std::addressof( *m_pendingClientThinkInput ) );
 
 		CheckTargetProximity();
 
@@ -386,7 +386,7 @@ void Bot::Update() {
 		}
 
 		// Apply modified botInput
-		m_movementSubsystem.ApplyInput( std::addressof( *m_pendingClientThinkInput ) );
+		m_movementSubsystem.applyInput( std::addressof( *m_pendingClientThinkInput ) );
 	}
 
 	assert( !m_selectedEnemy || !m_selectedEnemy->ShouldInvalidate() );
