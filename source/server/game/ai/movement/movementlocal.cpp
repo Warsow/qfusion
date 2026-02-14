@@ -300,26 +300,3 @@ bool TraceArcInSolidWorld( const vec3_t from, const vec3_t to ) {
 	StaticWorldTrace( &trace, midPoint.data(), to, brushMask );
 	return trace.fraction == 1.0f;
 }
-
-void DirToKeyInput( const Vec3 &desiredDir, const vec3_t actualForwardDir, const vec3_t actualRightDir, BotInput *input ) {
-	input->ClearMovementDirections();
-
-	float dotForward = desiredDir.dot( actualForwardDir );
-	if( dotForward > 0.3 ) {
-		input->SetForwardMovement( 1 );
-	} else if( dotForward < -0.3 ) {
-		input->SetForwardMovement( -1 );
-	}
-
-	float dotRight = desiredDir.dot( actualRightDir );
-	if( dotRight > 0.3 ) {
-		input->SetRightMovement( 1 );
-	} else if( dotRight < -0.3 ) {
-		input->SetRightMovement( -1 );
-	}
-
-	// Prevent being blocked
-	if( !input->ForwardMovement() && !input->RightMovement() ) {
-		input->SetForwardMovement( 1 );
-	}
-}

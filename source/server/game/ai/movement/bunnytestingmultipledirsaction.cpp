@@ -51,15 +51,6 @@ void BunnyTestingMultipleLookDirsAction::onApplicationSequenceStopped( Predictio
 	}
 }
 
-inline float SuggestObstacleAvoidanceCorrectionFraction( const PredictionContext *context ) {
-	// Might be negative!
-	float speedOverRunSpeed = context->movementState->entityPhysicsState.Speed() - context->GetRunSpeed();
-	if( speedOverRunSpeed > 500.0f ) {
-		return 0.15f;
-	}
-	return 0.35f - 0.20f * speedOverRunSpeed / 500.0f;
-}
-
 auto BunnyTestingMultipleLookDirsAction::planPredictionStep( PredictionContext *context ) -> PredictionResult {
 	if( const auto result = genericCheckIsActionEnabled( context ); result != PredictionResult::Continue ) {
 		return result;

@@ -218,25 +218,6 @@ inline float Distance2DSquared( const vec3_t a, const vec3_t b ) {
 	return dx * dx + dy * dy;
 }
 
-static inline bool ShouldCrouchSlideNow( PredictionContext *context ) {
-	const auto *pmState = &context->currMinimalPlayerState->pmove;
-	if( !( pmState->stats[PM_STAT_FEATURES] & PMFEAT_CROUCHSLIDING ) ) {
-		return false;
-	}
-
-	if( pmState->pm_flags & PMF_CROUCH_SLIDING ) {
-		if( pmState->stats[PM_STAT_CROUCHSLIDETIME] > PM_CROUCHSLIDE_FADE ) {
-			return true;
-		}
-	}
-
-	if( context->movementState->entityPhysicsState.Speed2D() > context->GetRunSpeed() * 1.2f ) {
-		return true;
-	}
-
-	return false;
-}
-
 class RegionBoundsCache {
 	const char *const tag;
 	const float *const addToMins;
@@ -376,8 +357,6 @@ public:
  * to avoid the mentioned failure in some environment kinds.
  */
 bool TraceArcInSolidWorld( const vec3_t from, const vec3_t to );
-
-void DirToKeyInput( const Vec3 &desiredDir, const vec3_t actualForwardDir, const vec3_t actualRightDir, BotInput *input );
 
 [[nodiscard]]
 bool findBestStairsExitProps( const AiEntityPhysicsState &entityPhysicsState, int stairsClusterNum, const Bot *bot,
