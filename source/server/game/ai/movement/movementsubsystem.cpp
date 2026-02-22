@@ -430,9 +430,23 @@ auto MovementSubsystem::findLastResortGroundScript( BotInput *input ) -> Movemen
 			m_singleFrameSideStepScript.setAttemptOffset( m_noScriptOnGroundSinceLevelFramenum + delta );
 			(void)produceBotInput( &m_singleFrameSideStepScript, input );
 		} else if( m_bot->Skill() <= 0.33f ) {
-			if( matchesByModulo( level.framenum + 1, m_bot->EntNum() ) ) {
-				// Easy bots don't normally use this script
-				(void)produceBotInput( &m_bunnyHopScript, input );
+			// Don't switch to bhop immediately, try using side steps first
+			if( delta > minDelta + 350 ) {
+				if( matchesByModulo( level.framenum + 1, m_bot->EntNum() ) ) {
+					// Easy bots don't normally use this script
+					(void)produceBotInput( &m_bunnyHopScript, input );
+				}
+			}
+		} else if( delta > minDelta + 700 ) {
+			if( matchesByModulo( level.framenum + 2, m_bot->EntNum() ) ) {
+				// TODO: Extract a subroutine for generation of a random dir
+				// (it should use randomized sampling of polar coordinates)
+				Vec3 lookVec( -0.5f + random(), -0.5f + random(), -0.5f + random() );
+				input->SetIntendedLookDir( lookVec );
+				input->SetTurnSpeedMultiplier( 15.0f );
+				input->isUcmdSet = true;
+				// This is not even a script, but we put this code here as we need to
+				// distribute attempts to frames and aren't obliged to return a script
 			}
 		}
 	}
