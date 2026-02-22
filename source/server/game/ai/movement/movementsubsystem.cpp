@@ -419,14 +419,25 @@ auto MovementSubsystem::findLastResortGroundScript( BotInput *input ) -> Movemen
 	constexpr auto minDelta = 500;
 	constexpr auto maxDelta = ( 2 * Bot::BLOCKED_TIMEOUT ) / 3;
 	static_assert( minDelta < maxDelta );
+
+	constexpr auto matchesByModulo = []( int64_t a, int64_t b ) {
+		return ( a % MAX_CLIENTS ) == ( b % MAX_CLIENTS );
+	};
+
 	// If we don't manage to unblock till we reach maxDelta, just let the bot respawn
 	if( const auto delta = level.time - m_noScriptOnGroundSinceLevelTime; delta > minDelta && delta < maxDelta ) {
-		if( ( level.framenum % MAX_CLIENTS ) == ( m_bot->EntNum() % MAX_CLIENTS ) ) {
+		if( matchesByModulo( level.framenum, m_bot->EntNum() ) ) {
 			m_singleFrameSideStepScript.setAttemptOffset( m_noScriptOnGroundSinceLevelFramenum + delta );
 			(void)produceBotInput( &m_singleFrameSideStepScript, input );
-			// Intentionally non returning anything (don't let the single-frame script become active)
+		} else if( m_bot->Skill() <= 0.33f ) {
+			if( matchesByModulo( level.framenum + 1, m_bot->EntNum() ) ) {
+				// Easy bots don't normally use this script
+				(void)produceBotInput( &m_bunnyHopScript, input );
+			}
 		}
 	}
+
+	// Intentionally don't return anything (don't let the single-frame script become active)
 	return nullptr;
 }
 
