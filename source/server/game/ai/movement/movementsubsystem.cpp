@@ -385,15 +385,17 @@ auto MovementSubsystem::findFallbackScript( BotInput *input ) -> MovementScript 
 						return &m_walkToPointScript;
 					}
 				} else if( reach.traveltype == TRAVEL_WALKOFFLEDGE ) {
+					// Don't ever try using WalkOffLedgeScript in this case as it turns out to be prone to looping
 					if( DistanceSquared( reach.start, reach.end ) <= wsw::square( AI_JUMPABLE_HEIGHT ) ) {
 						m_walkToPointScript.setTargetPoint( Vec3( reach.end ) );
 						if( produceBotInput( &m_walkToPointScript, input ) ) {
 							return &m_walkToPointScript;
 						}
-					}
-					m_traverseWalkOffLedgeReachScript.setTargetReachNum( reachNum );
-					if( produceBotInput( &m_traverseWalkOffLedgeReachScript, input ) ) {
-						return &m_traverseWalkOffLedgeReachScript;
+					} else {
+						m_traverseWalkOffLedgeReachScript.setTargetReachNum( reachNum );
+						if( produceBotInput( &m_traverseWalkOffLedgeReachScript, input ) ) {
+							return &m_traverseWalkOffLedgeReachScript;
+						}
 					}
 				} else if( reach.traveltype == TRAVEL_JUMP || reach.traveltype == TRAVEL_STRAFEJUMP ) {
 					m_traverseJumpReachScript.setTargetReachNum( reachNum );
