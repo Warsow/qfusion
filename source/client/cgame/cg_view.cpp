@@ -290,7 +290,6 @@ bool CG_ChaseStep( int step ) {
 	if( cg.chaseSwitchTimestamp + kChaseSwitchCooldown < cg.time ) {
 		if( doChaseStep( step ) ) {
 			cg.chaseSwitchTimestamp = cg.time;
-			cg.uiSystem->playForwardSound();
 			return true;
 		}
 	}
@@ -909,7 +908,6 @@ bool CG_SwitchChaseCamMode() {
 	if( cg.chaseSwitchTimestamp + kChaseSwitchCooldown < cg.time ) {
 		if( doSwitchChaseCamMode() ) {
 			cg.chaseSwitchTimestamp = cg.time;
-			cg.uiSystem->playForwardSound();
 			return true;
 		}
 	}

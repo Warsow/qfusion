@@ -3099,9 +3099,7 @@ static void CG_UpdatePlayerState() {
 
 	if( cg.hasPendingSwitchFromTiledMode ) {
 		if( cg.chaseMode == CAM_TILED ) {
-			if( CG_SwitchChaseCamMode() ) {
-				cg.uiSystem->playForwardSound();
-			}
+			(void)CG_SwitchChaseCamMode();
 		}
 		cg.hasPendingSwitchFromTiledMode = false;
 	}
