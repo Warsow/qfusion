@@ -114,7 +114,7 @@ auto JumpToPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 	return PredictionResult::Continue;
 }
 
-[[nodiscard]]
+[[maybe_unused]]
 static bool handleImperfectLanding( PredictionContext *context, const Vec3 &targetPoint, int targetAreaNum ) {
 	const auto &entityPhysicsState = context->movementState->entityPhysicsState;
 
@@ -152,7 +152,6 @@ static bool handleImperfectLanding( PredictionContext *context, const Vec3 &targ
 
 auto JumpToPointAction::checkPredictionStepResults( PredictionContext *context ) -> PredictionResult {
 	if( const auto result = BaseAction::checkPredictionStepResults( context ); result != PredictionResult::Continue ) {
-		context->ShowBuiltPlanPath( true );
 		return result;
 	}
 
@@ -164,11 +163,7 @@ auto JumpToPointAction::checkPredictionStepResults( PredictionContext *context )
 				return PredictionResult::Complete;
 			}
 			if( m_targetAreaNum ) {
-				if( !handleImperfectLanding( context, m_targetPoint, m_targetAreaNum ) ) {
-					context->ShowBuiltPlanPath();
-				}
-			} else {
-				context->ShowBuiltPlanPath();
+				handleImperfectLanding( context, m_targetPoint, m_targetAreaNum );
 			}
 			return PredictionResult::Restart;
 		}
@@ -182,7 +177,6 @@ auto JumpToPointAction::checkPredictionStepResults( PredictionContext *context )
 		return PredictionResult::Continue;
 	}
 
-	context->ShowBuiltPlanPath();
 	return PredictionResult::Restart;
 }
 
@@ -636,7 +630,6 @@ auto LandOnPointAction::planPredictionStep( PredictionContext *context ) -> Pred
 
 auto LandOnPointAction::checkPredictionStepResults( PredictionContext *context ) -> PredictionResult {
 	if( const auto result = BaseAction::checkPredictionStepResults( context ); result != PredictionResult::Continue ) {
-		context->ShowBuiltPlanPath( false );
 		return result;
 	}
 
@@ -646,18 +639,13 @@ auto LandOnPointAction::checkPredictionStepResults( PredictionContext *context )
 			return PredictionResult::Complete;
 		}
 		if( m_targetAreaNum ) {
-			if( !handleImperfectLanding( context, m_targetPoint, m_targetAreaNum ) ) {
-				context->ShowBuiltPlanPath( false );
-			}
-		} else {
-			context->ShowBuiltPlanPath( false );
+			handleImperfectLanding( context, m_targetPoint, m_targetAreaNum );
 		}
 		return PredictionResult::Restart;
 	} else {
 		if( context->topOfStackIndex + 2 < MAX_PREDICTED_STATES ) {
 			return PredictionResult::Continue;
 		}
-		context->ShowBuiltPlanPath( false );
 		return PredictionResult::Restart;
 	}
 }
@@ -806,9 +794,7 @@ auto ClimbOntoBarrierAction::checkPredictionStepResults( PredictionContext *cont
 				return PredictionResult::Complete;
 			}
 			// TODO: Test against target area center
-			if( !handleImperfectLanding( context, Vec3( targetReach.end ), targetReach.areanum ) ) {
-				context->ShowBuiltPlanPath();
-			}
+			handleImperfectLanding( context, Vec3( targetReach.end ), targetReach.areanum );
 			return PredictionResult::Restart;
 		}
 	}
@@ -817,7 +803,6 @@ auto ClimbOntoBarrierAction::checkPredictionStepResults( PredictionContext *cont
 		return PredictionResult::Continue;
 	}
 
-	context->ShowBuiltPlanPath();
 	return PredictionResult::Restart;
 }
 

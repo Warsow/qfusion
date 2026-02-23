@@ -202,7 +202,7 @@ void MovementSubsystem::frame( BotInput *input ) {
 					}
 				}
 			} else {
-				int beaconColor = 0;
+				[[maybe_unused]] int beaconColor = 0;
 				// Other scripts should recover on their own (should be sufficiently robust)
 				if( m_prevActiveScript == &m_walkToPointScript || m_prevActiveScript == &m_bunnyHopScript ) {
 					if( produceBotInput( &m_waitForLandingRelaxedScript, input ) ) {
@@ -221,11 +221,13 @@ void MovementSubsystem::frame( BotInput *input ) {
 					input->canOverrideLookVec = true;
 					input->canOverridePitch   = true;
 				}
+#if 0
 				if( beaconColor ) {
 					Vec3 v1( m_movementState.entityPhysicsState.Origin() );
 					Vec3 v2( Vec3( 0, 0, 72 ) + v1 );
 					AITools_DrawColorLine( v1.data(), v2.data(), beaconColor, 0 );
 				}
+#endif
 			}
 		}
 	}
