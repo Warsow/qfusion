@@ -52,6 +52,9 @@ public:
 	static void beginFrame( FrameGroup group, ProfilerArgsSupplier *argsSupplier );
 	static void endFrame( FrameGroup group, ProfilerResultSink *resultSink );
 
+	[[nodiscard]]
+	static bool isProfilingEnabled( FrameGroup group );
+
 	struct RegisteredScope {
 		wsw::StringView file;
 		int line { 0 };

@@ -57,6 +57,8 @@ cvar_t *dedicated;
 cvar_t *versioncvar;
 
 static UnsignedConfigVar v_fixedTime( "fixedtime"_asView, { .byDefault = 0, .flags = CVAR_CHEAT } );
+// TODO: Make it a cheat var, or, better, consider profiling to be cheating
+static IntConfigVar v_minServerFrameRealMsec( "pf_minServerFrameRealMsec"_asView, { .byDefault = 1000 / 125, .min = exclusive( 0 ), .max = exclusive( 10 ) } );
 
 cvar_t *logconsole;
 cvar_t *logconsole_append;
@@ -236,7 +238,7 @@ static void *SV_Thread( void * ) {
 
 	SV_GetCmdSystem()->markCurrentThreadForFurtherAccessChecks();
 
-	uint64_t oldtime = 0, newtime;
+	uint64_t oldtime = 0, newtime = 0;
 
 	unsigned gameMsec = 0;
 	float extraTime   = 0.0f;
@@ -258,8 +260,16 @@ static void *SV_Thread( void * ) {
 
 			newtime = Sys_Milliseconds();
 			realMsec = newtime - oldtime;
+
+			int minRealMsec = 1;
+			// Prevent running multiple consequent short frames which spam profiling results
+			if( wsw::ProfilingSystem::isProfilingEnabled( wsw::ProfilingSystem::ServerGroup ) ) {
+				minRealMsec = v_minServerFrameRealMsec.get();
+			}
+
+			assert( minRealMsec > 0 );
 			bool clientBlocked = false;
-			if( realMsec > 0 ) {
+			if( realMsec >= minRealMsec ) {
 				// Note: CA_ACTIVE is not our friend wrt
 				if( Com_ClientState() == CA_DISCONNECTED ) {
 					break;
@@ -271,7 +281,8 @@ static void *SV_Thread( void * ) {
 			}
 
 			if( Com_ServerState() >= ss_game && !clientBlocked ) {
-				Sys_Sleep( 0 );
+				assert( minRealMsec >= realMsec );
+				Sys_Sleep( minRealMsec - realMsec );
 			} else {
 				// TODO: We can just wait on pipe cmds, especially if we process sound too
 				Sys_Sleep( 16 );

@@ -198,6 +198,11 @@ volatile unsigned ProfilingSystem::s_isProfilingEnabled[2];
 
 static wsw::Mutex g_mutex;
 
+bool ProfilingSystem::isProfilingEnabled( FrameGroup group ) {
+	assert( group == 0 || group == 1 );
+	return s_isProfilingEnabled[group];
+}
+
 auto ProfilingSystem::getRegisteredScopes() -> std::span<const RegisteredScope> {
 	return getRegisteredScopesHolder().vec;
 }
