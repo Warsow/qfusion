@@ -51,8 +51,10 @@ struct SoundSet {
 	ALuint buffers[16] {};
 	ALuint stereoBuffers[16] {};
 	unsigned bufferDurationMillis[16] {};
-	float pitchVariations[16] {};
 	unsigned numBuffers { 0 };
+
+	static constexpr unsigned kMaxPitchVariations = 16;
+	float pitchVariations[kMaxPitchVariations] {};
 	unsigned numPitchVariations { 0 };
 
 	bool hasFailedLoading { false };

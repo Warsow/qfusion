@@ -35,6 +35,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 struct SoundSet;
 
 struct SoundSetProps {
+	enum ParamsOverrideMode : uint8_t {
+		OverrideExistingParams,
+		CreateNewIfParamsDiffer,
+	};
 	struct Exact {
 		wsw::StringView value;
 		explicit Exact( const wsw::StringView &value_ ) : value( value_ ) {}
@@ -57,6 +61,8 @@ struct SoundSetProps {
 	// but as a hint allowing lowering quality of sound processing for saving performance
 	// (the sound stays playing but in a lower quality, without effects, etc).
 	float processingQualityHint { 1.0f };
+	// What to do if pitchVariations or processingQualityHint differ
+	ParamsOverrideMode paramsOverrideMode { OverrideExistingParams };
 	bool lazyLoading { false };
 };
 

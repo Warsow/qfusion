@@ -289,22 +289,20 @@ static bool matchesByName( const SoundSetProps &lhs, const SoundSetProps &rhs ) 
 }
 
 [[nodiscard]]
-static bool assignPitchVariations( const wsw::StringView &soundSetName, SoundSet *soundSet, std::span<const float> values ) {
-	float sanitizedValues[16];
-	assert( std::size( sanitizedValues ) == std::size( soundSet->pitchVariations ) );
-	unsigned numSantizedValues = 0;
+static auto sanitizePitchVariations( const wsw::StringView &soundSetName, float *targetValues,
+									 std::span<const float> givenValues ) -> unsigned {
+	unsigned numSanitizedValues = 0;
 
 	bool hasIllegalValues = false;
 	bool hasTooManyValues = false;
-	for( const float &value: values ) {
+	for( const float &value: givenValues ) {
 		if( value <= 0.0f ) {
 			hasIllegalValues = true;
 		} else {
-			if( numSantizedValues == std::size( sanitizedValues ) ) {
+			if( numSanitizedValues == SoundSet::kMaxPitchVariations ) {
 				hasTooManyValues = true;
-				break;
 			} else {
-				sanitizedValues[numSantizedValues++] = value;
+				targetValues[numSanitizedValues++] = value;
 			}
 		}
 	}
@@ -316,48 +314,48 @@ static bool assignPitchVariations( const wsw::StringView &soundSetName, SoundSet
 		sWarning() << "Too many pitch variations for sound set" << soundSetName;
 	}
 
-	bool hasUpdates = false;
-	if( soundSet->numPitchVariations != numSantizedValues ) {
-		soundSet->numPitchVariations = numSantizedValues;
-		hasUpdates = true;
-	} else if( !std::equal( sanitizedValues, sanitizedValues + numSantizedValues, soundSet->pitchVariations ) ) {
-		hasUpdates = true;
-	}
-
-	if( hasUpdates ) {
-		std::copy( sanitizedValues, sanitizedValues + numSantizedValues, soundSet->pitchVariations );
-	}
-	return hasUpdates;
+	assert( numSanitizedValues <= SoundSet::kMaxPitchVariations );
+	return numSanitizedValues;
 }
 
 auto Backend::loadSound( const SoundSetProps &props ) -> const SoundSet * {
 	[[maybe_unused]] const wsw::StringView name( getSoundSetName( props ) );
 
+	float pitchVariations[SoundSet::kMaxPitchVariations];
+	const unsigned numPitchVariations = sanitizePitchVariations( name, pitchVariations, props.pitchVariations );
+
 	for( SoundSet *soundSet = m_registeredSoundSetsHead; soundSet; soundSet = soundSet->next ) {
 		if( matchesByName( props, soundSet->props ) ) {
-			bool hasUpdates = false;
-			bool hasToLoad  = false;
+			bool paramsDiffer = false;
 			// Note: We can't just assign values if we load different buffers for different variations
-			if( assignPitchVariations( name, soundSet, props.pitchVariations ) ) {
-				hasUpdates = true;
+			if( soundSet->numPitchVariations != numPitchVariations ||
+				!std::equal( pitchVariations, pitchVariations + numPitchVariations, soundSet->pitchVariations ) ) {
+				paramsDiffer = true;
 			}
 			if( soundSet->props.processingQualityHint != props.processingQualityHint ) {
-				soundSet->props.processingQualityHint = props.processingQualityHint;
-				hasUpdates = true;
+				paramsDiffer = true;
 			}
-			if( soundSet->props.lazyLoading != props.lazyLoading ) {
-				soundSet->props.lazyLoading = props.lazyLoading;
-				hasUpdates = true;
-				hasToLoad  = !props.lazyLoading && ( !soundSet->isLoaded && !soundSet->hasFailedLoading );
+			bool useThisSound = false;
+			if( paramsDiffer ) {
+				if( props.paramsOverrideMode == SoundSetProps::OverrideExistingParams ) {
+					sWarning() << "Overwriting properties for already registered sound" << name;
+					std::copy( pitchVariations, pitchVariations + numPitchVariations, soundSet->pitchVariations );
+					soundSet->numPitchVariations          = numPitchVariations;
+					soundSet->props.processingQualityHint = props.processingQualityHint;
+					useThisSound = true;
+				}
+			} else {
+				useThisSound = true;
 			}
-			if( hasUpdates ) {
-				sWarning() << "Overwriting properties for already registered sound" << name;
+			if( useThisSound ) {
+				soundSet->registrationSequence = s_registration_sequence;
+				const bool hasToLoad = !props.lazyLoading && ( !soundSet->isLoaded && !soundSet->hasFailedLoading );
+				if( hasToLoad ) {
+					forceLoading( soundSet );
+				}
+				return soundSet;
 			}
-			soundSet->registrationSequence = s_registration_sequence;
-			if( hasToLoad ) {
-				forceLoading( soundSet );
-			}
-			return soundSet;
+			// Otherwise, continue the loop and to find another sound set with exactly matching params.
 		}
 	}
 
@@ -381,7 +379,8 @@ auto Backend::loadSound( const SoundSetProps &props ) -> const SoundSet * {
 		wsw::failWithLogicError( "Unreachable" );
 	}
 
-	(void)assignPitchVariations( name, newSoundSet, props.pitchVariations );
+	std::copy( pitchVariations, pitchVariations + numPitchVariations, newSoundSet->pitchVariations );
+	newSoundSet->numPitchVariations = numPitchVariations;
 
 	wsw::link( newSoundSet, &m_registeredSoundSetsHead );
 
