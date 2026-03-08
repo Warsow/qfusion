@@ -7,6 +7,8 @@
 #include "classifiedentitiescache.h"
 #include "movement/triggeraaspropscache.h"
 
+#include <common/facilities/profilerscope.h>
+
 using wsw::operator""_asView;
 
 const BoolConfigVar v_evolution { "ai_evolution"_asView, { .byDefault = false, .flags = 0, } };
@@ -215,6 +217,8 @@ void AI_JoinedTeam( edict_t *ent, int team ) {
 }
 
 void AI_CommonFrame() {
+	WSW_PROFILER_SCOPE();
+
 	EntitiesPvsCache::Instance()->Update();
 
 	NavEntitiesRegistry::Instance()->Update();

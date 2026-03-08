@@ -2,6 +2,8 @@
 #include "../trajectorypredictor.h"
 #include "../bot.h"
 
+#include <common/facilities/profilerscope.h>
+
 BotWeaponsUsageModule::BotWeaponsUsageModule( Bot *bot_ )
 	: bot( bot_ )
 	, builtinFireTargetCache( bot_ )
@@ -13,14 +15,18 @@ inline bool operator!=( const AiScriptWeaponDef &first, const AiScriptWeaponDef 
 }
 
 void BotWeaponsUsageModule::Frame( const WorldState &cachedWorldState ) {
+	WSW_PROFILER_SCOPE();
 	weaponSelector.Frame();
 }
 
 void BotWeaponsUsageModule::Think( const WorldState &cachedWorldState ) {
+	WSW_PROFILER_SCOPE();
 	weaponSelector.Think();
 }
 
 void BotWeaponsUsageModule::UpdateScriptWeaponsStatus() {
+	WSW_PROFILER_SCOPE();
+
 	const auto *client = game.edicts[bot->EntNum()].r.client;
 
 	int scriptWeaponsNum = GT_asGetScriptWeaponsNum( client );
@@ -79,6 +85,8 @@ void BotWeaponsUsageModule::UpdateScriptWeaponsStatus() {
 }
 
 void BotWeaponsUsageModule::TryFire( BotInput *input ) {
+	WSW_PROFILER_SCOPE();
+
 	const auto &selectedEnemy = bot->GetSelectedEnemy();
 	if( selectedEnemy == std::nullopt ) {
 		return;

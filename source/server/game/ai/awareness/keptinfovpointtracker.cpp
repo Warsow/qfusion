@@ -1,7 +1,10 @@
 #include "keptinfovpointtracker.h"
 #include "../bot.h"
 
+#include <common/facilities/profilerscope.h>
+
 void KeptInFovPointTracker::update() {
+	WSW_PROFILER_SCOPE();
 	m_point = selectCurrentPoint();
 }
 

@@ -3,6 +3,8 @@
 #include "triggeraaspropscache.h"
 #include "../classifiedentitiescache.h"
 
+#include <common/facilities/profilerscope.h>
+
 PredictionContext::PredictionContext( MovementSubsystem *subsystem, PredictedPath *predictedMovementActions_ )
 	: bot( subsystem->m_bot )
 	, m_subsystem( subsystem )
@@ -664,6 +666,8 @@ bool PredictionContext::BuildPlan( std::span<BaseAction *> actionsToUse ) {
 }
 
 auto PredictionContext::TryBuildingPlanUsingAction( BaseAction *action ) -> PredictionResult {
+	WSW_PROFILER_SCOPE();
+
 	action->beforePlanning();
 
 #ifdef CHECK_INFINITE_NEXT_STEP_LOOPS

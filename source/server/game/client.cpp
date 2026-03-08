@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <common/facilities/fscompat.h>
 #include <common/facilities/gs_qrespath.h>
+#include <common/facilities/profilerscope.h>
 #define IMPLEMENT_REMOVECOLORTOKENS
 #include <common/helpers/q_libc.h>
 
@@ -1926,6 +1927,7 @@ bool Client::hasNewActivity( const usercmd_t &oldUcmd ) const {
 }
 
 void G_ClientThink( edict_t *ent, usercmd_t *ucmd, int timeDelta ) {
+	WSW_PROFILER_SCOPE();
 	ent->r.client->executeUcmd( *ucmd, timeDelta );
 }
 

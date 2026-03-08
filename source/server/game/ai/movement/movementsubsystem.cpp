@@ -4,6 +4,7 @@
 #include "triggeraaspropscache.h"
 #include <common/helpers/algorithm.h>
 #include <common/helpers/scopeexitaction.h>
+#include <common/facilities/profilerscope.h>
 
 MovementSubsystem::MovementSubsystem( Bot *bot_ )
 	: m_bot( bot_ )
@@ -147,6 +148,8 @@ bool MovementSubsystem::canInterruptMovement() const {
 
 
 void MovementSubsystem::frame( BotInput *input ) {
+	WSW_PROFILER_SCOPE();
+
 	if( const int reachNum = findNextReachNumForTravelType( TRAVEL_JUMPPAD, 24 ) ) {
 		m_lastNearbyJumppadReach.reachNum  = reachNum;
 		m_lastNearbyJumppadReach.touchedAt = level.time;

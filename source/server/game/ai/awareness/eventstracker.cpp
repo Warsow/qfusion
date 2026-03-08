@@ -2,6 +2,8 @@
 #include <common/types/smallassocarray.h>
 #include "../bot.h"
 
+#include <common/facilities/profilerscope.h>
+
 void EventsTracker::TryGuessingBeamOwnersOrigins( const EntNumsVector &dangerousEntsNums, float failureChance ) {
 	const edict_t *const gameEdicts = game.edicts;
 	for( auto entNum: dangerousEntsNums ) {
@@ -334,6 +336,8 @@ EventsTracker::EventsTracker( Bot *bot ) : m_bot( bot ) {
 }
 
 void EventsTracker::Update() {
+	WSW_PROFILER_SCOPE();
+
 	const edict_t *gameEdicts = game.edicts;
 	const int64_t levelTime   = level.time;
 

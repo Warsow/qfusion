@@ -3,6 +3,8 @@
 #include "../teamplay/squadbasedteam.h"
 #include "../bot.h"
 
+#include <common/facilities/profilerscope.h>
+
 BotAwarenessModule::BotAwarenessModule( Bot *bot_ )
 	: bot( bot_ )
 	, targetChoicePeriod( (unsigned)( 1500 - 500 * bot_->Skill() ) )
@@ -52,6 +54,8 @@ void BotAwarenessModule::InvalidateSelectedEnemiesIfNeeded() {
 }
 
 void BotAwarenessModule::Update() {
+	WSW_PROFILER_SCOPE();
+
 	// TODO: Make the control flow clear
 	InvalidateSelectedEnemiesIfNeeded();
 
@@ -321,6 +325,8 @@ static bool IsEnemyVisible( const edict_t *self, const edict_t *enemyEnt ) {
 }
 
 void BotAwarenessModule::RegisterVisibleEnemies() {
+	WSW_PROFILER_SCOPE();
+
 	if( GS_MatchState( *ggs ) == MATCH_STATE_COUNTDOWN ) {
 		return;
 	}
@@ -371,6 +377,8 @@ void BotAwarenessModule::CheckForNewHazards() {
 	if( PrimaryHazard() != nullptr ) {
 		return;
 	}
+
+	WSW_PROFILER_SCOPE();
 
 	hazardsSelector.BeginUpdate();
 

@@ -1,6 +1,8 @@
 #include "enemiestracker.h"
 #include "../bot.h"
 
+#include <common/facilities/profilerscope.h>
+
 constexpr float MAX_ENEMY_WEIGHT = 5.0f;
 
 float DamageToKill( const edict_t *ent, float armorProtection, float armorDegradation ) {
@@ -214,6 +216,8 @@ EnemiesTracker::~EnemiesTracker() noexcept {
 }
 
 void EnemiesTracker::Update() {
+	WSW_PROFILER_SCOPE();
+
 	const int64_t levelTime = level.time;
 
 	for( AttackStats *stats = m_trackedAttackerStatsHead, *next; stats; stats = next ) { next = stats->next;

@@ -5,6 +5,7 @@
 #include "../groundtracecache.h"
 #include "../navigation/aasworld.h"
 #include <common/facilities/q_collision.h>
+#include <common/facilities/profilerscope.h>
 #include <common/helpers/algorithm.h>
 
 PlannerNode *AiAction::newNodeForRecord( AiActionRecord *record, const WorldState &worldState, float cost ) {
@@ -655,6 +656,9 @@ void AiPlanner::Update() {
 	if( !ai->PermitsDistributedUpdateThisFrame() ) {
 		return;
 	}
+
+	// TODO: Move the condition above to the outer scope/to the caller
+	WSW_PROFILER_SCOPE();
 
 	// Prepare current world state for planner
 	WorldState currWorldState;

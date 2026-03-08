@@ -5,6 +5,8 @@
 #include "manager.h"
 #include <array>
 
+#include <common/facilities/profilerscope.h>
+
 #ifndef _MSC_VER
 // Allow getting an address of not initialized yet field movementModule.movementState.entityPhysicsState.
 // Saving this address for further use is legal, the field is not going to be used right now.
@@ -154,6 +156,8 @@ void Bot::TouchedOtherEntity( const edict_t *entity ) {
 }
 
 void Bot::CheckTargetProximity() {
+	WSW_PROFILER_SCOPE();
+
 	planningModule.CheckTargetProximity();
 
 	if( !NavTargetAasAreaNum() ) {
@@ -301,6 +305,8 @@ void Bot::OnRespawn() {
 }
 
 void Bot::Update() {
+	WSW_PROFILER_SCOPE();
+
 	// We should update weapons status each frame since script weapons may be changed each frame.
 	// These statuses are used by firing methods, so actual weapon statuses are required.
 	weaponsUsageModule.UpdateScriptWeaponsStatus();

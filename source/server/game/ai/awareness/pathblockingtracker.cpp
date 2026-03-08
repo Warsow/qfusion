@@ -3,6 +3,8 @@
 #include "../bot.h"
 #include "../navigation/aaselementsmask.h"
 
+#include <common/facilities/profilerscope.h>
+
 /**
  * A compact representation of {@code TrackedEnemy} that contains precomputed fields
  * required for determining blocking status of map areas in bulk fashion.
@@ -106,6 +108,8 @@ inline void PathBlockingTracker::ClearBlockedAreas() {
 }
 
 void PathBlockingTracker::Update() {
+	WSW_PROFILER_SCOPE();
+
 	if( bot->ShouldRushHeadless() ) {
 		ClearBlockedAreas();
 		return;

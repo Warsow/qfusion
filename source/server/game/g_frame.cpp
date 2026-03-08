@@ -667,6 +667,8 @@ static void G_RunEntities( void ) {
 * G_RunClients
 */
 static void G_RunClients( void ) {
+	WSW_PROFILER_SCOPE();
+
 	int i, step;
 	edict_t *ent;
 
