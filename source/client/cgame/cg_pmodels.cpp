@@ -187,6 +187,7 @@ static bool CG_ParseAnimationScript( pmodelinfo_t *pmodelinfo, char *filename ) 
 
 	memset( rootanims, -1, sizeof( rootanims ) );
 	pmodelinfo->sex = GENDER_MALE;
+	pmodelinfo->pitch = 1.0f;
 	rounder = 0;
 	counter = 1; //reseve 0 for 'no animation'
 
@@ -219,9 +220,27 @@ static bool CG_ParseAnimationScript( pmodelinfo_t *pmodelinfo, char *filename ) 
 		}
 
 		if( *token < '0' || *token > '9' ) {
+			if( !Q_stricmp( token, "pitch" ) ) {
+				if( debug ) {
+					Com_Printf( "Script: %s:", token );
+				}
+				token = COM_ParseExt( &ptr, false );
+				if( !token[0] ) {
+					break;
+				}
 
+				pmodelinfo->pitch = atof( token );
+				if( pmodelinfo->pitch == 0.0f ) {
+					pmodelinfo->pitch = 1.0f;
+				} else {
+					Q_clamp( pmodelinfo->pitch, 0.8f, 1.2f );
+				}
+				if( debug ) {
+					Com_Printf( " %s parsed as value %f\n", token, pmodelinfo->pitch );
+				}
+			}
 			// gender
-			if( !Q_stricmp( token, "sex" ) ) {
+			else if( !Q_stricmp( token, "sex" ) ) {
 				if( debug ) {
 					Com_Printf( "Script: %s:", token );
 				}

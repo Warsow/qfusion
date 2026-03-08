@@ -209,6 +209,7 @@ void GS_PlayerModel_AddAnimation( gs_pmodel_animationstate_t *animState, int low
 typedef struct pmodelinfo_s {
 	char *name;
 	int sex;
+	float pitch;
 
 	struct  model_s *model;
 	struct cg_sexedSfx_s *sexedSfx;

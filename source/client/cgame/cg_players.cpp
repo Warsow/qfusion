@@ -91,19 +91,21 @@ static const SoundSet *CG_RegisterPmodelSexedSound( pmodelinfo_t *pmodelinfo, co
 	// see if we already know of the model specific sound
 	Q_snprintfz( sexedFilename, sizeof( sexedFilename ), "sounds/players/%s/%s", model, oname + 1 );
 
-	if( ( !COM_FileExtension( sexedFilename ) &&
+	if( !( ( !COM_FileExtension( sexedFilename ) &&
 		FS_FirstExtension( sexedFilename, SOUND_EXTENSIONS, std::size( SOUND_EXTENSIONS ) ) ) ||
-		FS_FOpenFile( sexedFilename, NULL, FS_READ ) != -1 ) {
-		sexedSfx->sfx = cg.soundSystem->registerSound( { .name = SoundSetProps::Exact { wsw::StringView( sexedFilename ) } } );
-	} else {   // no, revert to default player sounds folders
+		FS_FOpenFile( sexedFilename, NULL, FS_READ ) != -1 ) ) {
 		if( pmodelinfo->sex == GENDER_FEMALE ) {
 			Q_snprintfz( sexedFilename, sizeof( sexedFilename ), "sounds/players/%s/%s", "female", oname + 1 );
-			sexedSfx->sfx = cg.soundSystem->registerSound( { .name = SoundSetProps::Exact { wsw::StringView( sexedFilename ) } } );
 		} else {
 			Q_snprintfz( sexedFilename, sizeof( sexedFilename ), "sounds/players/%s/%s", "male", oname + 1 );
-			sexedSfx->sfx = cg.soundSystem->registerSound( { .name = SoundSetProps::Exact { wsw::StringView( sexedFilename ) } } );
 		}
 	}
+
+	sexedSfx->sfx = cg.soundSystem->registerSound( SoundSetProps {
+		.name = SoundSetProps::Exact { wsw::StringView( sexedFilename ) },
+		.pitchVariations = { pmodelinfo->pitch },
+		.paramsOverrideMode = SoundSetProps::CreateNewIfParamsDiffer,
+	});
 
 	return sexedSfx->sfx;
 }
