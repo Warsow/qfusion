@@ -109,6 +109,8 @@ void ProfilerThreadInstance::dumpFrameStats( unsigned threadIndex, ProfilerResul
 			dataSink->addDiscoveredRoot( threadIndex, scopesHolder.map[function] );
 		}
 	} else {
+		assert( m_targetScopeReentrancyCounter == 0 );
+		assert( m_scopeDepthFromTheTargetScope == 0 );
 		const wsw::HashedStringView targetFunction( m_targetFunction.data(), m_targetFunction.size() );
 		assert( scopesHolder.map.contains( targetFunction ) );
 		dataSink->addCallStats( threadIndex, scopesHolder.map[targetFunction], {
@@ -300,18 +302,19 @@ void ProfilerThreadInstance::enterScope( ProfilerScope *scope ) {
 		}
 	} else {
 		assert( !m_targetFunction.empty() );
-		// If we are in the target scope
+		// If we are already within the target scope
 		if( m_targetScopeReentrancyCounter > 0 ) {
 			m_scopeDepthFromTheTargetScope++;
 		}
 		if( matchesTargetScope( scope ) ) {
 			m_targetScopeReentrancyCounter++;
+			// If we are actually entering the outermost target scope
 			if( m_targetScopeReentrancyCounter == 1 ) {
 				m_enterTimestamp = Sys_Microseconds();
 				m_enterCount++;
 			}
 		} else {
-			// If it's a direct call from the target scope
+			// If it's a direct call from the (outermost) target scope
 			if( m_scopeDepthFromTheTargetScope == 1 ) {
 				DescendantEntry &entry = m_statsOfDescendantScopes[scope->m_label.m_function];
 				entry.enterTimestamp = Sys_Microseconds();
@@ -326,23 +329,32 @@ void ProfilerThreadInstance::leaveScope( ProfilerScope *scope ) {
 		m_globalScopeDepth--;
 	} else {
 		assert( !m_targetFunction.empty() );
-		// If we are in the target scope
-		const bool isInTargetScope = m_targetScopeReentrancyCounter > 0;
-		if( isInTargetScope ) {
-			m_scopeDepthFromTheTargetScope--;
-		}
+		assert( m_scopeDepthFromTheTargetScope >= 0 );
+		assert( m_targetScopeReentrancyCounter >= 0 );
 		if( matchesTargetScope( scope ) ) {
+			assert( m_targetScopeReentrancyCounter > 0 );
 			m_targetScopeReentrancyCounter--;
+			// If we're leaving the (outermost) target scope
 			if( m_targetScopeReentrancyCounter == 0 ) {
+				assert( m_scopeDepthFromTheTargetScope == 0 );
 				m_accumTime += ( Sys_Microseconds() - m_enterTimestamp );
+			} else {
+				assert( m_scopeDepthFromTheTargetScope > 0 );
+				m_scopeDepthFromTheTargetScope--;
 			}
 		} else {
-			// If it's a direct call from the target scope
-			if( isInTargetScope && m_scopeDepthFromTheTargetScope == 0 ) {
-				DescendantEntry &entry = m_statsOfDescendantScopes[scope->m_label.m_function];
-				entry.accumTime += ( Sys_Microseconds() - entry.enterTimestamp );
+			// If we're within the target scope
+			if( m_targetScopeReentrancyCounter > 0 ) {
+				m_scopeDepthFromTheTargetScope--;
+				// If it's a direct call from the (outermost) target scope
+				if( m_scopeDepthFromTheTargetScope == 0 ) {
+					DescendantEntry &entry = m_statsOfDescendantScopes[scope->m_label.m_function];
+					entry.accumTime += ( Sys_Microseconds() - entry.enterTimestamp );
+				}
 			}
 		}
+		assert( m_scopeDepthFromTheTargetScope >= 0 );
+		assert( m_targetScopeReentrancyCounter >= 0 );
 	}
 }
 
