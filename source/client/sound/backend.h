@@ -4,10 +4,9 @@
 // TODO: lift it to the top level
 #include <server/game/ai/vec3.h>
 #include <common/types/staticvector.h>
-#include <common/helpers/freelistallocator.h>
-#include <common/helpers/randomgenerator.h>
 #include <common/facilities/q_comref.h>
 #include "snd_local.h"
+#include "soundsetcache.h"
 #include <array>
 
 namespace wsw::snd {
@@ -54,26 +53,7 @@ public:
 	void activate( bool active );
 
 private:
-	void unlinkAndFree( SoundSet *soundSet );
-	void forceLoading( SoundSet *soundSet );
-
-	void releaseFileDataBuffers( SoundSet *soundSet );
-
-	[[nodiscard]]
-	auto getBufferForPlayback( const SoundSet *soundSet, bool preferStereo = false ) -> std::optional<std::pair<ALuint, unsigned>>;
-	[[nodiscard]]
-	auto getPitchForPlayback( const SoundSet *soundSet ) -> float;
-
-	static constexpr unsigned kMaxSoundSets = 256;
-
-	SoundSet *m_registeredSoundSetsHead { nullptr };
-	wsw::MemberBasedFreelistAllocator<sizeof( SoundSet ) + MAX_QPATH + 1, kMaxSoundSets> m_soundSetsAllocator;
-
-	FileDataBufferCache m_fileDataBufferCache;
-
-	wsw::StringSpanStorage<unsigned, unsigned> m_tmpPathListStorage;
-
-	wsw::RandomGenerator m_rng;
+	SoundSetCache *m_soundSetCache { nullptr };
 
 	bool m_initialized { false };
 };

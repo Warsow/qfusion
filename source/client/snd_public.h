@@ -157,9 +157,6 @@ public:
 	// TODO: A zero-terminated string container is more appropriate here
 	[[nodiscard]]
 	static auto getPathForName( const wsw::StringView &name ) -> wsw::PodVector<char>;
-
-	[[nodiscard]]
-	static bool getPathListForPattern( const wsw::StringView &pattern, wsw::StringSpanStorage<unsigned, unsigned> *pathListStorage );
 };
 
 #endif
