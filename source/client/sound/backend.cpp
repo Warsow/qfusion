@@ -39,32 +39,6 @@ static ALCcontext *alContext;
 #define UPDATE_MSEC 10
 static int64_t s_last_update_time;
 
-struct ALBufferHolder {
-	ALuint buffer { 0 };
-	ALBufferHolder() = default;
-	explicit ALBufferHolder( ALuint buffer_ ): buffer( buffer_ ) {}
-	~ALBufferHolder() {
-		if( buffer ) {
-			alDeleteBuffers( 1, &buffer );
-		}
-	}
-	[[nodiscard]]
-	auto releaseOwnership() -> ALuint {
-		ALuint result = buffer;
-		buffer = 0;
-		return result;
-	}
-	operator bool() const {
-		return buffer != 0;
-	}
-	ALBufferHolder( const ALBufferHolder &that ) = delete;
-	ALBufferHolder &operator=( const ALBufferHolder &that ) = delete;
-	ALBufferHolder( ALBufferHolder &&that ) = delete;
-	ALBufferHolder &operator=( ALBufferHolder &&that ) = delete;
-};
-
-namespace std { void swap( ALBufferHolder &a, ALBufferHolder &b ) { std::swap( a.buffer, b.buffer ); } }
-
 static bool S_Init( void *hwnd, int maxEntities, bool verbose ) {
 	int numDevices;
 	int userDeviceNum = -1;
@@ -408,14 +382,10 @@ void Backend::forceLoading( SoundSet *soundSet ) {
 		const wsw::PodVector<char> filePathData = SoundSystem::getPathForName( exactName->value );
 		const wsw::StringView filePath( filePathData.data(), filePathData.size() - 1, wsw::StringView::ZeroTerminated );
 		if( !filePath.empty() ) {
-			ALuint buffer = 0, stereoBuffer = 0;
-			unsigned durationMillis = 0;
-			if( loadBuffersFromFile( filePath, &buffer, &stereoBuffer, &durationMillis ) ) {
-				soundSet->buffers[0]              = buffer;
-				soundSet->stereoBuffers[0]        = stereoBuffer;
-				soundSet->bufferDurationMillis[0] = durationMillis;
-				soundSet->numBuffers              = 1;
-				succeeded                         = true;
+			if( const FileDataBuffer *fileDataBuffer = m_fileDataBufferCache.get( filePath ) ) {
+				soundSet->buffers[0] = fileDataBuffer;
+				soundSet->numBuffers = 1;
+				succeeded            = true;
 			} else {
 				sError() << "Failed to load AL buffers for" << filePath;
 			}
@@ -424,24 +394,14 @@ void Backend::forceLoading( SoundSet *soundSet ) {
 		}
 	} else if( const auto *namePattern = std::get_if<SoundSetProps::Pattern>( &soundSet->props.name ) ) {
 		if( SoundSystem::getPathListForPattern( namePattern->pattern, &m_tmpPathListStorage ) ) {
-			assert( std::size( soundSet->buffers ) == std::size( soundSet->stereoBuffers ) );
 			const size_t maxBuffers = std::size( soundSet->buffers );
 			for( const wsw::StringView &filePath: m_tmpPathListStorage ) {
 				if( soundSet->numBuffers < maxBuffers ) {
-					ALuint buffer = 0, stereoBuffer = 0;
-					unsigned durationMillis = 0;
-					if( loadBuffersFromFile( filePath, &buffer, &stereoBuffer, &durationMillis ) ) {
-						soundSet->buffers[soundSet->numBuffers]              = buffer;
-						soundSet->stereoBuffers[soundSet->numBuffers]        = stereoBuffer;
-						soundSet->bufferDurationMillis[soundSet->numBuffers] = durationMillis;
-						soundSet->numBuffers++;
+					if( const FileDataBuffer *buffer = m_fileDataBufferCache.get( filePath ) ) {
+						soundSet->buffers[soundSet->numBuffers++] = buffer;
 					} else {
 						sError() << "Failed to load AL buffers for" << filePath;
-						if( soundSet->numBuffers ) {
-							alDeleteBuffers( (ALsizei)soundSet->numBuffers, soundSet->buffers );
-							alDeleteBuffers( (ALsizei)soundSet->numBuffers, soundSet->stereoBuffers );
-							soundSet->numBuffers = 0;
-						}
+						releaseFileDataBuffers( soundSet );
 					}
 				} else {
 					sWarning() << "Too many files matching" << namePattern->pattern;
@@ -461,135 +421,19 @@ void Backend::forceLoading( SoundSet *soundSet ) {
 	soundSet->hasFailedLoading = !succeeded;
 }
 
-// TODO: Do we really need bias?
-template <typename T>
-static void runResamplingLoop( const T *__restrict in, T *__restrict out, size_t numSteps, int bias ) {
-	size_t stepNum = 0;
-	if( bias == 0 ) {
-		// Mix channels
-		do {
-			*out = (short)( ( in[0] + in[1] ) / 2 );
-			out++;
-			in += 2;
-		} while( ++stepNum < numSteps );
-	} else {
-		const int channelIndex = bias < 0 ? 0 : 1;
-		// Copy the channel
-		do {
-			*out = in[channelIndex];
-			out++;
-			in += 2;
-		} while( ++stepNum < numSteps );
-	}
-}
-
-bool Backend::loadBuffersFromFile( const wsw::StringView &filePath, ALuint *buffer, ALuint *stereoBuffer, unsigned *durationMillis ) {
-	sDebug() << "Loading buffers for" << filePath;
-
-	wsw::PodVector<char> ztFilePath( filePath );
-	ztFilePath.append( '\0' );
-
-	snd_info_t fileInfo;
-	if( !S_LoadSound( ztFilePath.data(), &m_fileDataBuffer, &fileInfo ) ) {
-		// It produces verbose output on its own
-		return false;
-	}
-
-	const void *monoData;
-	snd_info_t monoInfo;
-	ALBufferHolder stereoBufferHolder;
-	if( fileInfo.numChannels == 1 ) {
-		monoData = m_fileDataBuffer.get();
-		monoInfo = fileInfo;
-	} else {
-		const void *stereoData      = m_fileDataBuffer.get();
-		const snd_info_t stereoInfo = fileInfo;
-
-		ALBufferHolder tmpBufferHolder( uploadBufferData( filePath, stereoInfo, stereoData ) );
-		if( !tmpBufferHolder ) {
-			sError() << "Failed to upload stereo buffer data";
-			return false;
-		}
-
-		// TODO: Check whether info parameters are really handled prpoperly
-
-		const size_t monoSizeInBytes = stereoInfo.samplesPerChannel * stereoInfo.bytesPerSample;
-		if( !m_resamplingBuffer.tryReserving( monoSizeInBytes ) ) {
-			sError() << "Failed to reserve resampling buffer data";
-			return false;
-		}
-
-		monoData = m_resamplingBuffer.get();
-		if( stereoInfo.bytesPerSample == 2 ) {
-			runResamplingLoop<int16_t>( (int16_t *)stereoData, (int16_t *)monoData, stereoInfo.samplesPerChannel, s_stereo2mono->integer );
-		} else {
-			runResamplingLoop<int8_t>( (int8_t *)stereoData, (int8_t *)monoData, stereoInfo.samplesPerChannel, s_stereo2mono->integer );
-		}
-
-		monoInfo             = stereoInfo;
-		monoInfo.numChannels = 1;
-		monoInfo.sizeInBytes = (int)monoSizeInBytes;
-
-		std::swap( tmpBufferHolder, stereoBufferHolder );
-	}
-
-	ALBufferHolder monoBufferHolder( uploadBufferData( filePath, monoInfo, monoData ) );
-	if( !monoBufferHolder ) {
-		if( fileInfo.numChannels == 1 ) {
-			sError() << "Failed to upload the buffer data";
-		} else {
-			sError() << "Failed to upload the mono buffer data";
-		}
-		return false;
-	}
-
-	*buffer = monoBufferHolder.releaseOwnership();
-	assert( alIsBuffer( *buffer ) );
-	*stereoBuffer = stereoBufferHolder.releaseOwnership();
-	assert( !*stereoBuffer || alIsBuffer( *stereoBuffer ) );
-	*durationMillis = (unsigned)( ( 1000 * (int64_t)fileInfo.samplesPerChannel ) / fileInfo.sampleRate );
-	return true;
-}
-
-auto Backend::uploadBufferData( const wsw::StringView &logFilePath, const snd_info_t &info, const void *data ) -> ALuint {
-	ALenum error = alGetError();
-	if( error != AL_NO_ERROR ) {
-		sWarning() << "Had an error" << error << "prior to loading of data for" << logFilePath;
-	}
-
-	ALuint rawBuffer = 0;
-	alGenBuffers( 1, &rawBuffer );
-	if( ( error = alGetError() ) != AL_NO_ERROR ) {
-		sWarning() << "Failed to create buffer:" << wsw::StringView( S_ErrorMessage( error ) ) << "while loading data for" << logFilePath;
-		return 0;
-	}
-
-	ALBufferHolder bufferHolder( rawBuffer );
-	rawBuffer = 0;
-
-	const ALenum format = S_SoundFormat( info.bytesPerSample, info.numChannels );
-	alBufferData( bufferHolder.buffer, format, data, info.sizeInBytes, info.sampleRate );
-	if( ( error = alGetError() ) != AL_NO_ERROR ) {
-		sWarning() << "Failed to set buffer data" << wsw::StringView( S_ErrorMessage( error ) ) << "while loading data for" << logFilePath;
-		return 0;
-	}
-
-	// Note: We have decided to drop forceful unloading of other buffers in case of AL_OUT_OF_MEMORY as its utility is questionable
-
-	return bufferHolder.releaseOwnership();
-}
-
 void Backend::unlinkAndFree( SoundSet *soundSet ) {
-	if( soundSet->numBuffers ) {
-		assert( soundSet->isLoaded && !soundSet->hasFailedLoading );
-		alDeleteBuffers( (ALsizei)soundSet->numBuffers, soundSet->buffers );
-		// "Deleting buffer name 0 is a legal NOP"
-		alDeleteBuffers( (ALsizei)soundSet->numBuffers, soundSet->stereoBuffers );
-	}
-
+	releaseFileDataBuffers( soundSet );
 	wsw::unlink( soundSet, &m_registeredSoundSetsHead );
 	soundSet->~SoundSet();
 	m_soundSetsAllocator.free( soundSet );
+}
+
+void Backend::releaseFileDataBuffers( SoundSet *soundSet ) {
+	for( unsigned i = 0; i < soundSet->numBuffers; ++i ) {
+		m_fileDataBufferCache.release( soundSet->buffers[i] );
+		soundSet->buffers[i] = nullptr;
+	}
+	soundSet->numBuffers = 0;
 }
 
 [[nodiscard]]
@@ -631,15 +475,13 @@ auto Backend::getBufferForPlayback( const SoundSet *soundSet, bool preferStereo 
 		const unsigned index = choseIndex( numBuffers, soundSet->lastChosenBufferIndex, &m_rng );
 		ALuint chosenBuffer;
 		if( preferStereo ) {
-			chosenBuffer = soundSet->stereoBuffers[index];
+			chosenBuffer = soundSet->buffers[index]->stereoBuffer;
 			// Looks like it is originally a mono sound
 			if( !chosenBuffer ) {
-				[[maybe_unused]] const ALuint *const end = soundSet->stereoBuffers + soundSet->numBuffers;
-				assert( !wsw::any_of( soundSet->stereoBuffers, end, []( ALuint b ) { return b != 0; } ) );
-				chosenBuffer = soundSet->buffers[index];
+				chosenBuffer = soundSet->buffers[index]->buffer;
 			}
 		} else {
-			chosenBuffer = soundSet->buffers[index];
+			chosenBuffer = soundSet->buffers[index]->buffer;
 		}
 		assert( alIsBuffer( chosenBuffer ) );
 		soundSet->lastChosenBufferIndex = (uint8_t)index;

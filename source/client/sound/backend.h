@@ -56,10 +56,8 @@ public:
 private:
 	void unlinkAndFree( SoundSet *soundSet );
 	void forceLoading( SoundSet *soundSet );
-	[[nodiscard]]
-	bool loadBuffersFromFile( const wsw::StringView &filePath, ALuint *buffer, ALuint *stereoBuffer, unsigned *durationMillis );
-	[[nodiscard]]
-	auto uploadBufferData( const wsw::StringView &logFilePath, const snd_info_t &info, const void *data ) -> ALuint;
+
+	void releaseFileDataBuffers( SoundSet *soundSet );
 
 	[[nodiscard]]
 	auto getBufferForPlayback( const SoundSet *soundSet, bool preferStereo = false ) -> std::optional<std::pair<ALuint, unsigned>>;
@@ -71,8 +69,7 @@ private:
 	SoundSet *m_registeredSoundSetsHead { nullptr };
 	wsw::MemberBasedFreelistAllocator<sizeof( SoundSet ) + MAX_QPATH + 1, kMaxSoundSets> m_soundSetsAllocator;
 
-	PodBuffer<uint8_t> m_fileDataBuffer;
-	PodBuffer<uint8_t> m_resamplingBuffer;
+	FileDataBufferCache m_fileDataBufferCache;
 
 	wsw::StringSpanStorage<unsigned, unsigned> m_tmpPathListStorage;
 

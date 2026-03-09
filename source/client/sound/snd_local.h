@@ -35,6 +35,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define AL_ALEXT_PROTOTYPES
 #define AL_LIBTYPE_STATIC
 
+#include "filedatabuffercache.h"
+
 #include <AL/al.h>
 #include <AL/alc.h>
 #include <AL/alext.h>
@@ -48,12 +50,11 @@ struct SoundSet {
 
 	mutable int registrationSequence { 0 };
 
-	ALuint buffers[16] {};
-	ALuint stereoBuffers[16] {};
-	unsigned bufferDurationMillis[16] {};
+	static constexpr unsigned kMaxBuffers { 16 };
+	const FileDataBuffer *buffers[kMaxBuffers];
 	unsigned numBuffers { 0 };
 
-	static constexpr unsigned kMaxPitchVariations = 16;
+	static constexpr unsigned kMaxPitchVariations { 16 };
 	float pitchVariations[kMaxPitchVariations] {};
 	unsigned numPitchVariations { 0 };
 
