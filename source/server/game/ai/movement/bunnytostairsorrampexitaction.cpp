@@ -39,8 +39,11 @@ bool BunnyToStairsOrRampExitAction::tryFindingAndSavingLookDir( PredictionContex
 			return false;
 		}
 
+		const auto &reach = aasWorld->getReaches()[exitReachNumAndTravelTime->first];
+		const auto &area  = aasWorld->getAreas()[reach.areanum];
+
 		Debug( "Found a best exit area of an inclined floor area\n" );
-		m_lookDirStorage.set( aasWorld->getAreas()[exitReachNumAndTravelTime->first].center );
+		m_lookDirStorage.set( area.center );
 		m_lookDirStorage -= context->movementState->entityPhysicsState.Origin();
 		if( !m_lookDirStorage.normalize() ) {
 			return false;
@@ -48,7 +51,7 @@ bool BunnyToStairsOrRampExitAction::tryFindingAndSavingLookDir( PredictionContex
 
 		m_intendedLookDir = m_lookDirStorage.data();
 
-		trySavingExitFloorCluster( context, exitReachNumAndTravelTime->first );
+		trySavingExitFloorCluster( context, reach.areanum );
 		return true;
 	}
 

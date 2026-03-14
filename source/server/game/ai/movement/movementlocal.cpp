@@ -225,12 +225,14 @@ bool findBestStairsExitProps( const AiEntityPhysicsState &entityPhysicsState, in
 
 	// TODO: Support curved stairs, here and from StairsClusterBuilder side
 	const std::span<const uint16_t> stairsClusterAreaNums = aasWorld->stairsClusterData( stairsClusterNum );
+	assert( !stairsClusterAreaNums.empty() );
 
 	int bestTravelTime = std::numeric_limits<int>::max();
 	int bestAreaNum    = 0;
 	int bestReachNum   = 0;
 	// Determine whether highest or lowest area is closer to the nav target
 	for( const int boundaryAreaNum : { stairsClusterAreaNums.front(), stairsClusterAreaNums.back() } ) {
+		assert( (unsigned)boundaryAreaNum < (unsigned)aasWorld->getAreas().size() );
 		int reachNum         = 0;
 		const int travelTime = routeCache->FindRoute( boundaryAreaNum, navTargetAreaNum, travelFlags );
 		// This means we can't compare travel times for boundary areas
