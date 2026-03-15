@@ -23,47 +23,19 @@ struct ListenerProps {
 	}
 };
 
-class EffectSampler {
-protected:
-	static unsigned GetNumSamplesForCurrentQuality( unsigned minSamples, unsigned maxSamples ) {
-		float quality = s_environment_sampling_quality->value;
-
-		assert( quality >= 0.0f && quality <= 1.0f );
-		assert( minSamples < maxSamples );
-
-		auto numSamples = (unsigned)( minSamples + ( maxSamples - minSamples ) * quality );
-		assert( numSamples && numSamples <= maxSamples );
-		return numSamples;
-	}
-
-	virtual Effect *TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc ) = 0;
-};
-
 class EffectSamplers {
 public:
 	// Would be nice just have a method of the same signature in Effect scope but static.
 	// Unfortunately there is no companion objects like in Scala/Kotlin.
-	static Effect *TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc );
+	static EaxReverbEffect *TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc );
 	static float SamplingRandom();
-};
-
-class ObstructedEffectSampler: public virtual EffectSampler {
-protected:
-	void SetupDirectObstructionSamplingProps( src_t *src, unsigned minSamples, unsigned maxSamples );
-
-	float ComputeDirectObstruction( const ListenerProps &listenerProps, src_t *src );
-};
-
-class UnderwaterFlangerEffectSampler final: public ObstructedEffectSampler {
-public:
-	Effect *TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc ) override;
 };
 
 constexpr const auto MAX_DIRECT_OBSTRUCTION_SAMPLES = 8;
 // Almost doubled for "realistic obstruction" (we need more secondary rays)
 constexpr const auto MAX_REVERB_PRIMARY_RAY_SAMPLES = 80;
 
-class ReverbEffectSampler final: public ObstructedEffectSampler, private GenericRaycastSampler {
+class ReverbEffectSampler final: private GenericRaycastSampler {
 private:
 	vec3_t primaryRayDirs[MAX_REVERB_PRIMARY_RAY_SAMPLES];
 	vec3_t reflectionPoints[MAX_REVERB_PRIMARY_RAY_SAMPLES];
@@ -74,6 +46,12 @@ private:
 	src_t * src;
 	EaxReverbEffect * effect;
 
+	void SetupDirectObstructionSamplingProps( src_t *src, unsigned minSamples, unsigned maxSamples );
+
+	float ComputeDirectObstruction( const ListenerProps &listenerProps, src_t *src );
+
+	static unsigned GetNumSamplesForCurrentQuality( unsigned minSamples, unsigned maxSamples );
+
 	void ComputeReverberation( const ListenerProps &listenerProps_, src_t *src_, EaxReverbEffect *effect_ );
 
 	void ResetMutableState( const ListenerProps &listenerProps_, src_t *src_, EaxReverbEffect *effect_ );
@@ -83,7 +61,7 @@ private:
 	void EmitSecondaryRays();
 
 public:
-	Effect *TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc ) override;
+	EaxReverbEffect *TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc );
 };
 
 #endif

@@ -33,10 +33,10 @@ void *EffectsAllocator::AllocEntry( const src_t *src, ALint forType ) {
 	Com_Error( ERR_FATAL, "EffectsAllocator::AllocEntry(): There are no free slots for an effect\n" );
 }
 
-void EffectsAllocator::DeleteEffect( Effect *effect ) {
+void EffectsAllocator::DeleteEffect( EaxReverbEffect *effect ) {
 	if( effect ) {
 		FreeEntry( effect );
-		effect->~Effect();
+		effect->~EaxReverbEffect();
 	}
 }
 

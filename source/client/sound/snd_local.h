@@ -129,7 +129,7 @@ struct PanningUpdateState {
 	unsigned numPassedSecondaryRays;
 };
 
-class Effect;
+class EaxReverbEffect;
 
 typedef struct envUpdateState_s {
 	const SoundSet *parent;
@@ -137,8 +137,8 @@ typedef struct envUpdateState_s {
 	int64_t nextEnvUpdateAt;
 	int64_t lastEnvUpdateAt;
 
-	Effect *oldEffect;
-	Effect *effect;
+	EaxReverbEffect *oldEffect;
+	EaxReverbEffect *effect;
 
 	samplingProps_t directObstructionSamplingProps;
 

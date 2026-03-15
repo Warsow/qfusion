@@ -8,7 +8,7 @@
 // TODO
 extern ListenerProps listenerProps;
 
-void Effect::CheckCurrentlyBoundEffect( src_t *src ) {
+void EaxReverbEffect::CheckCurrentlyBoundEffect( src_t *src ) {
 	ALint effectType;
 
 	// We limit every source to have only a single effect.
@@ -30,20 +30,20 @@ void Effect::CheckCurrentlyBoundEffect( src_t *src ) {
 	IntiallySetupEffect( src );
 }
 
-void Effect::IntiallySetupEffect( src_t *src ) {
+void EaxReverbEffect::IntiallySetupEffect( src_t *src ) {
 	alGenEffects( 1, &src->effect );
 	alEffecti( src->effect, AL_EFFECT_TYPE, this->type );
 }
 
-float Effect::GetSourceGain( src_s *src ) const {
+float EaxReverbEffect::GetSourceGain( src_s *src ) const {
 	return src->fvol * src->volumeVar->value;
 }
 
-void Effect::AdjustGain( src_t *src ) const {
+void EaxReverbEffect::AdjustGain( src_t *src ) const {
 	alSourcef( src->source, AL_GAIN, checkSourceGain( GetSourceGain( src ) ) );
 }
 
-void Effect::AttachEffect( src_t *src ) {
+void EaxReverbEffect::AttachEffect( src_t *src ) {
 	// Set gain in any case (useful if the "attenuate on obstruction" flag has been turned off).
 	AdjustGain( src );
 
@@ -53,36 +53,6 @@ void Effect::AttachEffect( src_t *src ) {
 	alAuxiliaryEffectSloti( src->effectSlot, AL_EFFECTSLOT_EFFECT, src->effect );
 	// Feed the slot from the source
 	alSource3i( src->source, AL_AUXILIARY_SEND_FILTER, src->effectSlot, 0, AL_FILTER_NULL );
-}
-
-void UnderwaterFlangerEffect::IntiallySetupEffect( src_t *src ) {
-	Effect::IntiallySetupEffect( src );
-	// This is the only place where the flanger gets tweaked
-	alEffectf( src->effect, AL_FLANGER_DEPTH, 0.5f );
-	alEffectf( src->effect, AL_FLANGER_FEEDBACK, -0.4f );
-}
-
-float UnderwaterFlangerEffect::GetSourceGain( src_t *src ) const {
-	float gain = src->fvol * src->volumeVar->value;
-	// Lower gain significantly if there is a medium transition
-	// (if the listener is not in liquid and the source is, and vice versa)
-	if( hasMediumTransition ) {
-		gain *= 0.25f;
-	}
-
-	// Modify the gain by the direct obstruction factor
-	// Lowering the gain by 1/3 on full obstruction is fairly sufficient (its not linearly perceived)
-	gain *= 1.0f - 0.33f * directObstruction;
-	assert( gain >= 0.0f && gain <= 1.0f );
-	return gain;
-}
-
-void UnderwaterFlangerEffect::BindOrUpdate( src_t *src ) {
-	CheckCurrentlyBoundEffect( src );
-
-	alFilterf( src->directFilter, AL_LOWPASS_GAINHF, 0.0f );
-
-	AttachEffect( src );
 }
 
 [[maybe_unused]]
@@ -181,15 +151,6 @@ static float CalcLerpFracForTimeDelta( int timeDelta ) {
 	return 1.0f;
 }
 
-void UnderwaterFlangerEffect::InterpolateProps( const Effect *oldOne, int timeDelta ) {
-	const auto *that = Cast<UnderwaterFlangerEffect *>( oldOne );
-	if( !that ) {
-		return;
-	}
-
-	directObstruction = std::lerp( directObstruction, that->directObstruction, CalcLerpFracForTimeDelta( timeDelta ) );
-}
-
 bool EaxReverbEffect::ShouldKeepLingering( float sourceQualityHint, int64_t millisNow ) const {
 	if( sourceQualityHint <= 0 ) {
 		return false;
@@ -204,8 +165,7 @@ bool EaxReverbEffect::ShouldKeepLingering( float sourceQualityHint, int64_t mill
 	return distanceAtLastUpdate < 192.0f + 768.0f * factor;
 }
 
-void EaxReverbEffect::InterpolateProps( const Effect *oldOne, int timeDelta ) {
-	const auto *that = Cast<EaxReverbEffect *>( oldOne );
+void EaxReverbEffect::InterpolateProps( const EaxReverbEffect *that, int timeDelta ) {
 	if( !that ) {
 		return;
 	}

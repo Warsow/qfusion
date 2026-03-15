@@ -181,7 +181,7 @@ static void source_spatialize( src_t *src ) {
 	}
 
 	// Delegate setting source origin to the effect in this case
-	if( Effect::Cast<const EaxReverbEffect *>( src->envUpdateState.effect ) ) {
+	if( src->envUpdateState.effect ) {
 		return;
 	}
 

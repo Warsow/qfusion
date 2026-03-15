@@ -322,7 +322,7 @@ void ENV_UpdateRelativeSoundsSpatialization( const vec3_t origin, const vec3_t v
 static void ENV_UpdatePanning( int64_t millisNow, int listenerEntNum, const vec3_t origin, const mat3_t axes ) {
 	for( src_t *src = srclist, *end = srclist + src_count; src != end; ++src ) {
 		if( src->isActive ) {
-			if( Effect *effect = src->envUpdateState.effect ) {
+			if( EaxReverbEffect *effect = src->envUpdateState.effect ) {
 				effect->UpdatePanning( src, listenerEntNum, origin, axes );
 			}
 		}

@@ -11,15 +11,10 @@
 #include <limits>
 #include <random>
 
-static UnderwaterFlangerEffectSampler underwaterFlangerEffectSampler;
-
 static ReverbEffectSampler reverbEffectSampler;
 
-Effect *EffectSamplers::TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc ) {
-	Effect *effect;
-	if( ( effect = ::underwaterFlangerEffectSampler.TryApply( listenerProps, src, tryReusePropsSrc ) ) ) {
-		return effect;
-	}
+EaxReverbEffect *EffectSamplers::TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc ) {
+	EaxReverbEffect *effect;
 	if( ( effect = ::reverbEffectSampler.TryApply( listenerProps, src, tryReusePropsSrc ) ) ) {
 		return effect;
 	}
@@ -35,28 +30,12 @@ float EffectSamplers::SamplingRandom() {
 	return ( samplingRandom() - R::min() ) / (float)( R::max() - R::min() );
 }
 
-Effect *UnderwaterFlangerEffectSampler::TryApply( const ListenerProps &listenerProps, src_t *src, const src_t * ) {
-	if( !listenerProps.isInLiquid && !src->envUpdateState.isInLiquid ) {
-		return nullptr;
-	}
-
-	float directObstruction = 0.9f;
-	if( src->envUpdateState.isInLiquid && listenerProps.isInLiquid ) {
-		directObstruction = ComputeDirectObstruction( listenerProps, src );
-	}
-
-	auto *effect = EffectsAllocator::Instance()->NewFlangerEffect( src );
-	effect->directObstruction = directObstruction;
-	effect->hasMediumTransition = src->envUpdateState.isInLiquid ^ listenerProps.isInLiquid;
-	return effect;
-}
-
 static bool ENV_TryReuseSourceReverbProps( src_t *src, const src_t *tryReusePropsSrc, EaxReverbEffect *newEffect ) {
 	if( !tryReusePropsSrc ) {
 		return false;
 	}
 
-	auto *reuseEffect = Effect::Cast<const EaxReverbEffect *>( tryReusePropsSrc->envUpdateState.effect );
+	auto *reuseEffect = tryReusePropsSrc->envUpdateState.effect;
 	if( !reuseEffect ) {
 		return false;
 	}
@@ -94,7 +73,7 @@ static bool ENV_TryReuseSourceReverbProps( src_t *src, const src_t *tryReuseProp
 	return true;
 }
 
-void ObstructedEffectSampler::SetupDirectObstructionSamplingProps( src_t *src, unsigned minSamples, unsigned maxSamples ) {
+void ReverbEffectSampler::SetupDirectObstructionSamplingProps( src_t *src, unsigned minSamples, unsigned maxSamples ) {
 	float quality = s_environment_sampling_quality->value;
 	samplingProps_t *props = &src->envUpdateState.directObstructionSamplingProps;
 
@@ -108,6 +87,17 @@ void ObstructedEffectSampler::SetupDirectObstructionSamplingProps( src_t *src, u
 	props->quality = quality;
 	props->numSamples = numSamples;
 	props->valueIndex = (uint16_t)( EffectSamplers::SamplingRandom() * std::numeric_limits<uint16_t>::max() );
+}
+
+unsigned ReverbEffectSampler::GetNumSamplesForCurrentQuality( unsigned minSamples, unsigned maxSamples ) {
+	float quality = s_environment_sampling_quality->value;
+
+	assert( quality >= 0.0f && quality <= 1.0f );
+	assert( minSamples < maxSamples );
+
+	auto numSamples = (unsigned)( minSamples + ( maxSamples - minSamples ) * quality );
+	assert( numSamples && numSamples <= maxSamples );
+	return numSamples;
 }
 
 struct DirectObstructionOffsetsHolder {
@@ -126,7 +116,7 @@ struct DirectObstructionOffsetsHolder {
 
 static DirectObstructionOffsetsHolder directObstructionOffsetsHolder;
 
-float ObstructedEffectSampler::ComputeDirectObstruction( const ListenerProps &listenerProps, src_t *src ) {
+float ReverbEffectSampler::ComputeDirectObstruction( const ListenerProps &listenerProps, src_t *src ) {
 	trace_t trace;
 	envUpdateState_t *updateState;
 	float *originOffset;
@@ -189,7 +179,7 @@ float ObstructedEffectSampler::ComputeDirectObstruction( const ListenerProps &li
 	return 1.0f - 0.9f * ( numPassedRays / (float)numTestedRays );
 }
 
-Effect *ReverbEffectSampler::TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc ) {
+EaxReverbEffect *ReverbEffectSampler::TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc ) {
 	EaxReverbEffect *effect = EffectsAllocator::Instance()->NewReverbEffect( src );
 	effect->directObstruction = ComputeDirectObstruction( listenerProps, src );
 	// We try reuse props only for reverberation effects

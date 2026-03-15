@@ -9,8 +9,6 @@
 class alignas( 8 )EffectsAllocator {
 	template<typename> friend class SingletonHolder;
 
-	static_assert( sizeof( EaxReverbEffect ) >= sizeof( UnderwaterFlangerEffect ), "" );
-
 	static constexpr auto MAX_EFFECT_SIZE = sizeof( EaxReverbEffect );
 
 	static constexpr auto ENTRY_SIZE =
@@ -38,15 +36,11 @@ public:
 	static void Init();
 	static void Shutdown();
 
-	UnderwaterFlangerEffect *NewFlangerEffect( const src_t *src ) {
-		return new( AllocEntry( src, AL_EFFECT_FLANGER ) )UnderwaterFlangerEffect();
-	}
-
 	EaxReverbEffect *NewReverbEffect( const src_t *src ) {
 		return new( AllocEntry( src, AL_EFFECT_EAXREVERB ) )EaxReverbEffect();
 	}
 
-	void DeleteEffect( Effect *effect );
+	void DeleteEffect( EaxReverbEffect *effect );
 };
 
 #endif
