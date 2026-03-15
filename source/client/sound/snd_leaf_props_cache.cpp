@@ -277,7 +277,24 @@ struct LeafPropsBuilder {
 	}
 };
 
-class LeafPropsSampler: public GenericRaycastSampler {
+class LeafPropsRaycastSampler : public GenericRaycastSampler {
+public:
+	LeafPropsRaycastSampler( vec3_t *primaryRayDirs_, vec3_t *primaryHitPoints_,
+							 float *primaryHitDistances_, const vec3_t emissionOrigin_, float emissionRadius_, unsigned numPrimaryRays_ )
+		: GenericRaycastSampler( primaryRayDirs_, primaryHitPoints_, primaryHitDistances_,
+								 emissionOrigin_, emissionRadius_, numPrimaryRays_ ) {
+	}
+
+	unsigned numRaysHitSky { 0 };
+	unsigned numRaysHitSmoothSurface { 0 };
+	unsigned numRaysHitAbsorptiveSurface { 0 };
+	unsigned numRaysHitMetal { 0 };
+private:
+	[[nodiscard]]
+	bool CheckAndAddHitSurfaceProps( const trace_t &trace ) override;
+};
+
+class LeafPropsComputer {
 	static constexpr unsigned MAX_RAYS = 1024;
 
 	// Inline buffers for algorithm intermediates.
@@ -286,25 +303,17 @@ class LeafPropsSampler: public GenericRaycastSampler {
 	float distances[MAX_RAYS];
 	const unsigned maxRays;
 
-	unsigned numRaysHitSky { 0 };
-	unsigned numRaysHitSmoothSurface { 0 };
-	unsigned numRaysHitAbsorptiveSurface { 0 };
-	unsigned numRaysHitMetal { 0 };
-
 public:
-	explicit LeafPropsSampler( bool fastAndCoarse )
+	explicit LeafPropsComputer( bool fastAndCoarse )
 		: maxRays( fastAndCoarse ? MAX_RAYS / 2 : MAX_RAYS ) {
-		SetupSamplingRayDirs( dirs, maxRays );
+		GenericRaycastSampler::SetupSamplingRayDirs( dirs, maxRays );
 	}
-
-	[[nodiscard]]
-	bool CheckAndAddHitSurfaceProps( const trace_t &trace ) override;
 
 	[[nodiscard]]
 	auto ComputeLeafProps( const vec3_t origin ) -> std::optional<LeafProps>;
 };
 
-static LeafProps ComputeLeafProps( LeafPropsSampler *sampler, int leafNum, bool fastAndCoarse );
+static LeafProps ComputeLeafProps( LeafPropsComputer *computer, int leafNum, bool fastAndCoarse );
 
 bool LeafPropsCache::ComputeNewState( bool fastAndCoarse ) {
 	leafProps[0] = LeafProps();
@@ -317,18 +326,18 @@ bool LeafPropsCache::ComputeNewState( bool fastAndCoarse ) {
 
 	try {
 		TaskSystem taskSystem( { .numExtraThreads = S_SuggestNumExtraThreadsForComputations() } );
-		std::vector<LeafPropsSampler> samplersForWorkers;
+		std::vector<LeafPropsComputer> computersForWorkers;
 		for( unsigned i = 0, numWorkers = taskSystem.getNumberOfWorkers(); i < numWorkers; ++i ) {
-			samplersForWorkers.emplace_back( LeafPropsSampler( fastAndCoarse ) );
+			computersForWorkers.emplace_back( LeafPropsComputer( fastAndCoarse ) );
 		}
 		// TODO: Let the task system manage it automatically?
 		unsigned subrangeLength = 4;
 		if( ( actualNumLeafs / subrangeLength ) + 16 >= TaskSystem::kMaxTaskEntries ) {
 			subrangeLength = ( actualNumLeafs / TaskSystem::kMaxTaskEntries ) + 1;
 		}
-		auto fn = [=,&samplersForWorkers,this]( unsigned workerIndex, unsigned beginLeafIndex, unsigned endLeafIndex ) {
+		auto fn = [=,&computersForWorkers,this]( unsigned workerIndex, unsigned beginLeafIndex, unsigned endLeafIndex ) {
 			for( unsigned leafIndex = beginLeafIndex; leafIndex < endLeafIndex; ++leafIndex ) {
-				leafProps[leafIndex] = ComputeLeafProps( &samplersForWorkers[workerIndex], (int)leafIndex, fastAndCoarse );
+				leafProps[leafIndex] = ComputeLeafProps( &computersForWorkers[workerIndex], (int)leafIndex, fastAndCoarse );
 			}
 		};
 		// Start early to test dynamic submission
@@ -340,31 +349,25 @@ bool LeafPropsCache::ComputeNewState( bool fastAndCoarse ) {
 	}
 }
 
-auto LeafPropsSampler::ComputeLeafProps( const vec3_t origin ) -> std::optional<LeafProps> {
-	GenericRaycastSampler::ResetMutableState( dirs, nullptr, distances, origin );
-	this->numRaysHitAbsorptiveSurface = 0;
-	this->numRaysHitSmoothSurface = 0;
-	this->numRaysHitMetal = 0;
-	this->numRaysHitSky = 0;
+auto LeafPropsComputer::ComputeLeafProps( const vec3_t origin ) -> std::optional<LeafProps> {
+	LeafPropsRaycastSampler sampler( dirs, nullptr, distances, origin, 999999.9f, maxRays );
 
-	this->numPrimaryRays = maxRays;
-
-	EmitPrimaryRays();
+	sampler.EmitPrimaryRays();
 
 	// Happens mostly if rays outgoing from origin start in solid
-	if( !numPrimaryHits ) {
+	if( !sampler.numPrimaryHits ) {
 		return std::nullopt;
 	}
 
-	assert( numRaysHitAnySurface >= numPrimaryHits );
+	assert( sampler.numRaysHitAnySurface >= sampler.numPrimaryHits );
 
-	assert( numRaysHitSmoothSurface + numRaysHitAbsorptiveSurface <= numRaysHitAnySurface );
+	assert( sampler.numRaysHitSmoothSurface + sampler.numRaysHitAbsorptiveSurface <= sampler.numRaysHitAnySurface );
 	// A neutral leaf is either surrounded by fully neutral surfaces or numbers of smooth and absorptive surfaces match
 	// A frac is  0.0 for a neutral leaf
 	// A frac is -1.0 for a leaf that is surrounded by absorptive surfaces
 	// A frac is +1.0 for a leaf that is surrounded by smooth surfaces
-	float frac = ( (float)numRaysHitSmoothSurface - (float)numRaysHitAbsorptiveSurface );
-	frac *= 1.0f / (float)numRaysHitAnySurface;
+	float frac = ( (float)sampler.numRaysHitSmoothSurface - (float)sampler.numRaysHitAbsorptiveSurface );
+	frac *= 1.0f / (float)sampler.numRaysHitAnySurface;
 	assert( frac >= -1.0f && frac <= +1.0f );
 
 	// A smoothness is 0.5 for a neutral leaf
@@ -375,15 +378,15 @@ auto LeafPropsSampler::ComputeLeafProps( const vec3_t origin ) -> std::optional<
 
 	LeafProps props {};
 	props.setSmoothnessFactor( smoothness );
-	props.setRoomSizeFactor( ComputeRoomSizeFactor() );
-	const float rcpNumPrimaryHits = 1.0f / (float)numPrimaryHits;
-	props.setSkyFactor( std::pow( (float)numRaysHitSky * rcpNumPrimaryHits, 0.25f ) );
-	props.setMetallnessFactor( (float)numRaysHitMetal * rcpNumPrimaryHits );
+	props.setRoomSizeFactor( sampler.ComputeRoomSizeFactor() );
+	const float rcpNumPrimaryHits = 1.0f / (float)sampler.numPrimaryHits;
+	props.setSkyFactor( std::pow( (float)sampler.numRaysHitSky * rcpNumPrimaryHits, 0.25f ) );
+	props.setMetallnessFactor( (float)sampler.numRaysHitMetal * rcpNumPrimaryHits );
 
 	return props;
 }
 
-bool LeafPropsSampler::CheckAndAddHitSurfaceProps( const trace_t &trace ) {
+bool LeafPropsRaycastSampler::CheckAndAddHitSurfaceProps( const trace_t &trace ) {
 	const auto contents = trace.contents;
 	if( contents & ( CONTENTS_WATER | CONTENTS_SLIME ) ) {
 		numRaysHitSmoothSurface++;
@@ -421,7 +424,7 @@ bool LeafPropsSampler::CheckAndAddHitSurfaceProps( const trace_t &trace ) {
 	return true;
 }
 
-static LeafProps ComputeLeafProps( LeafPropsSampler *sampler, int leafNum, bool fastAndCoarse ) {
+static LeafProps ComputeLeafProps( LeafPropsComputer *computer, int leafNum, bool fastAndCoarse ) {
 	const vec3_t *leafBounds = S_GetLeafBounds( leafNum );
 	const float *leafMins = leafBounds[0];
 	const float *leafMaxs = leafBounds[1];
@@ -476,7 +479,7 @@ static LeafProps ComputeLeafProps( LeafPropsSampler *sampler, int leafNum, bool 
 		}
 
 		// Might fail if the rays outgoing from the point start in solid
-		if( const auto maybeProps = sampler->ComputeLeafProps( point ) ) {
+		if( const auto maybeProps = computer->ComputeLeafProps( point ) ) {
 			propsBuilder += *maybeProps;
 			numSamples++;
 			// Invalidate previous point used for sampling

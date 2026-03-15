@@ -425,7 +425,7 @@ static void ENV_UpdateSourceEnvironment( src_t *src, int64_t millisNow, const sr
 	// Get the leaf num before the update as it is important for all present tests
 	updateState->leafNum = S_PointLeafNum( src->origin );
 
-	updateState->effect = EffectSamplers::TryApply( listenerProps, src, tryReusePropsSrc );
+	updateState->effect = ReverbEffectComputer::TryApply( listenerProps, src, tryReusePropsSrc );
 
 	updateState->effect->distanceAtLastUpdate = sqrtf( DistanceSquared( src->origin, listenerProps.origin ) );
 	updateState->effect->lastUpdateAt = millisNow;
