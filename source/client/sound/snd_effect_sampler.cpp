@@ -11,17 +11,6 @@
 #include <limits>
 #include <random>
 
-static ReverbEffectSampler reverbEffectSampler;
-
-EaxReverbEffect *EffectSamplers::TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc ) {
-	EaxReverbEffect *effect;
-	if( ( effect = ::reverbEffectSampler.TryApply( listenerProps, src, tryReusePropsSrc ) ) ) {
-		return effect;
-	}
-
-	Com_Error( ERR_FATAL, "EffectSamplers::TryApply(): Can't find an applicable effect sampler\n" );
-}
-
 // We want sampling results to be reproducible especially for leaf sampling and thus use this local implementation
 static std::minstd_rand0 samplingRandom;
 
@@ -73,7 +62,7 @@ static bool ENV_TryReuseSourceReverbProps( src_t *src, const src_t *tryReuseProp
 	return true;
 }
 
-void ReverbEffectSampler::SetupDirectObstructionSamplingProps( src_t *src, unsigned minSamples, unsigned maxSamples ) {
+void ReverbEffectComputer::SetupDirectObstructionSamplingProps( src_t *src, unsigned minSamples, unsigned maxSamples ) {
 	float quality = s_environment_sampling_quality->value;
 	samplingProps_t *props = &src->envUpdateState.directObstructionSamplingProps;
 
@@ -89,7 +78,7 @@ void ReverbEffectSampler::SetupDirectObstructionSamplingProps( src_t *src, unsig
 	props->valueIndex = (uint16_t)( EffectSamplers::SamplingRandom() * std::numeric_limits<uint16_t>::max() );
 }
 
-unsigned ReverbEffectSampler::GetNumSamplesForCurrentQuality( unsigned minSamples, unsigned maxSamples ) {
+unsigned ReverbEffectComputer::GetNumSamplesForCurrentQuality( unsigned minSamples, unsigned maxSamples ) {
 	float quality = s_environment_sampling_quality->value;
 
 	assert( quality >= 0.0f && quality <= 1.0f );
@@ -116,7 +105,7 @@ struct DirectObstructionOffsetsHolder {
 
 static DirectObstructionOffsetsHolder directObstructionOffsetsHolder;
 
-float ReverbEffectSampler::ComputeDirectObstruction( const ListenerProps &listenerProps, src_t *src ) {
+float ReverbEffectComputer::ComputeDirectObstruction( const ListenerProps &listenerProps, src_t *src ) {
 	trace_t trace;
 	envUpdateState_t *updateState;
 	float *originOffset;
@@ -179,7 +168,7 @@ float ReverbEffectSampler::ComputeDirectObstruction( const ListenerProps &listen
 	return 1.0f - 0.9f * ( numPassedRays / (float)numTestedRays );
 }
 
-EaxReverbEffect *ReverbEffectSampler::TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc ) {
+EaxReverbEffect *ReverbEffectComputer::TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc ) {
 	EaxReverbEffect *effect = EffectsAllocator::Instance()->NewReverbEffect( src );
 	effect->directObstruction = ComputeDirectObstruction( listenerProps, src );
 	// We try reuse props only for reverberation effects
@@ -194,7 +183,7 @@ EaxReverbEffect *ReverbEffectSampler::TryApply( const ListenerProps &listenerPro
 	return effect;
 }
 
-float ReverbEffectSampler::GetEmissionRadius() const {
+float ReverbEffectComputer::CalcEmissionRadius( const src_t *src ) {
 	// Do not even bother casting rays 999999 units ahead for very attenuated sources.
 	// However, clamp/normalize the hit distance using the same defined threshold
 	float attenuation = src->attenuation;
@@ -207,17 +196,6 @@ float ReverbEffectSampler::GetEmissionRadius() const {
 	float distance = 4.0f * REVERB_ENV_DISTANCE_THRESHOLD;
 	distance -= 3.5f * Q_Sqrt( attenuation / 10.0f ) * REVERB_ENV_DISTANCE_THRESHOLD;
 	return distance;
-}
-
-void ReverbEffectSampler::ResetMutableState( const ListenerProps &listenerProps_, src_t *src_, EaxReverbEffect *effect_ ) {
-	this->listenerProps = &listenerProps_;
-	this->src = src_;
-	this->effect = effect_;
-
-	GenericRaycastSampler::ResetMutableState( primaryRayDirs, reflectionPoints, primaryHitDistances, src->origin );
-
-	VectorCopy( listenerProps_.origin, testedListenerOrigin );
-	testedListenerOrigin[2] += 18.0f;
 }
 
 class CachedPresetTracker {
@@ -303,18 +281,22 @@ static CachedPresetTracker g_tinyMetallicRoomPreset { "s_tinyMetallicRoomPreset"
 static CachedPresetTracker g_largeMetallicRoomPreset { "s_largeMetallicRoomPreset", "factory_largeroom factory_mediumroom" };
 static CachedPresetTracker g_hugeMetallicRoomPreset { "s_hugeMetallicRoomPreset", "factory_hall factory_hall hangar" };
 
-void ReverbEffectSampler::ComputeReverberation( const ListenerProps &listenerProps_,
-												src_t *src_,
-												EaxReverbEffect *effect_ ) {
-	ResetMutableState( listenerProps_, src_, effect_ );
+void ReverbEffectComputer::ComputeReverberation( const ListenerProps &listenerProps,
+												 src_t *src, EaxReverbEffect *effect ) {
+	const unsigned numPrimaryRays = GetNumSamplesForCurrentQuality( 16, MAX_REVERB_PRIMARY_RAY_SAMPLES );
 
-	numPrimaryRays = GetNumSamplesForCurrentQuality( 16, MAX_REVERB_PRIMARY_RAY_SAMPLES );
+	vec3_t primaryRayDirs[MAX_REVERB_PRIMARY_RAY_SAMPLES];
+	vec3_t reflectionPoints[MAX_REVERB_PRIMARY_RAY_SAMPLES];
+	float primaryHitDistances[MAX_REVERB_PRIMARY_RAY_SAMPLES];
 
-	SetupPrimaryRayDirs();
+	GenericRaycastSampler::SetupSamplingRayDirs( primaryRayDirs, numPrimaryRays );
 
-	EmitPrimaryRays();
+	ReverbRaycastSampler sampler( primaryRayDirs, reflectionPoints, primaryHitDistances, src->origin,
+								  CalcEmissionRadius( src ), numPrimaryRays );
 
-	if( !numPrimaryHits ) {
+	sampler.EmitPrimaryRays();
+
+	if( !sampler.numPrimaryHits ) {
 		// Keep existing values (they are valid by default now)
 		return;
 	}
@@ -395,41 +377,41 @@ void ReverbEffectSampler::ComputeReverberation( const ListenerProps &listenerPro
 
 	interpolateReverbProps( &closedProps, leafProps.getSkyFactor(), &openProps, &effect->reverbProps );
 
-	EmitSecondaryRays();
+	EmitSecondaryRays( sampler, listenerProps, src, effect );
 }
 
-void ReverbEffectSampler::SetupPrimaryRayDirs() {
-	assert( numPrimaryRays );
+void ReverbEffectComputer::EmitSecondaryRays( const ReverbRaycastSampler &sampler, const ListenerProps &listenerProps,
+											  src_t *src, EaxReverbEffect *effect ) {
+	int listenerLeafNum = listenerProps.GetLeafNum();
 
-	SetupSamplingRayDirs( primaryRayDirs, numPrimaryRays );
-}
-
-void ReverbEffectSampler::EmitSecondaryRays() {
-	int listenerLeafNum = listenerProps->GetLeafNum();
+	vec3_t testedListenerOrigin;
+	VectorCopy( listenerProps.origin, testedListenerOrigin );
+	// TODO: Use attachment offsets
+	testedListenerOrigin[2] += 18.0f;
 
 	auto *const panningUpdateState = &src->panningUpdateState;
-	panningUpdateState->numPrimaryRays = numPrimaryRays;
+	panningUpdateState->numPrimaryRays = sampler.numPrimaryRays;
 
 	trace_t trace;
 
 	unsigned numPassedSecondaryRays = 0;
 	panningUpdateState->numPassedSecondaryRays = 0;
-	for( unsigned i = 0; i < numPrimaryHits; i++ ) {
+	for( unsigned i = 0; i < sampler.numPrimaryHits; i++ ) {
 		// Cut off by PVS system early, we are not interested in actual ray hit points contrary to the primary emission.
-		if( !S_LeafsInPVS( listenerLeafNum, S_PointLeafNum( reflectionPoints[i] ) ) ) {
+		if( !S_LeafsInPVS( listenerLeafNum, S_PointLeafNum( sampler.primaryHitPoints[i] ) ) ) {
 			continue;
 		}
 
-		S_Trace( &trace, reflectionPoints[i], testedListenerOrigin, vec3_origin, vec3_origin, MASK_SOLID );
+		S_Trace( &trace, sampler.primaryHitPoints[i], testedListenerOrigin, vec3_origin, vec3_origin, MASK_SOLID );
 		if( trace.fraction == 1.0f && !trace.startsolid ) {
 			numPassedSecondaryRays++;
 			float *savedPoint = panningUpdateState->reflectionPoints[panningUpdateState->numPassedSecondaryRays++];
-			VectorCopy( reflectionPoints[i], savedPoint );
+			VectorCopy( sampler.primaryHitPoints[i], savedPoint );
 		}
 	}
 
-	if( numPrimaryHits ) {
-		float frac = numPassedSecondaryRays / (float)numPrimaryHits;
+	if( sampler.numPrimaryHits ) {
+		float frac = numPassedSecondaryRays / (float)sampler.numPrimaryHits;
 		// The secondary rays obstruction is complement to the `frac`
 		effect->secondaryRaysObstruction = 1.0f - frac;
 	} else {

@@ -25,9 +25,6 @@ struct ListenerProps {
 
 class EffectSamplers {
 public:
-	// Would be nice just have a method of the same signature in Effect scope but static.
-	// Unfortunately there is no companion objects like in Scala/Kotlin.
-	static EaxReverbEffect *TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc );
 	static float SamplingRandom();
 };
 
@@ -35,33 +32,29 @@ constexpr const auto MAX_DIRECT_OBSTRUCTION_SAMPLES = 8;
 // Almost doubled for "realistic obstruction" (we need more secondary rays)
 constexpr const auto MAX_REVERB_PRIMARY_RAY_SAMPLES = 80;
 
-class ReverbEffectSampler final: private GenericRaycastSampler {
+class ReverbRaycastSampler : public GenericRaycastSampler {
+public:
+	ReverbRaycastSampler( vec3_t *primaryRayDirs_, vec3_t *primaryHitPoints_, float *primaryHitDistances_,
+						  const vec3_t emissionOrigin_, float emissionRadius_, unsigned numPrimaryRays_ )
+		: GenericRaycastSampler( primaryRayDirs_, primaryHitPoints_, primaryHitDistances_,
+								 emissionOrigin_, emissionRadius_, numPrimaryRays_ ) {}
+};
+
+class ReverbEffectComputer {
 private:
-	vec3_t primaryRayDirs[MAX_REVERB_PRIMARY_RAY_SAMPLES];
-	vec3_t reflectionPoints[MAX_REVERB_PRIMARY_RAY_SAMPLES];
-	float primaryHitDistances[MAX_REVERB_PRIMARY_RAY_SAMPLES];
-	vec3_t testedListenerOrigin;
+	static void SetupDirectObstructionSamplingProps( src_t *src, unsigned minSamples, unsigned maxSamples );
 
-	const ListenerProps *listenerProps;
-	src_t * src;
-	EaxReverbEffect * effect;
-
-	void SetupDirectObstructionSamplingProps( src_t *src, unsigned minSamples, unsigned maxSamples );
-
-	float ComputeDirectObstruction( const ListenerProps &listenerProps, src_t *src );
+	static float ComputeDirectObstruction( const ListenerProps &listenerProps, src_t *src );
 
 	static unsigned GetNumSamplesForCurrentQuality( unsigned minSamples, unsigned maxSamples );
 
-	void ComputeReverberation( const ListenerProps &listenerProps_, src_t *src_, EaxReverbEffect *effect_ );
+	static void ComputeReverberation( const ListenerProps &listenerProps_, src_t *src, EaxReverbEffect *effect );
 
-	void ResetMutableState( const ListenerProps &listenerProps_, src_t *src_, EaxReverbEffect *effect_ );
+	static float CalcEmissionRadius( const src_t *src );
 
-	float GetEmissionRadius() const override;
-	void SetupPrimaryRayDirs();
-	void EmitSecondaryRays();
-
+	static void EmitSecondaryRays( const ReverbRaycastSampler &sampler, const ListenerProps &listenerProps, src_t *src, EaxReverbEffect *effect );
 public:
-	EaxReverbEffect *TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc );
+	static EaxReverbEffect *TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc );
 };
 
 #endif

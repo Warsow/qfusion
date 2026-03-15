@@ -52,9 +52,8 @@ bool GenericRaycastSampler::CheckAndAddHitSurfaceProps( const trace_t &trace ) {
 }
 
 void GenericRaycastSampler::EmitPrimaryRays() {
-	const float primaryEmissionRadius = GetEmissionRadius();
 	// Using top node hints is quite beneficial for small emission radii.
-	const int topNode = S_FindTopNodeForSphere( emissionOrigin, primaryEmissionRadius );
+	const int topNode = S_FindTopNodeForSphere( emissionOrigin, emissionRadius );
 
 	// These values must be reset at this stage
 	assert( !averageDistance );
@@ -72,7 +71,7 @@ void GenericRaycastSampler::EmitPrimaryRays() {
 		sampleDir = primaryRayDirs[i];
 
 		vec3_t testedRayPoint;
-		VectorScale( sampleDir, primaryEmissionRadius, testedRayPoint );
+		VectorScale( sampleDir, emissionRadius, testedRayPoint );
 		VectorAdd( testedRayPoint, emissionOrigin, testedRayPoint );
 		S_Trace( &trace, emissionOrigin, testedRayPoint, vec3_origin, vec3_origin, MASK_SOLID | MASK_WATER, topNode );
 
