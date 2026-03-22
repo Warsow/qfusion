@@ -19,6 +19,8 @@ struct ListenerProps {
 	}
 };
 
+struct PanningUpdateState;
+
 class EffectSamplers {
 public:
 	static float SamplingRandom();
@@ -29,6 +31,12 @@ void ENV_Shutdown();
 void ENV_EndRegistration();
 
 void ENV_UpdateListener( int entNum, const vec3_t origin, const vec3_t velocity, const mat3_t axes );
+
+void ENV_CalculateSourcePan( const vec3_t listenerOrigin, const mat3_t listenerAxes,
+							 const PanningUpdateState *updateState, vec3_t earlyPan, vec3_t latePan );
+
+void ENV_CalculatePropagationOrigin( const vec3_t listenerOrigin, const vec3_t realSourceOrigin,
+									 float *sourcePitchScale, vec3_t sourceOriginToUse );
 
 void ENV_RegisterSource( struct src_s *src );
 

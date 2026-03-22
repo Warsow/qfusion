@@ -1,6 +1,5 @@
 #include "snd_env_effects.h"
 #include "environmentupdates.h"
-#include "snd_propagation.h"
 #include <common/facilities/gs_public.h>
 #include <common/facilities/protocol.h>
 #include <common/facilities/sysclock.h>
@@ -175,11 +174,12 @@ void EaxReverbEffect::InterpolateProps( const EaxReverbEffect *that, int timeDel
 	interpolateReverbProps( &that->reverbProps, lerpFrac, &this->reverbProps, &this->reverbProps );
 }
 
+
+
 void EaxReverbEffect::UpdatePanning( src_s *src, int listenerEntNum, const vec3_t listenerOrigin, const mat3_t listenerAxes ) {
 	// "If there is an active EaxReverbEffect, setting source origin/velocity is delegated to it".
 	UpdateDelegatedSpatialization( src, listenerEntNum, listenerOrigin );
 
-	// Disable reverb panning for local sounds
 	if( src->attenuation != ATTN_NONE ) {
 		return;
 	}
@@ -188,64 +188,8 @@ void EaxReverbEffect::UpdatePanning( src_s *src, int listenerEntNum, const vec3_
 		return;
 	}
 
-	const auto *updateState = &src->panningUpdateState;
-
-	float earlyPanDir[3] { 0.0f, 0.0f, 0.0f };
-	float latePanDir[3] { 0.0f, 0.0f, 0.0f };
-
-	unsigned numAccountedDirs = 0;
-	for( unsigned i = 0; i < updateState->numPassedSecondaryRays; ++i ) {
-		float dir[3];
-		VectorSubtract( listenerOrigin, src->panningUpdateState.reflectionPoints[i], dir );
-
-		float squareDistance = VectorLengthSquared( dir );
-		// Do not even take into account directions that have very short segments
-		if( squareDistance < 48.0f * 48.0f ) {
-			continue;
-		}
-
-		numAccountedDirs++;
-
-		const float rcpDistance = Q_RSqrt( squareDistance );
-		VectorScale( dir, rcpDistance, dir );
-
-		const float distance         = squareDistance * rcpDistance;
-		constexpr float rcpThreshold = 1.0f / REVERB_ENV_DISTANCE_THRESHOLD;
-		const float distanceFrac     = wsw::min( 1.0f, distance * rcpThreshold );
-
-		// Give far reflections a priority. Disallow zero values to guarantee that the normalization would succeed.
-		const float lateFrac = 0.3f + 0.7f * distanceFrac;
-		VectorMA( latePanDir, lateFrac, dir, latePanDir );
-
-		// Give near reflections a priority
-		const float earlyFrac = 1.0f - 0.7f * distanceFrac;
-		VectorMA( earlyPanDir, earlyFrac, dir, earlyPanDir );
-	}
-
-	float earlyPan[3] { 0.0f, 0.0f, 0.0f };
-	float latePan[3] { 0.0f, 0.0f, 0.0f };
-	if( numAccountedDirs ) {
-		VectorNormalizeFast( earlyPanDir );
-		VectorNormalizeFast( latePanDir );
-
-		// Convert to "speakers" coordinate system
-		earlyPan[0] = -DotProduct( earlyPanDir, &listenerAxes[AXIS_RIGHT] );
-		latePan[0]  = -DotProduct( latePanDir, &listenerAxes[AXIS_RIGHT] );
-
-		// Not sure about "minus" sign in this case...
-		// We need something like 9.1 sound system (that has channels distinction in height) to test that
-		earlyPan[1] = -DotProduct( earlyPanDir, &listenerAxes[AXIS_UP] );
-		latePan[1]  = -DotProduct( latePanDir, &listenerAxes[AXIS_UP] );
-
-		earlyPan[2] = -DotProduct( earlyPanDir, &listenerAxes[AXIS_FORWARD] );
-		latePan[2]  = -DotProduct( latePanDir, &listenerAxes[AXIS_FORWARD] );
-
-		// We should be more confident regarding the direction if most of primary rays did yield results
-		const float panningStrengthScale = 0.3f * (float)numAccountedDirs * Q_Rcp( (float)updateState->numPrimaryRays );
-
-		VectorScale( earlyPan, panningStrengthScale, earlyPan );
-		VectorScale( latePan, panningStrengthScale, latePan );
-	}
+	vec3_t earlyPan, latePan;
+	ENV_CalculateSourcePan( listenerOrigin, listenerAxes, &src->panningUpdateState, earlyPan, latePan );
 
 	alEffectfv( src->effect, AL_EAXREVERB_REFLECTIONS_PAN, earlyPan );
 	alEffectfv( src->effect, AL_EAXREVERB_LATE_REVERB_PAN, latePan );
@@ -264,8 +208,10 @@ void EaxReverbEffect::UpdateDelegatedSpatialization( struct src_s *src, int list
 
 	alSourcei( src->source, AL_SOURCE_RELATIVE, AL_FALSE );
 
-	float sourcePitchScale    = 1.0f;
-	const float *sourceOrigin = src->origin;
+	float sourcePitchScale = 1.0f;
+	vec3_t sourceOriginToUse;
+	VectorCopy( src->origin, sourceOriginToUse );
+
 	// Don't do that for own sounds
 	if( listenerEntNum <= 0 || listenerEntNum != src->entNum ) {
 		// Setting effect panning vectors is not sufficient for "realistic" obstruction,
@@ -276,41 +222,14 @@ void EaxReverbEffect::UpdateDelegatedSpatialization( struct src_s *src, int list
 		// 2) there is a definite propagation path
 		if( directObstruction == 1.0f ) {
 			sourcePitchScale = 0.96f;
-			// Provide a fake origin for the source that is at the same distance
-			// as the real origin and is aligned to the sound propagation "window"
-			// TODO: Precache at least the listener leaf for this sound backend update frame
-			if( const int listenerLeaf = S_PointLeafNum( listenerOrigin ) ) {
-				if( const int srcLeaf = S_PointLeafNum( src->origin ) ) {
-					vec3_t dir;
-					float distance;
-					if( PropagationTable::Instance()->GetIndirectPathProps( srcLeaf, listenerLeaf, dir, &distance ) ) {
-						// The table stores distance using this granularity, so it might be zero
-						// for very close leaves. Adding an extra distance won't harm
-						// (even if the indirect path length is already larger than the straight euclidean distance).
-						distance += 256.0f;
-						// Feels better with this multiplier
-						distance *= 1.15f;
-						// Negate the vector scale multiplier as the dir is an sound influx dir to the listener
-						// and we want to shift the origin along the line of the dir but from the listener
-						VectorScale( dir, -distance, tmpSourceOrigin );
-						// Shift the listener origin in `dir` direction for `distance` units
-						VectorAdd( listenerOrigin, tmpSourceOrigin, tmpSourceOrigin );
-						// Use the shifted origin as a fake position in the world-space for the source
-						sourceOrigin = tmpSourceOrigin;
-						assert( sourcePitchScale > 0.0f && sourcePitchScale < 1.0f );
-						const float gainLike = calcSoundGainForDistanceAndAttenuation( distance, ATTN_NORM );
-						sourcePitchScale += ( 1.0f - sourcePitchScale ) * gainLike;
-						if( std::fabs( sourcePitchScale - 1.0f ) < 0.005f ) {
-							sourcePitchScale = 1.0f;
-						}
-					}
-				}
-			}
+			ENV_CalculatePropagationOrigin( listenerOrigin, src->origin, &sourcePitchScale, sourceOriginToUse );
 		}
 	}
 
+	assert( sourcePitchScale > 0.0f && sourcePitchScale <= 1.0f );
 	alSourcef( src->source, AL_PITCH, src->chosenPitch * sourcePitchScale );
-	alSourcefv( src->source, AL_POSITION, sourceOrigin );
+
+	alSourcefv( src->source, AL_POSITION, sourceOriginToUse );
 	// The velocity is kept untouched for now.
 	alSourcefv( src->source, AL_VELOCITY, src->velocity );
 }

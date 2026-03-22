@@ -7,6 +7,8 @@
 #include <common/helpers/algorithm.h>
 #include <common/helpers/stringsplitter.h>
 #include <common/facilities/cvar.h>
+#include <common/facilities/gs_public.h>
+#include <common/facilities/protocol.h>
 #include <common/facilities/sysclock.h>
 #include <limits>
 #include <random>
@@ -881,5 +883,102 @@ void ReverbEffectComputer::EmitSecondaryRays( const ReverbRaycastSampler &sample
 	} else {
 		// Set minimal feasible values
 		effect->secondaryRaysObstruction = 1.0f;
+	}
+}
+
+void ENV_CalculateSourcePan( const vec3_t listenerOrigin, const mat3_t listenerAxes,
+							 const PanningUpdateState *updateState, vec3_t earlyPan, vec3_t latePan ) {
+	float earlyPanDir[3] { 0.0f, 0.0f, 0.0f };
+	float latePanDir[3] { 0.0f, 0.0f, 0.0f };
+
+	unsigned numAccountedDirs = 0;
+	for( unsigned i = 0; i < updateState->numPassedSecondaryRays; ++i ) {
+		float dir[3];
+		VectorSubtract( listenerOrigin, updateState->reflectionPoints[i], dir );
+
+		float squareDistance = VectorLengthSquared( dir );
+		// Do not even take into account directions that have very short segments
+		if( squareDistance < 48.0f * 48.0f ) {
+			continue;
+		}
+
+		numAccountedDirs++;
+
+		const float rcpDistance = Q_RSqrt( squareDistance );
+		VectorScale( dir, rcpDistance, dir );
+
+		const float distance         = squareDistance * rcpDistance;
+		constexpr float rcpThreshold = 1.0f / REVERB_ENV_DISTANCE_THRESHOLD;
+		const float distanceFrac     = wsw::min( 1.0f, distance * rcpThreshold );
+
+		// Give far reflections a priority. Disallow zero values to guarantee that the normalization would succeed.
+		const float lateFrac = 0.3f + 0.7f * distanceFrac;
+		VectorMA( latePanDir, lateFrac, dir, latePanDir );
+
+		// Give near reflections a priority
+		const float earlyFrac = 1.0f - 0.7f * distanceFrac;
+		VectorMA( earlyPanDir, earlyFrac, dir, earlyPanDir );
+	}
+
+	VectorSet( earlyPan, 0.0f, 0.0f, 0.0f );
+	VectorSet( latePan, 0.0f, 0.0f, 0.0f );
+
+	if( numAccountedDirs ) {
+		VectorNormalizeFast( earlyPanDir );
+		VectorNormalizeFast( latePanDir );
+
+		// Convert to "speakers" coordinate system
+		earlyPan[0] = -DotProduct( earlyPanDir, &listenerAxes[AXIS_RIGHT] );
+		latePan[0]  = -DotProduct( latePanDir, &listenerAxes[AXIS_RIGHT] );
+
+		// Not sure about "minus" sign in this case...
+		// We need something like 9.1 sound system (that has channels distinction in height) to test that
+		earlyPan[1] = -DotProduct( earlyPanDir, &listenerAxes[AXIS_UP] );
+		latePan[1]  = -DotProduct( latePanDir, &listenerAxes[AXIS_UP] );
+
+		earlyPan[2] = -DotProduct( earlyPanDir, &listenerAxes[AXIS_FORWARD] );
+		latePan[2]  = -DotProduct( latePanDir, &listenerAxes[AXIS_FORWARD] );
+
+		// We should be more confident regarding the direction if most of primary rays did yield results
+		const float panningStrengthScale = 0.3f * (float)numAccountedDirs * Q_Rcp( (float)updateState->numPrimaryRays );
+
+		VectorScale( earlyPan, panningStrengthScale, earlyPan );
+		VectorScale( latePan, panningStrengthScale, latePan );
+	}
+}
+
+void ENV_CalculatePropagationOrigin( const vec3_t listenerOrigin, const vec3_t realSourceOrigin,
+									 float *sourcePitchScale, vec3_t sourceOriginToUse ) {
+	// Should be already set to a feasible value
+	assert( *sourcePitchScale > 0.0f && *sourcePitchScale <= 1.0f );
+	assert( VectorCompare( realSourceOrigin, sourceOriginToUse ) );
+
+	// Provide a fake origin for the source that is at the same distance
+	// as the real origin and is aligned to the sound propagation "window"
+	// TODO: Precache at least the listener leaf for this sound backend update frame
+	if( const int listenerLeaf = S_PointLeafNum( listenerOrigin ) ) {
+		if( const int srcLeaf = S_PointLeafNum( listenerOrigin ) ) {
+			vec3_t dir;
+			float distance;
+			if( PropagationTable::Instance()->GetIndirectPathProps( srcLeaf, listenerLeaf, dir, &distance ) ) {
+				// The table stores distance using this granularity, so it might be zero
+				// for very close leaves. Adding an extra distance won't harm
+				// (even if the indirect path length is already larger than the straight euclidean distance).
+				distance += 256.0f;
+				// Feels better with this multiplier
+				distance *= 1.15f;
+				// Negate the vector scale multiplier as the dir is an sound influx dir to the listener
+				// and we want to shift the origin along the line of the dir but from the listener
+				VectorScale( dir, -distance, sourceOriginToUse );
+				// Shift the listener origin in `dir` direction for `distance` units
+				VectorAdd( listenerOrigin, sourceOriginToUse, sourceOriginToUse );
+				const float gainLike = calcSoundGainForDistanceAndAttenuation( distance, ATTN_NORM );
+				*sourcePitchScale += ( 1.0f - *sourcePitchScale ) * gainLike;
+				// Suppress pitch modification if the difference is small
+				if( std::fabs( *sourcePitchScale - 1.0f ) < 0.005f ) {
+					*sourcePitchScale = 1.0f;
+				}
+			}
+		}
 	}
 }
