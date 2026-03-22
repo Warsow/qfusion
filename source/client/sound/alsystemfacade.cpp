@@ -4,7 +4,7 @@
 #include <common/helpers/pipeutils.h>
 
 #include "snd_local.h"
-#include "snd_env_sampler.h"
+#include "environmentupdates.h"
 
 static SingletonHolder<wsw::snd::ALSoundSystem> alSoundSystemHolder;
 static bool s_registering;

@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "snd_local.h"
-#include "snd_env_sampler.h"
+#include "environmentupdates.h"
 #include "alsystemfacade.h"
 #include <common/facilities/cvar.h>
 #include <common/facilities/q_comref.h>

@@ -1,5 +1,6 @@
 #include "snd_leaf_props_cache.h"
-#include "snd_effect_sampler.h"
+#include "environmentupdates.h"
+#include "snd_raycast_sampler.h"
 #include <common/helpers/glob.h>
 #include <common/helpers/singletonholder.h>
 #include <common/facilities/tasksystem.h>
