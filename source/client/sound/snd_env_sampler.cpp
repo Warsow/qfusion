@@ -10,7 +10,7 @@
 #include <common/facilities/sysclock.h>
 #include <limits>
 
-ListenerProps listenerProps;
+static ListenerProps g_listenerProps;
 
 static_assert( PanningUpdateState::MAX_POINTS == MAX_REVERB_PRIMARY_RAY_SAMPLES, "" );
 
@@ -43,7 +43,7 @@ void ENV_Init() {
 		return;
 	}
 
-	listenerProps.InvalidateCachedUpdateState();
+	g_listenerProps.InvalidateCachedUpdateState();
 
 	ENV_InitGlobalInstances();
 }
@@ -55,7 +55,7 @@ void ENV_Shutdown() {
 
 	ENV_ShutdownGlobalInstances();
 
-	listenerProps.InvalidateCachedUpdateState();
+	g_listenerProps.InvalidateCachedUpdateState();
 }
 
 void ENV_EndRegistration() {
@@ -131,18 +131,11 @@ public:
 	src_t *PopSource();
 };
 
-static SourcesUpdatePriorityQueue sourcesUpdatePriorityQueue;
+static void ENV_UpdateSourceEnvironment( src_t *src, const src_t *tryReusePropsSrc,
+										 const ListenerProps &listenerProps, int64_t millisNow );
 
-static void ENV_ProcessUpdatesPriorityQueue();
-
-static void ENV_UpdateSourceEnvironment( src_t *src, int64_t millisNow, const src_t *tryReusePropsSrc );
-
-static inline void ENV_CollectForcedEnvironmentUpdates() {
-	src_t *src, *end;
-
-	auto &priorityQueue = ::sourcesUpdatePriorityQueue;
-
-	for( src = srclist, end = srclist + src_count; src != end; ++src ) {
+static void ENV_CollectForcedEnvironmentUpdates( SourcesUpdatePriorityQueue *priorityQueue ) {
+	for( src_t *src = srclist, *end = srclist + src_count; src != end; ++src ) {
 		if( !src->isActive ) {
 			continue;
 		}
@@ -152,26 +145,24 @@ static inline void ENV_CollectForcedEnvironmentUpdates() {
 		}
 
 		if( src->priority != SRCPRI_LOCAL ) {
-			priorityQueue.AddSource( src, 1.0f );
+			priorityQueue->AddSource( src, 1.0f );
 			continue;
 		}
 
 		if( !src->envUpdateState.nextEnvUpdateAt ) {
-			priorityQueue.AddSource( src, 1.0f );
+			priorityQueue->AddSource( src, 1.0f );
 			continue;
 		}
 	}
 }
 
-static void ENV_CollectRegularEnvironmentUpdates() {
+static void ENV_CollectRegularEnvironmentUpdates( SourcesUpdatePriorityQueue *priorityQueue ) {
 	src_t *src, *end;
 	envUpdateState_t *updateState;
 	int64_t millisNow;
 	int contents;
 
 	millisNow = Sys_Milliseconds();
-
-	auto &priorityQueue = ::sourcesUpdatePriorityQueue;
 
 	for( src = srclist, end = srclist + src_count; src != end; ++src ) {
 		if( !src->isActive ) {
@@ -186,7 +177,7 @@ static void ENV_CollectRegularEnvironmentUpdates() {
 		if( src->priority == SRCPRI_LOCAL ) {
 			// If this source has never been updated, add it to the queue, otherwise skip further updates.
 			if( !updateState->nextEnvUpdateAt ) {
-				priorityQueue.AddSource( src, 5.0f );
+				priorityQueue->AddSource( src, 5.0f );
 			}
 			continue;
 		}
@@ -195,7 +186,7 @@ static void ENV_CollectRegularEnvironmentUpdates() {
 		bool wasInLiquid = updateState->isInLiquid;
 		updateState->isInLiquid = ( contents & ( CONTENTS_LAVA | CONTENTS_SLIME | CONTENTS_WATER ) ) != 0;
 		if( updateState->isInLiquid ^ wasInLiquid ) {
-			priorityQueue.AddSource( src, 2.0f );
+			priorityQueue->AddSource( src, 2.0f );
 			continue;
 		}
 
@@ -207,9 +198,9 @@ static void ENV_CollectRegularEnvironmentUpdates() {
 		if( updateState->nextEnvUpdateAt <= millisNow ) {
 			// If the playback has been just added
 			if( !updateState->nextEnvUpdateAt ) {
-				priorityQueue.AddSource( src, 5.0f );
+				priorityQueue->AddSource( src, 5.0f );
 			} else {
-				priorityQueue.AddSource( src, 1.0f );
+				priorityQueue->AddSource( src, 1.0f );
 			}
 			continue;
 		}
@@ -221,14 +212,14 @@ static void ENV_CollectRegularEnvironmentUpdates() {
 				// Hack! Prevent fast-moving entities (that are very likely PG projectiles)
 				// to consume the entire updates throughput
 				if( VectorLengthSquared( src->velocity ) < 700 * 700 ) {
-					priorityQueue.AddSource( src, 1.5f );
+					priorityQueue->AddSource( src, 1.5f );
 				}
 				continue;
 			}
 
 			// If the entity velocity has been significantly modified
 			if( DistanceSquared( src->velocity, updateState->lastUpdateVelocity ) > 200 * 200 ) {
-				priorityQueue.AddSource( src, 1.5f );
+				priorityQueue->AddSource( src, 1.5f );
 				continue;
 			}
 		}
@@ -268,19 +259,19 @@ src_t *SourcesUpdatePriorityQueue::PopSource() {
 	return heap[numSourcesInHeap].src;
 }
 
-static void ENV_ProcessUpdatesPriorityQueue() {
+static void ENV_ProcessUpdatesPriorityQueue( ListenerProps *listenerProps, SourcesUpdatePriorityQueue *priorityQueue ) {
 	const uint64_t micros = Sys_Microseconds();
 	const int64_t millis = (int64_t)( micros / 1000 );
 	src_t *src;
 
-	listenerProps.InvalidateCachedUpdateState();
+	listenerProps->InvalidateCachedUpdateState();
 
 	const SoundSet *lastProcessedSfx = nullptr;
 	const src_t *lastProcessedSrc = nullptr;
 	float lastProcessedPriority = std::numeric_limits<float>::max();
 	// Always do at least a single update
 	for( ;; ) {
-		if( !( src = sourcesUpdatePriorityQueue.PopSource() ) ) {
+		if( !( src = priorityQueue->PopSource() ) ) {
 			break;
 		}
 
@@ -294,7 +285,7 @@ static void ENV_ProcessUpdatesPriorityQueue() {
 		lastProcessedSfx = src->sfx;
 		lastProcessedSrc = src;
 
-		ENV_UpdateSourceEnvironment( src, millis, tryReusePropsSrc );
+		ENV_UpdateSourceEnvironment( src, tryReusePropsSrc, *listenerProps, millis );
 		// Stop updates if the time quota has been exceeded immediately.
 		// Do not block the commands queue processing.
 		// The priority queue will be rebuilt next ENV_UpdateListenerCall().
@@ -343,9 +334,9 @@ void ENV_UpdateListener( int listenerEntNum, const vec3_t origin, const vec3_t v
 	// Check whether we have teleported or entered/left a liquid.
 	// Run a forced major update in this case.
 
-	if( DistanceSquared( origin, listenerProps.origin ) > 100.0f * 100.0f ) {
+	if( DistanceSquared( origin, g_listenerProps.origin ) > 100.0f * 100.0f ) {
 		needsForcedUpdate = true;
-	} else if( DistanceSquared( velocity, listenerProps.velocity ) > 200.0f * 200.0f ) {
+	} else if( DistanceSquared( velocity, g_listenerProps.velocity ) > 200.0f * 200.0f ) {
 		needsForcedUpdate = true;
 	}
 
@@ -355,29 +346,31 @@ void ENV_UpdateListener( int listenerEntNum, const vec3_t origin, const vec3_t v
 	int contents = S_PointContents( testedOrigin );
 
 	isListenerInLiquid = ( contents & ( CONTENTS_LAVA | CONTENTS_SLIME | CONTENTS_WATER ) ) != 0;
-	if( listenerProps.isInLiquid != isListenerInLiquid ) {
+	if( g_listenerProps.isInLiquid != isListenerInLiquid ) {
 		needsForcedUpdate = true;
 	}
 
-	VectorCopy( origin, listenerProps.origin );
-	VectorCopy( velocity, listenerProps.velocity );
-	listenerProps.entNum     = listenerEntNum;
-	listenerProps.isInLiquid = isListenerInLiquid;
+	VectorCopy( origin, g_listenerProps.origin );
+	VectorCopy( velocity, g_listenerProps.velocity );
+	g_listenerProps.entNum     = listenerEntNum;
+	g_listenerProps.isInLiquid = isListenerInLiquid;
 
 	// Sanitize the possibly modified cvar before the environment update
 	if( s_environment_sampling_quality->value < 0.0f || s_environment_sampling_quality->value > 1.0f ) {
 		Cvar_ForceSet( s_environment_sampling_quality->name, "0.5" );
 	}
 
-	sourcesUpdatePriorityQueue.Clear();
+	// Caution! This code relies on an assumtion that the priority queue does not perform heap allocation.
+	// Otherwise, cache the queue instance;
+	SourcesUpdatePriorityQueue priorityQueue;
 
 	if( needsForcedUpdate ) {
-		ENV_CollectForcedEnvironmentUpdates();
+		ENV_CollectForcedEnvironmentUpdates( &priorityQueue );
 	} else {
-		ENV_CollectRegularEnvironmentUpdates();
+		ENV_CollectRegularEnvironmentUpdates( &priorityQueue );
 	}
 
-	ENV_ProcessUpdatesPriorityQueue();
+	ENV_ProcessUpdatesPriorityQueue( &g_listenerProps, &priorityQueue );
 
 	// Panning info is dependent of environment one, make sure it is executed last
 	ENV_UpdatePanning( Sys_Milliseconds(), listenerEntNum, testedOrigin, axes );
@@ -394,7 +387,8 @@ static void ENV_InterpolateEnvironmentProps( src_t *src, int64_t millisNow ) {
 	updateState->lastEnvUpdateAt = millisNow;
 }
 
-static void ENV_UpdateSourceEnvironment( src_t *src, int64_t millisNow, const src_t *tryReusePropsSrc ) {
+static void ENV_UpdateSourceEnvironment( src_t *src, const src_t *tryReusePropsSrc,
+										 const ListenerProps &listenerProps, int64_t millisNow ) {
 	envUpdateState_t *updateState = &src->envUpdateState;
 
 	if( src->priority == SRCPRI_LOCAL ) {
@@ -438,7 +432,7 @@ static void ENV_UpdateSourceEnvironment( src_t *src, int64_t millisNow, const sr
 	EffectsAllocator::Instance()->DeleteEffect( updateState->oldEffect );
 	updateState->oldEffect = nullptr;
 
-	updateState->effect->BindOrUpdate( src );
+	updateState->effect->BindOrUpdate( src, listenerProps );
 
 	// Prevent reusing an outdated leaf num
 	updateState->leafNum = -1;

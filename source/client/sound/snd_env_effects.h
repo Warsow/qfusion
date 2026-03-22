@@ -5,6 +5,7 @@
 #include "efxpresetsregistry.h"
 
 struct src_s;
+struct ListenerProps;
 
 static constexpr float REVERB_ENV_DISTANCE_THRESHOLD = 4096.0f;
 
@@ -45,7 +46,7 @@ public:
 
 	bool ShouldKeepLingering( float sourceQualityHint, int64_t millisNow ) const;
 
-	void BindOrUpdate( struct src_s *src );
+	void BindOrUpdate( src_s *src, const ListenerProps &listenerProps );
 	void InterpolateProps( const EaxReverbEffect *oldOne, int timeDelta );
 
 	void UpdatePanning( src_s *src, int listenerEntNum, const vec3_t listenerOrigin, const mat3_t listenerAxes );

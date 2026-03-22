@@ -5,9 +5,6 @@
 #include <common/facilities/protocol.h>
 #include <common/facilities/sysclock.h>
 
-// TODO
-extern ListenerProps listenerProps;
-
 void EaxReverbEffect::CheckCurrentlyBoundEffect( src_t *src ) {
 	ALint effectType;
 
@@ -79,7 +76,7 @@ static void PrintReverbProps( const EfxReverbProps &props ) {
 	Com_Printf( "LF reference           : %f\n", props.lfReference );
 }
 
-void EaxReverbEffect::BindOrUpdate( src_t *src ) {
+void EaxReverbEffect::BindOrUpdate( src_t *src, const ListenerProps &listenerProps ) {
 	CheckCurrentlyBoundEffect( src );
 
 	//PrintReverbProps( this->reverbProps );
