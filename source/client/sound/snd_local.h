@@ -42,6 +42,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <AL/alext.h>
 #include <AL/efx.h>
 
+#include "efxpresetsregistry.h"
+
 #define MAX_SRC 128
 
 struct SoundSet {
@@ -129,31 +131,27 @@ struct PanningUpdateState {
 	unsigned numPassedSecondaryRays;
 };
 
-class EaxReverbEffect;
+struct ReverbEffectProps {
+	EfxReverbProps reverbProps {};
+	float directObstruction { 0.0f };
+	float secondaryRaysObstruction { 0.0f };
+};
 
 typedef struct envUpdateState_s {
-	const SoundSet *parent;
-
 	int64_t nextEnvUpdateAt;
 	int64_t lastEnvUpdateAt;
 
-	EaxReverbEffect *oldEffect;
-	EaxReverbEffect *effect;
+	ReverbEffectProps effectProps;
 
 	samplingProps_t directObstructionSamplingProps;
 
 	vec3_t lastUpdateOrigin;
 	vec3_t lastUpdateVelocity;
 
-	int leafNum;
-
-	int entNum;
-	float attenuation;
+	// A distance between emitter and listener at last props update
+	float distanceAtLastUpdate { 0.0f };
 
 	float priorityInQueue;
-
-	bool isInLiquid;
-	bool needsInterpolation;
 } envUpdateState_t;
 
 /*
@@ -190,6 +188,7 @@ typedef struct src_s {
 	bool isTracking;
 	bool isLingering;
 	bool touchedThisFrame;
+	bool effectActive;
 
 	int64_t lingeringTimeoutAt;
 
@@ -213,6 +212,13 @@ void S_StopAllSources( bool retainLocal );
 ALuint S_GetALSource( const src_t *src );
 src_t *S_AllocRawSource( int entNum, float fvol, float attenuation, cvar_t *volumeVar );
 void S_SetEntitySpatialization( int entnum, const vec3_t origin, const vec3_t velocity, const mat3_t axis );
+static constexpr float REVERB_ENV_DISTANCE_THRESHOLD = 4096.0f;
+
+struct ListenerProps;
+
+bool IsEffectActive( const src_t *src );
+void UpdateSourceEffectProps( src_s *src, const ReverbEffectProps &effectProps, const ListenerProps &listenerProps );
+void UpdateSourceEffectPanning( src_s *src, int listenerEntNum, const vec3_t listenerOrigin, const mat3_t listenerAxes );
 
 /*
 * Music

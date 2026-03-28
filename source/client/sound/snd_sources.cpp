@@ -22,7 +22,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "snd_local.h"
-#include "snd_env_effects.h"
 #include "environmentupdates.h"
 #include <common/helpers/algorithm.h>
 #include <common/facilities/cvar.h>
@@ -43,11 +42,6 @@ static sentity_t *entlist = NULL; //[MAX_EDICTS];
 static int max_ents;
 
 static void S_AdjustGain( src_t *src ) {
-	if( auto *effect = src->envUpdateState.effect ) {
-		effect->AdjustGain( src );
-		return;
-	}
-
 	if( src->volumeVar ) {
 		alSourcef( src->source, AL_GAIN, checkSourceGain( src->fvol * src->volumeVar->value ) );
 	} else {
@@ -181,7 +175,7 @@ static void source_spatialize( src_t *src ) {
 	}
 
 	// Delegate setting source origin to the effect in this case
-	if( src->envUpdateState.effect ) {
+	if( IsEffectActive( src ) ) {
 		return;
 	}
 
@@ -309,7 +303,7 @@ static bool S_InitSourceEFX( src_t *src ) {
 		if( alGetError() != AL_NO_ERROR ) {
 			break;
 		}
-		alEffecti( src->effect, AL_EFFECT_TYPE, AL_EFFECT_REVERB );
+		alEffecti( src->effect, AL_EFFECT_TYPE, AL_EFFECT_EAXREVERB );
 		if( alGetError() != AL_NO_ERROR ) {
 			break;
 		}
@@ -475,7 +469,7 @@ void S_UpdateSources( void ) {
 			continue;
 		}
 
-		if( src->envUpdateState.effect ) {
+		if( IsEffectActive( src ) ) {
 			numActiveEffects++;
 		}
 
@@ -492,7 +486,7 @@ void S_UpdateSources( void ) {
 			// Do not even bother adding the source to the list of zombie sources in these cases:
 			// 1) There's no effect attached
 			// 2) There's no sfx attached
-			if( !src->envUpdateState.effect || !src->sfx ) {
+			if( !IsEffectActive( src ) || !src->sfx ) {
 				source_kill( src );
 			} else {
 				zombieSources[numZombieSources++] = src;
@@ -505,10 +499,11 @@ void S_UpdateSources( void ) {
 			// If a looping effect hasn't been touched this frame, kill it
 			// Note: lingering produces bad results in this case
 			if( !src->touchedThisFrame ) {
+				const bool wasEffectActive = IsEffectActive( src );
 				// Don't even bother adding this source to a list of zombie sources...
 				source_kill( &srclist[i] );
 				// Do not misinform zombies processing logic
-				if( src->envUpdateState.effect ) {
+				if( wasEffectActive ) {
 					numActiveEffects--;
 				}
 			} else {
@@ -522,6 +517,19 @@ void S_UpdateSources( void ) {
 	S_ProcessZombieSources( zombieSources, numZombieSources, numActiveEffects, millisNow );
 }
 
+static bool ShouldKeepLingering( const envUpdateState_s &updateState, float sourceQualityHint, int64_t millisNow ) {
+	if( sourceQualityHint <= 0 ) {
+		return false;
+	}
+	const ReverbEffectProps &effectProps = updateState.effectProps;
+	clamp_high( sourceQualityHint, 1.0f );
+	float factor = 0.5f * sourceQualityHint;
+	factor += 0.25f * ( ( 1.0f - effectProps.directObstruction ) + ( 1.0f - effectProps.secondaryRaysObstruction ) );
+	assert( factor >= 0.0f && factor <= 1.0f );
+	// TODO: Calc gain for attenuation?
+	return updateState.distanceAtLastUpdate < 192.0f + 768.0f * factor;
+}
+
 /**
 * A zombie is a source that still has an "active" flag but AL reports that it is stopped (is completed).
 */
@@ -530,12 +538,12 @@ static void S_ProcessZombieSources( src_t **zombieSources, int numZombieSources,
 	for( int i = 0; i < numZombieSources; ) {
 		src_t *const src = zombieSources[i];
 		// Adding a source to "zombies" list makes sense only for sources with attached effects
-		assert( src->envUpdateState.effect );
+		assert( IsEffectActive( src ) );
 
 		// If the source is not lingering, set the lingering state
 		if( !src->isLingering ) {
 			src->isLingering = true;
-			src->lingeringTimeoutAt = millisNow + src->envUpdateState.effect->GetLingeringTimeout();
+			src->lingeringTimeoutAt = millisNow + (int)( src->envUpdateState.effectProps.reverbProps.decayTime * 1000 ) + 50;
 			i++;
 			continue;
 		}
@@ -597,7 +605,7 @@ static void S_ProcessZombieSources( src_t **zombieSources, int numZombieSources,
 		src_t *const src = zombieSources[numZombieSources - 1];
 		numZombieSources--;
 
-		if( src->envUpdateState.effect->ShouldKeepLingering( src->sfx->props.processingQualityHint, millisNow ) ) {
+		if( ShouldKeepLingering( src->envUpdateState, src->sfx->props.processingQualityHint, millisNow ) ) {
 			keepEffectLingering[src - srcBegin] = true;
 			continue;
 		}
@@ -621,7 +629,7 @@ static void S_ProcessZombieSources( src_t **zombieSources, int numZombieSources,
 		if( !src->isActive ) {
 			continue;
 		}
-		if( !src->envUpdateState.effect ) {
+		if( !IsEffectActive( src ) ) {
 			continue;
 		}
 		// If it was considered to keep effect lingering, do not touch the effect even if we want to disable some
@@ -820,4 +828,162 @@ void S_StopAllSources( bool retainLocal ) {
 			source_kill( &srclist[i] );
 		}
 	}
+}
+
+bool IsEffectActive( const src_t *src ) {
+	return src->effectActive;
+}
+
+[[maybe_unused]]
+static void PrintReverbProps( const EfxReverbProps &props ) {
+	Com_Printf( "====================== : %" PRId64 "\n", Sys_Milliseconds() );
+	Com_Printf( "Density                : %f\n", props.density );
+	Com_Printf( "Diffusion              : %f\n", props.diffusion );
+	Com_Printf( "Decay time             : %f\n", props.decayTime );
+	Com_Printf( "Decay HF Ratio         : %f\n", props.decayHfRatio );
+	Com_Printf( "Decay LF Ratio         : %f\n", props.decayLfRatio );
+	Com_Printf( "Gain                   : %f\n", props.gain );
+	Com_Printf( "Gain HF                : %f\n", props.gainHf );
+	Com_Printf( "Gain LF                : %f\n", props.gainLf );
+	Com_Printf( "Reflections gain       : %f\n", props.reflectionsGain );
+	Com_Printf( "Reflections delay      : %f\n", props.reflectionsDelay );
+	Com_Printf( "Late reverb gain       : %f\n", props.lateReverbGain );
+	Com_Printf( "Late reverb delay      : %f\n", props.lateReverbDelay );
+	Com_Printf( "Echo time              : %f\n", props.echoTime );
+	Com_Printf( "Echo depth             : %f\n", props.echoDepth );
+	Com_Printf( "Modulation time        : %f\n", props.modulationTime );
+	Com_Printf( "Modulation depth       : %f\n", props.modulationDepth );
+	Com_Printf( "Air absorption gain HF : %f\n", props.airAbsorptionGainHf );
+	Com_Printf( "HF reference           : %f\n", props.hfReference );
+	Com_Printf( "LF reference           : %f\n", props.lfReference );
+}
+
+void UpdateSourceEffectProps( src_t *src, const ReverbEffectProps &effectProps, const ListenerProps &listenerProps ) {
+	[[maybe_unused]] ALint effectType = 0;
+	alGetEffecti( src->effect, AL_EFFECT_TYPE, &effectType );
+	assert( AL_EFFECT_EAXREVERB == effectType );
+
+	//PrintReverbProps( effectProps.reverbProps );
+
+	alEffectf( src->effect, AL_EAXREVERB_DENSITY, effectProps.reverbProps.density );
+	alEffectf( src->effect, AL_EAXREVERB_DIFFUSION, effectProps.reverbProps.diffusion );
+
+	alEffectf( src->effect, AL_EAXREVERB_DECAY_TIME, effectProps.reverbProps.decayTime );
+	alEffectf( src->effect, AL_EAXREVERB_DECAY_HFRATIO, effectProps.reverbProps.decayHfRatio );
+	alEffectf( src->effect, AL_EAXREVERB_DECAY_LFRATIO, effectProps.reverbProps.decayLfRatio );
+
+	const float distance         = DistanceFast( src->origin, listenerProps.origin );
+	const float distanceGainFrac = calcSoundGainForDistanceAndAttenuation( distance, src->attenuation );
+	assert( distanceGainFrac >= 0.0f && distanceGainFrac <= 1.0f );
+
+	// Make the effect less pronounced on close distance
+	const float effectGain = effectProps.reverbProps.gain * ( 1.0f - 0.1f * distanceGainFrac );
+
+	alEffectf( src->effect, AL_EAXREVERB_GAIN, effectGain );
+	alEffectf( src->effect, AL_EAXREVERB_GAINHF, effectProps.reverbProps.gainHf * ( 1.0f - 0.5f * effectProps.secondaryRaysObstruction ) );
+	alEffectf( src->effect, AL_EAXREVERB_GAINLF, effectProps.reverbProps.gainLf );
+
+	alEffectf( src->effect, AL_EAXREVERB_REFLECTIONS_GAIN, effectProps.reverbProps.reflectionsGain );
+	alEffectf( src->effect, AL_EAXREVERB_REFLECTIONS_DELAY, effectProps.reverbProps.reflectionsDelay );
+
+	alEffectf( src->effect, AL_EAXREVERB_LATE_REVERB_GAIN, effectProps.reverbProps.lateReverbGain );
+	alEffectf( src->effect, AL_EAXREVERB_LATE_REVERB_DELAY, effectProps.reverbProps.lateReverbDelay );
+
+	alEffectf( src->effect, AL_EAXREVERB_ECHO_TIME, effectProps.reverbProps.echoTime );
+	alEffectf( src->effect, AL_EAXREVERB_ECHO_DEPTH, effectProps.reverbProps.echoDepth );
+
+	alEffectf( src->effect, AL_EAXREVERB_MODULATION_TIME, effectProps.reverbProps.modulationTime );
+	alEffectf( src->effect, AL_EAXREVERB_MODULATION_DEPTH, effectProps.reverbProps.modulationDepth );
+
+	alEffectf( src->effect, AL_EAXREVERB_AIR_ABSORPTION_GAINHF, effectProps.reverbProps.airAbsorptionGainHf );
+
+	alEffectf( src->effect, AL_EAXREVERB_LFREFERENCE, effectProps.reverbProps.lfReference );
+	alEffectf( src->effect, AL_EAXREVERB_HFREFERENCE, effectProps.reverbProps.hfReference );
+
+	alEffecti( src->effect, AL_EAXREVERB_DECAY_HFLIMIT, effectProps.reverbProps.decayHfLimit );
+
+	// Configure the direct send filter parameters
+
+	assert( effectProps.directObstruction >= 0.0f && effectProps.directObstruction <= 1.0f );
+	assert( effectProps.secondaryRaysObstruction >= 0.0f && effectProps.secondaryRaysObstruction <= 1.0f );
+
+	// Both partial obstruction factors are within [0, 1] range, so we can get a weighted average
+	const float obstructionFrac = 0.3f * effectProps.directObstruction + 0.7f * effectProps.secondaryRaysObstruction;
+	assert( obstructionFrac >= 0.0f && obstructionFrac <= 1.0f );
+
+	// Strongly suppress the dry path on obstruction.
+	// Note: we do not touch the entire source gain.
+	alFilterf( src->directFilter, AL_LOWPASS_GAIN, 1.0f - 0.7f * obstructionFrac );
+
+	// There's nothing special with looping sources, their current sfx/sounds happen to benefit from that
+	if( src->isLooping ) {
+		alFilterf( src->directFilter, AL_LOWPASS_GAINHF, 1.0f - obstructionFrac );
+	} else {
+		alFilterf( src->directFilter, AL_LOWPASS_GAINHF, 1.0f - 0.5f * obstructionFrac );
+	}
+
+	// Attach the filter to the source
+	alSourcei( src->source, AL_DIRECT_FILTER, src->directFilter );
+	// Attach the effect to the slot
+	alAuxiliaryEffectSloti( src->effectSlot, AL_EFFECTSLOT_EFFECT, src->effect );
+	// Feed the slot from the source
+	alSource3i( src->source, AL_AUXILIARY_SEND_FILTER, src->effectSlot, 0, AL_FILTER_NULL );
+}
+
+static void UpdateDelegatedSpatialization( struct src_s *src, int listenerEntNum, const vec3_t listenerOrigin ) {
+	if( src->attenuation == ATTN_NONE ) {
+		// It MUST already be a relative sound
+#ifndef PUBLIC_BUILD
+		ALint value;
+		alGetSourcei( src->source, AL_SOURCE_RELATIVE, &value );
+		assert( value == AL_TRUE );
+#endif
+		return;
+	}
+
+	alSourcei( src->source, AL_SOURCE_RELATIVE, AL_FALSE );
+
+	float sourcePitchScale = 1.0f;
+	vec3_t sourceOriginToUse;
+	VectorCopy( src->origin, sourceOriginToUse );
+
+	// Don't do that for own sounds
+	if( listenerEntNum <= 0 || listenerEntNum != src->entNum ) {
+		// Setting effect panning vectors is not sufficient for "realistic" obstruction,
+		// as the dry path is still propagates like if there were no obstacles and walls.
+		// We try modifying the source origin as well to simulate sound propagation.
+		// These conditions must be met:
+		// 1) the direct path is fully obstructed
+		// 2) there is a definite propagation path
+		if( src->envUpdateState.effectProps.directObstruction == 1.0f ) {
+			sourcePitchScale = 0.96f;
+			ENV_CalculatePropagationOrigin( listenerOrigin, src->origin, &sourcePitchScale, sourceOriginToUse );
+		}
+	}
+
+	assert( sourcePitchScale > 0.0f && sourcePitchScale <= 1.0f );
+	alSourcef( src->source, AL_PITCH, src->chosenPitch * sourcePitchScale );
+
+	alSourcefv( src->source, AL_POSITION, sourceOriginToUse );
+	// The velocity is kept untouched for now.
+	alSourcefv( src->source, AL_VELOCITY, src->velocity );
+}
+
+void UpdateSourceEffectPanning( src_s *src, int listenerEntNum, const vec3_t listenerOrigin, const mat3_t listenerAxes ) {
+	// "If there is an active EaxReverbEffect, setting source origin/velocity is delegated to it".
+	UpdateDelegatedSpatialization( src, listenerEntNum, listenerOrigin );
+
+	if( src->attenuation != ATTN_NONE ) {
+		return;
+	}
+	// Disable panning for listener sounds except for weapon sounds
+	if( listenerEntNum > 0 && src->entNum == listenerEntNum && src->attachmentTag != SoundSystem::WeaponAttachment ) {
+		return;
+	}
+
+	vec3_t earlyPan, latePan;
+	ENV_CalculateSourcePan( listenerOrigin, listenerAxes, &src->panningUpdateState, earlyPan, latePan );
+
+	alEffectfv( src->effect, AL_EAXREVERB_REFLECTIONS_PAN, earlyPan );
+	alEffectfv( src->effect, AL_EAXREVERB_LATE_REVERB_PAN, latePan );
 }

@@ -1,8 +1,6 @@
 #include "environmentupdates.h"
 #include "snd_leaf_props_cache.h"
-#include "snd_env_effects.h"
 #include "snd_raycast_sampler.h"
-#include "snd_effects_allocator.h"
 #include "snd_propagation.h"
 #include <common/helpers/algorithm.h>
 #include <common/helpers/stringsplitter.h>
@@ -40,8 +38,6 @@ static void ENV_ShutdownGlobalInstances() {
 	LeafPropsCache::Shutdown();
 	CachedLeafsGraph::Shutdown();
 	PropagationTable::Shutdown();
-
-	EffectsAllocator::Shutdown();
 }
 
 static void ENV_DispatchEnsureValidCall() {
@@ -56,8 +52,6 @@ static void ENV_InitGlobalInstances() {
 	PropagationTable::Init();
 
 	ENV_DispatchEnsureValidCall();
-
-	EffectsAllocator::Init();
 }
 
 void ENV_Init() {
@@ -96,6 +90,8 @@ void ENV_RegisterSource( src_t *src ) {
 	src->envUpdateState.nextEnvUpdateAt = 0;
 	// Reset sampling patterns by setting an illegal quality value
 	src->envUpdateState.directObstructionSamplingProps.quality = -1.0f;
+
+	src->effectActive = true;
 }
 
 void ENV_UnregisterSource( src_t *src ) {
@@ -104,15 +100,8 @@ void ENV_UnregisterSource( src_t *src ) {
 	}
 
 	// Prevent later occasional updates
+	src->envUpdateState.lastEnvUpdateAt = std::numeric_limits<int64_t>::max();
 	src->envUpdateState.nextEnvUpdateAt = std::numeric_limits<int64_t>::max();
-
-	if( src->envUpdateState.effect || src->envUpdateState.oldEffect ) {
-		auto *const effectsAllocator = EffectsAllocator::Instance();
-		effectsAllocator->DeleteEffect( src->envUpdateState.oldEffect );
-		src->envUpdateState.oldEffect = nullptr;
-		effectsAllocator->DeleteEffect( src->envUpdateState.effect );
-		src->envUpdateState.effect = nullptr;
-	}
 
 	// Detach the slot from the source
 	alSource3i( src->source, AL_AUXILIARY_SEND_FILTER, AL_EFFECTSLOT_NULL, 0, AL_FILTER_NULL );
@@ -126,6 +115,8 @@ void ENV_UnregisterSource( src_t *src ) {
 	} else {
 		alSourcef( src->source, AL_GAIN, checkSourceGain( src->fvol * s_volume->value ) );
 	}
+
+	src->effectActive = false;
 }
 
 class SourcesUpdatePriorityQueue {
@@ -182,7 +173,6 @@ static void ENV_CollectRegularEnvironmentUpdates( SourcesUpdatePriorityQueue *pr
 	src_t *src, *end;
 	envUpdateState_t *updateState;
 	int64_t millisNow;
-	int contents;
 
 	millisNow = Sys_Milliseconds();
 
@@ -204,14 +194,6 @@ static void ENV_CollectRegularEnvironmentUpdates( SourcesUpdatePriorityQueue *pr
 			continue;
 		}
 
-		contents = S_PointContents( src->origin );
-		bool wasInLiquid = updateState->isInLiquid;
-		updateState->isInLiquid = ( contents & ( CONTENTS_LAVA | CONTENTS_SLIME | CONTENTS_WATER ) ) != 0;
-		if( updateState->isInLiquid ^ wasInLiquid ) {
-			priorityQueue->AddSource( src, 2.0f );
-			continue;
-		}
-
 		// Don't update lingering sources environment
 		if( src->isLingering ) {
 			continue;
@@ -228,7 +210,7 @@ static void ENV_CollectRegularEnvironmentUpdates( SourcesUpdatePriorityQueue *pr
 		}
 
 		// If the sound is not fixed
-		if( updateState->entNum >= 0 ) {
+		if( src->entNum >= 0 ) {
 			// If the sound origin has been significantly modified
 			if( DistanceSquared( src->origin, updateState->lastUpdateOrigin ) > 128 * 128 ) {
 				// Hack! Prevent fast-moving entities (that are very likely PG projectiles)
@@ -297,6 +279,10 @@ static void ENV_ProcessUpdatesPriorityQueue( ListenerProps *listenerProps, Sourc
 			break;
 		}
 
+		if( Sys_Microseconds() - micros > 2000 && src->envUpdateState.priorityInQueue < 1.0f && src->envUpdateState.nextEnvUpdateAt > 0 ) {
+			continue;
+		}
+
 		const src_t *tryReusePropsSrc = nullptr;
 		if( src->sfx == lastProcessedSfx ) {
 			tryReusePropsSrc = lastProcessedSrc;
@@ -308,12 +294,6 @@ static void ENV_ProcessUpdatesPriorityQueue( ListenerProps *listenerProps, Sourc
 		lastProcessedSrc = src;
 
 		ENV_UpdateSourceEnvironment( src, tryReusePropsSrc, *listenerProps, millis );
-		// Stop updates if the time quota has been exceeded immediately.
-		// Do not block the commands queue processing.
-		// The priority queue will be rebuilt next ENV_UpdateListenerCall().
-		if( Sys_Microseconds() - micros > 2000 && lastProcessedPriority < 1.0f ) {
-			break;
-		}
 	}
 }
 
@@ -335,8 +315,8 @@ void ENV_UpdateRelativeSoundsSpatialization( const vec3_t origin, const vec3_t v
 static void ENV_UpdatePanning( int64_t millisNow, int listenerEntNum, const vec3_t origin, const mat3_t axes ) {
 	for( src_t *src = srclist, *end = srclist + src_count; src != end; ++src ) {
 		if( src->isActive ) {
-			if( EaxReverbEffect *effect = src->envUpdateState.effect ) {
-				effect->UpdatePanning( src, listenerEntNum, origin, axes );
+			if( IsEffectActive( src ) ) {
+				UpdateSourceEffectPanning( src, listenerEntNum, origin, axes );
 			}
 		}
 	}
@@ -407,93 +387,28 @@ public:
 };
 
 class ReverbEffectComputer {
-private:
+public:
 	static void SetupDirectObstructionSamplingProps( src_t *src, unsigned minSamples, unsigned maxSamples );
 
 	static float ComputeDirectObstruction( const ListenerProps &listenerProps, src_t *src );
 
 	static unsigned GetNumSamplesForCurrentQuality( unsigned minSamples, unsigned maxSamples );
 
-	static void ComputeReverberation( const ListenerProps &listenerProps_, src_t *src, EaxReverbEffect *effect );
+	static void ComputeReverberation( const ListenerProps &listenerProps_, src_t *src, int srcLeafNum, ReverbEffectProps *effectProps );
 
 	static float CalcEmissionRadius( const src_t *src );
 
-	static void EmitSecondaryRays( const ReverbRaycastSampler &sampler, const ListenerProps &listenerProps, src_t *src, EaxReverbEffect *effect );
-public:
-	static EaxReverbEffect *TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc );
+	static void EmitSecondaryRays( const ReverbRaycastSampler &sampler, const ListenerProps &listenerProps, src_t *src, ReverbEffectProps *effectProps );
 };
 
-static void ENV_InterpolateEnvironmentProps( src_t *src, int64_t millisNow ) {
-	auto *updateState = &src->envUpdateState;
-	if( !updateState->effect ) {
-		return;
-	}
-
-	int timeDelta = (int)( millisNow - updateState->lastEnvUpdateAt );
-	updateState->effect->InterpolateProps( updateState->oldEffect, timeDelta );
-	updateState->lastEnvUpdateAt = millisNow;
-}
-
-static void ENV_UpdateSourceEnvironment( src_t *src, const src_t *tryReusePropsSrc,
-										 const ListenerProps &listenerProps, int64_t millisNow ) {
-	envUpdateState_t *updateState = &src->envUpdateState;
-
-	if( src->priority == SRCPRI_LOCAL ) {
-		// Check whether the source has never been updated for this local sound.
-		assert( !updateState->nextEnvUpdateAt );
-		ENV_UnregisterSource( src );
-		return;
-	}
-
-	if( src->isLooping ) {
-		updateState->nextEnvUpdateAt = (int64_t)( (double)millisNow + 250 + 50 * random() );
-	} else {
-		// Don't bother updating it after the initial update.
-		// This helps to prevent unpleasant effect property transitions, and also acts as a performance optimization.
-		if( src->sfx->buffers[src->bufferIndex]->durationMillis < 1000 ) {
-			updateState->nextEnvUpdateAt = std::numeric_limits<int64_t>::max();
-		} else {
-			updateState->nextEnvUpdateAt = (int64_t)( (double)millisNow + 400 + 100 * random() );
-		}
-	}
-
-	VectorCopy( src->origin, updateState->lastUpdateOrigin );
-	VectorCopy( src->velocity, updateState->lastUpdateVelocity );
-
-	updateState->oldEffect = updateState->effect;
-	updateState->needsInterpolation = true;
-
-	// Get the leaf num before the update as it is important for all present tests
-	updateState->leafNum = S_PointLeafNum( src->origin );
-
-	updateState->effect = ReverbEffectComputer::TryApply( listenerProps, src, tryReusePropsSrc );
-
-	updateState->effect->distanceAtLastUpdate = sqrtf( DistanceSquared( src->origin, listenerProps.origin ) );
-	updateState->effect->lastUpdateAt = millisNow;
-
-	if( updateState->needsInterpolation ) {
-		ENV_InterpolateEnvironmentProps( src, millisNow );
-	}
-
-	// Recycle the old effect
-	EffectsAllocator::Instance()->DeleteEffect( updateState->oldEffect );
-	updateState->oldEffect = nullptr;
-
-	updateState->effect->BindOrUpdate( src, listenerProps );
-
-	// Prevent reusing an outdated leaf num
-	updateState->leafNum = -1;
-}
-
-static bool ENV_TryReuseSourceReverbProps( src_t *src, const src_t *tryReusePropsSrc, EaxReverbEffect *newEffect ) {
+static bool ENV_TryReuseSourceReverbProps( src_t *src, const src_t *tryReusePropsSrc, ReverbEffectProps *effectProps ) {
 	if( !tryReusePropsSrc ) {
 		return false;
 	}
 
-	auto *reuseEffect = tryReusePropsSrc->envUpdateState.effect;
-	if( !reuseEffect ) {
-		return false;
-	}
+	assert( IsEffectActive( tryReusePropsSrc ) );
+
+	const ReverbEffectProps &reuseProps = tryReusePropsSrc->envUpdateState.effectProps;
 
 	// We are already sure that both sources are in the same contents kind (non-liquid).
 	// Check distance between sources.
@@ -522,10 +437,81 @@ static bool ENV_TryReuseSourceReverbProps( src_t *src, const src_t *tryReuseProp
 		}
 	}
 
-	newEffect->directObstruction        = reuseEffect->directObstruction;
-	newEffect->secondaryRaysObstruction = reuseEffect->secondaryRaysObstruction;
-	newEffect->reverbProps              = reuseEffect->reverbProps;
+	effectProps->secondaryRaysObstruction = reuseProps.secondaryRaysObstruction;
+	effectProps->reverbProps              = reuseProps.reverbProps;
 	return true;
+}
+
+static void ENV_UpdateSourceEnvironment( src_t *src, const src_t *tryReusePropsSrc,
+										 const ListenerProps &listenerProps, int64_t millisNow ) {
+	envUpdateState_t *updateState = &src->envUpdateState;
+
+	if( src->priority == SRCPRI_LOCAL ) {
+		// Check whether the source has never been updated for this local sound.
+		assert( !updateState->nextEnvUpdateAt );
+		ENV_UnregisterSource( src );
+		return;
+	}
+
+	ReverbEffectProps tmpStorageOfProps;
+	const ReverbEffectProps *oldProps = nullptr;
+	bool needsInterpolation           = false;
+	if( updateState->lastEnvUpdateAt > 0 ) {
+		tmpStorageOfProps  = updateState->effectProps;
+		oldProps           = &tmpStorageOfProps;
+		needsInterpolation = true;
+	}
+
+	if( src->isLooping ) {
+		updateState->nextEnvUpdateAt = (int64_t)( (double)millisNow + 250 + 50 * random() );
+	} else {
+		// Don't bother updating it after the initial update.
+		// This helps to prevent unpleasant effect property transitions, and also acts as a performance optimization.
+		if( src->sfx->buffers[src->bufferIndex]->durationMillis < 1000 ) {
+			updateState->nextEnvUpdateAt = std::numeric_limits<int64_t>::max();
+		} else {
+			updateState->nextEnvUpdateAt = (int64_t)( (double)millisNow + 400 + 100 * random() );
+		}
+	}
+
+	VectorCopy( src->origin, updateState->lastUpdateOrigin );
+	VectorCopy( src->velocity, updateState->lastUpdateVelocity );
+
+	updateState->effectProps = ReverbEffectProps {};
+
+	updateState->effectProps.directObstruction = ReverbEffectComputer::ComputeDirectObstruction( listenerProps, src );
+	// We try reuse props only for reverberation effects
+	// since reverberation effects sampling is extremely expensive.
+	// Moreover, direct obstruction reuse is just not valid,
+	// since even a small origin difference completely changes it.
+	if( ENV_TryReuseSourceReverbProps( src, tryReusePropsSrc, &updateState->effectProps ) ) {
+		needsInterpolation = false;
+	} else {
+		// TODO: Respect attachment wrt calculating origin position
+		ReverbEffectComputer::ComputeReverberation( listenerProps, src, S_PointLeafNum( src->origin ), &updateState->effectProps );
+	}
+
+	updateState->distanceAtLastUpdate = sqrtf( DistanceSquared( src->origin, listenerProps.origin ) );
+
+	if( needsInterpolation ) {
+		const int timeDelta = (int)( millisNow - updateState->lastEnvUpdateAt );
+		assert( timeDelta > 0 );
+		if( const int limit = 350; timeDelta < limit ) {
+			const float lerpFrac = Q_Sqrt( (float)timeDelta / (float)limit );
+
+			updateState->effectProps.directObstruction =
+				std::lerp( oldProps->directObstruction, updateState->effectProps.directObstruction, lerpFrac );
+			updateState->effectProps.secondaryRaysObstruction =
+				std::lerp( oldProps->secondaryRaysObstruction, updateState->effectProps.secondaryRaysObstruction, lerpFrac );
+
+			interpolateReverbProps( &oldProps->reverbProps, lerpFrac, &updateState->effectProps.reverbProps,
+									&updateState->effectProps.reverbProps );
+		}
+	}
+
+	updateState->lastEnvUpdateAt = millisNow;
+
+	UpdateSourceEffectProps( src, updateState->effectProps, listenerProps );
 }
 
 void ReverbEffectComputer::SetupDirectObstructionSamplingProps( src_t *src, unsigned minSamples, unsigned maxSamples ) {
@@ -634,21 +620,6 @@ float ReverbEffectComputer::ComputeDirectObstruction( const ListenerProps &liste
 	return 1.0f - 0.9f * ( numPassedRays / (float)numTestedRays );
 }
 
-EaxReverbEffect *ReverbEffectComputer::TryApply( const ListenerProps &listenerProps, src_t *src, const src_t *tryReusePropsSrc ) {
-	EaxReverbEffect *effect = EffectsAllocator::Instance()->NewReverbEffect( src );
-	effect->directObstruction = ComputeDirectObstruction( listenerProps, src );
-	// We try reuse props only for reverberation effects
-	// since reverberation effects sampling is extremely expensive.
-	// Moreover, direct obstruction reuse is just not valid,
-	// since even a small origin difference completely changes it.
-	if( ENV_TryReuseSourceReverbProps( src, tryReusePropsSrc, effect ) ) {
-		src->envUpdateState.needsInterpolation = false;
-	} else {
-		ComputeReverberation( listenerProps, src, effect );
-	}
-	return effect;
-}
-
 float ReverbEffectComputer::CalcEmissionRadius( const src_t *src ) {
 	// Do not even bother casting rays 999999 units ahead for very attenuated sources.
 	// However, clamp/normalize the hit distance using the same defined threshold
@@ -748,7 +719,7 @@ static CachedPresetTracker g_largeMetallicRoomPreset { "s_largeMetallicRoomPrese
 static CachedPresetTracker g_hugeMetallicRoomPreset { "s_hugeMetallicRoomPreset", "factory_hall factory_hall hangar" };
 
 void ReverbEffectComputer::ComputeReverberation( const ListenerProps &listenerProps,
-												 src_t *src, EaxReverbEffect *effect ) {
+												 src_t *src, int srcLeafNum, ReverbEffectProps *effectProps ) {
 	const unsigned numPrimaryRays = GetNumSamplesForCurrentQuality( 16, MAX_REVERB_PRIMARY_RAY_SAMPLES );
 
 	vec3_t primaryRayDirs[MAX_REVERB_PRIMARY_RAY_SAMPLES];
@@ -769,10 +740,10 @@ void ReverbEffectComputer::ComputeReverberation( const ListenerProps &listenerPr
 
 	// Instead of trying to compute these factors every sampling call,
 	// reuse pre-computed properties of CM map leafs that briefly resemble rooms/convex volumes.
-	assert( src->envUpdateState.leafNum >= 0 );
+	assert( srcLeafNum >= 0 );
 
 	const auto *const leafPropsCache = LeafPropsCache::Instance();
-	const LeafProps &leafProps = leafPropsCache->GetPropsForLeaf( src->envUpdateState.leafNum );
+	const LeafProps &leafProps = leafPropsCache->GetPropsForLeaf( srcLeafNum );
 
 	EfxReverbProps openProps { EfxReverbProps::NoInit };
 	EfxReverbProps closedMetallicProps { EfxReverbProps::NoInit };
@@ -841,13 +812,13 @@ void ReverbEffectComputer::ComputeReverberation( const ListenerProps &listenerPr
 	EfxReverbProps closedProps { EfxReverbProps::NoInit };
 	interpolateReverbProps( &closedNonMetallicProps, leafProps.getMetallnessFactor(), &closedMetallicProps, &closedProps );
 
-	interpolateReverbProps( &closedProps, leafProps.getSkyFactor(), &openProps, &effect->reverbProps );
+	interpolateReverbProps( &closedProps, leafProps.getSkyFactor(), &openProps, &effectProps->reverbProps );
 
-	EmitSecondaryRays( sampler, listenerProps, src, effect );
+	EmitSecondaryRays( sampler, listenerProps, src, effectProps );
 }
 
 void ReverbEffectComputer::EmitSecondaryRays( const ReverbRaycastSampler &sampler, const ListenerProps &listenerProps,
-											  src_t *src, EaxReverbEffect *effect ) {
+											  src_t *src, ReverbEffectProps *effectProps ) {
 	int listenerLeafNum = listenerProps.GetLeafNum();
 
 	vec3_t testedListenerOrigin;
@@ -879,10 +850,10 @@ void ReverbEffectComputer::EmitSecondaryRays( const ReverbRaycastSampler &sample
 	if( sampler.numPrimaryHits ) {
 		float frac = numPassedSecondaryRays / (float)sampler.numPrimaryHits;
 		// The secondary rays obstruction is complement to the `frac`
-		effect->secondaryRaysObstruction = 1.0f - frac;
+		effectProps->secondaryRaysObstruction = 1.0f - frac;
 	} else {
 		// Set minimal feasible values
-		effect->secondaryRaysObstruction = 1.0f;
+		effectProps->secondaryRaysObstruction = 1.0f;
 	}
 }
 
