@@ -2,6 +2,7 @@
 #include "environmentupdates.h"
 #include "snd_raycast_sampler.h"
 #include <common/helpers/glob.h>
+#include <common/helpers/randomgenerator.h>
 #include <common/helpers/singletonholder.h>
 #include <common/facilities/tasksystem.h>
 #include <common/types/stringview.h>
@@ -457,6 +458,7 @@ static LeafProps ComputeLeafProps( LeafPropsComputer *computer, int leafNum, boo
 	VectorMA( leafMins, 0.5f, extent, point );
 	bool hasValidPoint = true;
 
+	wsw::RandomGenerator rng;
 	while( numSamples < maxSamples ) {
 		numAttempts++;
 		// Attempts may fail for 2 reasons: can't pick a valid point and a point sampling has failed.
@@ -467,7 +469,7 @@ static LeafProps ComputeLeafProps( LeafPropsComputer *computer, int leafNum, boo
 
 		if( !hasValidPoint ) {
 			for( int i = 0; i < 3; ++i ) {
-				point[i] = leafMins[i] + ( 0.1f + 0.9f * EffectSamplers::SamplingRandom() ) * extent[i];
+				point[i] = leafMins[i] + rng.nextFloat() * extent[i];
 			}
 
 			// Check whether the point is really in leaf (the leaf is not a box but is inscribed in the bounds box)

@@ -137,9 +137,9 @@ struct ReverbEffectProps {
 	float secondaryRaysObstruction { 0.0f };
 };
 
-typedef struct envUpdateState_s {
-	int64_t nextEnvUpdateAt;
-	int64_t lastEnvUpdateAt;
+struct EnvUpdateState {
+	int64_t nextUpdateAt { 0 };
+	int64_t lastUpdateAt { 0 };
 
 	ReverbEffectProps effectProps;
 
@@ -150,9 +150,7 @@ typedef struct envUpdateState_s {
 
 	// A distance between emitter and listener at last props update
 	float distanceAtLastUpdate { 0.0f };
-
-	float priorityInQueue;
-} envUpdateState_t;
+};
 
 /*
 * Source management
@@ -192,7 +190,7 @@ typedef struct src_s {
 
 	int64_t lingeringTimeoutAt;
 
-	envUpdateState_t envUpdateState;
+	EnvUpdateState envUpdateState;
 	PanningUpdateState panningUpdateState;
 
 	vec3_t origin, velocity; // for local culling
@@ -214,10 +212,8 @@ src_t *S_AllocRawSource( int entNum, float fvol, float attenuation, cvar_t *volu
 void S_SetEntitySpatialization( int entnum, const vec3_t origin, const vec3_t velocity, const mat3_t axis );
 static constexpr float REVERB_ENV_DISTANCE_THRESHOLD = 4096.0f;
 
-struct ListenerProps;
-
 bool IsEffectActive( const src_t *src );
-void UpdateSourceEffectProps( src_s *src, const ReverbEffectProps &effectProps, const ListenerProps &listenerProps );
+void UpdateSourceEffectProps( src_s *src, const ReverbEffectProps &effectProps, const vec3_t listenerOrigin );
 void UpdateSourceEffectPanning( src_s *src, int listenerEntNum, const vec3_t listenerOrigin, const mat3_t listenerAxes );
 
 /*

@@ -5,7 +5,6 @@
 
 class GenericRaycastSampler {
 	friend class LeafPropsComputer;
-	friend class ReverbEffectComputer;
 public:
 	virtual ~GenericRaycastSampler() = default;
 
@@ -21,7 +20,6 @@ public:
 	}
 
 	static void SetupSamplingRayDirs( vec3_t *rayDirs, unsigned numRays );
-protected:
 	const unsigned numPrimaryRays;
 	// A number of ray hits that address recorded hit points/distances
 	// that in turn could be used for secondary emission.
@@ -39,11 +37,10 @@ protected:
 
 	float ComputePrimaryHitDistanceStdDev() const;
 
-	void EmitPrimaryRays();
-
 	float ComputeRoomSizeFactor() const;
 
-public:
+	void EmitPrimaryRays();
+
 	vec3_t *primaryRayDirs;
 	vec3_t *primaryHitPoints;
 	mutable float *primaryHitDistances;

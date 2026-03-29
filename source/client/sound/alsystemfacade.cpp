@@ -4,6 +4,8 @@
 #include <common/helpers/pipeutils.h>
 
 #include "snd_local.h"
+#include "snd_propagation.h"
+#include "snd_leaf_props_cache.h"
 #include "environmentupdates.h"
 
 static SingletonHolder<wsw::snd::ALSoundSystem> alSoundSystemHolder;
@@ -75,7 +77,11 @@ ALSoundSystem::~ALSoundSystem() {
 	// wait for the queue to be processed
 	QBufPipe_Finish( m_pipe );
 
-	ENV_Shutdown();
+	if( s_environment_effects->integer ) {
+		LeafPropsCache::Shutdown();
+		CachedLeafsGraph::Shutdown();
+		PropagationTable::Shutdown();
+	}
 
 	// shutdown backend
 
@@ -92,7 +98,15 @@ ALSoundSystem::~ALSoundSystem() {
 }
 
 void ALSoundSystem::postInit() {
-	ENV_Init();
+	if( s_environment_effects->integer ) {
+		LeafPropsCache::Init();
+		CachedLeafsGraph::Init();
+		PropagationTable::Init();
+
+		LeafPropsCache::Instance()->EnsureValid();
+		CachedLeafsGraph::Instance()->EnsureValid();
+		PropagationTable::Instance()->EnsureValid();
+	}
 }
 
 void ALSoundSystem::beginRegistration() {
@@ -118,7 +132,11 @@ void ALSoundSystem::endRegistration() {
 
 	s_registering = false;
 
-	ENV_EndRegistration();
+	if( s_environment_effects->integer ) {
+		LeafPropsCache::Instance()->EnsureValid();
+		CachedLeafsGraph::Instance()->EnsureValid();
+		PropagationTable::Instance()->EnsureValid();
+	}
 }
 
 void ALSoundSystem::stopSounds( unsigned flags ) {
