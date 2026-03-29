@@ -151,7 +151,7 @@ static auto getCorrectedValue( const cvar_t *var, const char *string ) -> char *
 	}
 }
 
-static void setValueString( cvar_t *var, const char *string ) {
+static void setValueStringAndRelatedValues( cvar_t *var, const char *string ) {
 	if( DeclaredConfigVar *const controller = var->controller ) {
 		wsw::PodVector<char> tmpBuffer;
 		const wsw::StringView stringView( string );
@@ -165,6 +165,8 @@ static void setValueString( cvar_t *var, const char *string ) {
 	} else {
 		var->string = Q_strdup( string );
 	}
+	var->value   = atof( var->string );
+	var->integer = Q_rint( var->value );
 }
 
 static void Cvar_SetModified( cvar_t *var ) {
@@ -234,10 +236,8 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, cvar_flag_t flags
 			if( var->string ) {
 				Q_free( var->string );
 			}
-			setValueString( var, var_value );
-			var->value   = atof( var->string );
-			var->integer = Q_rint( var->value );
-			var->flags   = flags;
+			setValueStringAndRelatedValues( var, var_value );
+			var->flags = flags;
 		}
 
 		if( Cvar_FlagIsSet( flags, CVAR_USERINFO ) && !Cvar_FlagIsSet( var->flags, CVAR_USERINFO ) ) {
@@ -259,10 +259,8 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, cvar_flag_t flags
 	var->controller = controller;
 	var->name = (char *)( (uint8_t *)var + sizeof( *var ) );
 	strcpy( var->name, var_name );
-	setValueString( var, var_value );
+	setValueStringAndRelatedValues( var, var_value );
 	var->dvalue  = Q_strdup( var->string );
-	var->value   = atof( var->string );
-	var->integer = Q_rint( var->value );
 	var->flags   = flags;
 	Cvar_SetModified( var );
 
@@ -330,9 +328,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, bool force ) {
 					var->latched_string = getCorrectedValue( var, value );
 				} else {
 					Q_free( var->string ); // free the old value string
-					setValueString( var, value );
-					var->value   = atof( var->string );
-					var->integer = Q_rint( var->value );
+					setValueStringAndRelatedValues( var, value );
 					Cvar_SetModified( var );
 				}
 			}
@@ -354,9 +350,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, bool force ) {
 
 	Q_free( var->string ); // free the old value string
 
-	setValueString( var, value );
-	var->value   = atof( var->string );
-	var->integer = Q_rint( var->value );
+	setValueStringAndRelatedValues( var, value );
 	Cvar_SetModified( var );
 
 	return var;
@@ -439,7 +433,7 @@ void Cvar_GetLatchedVars( cvar_flag_t flags ) {
 	for( i = 0; i < dump->size; ++i ) {
 		cvar_t *const var = (cvar_t *) dump->key_value_vector[i].value;
 		Q_free( var->string );
-		setValueString( var, var->latched_string );
+		setValueStringAndRelatedValues( var, var->latched_string );
 		Q_free( var->latched_string );
 		var->latched_string = NULL;
 	}
@@ -467,7 +461,7 @@ void Cvar_FixCheatVars( void ) {
 	for( i = 0; i < dump->size; ++i ) {
 		cvar_t *const var = (cvar_t *) dump->key_value_vector[i].value;
 		Q_free( var->string );
-		setValueString( var, var->dvalue );
+		setValueStringAndRelatedValues( var, var->dvalue );
 	}
 	Trie_FreeDump( dump );
 }
