@@ -88,7 +88,9 @@ static void source_setup( src_t *src, const SoundSet *sfx, std::pair<ALuint, uns
 	alSourcef( src->source, AL_MAX_DISTANCE, kSoundAttenuationMaxDistance );
 	alSourcef( src->source, AL_ROLLOFF_FACTOR, attenuation );
 
-	ENV_RegisterSource( src );
+	if( s_environment_effects->integer ) {
+		setupSourceEffectsAndEnvUpdates( src );
+	}
 }
 
 /*
@@ -137,7 +139,9 @@ static void source_kill( src_t *src ) {
 	src->isLingering = false;
 	src->lingeringTimeoutAt = 0;
 
-	ENV_UnregisterSource( src );
+	if( s_environment_effects->integer ) {
+		disableSourceEffectsAndEnvUpdates( src );
+	}
 }
 
 /*
@@ -517,7 +521,7 @@ void S_UpdateSources( void ) {
 	S_ProcessZombieSources( zombieSources, numZombieSources, numActiveEffects, millisNow );
 }
 
-static bool ShouldKeepLingering( const envUpdateState_s &updateState, float sourceQualityHint, int64_t millisNow ) {
+static bool ShouldKeepLingering( const EnvUpdateState &updateState, float sourceQualityHint, int64_t millisNow ) {
 	if( sourceQualityHint <= 0 ) {
 		return false;
 	}
@@ -671,7 +675,7 @@ static void S_ProcessZombieSources( src_t **zombieSources, int numZombieSources,
 		src_t *src = disableEffectCandidates[numDisableEffectCandidates - 1];
 		numDisableEffectCandidates--;
 
-		ENV_UnregisterSource( src );
+		disableSourceEffectsAndEnvUpdates( src );
 		numActiveEffects--;
 	}
 }
@@ -858,7 +862,7 @@ static void PrintReverbProps( const EfxReverbProps &props ) {
 	Com_Printf( "LF reference           : %f\n", props.lfReference );
 }
 
-void UpdateSourceEffectProps( src_t *src, const ReverbEffectProps &effectProps, const ListenerProps &listenerProps ) {
+void UpdateSourceEffectProps( src_t *src, const ReverbEffectProps &effectProps, const vec3_t listenerOrigin ) {
 	[[maybe_unused]] ALint effectType = 0;
 	alGetEffecti( src->effect, AL_EFFECT_TYPE, &effectType );
 	assert( AL_EFFECT_EAXREVERB == effectType );
@@ -872,7 +876,7 @@ void UpdateSourceEffectProps( src_t *src, const ReverbEffectProps &effectProps, 
 	alEffectf( src->effect, AL_EAXREVERB_DECAY_HFRATIO, effectProps.reverbProps.decayHfRatio );
 	alEffectf( src->effect, AL_EAXREVERB_DECAY_LFRATIO, effectProps.reverbProps.decayLfRatio );
 
-	const float distance         = DistanceFast( src->origin, listenerProps.origin );
+	const float distance         = DistanceFast( src->origin, listenerOrigin );
 	const float distanceGainFrac = calcSoundGainForDistanceAndAttenuation( distance, src->attenuation );
 	assert( distanceGainFrac >= 0.0f && distanceGainFrac <= 1.0f );
 
@@ -957,7 +961,7 @@ static void UpdateDelegatedSpatialization( struct src_s *src, int listenerEntNum
 		// 2) there is a definite propagation path
 		if( src->envUpdateState.effectProps.directObstruction == 1.0f ) {
 			sourcePitchScale = 0.96f;
-			ENV_CalculatePropagationOrigin( listenerOrigin, src->origin, &sourcePitchScale, sourceOriginToUse );
+			calcPropagationOrigin( listenerOrigin, src->origin, &sourcePitchScale, sourceOriginToUse );
 		}
 	}
 
@@ -982,7 +986,7 @@ void UpdateSourceEffectPanning( src_s *src, int listenerEntNum, const vec3_t lis
 	}
 
 	vec3_t earlyPan, latePan;
-	ENV_CalculateSourcePan( listenerOrigin, listenerAxes, &src->panningUpdateState, earlyPan, latePan );
+	calcReverbPan( listenerOrigin, listenerAxes, &src->panningUpdateState, earlyPan, latePan );
 
 	alEffectfv( src->effect, AL_EAXREVERB_REFLECTIONS_PAN, earlyPan );
 	alEffectfv( src->effect, AL_EAXREVERB_LATE_REVERB_PAN, latePan );

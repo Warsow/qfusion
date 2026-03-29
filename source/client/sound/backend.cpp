@@ -184,7 +184,9 @@ static void S_SetListener( int entNum, const vec3_t origin, const vec3_t velocit
 	alListenerfv( AL_VELOCITY, velocity );
 	alListenerfv( AL_ORIENTATION, orientation );
 
-	ENV_UpdateListener( entNum, origin, velocity, axis );
+	if( s_environment_effects->integer ) {
+		updateEnvOfListenerAndSources( entNum, origin, velocity, axis );
+	}
 }
 
 namespace wsw::snd {
