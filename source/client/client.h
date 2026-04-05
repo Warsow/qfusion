@@ -513,6 +513,8 @@ class ProfilerResultSink;
 wsw::ProfilerArgsSupplier *CL_GetProfilerArgsSupplier();
 wsw::ProfilerResultSink *CL_GetProfilerResultSink();
 
+void CL_AddDebugLine( const float *from, const float *to, int color );
+
 void CL_InitMedia( void );
 void CL_ShutdownMedia( void );
 void CL_RestartMedia( void );

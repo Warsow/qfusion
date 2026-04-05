@@ -301,3 +301,7 @@ unsigned S_SuggestNumExtraThreadsForComputations() {
 	// Use only the current thread.
 	return 0;
 }
+
+void S_AddDebugLine( const float *from, const float *to, int color ) {
+	CL_AddDebugLine( from, to, color );
+}

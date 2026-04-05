@@ -115,6 +115,7 @@ unsigned CG_GetButtonBits();
 void CG_AddViewAngles( vec3_t viewAngles );
 void CG_AddMovement( vec3_t movement );
 void CG_MouseMove( int mx, int my );
+void CG_AddDebugLine( const float *from, const float *to, int color );
 
 struct CmdArgs;
 void CG_OptionsStatus( const CmdArgs &cmdArgs );

@@ -303,6 +303,12 @@ bool CG_HasKeyboardFocus() {
 	return cge && !Con_HasKeyboardFocus() && !wsw::ui::UISystem::instance()->grabsKeyboardAndMouseButtons();
 }
 
+void CL_AddDebugLine( const float *from, const float *to, int color ) {
+	if( cge ) {
+		CG_AddDebugLine( from, to, color );
+	}
+}
+
 static void CL_CreateNewUserCommand( int realMsec );
 
 void CL_ClearInputState( void ) {

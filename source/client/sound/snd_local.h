@@ -294,6 +294,7 @@ int S_FindTopNodeForSphere( const float *center, float radius );
 
 const char *S_GetConfigString( int index );
 
+void S_AddDebugLine( const float *from, const float *to, int color );
 
 #define sDebug()   wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Sound, wsw::MessageCategory::Debug ) ).getWriter()
 #define sNotice()  wsw::PendingRegularMessage( wsw::createRegularMessageStream( wsw::MessageDomain::Sound, wsw::MessageCategory::Notice ) ).getWriter()

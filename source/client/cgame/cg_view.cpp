@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/cmdargs.h>
 #include <common/facilities/cmdcompat.h>
 #include <common/helpers/algorithm.h>
+#include <common/helpers/qthreads.h>
 #include <common/helpers/scopeexitaction.h>
 #include <common/types/scopedresource.h>
 #include <common/facilities/wswfs.h>
@@ -130,6 +131,14 @@ struct CrosshairSettingsTracker {
 };
 
 static CrosshairSettingsTracker crosshairSettingsTracker;
+
+struct PendingDebugLine {
+	vec3_t from, to;
+	int color;
+};
+
+static wsw::PodVector<PendingDebugLine> g_pendingDebugLines;
+static wsw::Mutex g_debugLinesMutex;
 
 // TODO: Should it belong to the same place where prediction gets executed?
 void CG_DemoCam_FreeFly() {
@@ -1526,6 +1535,19 @@ static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actual
 CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t serverTime, unsigned extrapolationTime ) {
 	WSW_PROFILER_SCOPE();
 
+	// The default constructor does not allocate anything.
+	// Just move the accumulated lines so the exchange happends once per RenderView() call.
+	// Note that the moved-out container can be perfectly filled again.
+	wsw::PodVector<PendingDebugLine> debugLines;
+	do {
+		[[maybe_unused]] volatile wsw::ScopedLock<wsw::Mutex> lock( &g_debugLinesMutex );
+		debugLines = std::move( g_pendingDebugLines );
+	} while( false );
+	for( const PendingDebugLine &dl : debugLines ) {
+		const vec4_t color { COLOR_R( dl.color ) / 255.0f, COLOR_G( dl.color ) / 255.0f, COLOR_B( dl.color ) / 255.0f, 1.0f };
+		cg.effectsSystem.spawnGameDebugBeam( dl.from, dl.to, color, 0 );
+	}
+
 	CGRenderViewResult result {
 		.hasBlittedTheMenu       = false,
 		.hasBlittedTheHud        = false,
@@ -1630,6 +1652,16 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 	}
 
 	return result;
+}
+
+void CG_AddDebugLine( const float *from, const float *to, int color ) {
+	[[maybe_unused]] volatile wsw::ScopedLock<wsw::Mutex> lock( &g_debugLinesMutex );
+
+	g_pendingDebugLines.push_back( PendingDebugLine {
+		.from  = { from[0], from[1], from[2] },
+		.to    = { to[0], to[1], to[2] },
+		.color = color,
+	});
 }
 
 void CG_LoadingString( const char *str ) {
