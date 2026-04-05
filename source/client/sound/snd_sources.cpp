@@ -495,7 +495,9 @@ void S_UpdateSources( void ) {
 			} else {
 				zombieSources[numZombieSources++] = src;
 			}
-			src->entNum = -1;
+			// Note: It turns out that it's better to keep it attached to the source
+			// (it's very important for POV-attached sounds which are not necessarily AL_SOURCE_RELATIVE)
+			// src->entNum = -1;
 			continue;
 		}
 
@@ -977,16 +979,12 @@ void UpdateSourceEffectPanning( src_s *src, int listenerEntNum, const vec3_t lis
 	// "If there is an active EaxReverbEffect, setting source origin/velocity is delegated to it".
 	UpdateDelegatedSpatialization( src, listenerEntNum, listenerOrigin );
 
-	if( src->attenuation != ATTN_NONE ) {
-		return;
-	}
-	// Disable panning for listener sounds except for weapon sounds
-	if( listenerEntNum > 0 && src->entNum == listenerEntNum && src->attachmentTag != SoundSystem::WeaponAttachment ) {
-		return;
-	}
+	vec3_t earlyPan { 0.0f, 0.0f, 0.0f }, latePan { 0.0f, 0.0f, 0.0f };
 
-	vec3_t earlyPan, latePan;
-	calcReverbPan( listenerOrigin, listenerAxes, &src->panningUpdateState, earlyPan, latePan );
+	// Limit panning to listener-related sounds
+	if( listenerEntNum > 0 && src->entNum == listenerEntNum ) {
+		calcReverbPan( listenerOrigin, listenerAxes, &src->panningUpdateState, earlyPan, latePan );
+	}
 
 	alEffectfv( src->effect, AL_EAXREVERB_REFLECTIONS_PAN, earlyPan );
 	alEffectfv( src->effect, AL_EAXREVERB_LATE_REVERB_PAN, latePan );

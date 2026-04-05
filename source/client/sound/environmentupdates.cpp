@@ -828,7 +828,7 @@ void calcPropagationOrigin( const vec3_t listenerOrigin, const vec3_t realSource
 	// as the real origin and is aligned to the sound propagation "window"
 	// TODO: Precache at least the listener leaf for this sound backend update frame
 	if( const int listenerLeaf = S_PointLeafNum( listenerOrigin ) ) {
-		if( const int srcLeaf = S_PointLeafNum( listenerOrigin ) ) {
+		if( const int srcLeaf = S_PointLeafNum( realSourceOrigin ) ) {
 			vec3_t dir;
 			float distance;
 			if( PropagationTable::Instance()->GetIndirectPathProps( srcLeaf, listenerLeaf, dir, &distance ) ) {
