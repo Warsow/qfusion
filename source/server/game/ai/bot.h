@@ -373,13 +373,13 @@ public:
 		return m_movementSubsystem.hasActiveCampingSpot();
 	}
 	void SetPendingLookAtPoint( const AiPendingLookAtPoint &lookAtPoint, unsigned timeoutPeriod ) {
-		return m_movementSubsystem.setPendingLookAtPoint( lookAtPoint, timeoutPeriod );
+		return awarenessModule.setPendingLookAtPoint( lookAtPoint, timeoutPeriod );
 	}
 	void ResetPendingLookAtPoint() {
-		m_movementSubsystem.resetPendingLookAtPoint();
+		awarenessModule.resetPendingLookAtPoint();
 	}
 	bool HasPendingLookAtPoint() const {
-		return m_movementSubsystem.hasPendingLookAtPoint();
+		return awarenessModule.hasPendingLookAtPoint();
 	}
 
 	bool CanInterruptMovement() const {

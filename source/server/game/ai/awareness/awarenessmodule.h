@@ -65,6 +65,8 @@ private:
 public:
 	BotAwarenessModule( Bot *bot_ );
 
+	void Reset();
+
 	void Update();
 
 	void OnAttachedToSquad( AiSquad *squad_ );
@@ -106,6 +108,19 @@ public:
 		}
 
 		return &hurtEvent;
+	}
+
+	void setPendingLookAtPoint( const AiPendingLookAtPoint &pendingLookAtPoint, unsigned timeoutPeriod ) {
+		keptInFovPointTracker.setPendingLookAtPoint( pendingLookAtPoint, timeoutPeriod );
+	}
+
+	void resetPendingLookAtPoint() {
+		keptInFovPointTracker.resetPendingLookAtPoint();
+	}
+
+	[[nodiscard]]
+	bool hasPendingLookAtPoint() const {
+		return keptInFovPointTracker.hasPendingLookAtPoint();
 	}
 
 	const std::optional<Vec3> &GetKeptInFovPoint() const {

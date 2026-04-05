@@ -53,6 +53,11 @@ void BotAwarenessModule::InvalidateSelectedEnemiesIfNeeded() {
 	}
 }
 
+void BotAwarenessModule::Reset() {
+	hurtEvent.Invalidate();
+	keptInFovPointTracker.resetPendingLookAtPoint();
+}
+
 void BotAwarenessModule::Update() {
 	WSW_PROFILER_SCOPE();
 

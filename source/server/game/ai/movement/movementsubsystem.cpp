@@ -460,40 +460,6 @@ auto MovementSubsystem::findLastResortGroundScript( BotInput *input ) -> Movemen
 	return nullptr;
 }
 
-void MovementSubsystem::applyPendingTurnToLookAtPoint( BotInput *botInput, PredictionContext *context ) {
-	if( m_pendingLookAtPointState.timeoutAt < level.time ) {
-		return;
-	}
-
-	AiEntityPhysicsState *entityPhysicsState_;
-	unsigned frameTime;
-	if( context ) {
-		entityPhysicsState_ = &context->movementState->entityPhysicsState;
-		frameTime = context->predictionStepMillis;
-	} else {
-		entityPhysicsState_ = &m_movementState.entityPhysicsState;
-		frameTime = game.frametime;
-	}
-
-
-	const AiPendingLookAtPoint &pendingLookAtPoint = m_pendingLookAtPointState.pendingLookAtPoint;
-	Vec3 toPointDir( pendingLookAtPoint.Origin() );
-	toPointDir -= entityPhysicsState_->Origin();
-	if( !toPointDir.normalizeFast() ) {
-		return;
-	}
-
-	botInput->SetIntendedLookDir( toPointDir, true );
-	botInput->isLookDirSet = true;
-
-	float turnSpeedMultiplier = pendingLookAtPoint.TurnSpeedMultiplier();
-	Vec3 newAngles = m_bot->GetNewViewAngles( entityPhysicsState_->Angles().data(), toPointDir, frameTime, turnSpeedMultiplier );
-	botInput->SetAlreadyComputedAngles( newAngles );
-
-	botInput->canOverrideLookVec = false;
-	botInput->canOverridePitch = false;
-}
-
 static const char *lastNoLookDirAction = "";
 static const char *lastNoUcmdAction = "";
 

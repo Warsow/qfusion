@@ -184,35 +184,6 @@ public:
 	}
 };
 
-class alignas ( 2 )AiPendingLookAtPoint {
-	friend class MovementSubsystem;
-
-	int16_t origin[3];
-	// Floating point values greater than 1.0f are allowed (unless they are significantly greater than 1.0f);
-	uint16_t turnSpeedMultiplier;
-
-	AiPendingLookAtPoint() {
-		// Shut an analyzer up
-		turnSpeedMultiplier = 16;
-	}
-
-public:
-	Vec3 Origin() const { return GetUnpacked4uVec( origin ); }
-	float TurnSpeedMultiplier() const { return turnSpeedMultiplier / 16.0f; };
-
-	AiPendingLookAtPoint( const vec3_t origin_, float turnSpeedMultiplier_ )
-		: turnSpeedMultiplier( (uint16_t)( wsw::min( 255.0f, turnSpeedMultiplier_ * 16.0f ) ) )
-	{
-		SetPacked4uVec( origin_, origin );
-	}
-
-	AiPendingLookAtPoint( const Vec3 &origin_, float turnSpeedMultiplier_ )
-		: turnSpeedMultiplier(  (uint16_t)( wsw::min( 255.0f, turnSpeedMultiplier_ * 16.0f ) ) )
-	{
-		SetPacked4uVec( origin_, origin );
-	}
-};
-
 struct MovementState {
 	AiEntityPhysicsState entityPhysicsState;
 };

@@ -117,27 +117,12 @@ public:
 		//return movementState.campingSpotState.IsActive();
 	}
 
-	void setPendingLookAtPoint( const AiPendingLookAtPoint &lookAtPoint, unsigned timeoutPeriod ) {
-		m_pendingLookAtPointState.pendingLookAtPoint = lookAtPoint;
-		m_pendingLookAtPointState.timeoutAt          = level.time + timeoutPeriod;
-	}
-
-	void resetPendingLookAtPoint() {
-		m_pendingLookAtPointState.timeoutAt = 0;
-	}
-
-	[[nodiscard]]
-	bool hasPendingLookAtPoint() const {
-		return m_pendingLookAtPointState.timeoutAt > level.time;
-	}
-
 	void activateJumppadState( const edict_t *jumppadEnt );
 	void activateElevatorState( const edict_t *triggerEnt );
 
 	bool canChangeWeapons() const;
 
 	void reset() {
-		resetPendingLookAtPoint();
 		m_activeScript                   = nullptr;
 		m_prevActiveScript               = nullptr;
 		m_lastNearbyElevatorReach.entNum = 0;
@@ -152,8 +137,6 @@ public:
 
 private:
 	struct CachedLastNearbyTriggerReach;
-
-	void applyPendingTurnToLookAtPoint( BotInput *input, PredictionContext *context = nullptr );
 
 	void setActiveScript( MovementScript *script );
 
@@ -215,11 +198,6 @@ private:
 
 	SameFloorClusterAreasCache m_sameFloorClusterAreasCache;
 	NextFloorClusterAreasCache m_nextFloorClusterAreasCache;
-
-	struct PendingLookAtPointState {
-		AiPendingLookAtPoint pendingLookAtPoint;
-		int64_t timeoutAt { 0 };
-	} m_pendingLookAtPointState;
 
 	MovementScript *m_activeScript { nullptr };
 	MovementScript *m_testedScript { nullptr };

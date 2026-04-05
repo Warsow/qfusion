@@ -715,8 +715,6 @@ void PredictionContext::NextMovementStep( BaseAction *action ) {
 
 	// Make sure we're modify botInput/entityPhysicsState before copying to ucmd
 
-	// Corresponds to Bot::Think();
-	m_subsystem->applyPendingTurnToLookAtPoint( botInput, this );
 	// Corresponds to m_subsystem->Frame();
 	action->execActionRecord( this->record, botInput, this );
 	// Corresponds to Bot::Think();

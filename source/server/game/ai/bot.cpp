@@ -299,6 +299,7 @@ void Bot::OnRespawn() {
 
 	planningModule.ClearGoalAndPlan();
 	m_movementSubsystem.reset();
+	awarenessModule.Reset();
 	blockedTimeoutAt = level.time + BLOCKED_TIMEOUT;
 	navTarget = nullptr;
 	m_selectedNavEntity = std::nullopt;
@@ -340,6 +341,7 @@ void Bot::Update() {
 		planningModule.ClearGoalAndPlan();
 
 		m_movementSubsystem.reset();
+		awarenessModule.Reset();
 
 		navTarget           = nullptr;
 		m_selectedNavEntity = std::nullopt;

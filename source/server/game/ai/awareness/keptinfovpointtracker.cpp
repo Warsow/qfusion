@@ -5,7 +5,24 @@
 
 void KeptInFovPointTracker::update() {
 	WSW_PROFILER_SCOPE();
-	m_point = selectCurrentPoint();
+
+	if( hasPendingLookAtPoint() ) {
+		Vec3 dirToPoint( m_pendingLookAtPointState.pendingLookAtPoint.Origin() - m_bot->Origin() );
+		if( dirToPoint.normalizeFast() ) {
+			if( m_bot->EntityPhysicsState()->ForwardDir().dot( dirToPoint ) >= m_bot->FovDotFactor() ) {
+				resetPendingLookAtPoint();
+			}
+		} else {
+			resetPendingLookAtPoint();
+		}
+	}
+
+	if( hasPendingLookAtPoint() ) {
+		// We don't care of "misc tactics" here as the pending-look-at-point is considered stronger than these flags
+		m_point = m_pendingLookAtPointState.pendingLookAtPoint.Origin();
+	} else {
+		m_point = selectCurrentPoint();
+	}
 }
 
 auto KeptInFovPointTracker::selectCurrentPoint() -> std::optional<Vec3> {
