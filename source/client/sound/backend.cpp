@@ -231,7 +231,8 @@ void Backend::stopSounds( unsigned flags ) {
 	}
 }
 
-void Backend::processFrameUpdates() {
+void Backend::processFrameUpdates( const EntitySpatialParams &listenerSpatialParams ) {
+	S_SetListener( listenerSpatialParams.entNum, listenerSpatialParams.origin, listenerSpatialParams.velocity, listenerSpatialParams.axis );
 	S_UpdateSources();
 }
 
@@ -249,12 +250,8 @@ void Backend::endRegistration() {
 
 void Backend::setEntitySpatialParams( const EntitySpatialParamsBatch &batch ) {
 	for( unsigned i = 0; i < batch.count; ++i ) {
-		S_SetEntitySpatialization( batch.entNums[i], batch.origins[i], batch.velocities[i], batch.axes[i] );
+		S_SetEntitySpatialization( batch.params[i].entNum, batch.params[i].origin, batch.params[i].velocity, batch.params[i].axis );
 	}
-}
-
-void Backend::setListener( int entNum, const Vec3 &origin, const Vec3 &velocity, const std::array<Vec3, 3> &axis ) {
-	S_SetListener( entNum, origin.data(), velocity.data(), (const float *)axis.data() );
 }
 
 void Backend::startLocalSound( const SoundSet *sound, float volume ) {

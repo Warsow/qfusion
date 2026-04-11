@@ -76,6 +76,7 @@ typedef struct snapshot_s {
 void CG_InitPersistentState();
 
 class SoundSystem;
+class RenderSystem;
 namespace wsw::ui { class UISystem; }
 
 void CG_Init( RenderSystem *renderSystem, SoundSystem *soundSystem, wsw::ui::UISystem *uiSystem,
@@ -93,13 +94,22 @@ void CG_ConfigString( int i, const wsw::StringView &string );
 
 struct ViewState;
 
+struct EntitySpatialParams {
+	vec3_t origin { 0.0f, 0.0f, 0.0f };
+	vec3_t velocity { 0.0f, 0.0f, 0.0f };
+	mat3_t axis { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+	int entNum { -1 };
+};
+
 void CG_GameCommand( ViewState *viewState, const wsw::StringView &fullText );
-void CG_GetEntitySpatilization( int entNum, float *origin, float *velocity, float *axis );
+void CG_GetEntitySpatialParams( int number, EntitySpatialParams *spatialParams );
 float CG_GetSensitivityScale( float sens, float zoomSens );
 bool CG_NewFrameSnap( snapshot_t *frame, snapshot_t *lerpframe );
 
 // Less namespace-polluting than enums
 struct CGRenderViewResult {
+	std::optional<EntitySpatialParams> listenerSpatialParams;
+
 	bool hasBlittedTheMenu { false };
 	bool hasBlittedTheHud { false };
 	bool hasRenderedUIInternally { false };

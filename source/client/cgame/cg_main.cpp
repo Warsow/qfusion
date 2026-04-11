@@ -2394,10 +2394,9 @@ static void handleBloodEvent( entity_state_t *ent, int parm, bool predicted ) {
 
 static void handleMoverEvent( entity_state_t *ent, int parm ) {
 	if( getPrimaryViewState()->allowSounds ) {
-		[[maybe_unused]] vec3_t so, velocity;
-		[[maybe_unused]] mat3_t axis;
-		CG_GetEntitySpatilization( ent->number, so, velocity, axis );
-		cg.soundSystem->startFixedSound( cgs.soundPrecache[parm], so, CHAN_AUTO, v_volumeEffects.get(), ATTN_STATIC );
+		EntitySpatialParams spatialParams;
+		CG_GetEntitySpatialParams( ent->number, &spatialParams );
+		cg.soundSystem->startFixedSound( cgs.soundPrecache[parm], spatialParams.origin, CHAN_AUTO, v_volumeEffects.get(), ATTN_STATIC );
 	}
 }
 
@@ -4638,6 +4637,8 @@ void CG_LerpEntities( ViewState *drawFromViewState ) {
 	int pnum;
 	centity_t *cent;
 
+	EntitySpatialParams spatialParams;
+
 	for( pnum = 0; pnum < cg.frame.numEntities; pnum++ ) {
 		int number;
 		bool spatialize;
@@ -4716,10 +4717,8 @@ void CG_LerpEntities( ViewState *drawFromViewState ) {
 		}
 
 		if( spatialize ) {
-			vec3_t origin, velocity;
-			mat3_t axis;
-			CG_GetEntitySpatilization( number, origin, velocity, axis );
-			cg.soundSystem->setEntitySpatialParams( number, origin, velocity, axis );
+			CG_GetEntitySpatialParams( number, &spatialParams );
+			cg.soundSystem->setEntitySpatialParams( spatialParams );
 		}
 	}
 }
@@ -4842,33 +4841,29 @@ void CG_UpdateEntities( void ) {
 	CG_SortItemTimers();
 }
 
-void CG_GetEntitySpatilization( int entNum, float *origin, float *velocity, float *axis ) {
-	centity_t *cent;
-	const cmodel_s *cmodel;
-	vec3_t mins, maxs;
-
+void CG_GetEntitySpatialParams( int entNum, EntitySpatialParams *spatialParams ) {
+	// TODO: Is this reachable?
 	if( entNum < 0 || entNum >= MAX_EDICTS ) {
 		CG_Error( "CG_GetEntitySoundOrigin: bad entnum" );
 		return;
 	}
 
-	cent = &cg_entities[entNum];
+	centity_t *cent = &cg_entities[entNum];
+	spatialParams->entNum = entNum;
 
-	// normal
 	if( cent->current.solid != SOLID_BMODEL ) {
-		VectorCopy( cent->ent.origin, origin );
-		VectorCopy( cent->velocity, velocity );
-		VectorCopy( cent->ent.axis, axis );
-		return;
+		VectorCopy( cent->ent.origin, spatialParams->origin );
+		VectorCopy( cent->velocity, spatialParams->velocity );
+		Matrix3_Copy( cent->ent.axis, spatialParams->axis );
+	} else {
+		vec3_t mins, maxs;
+		const cmodel_s *cmodel = CG_InlineModel( cent->current.modelindex );
+		CG_InlineModelBounds( cmodel, mins, maxs );
+		VectorAdd( maxs, mins, spatialParams->origin );
+		VectorMA( cent->ent.origin, 0.5f, spatialParams->origin, spatialParams->origin );
+		VectorCopy( cent->velocity, spatialParams->velocity );
+		Matrix3_Copy( cent->ent.axis, spatialParams->axis );
 	}
-
-	// bmodel
-	cmodel = CG_InlineModel( cent->current.modelindex );
-	CG_InlineModelBounds( cmodel, mins, maxs );
-	VectorAdd( maxs, mins, origin );
-	VectorMA( cent->ent.origin, 0.5f, origin, origin );
-	VectorCopy( cent->velocity, velocity );
-	VectorCopy( cent->ent.axis, axis );
 }
 
 /*

@@ -67,6 +67,7 @@ struct SoundSetProps {
 };
 
 struct client_state_s;
+struct EntitySpatialParams;
 
 class SoundSystem {
 	static SoundSystem *s_instance;
@@ -128,12 +129,11 @@ public:
 
 	virtual void stopSounds( unsigned flags = 0 ) = 0;
 
-	virtual void updateListener( int entNum, const float *origin, const float *velocity, const mat3_t axis ) = 0;
 	virtual void activate( bool isActive ) = 0;
 
-	virtual void processFrameUpdates() = 0;
+	virtual void processFrameUpdates( const EntitySpatialParams &listenerSpatialParams ) = 0;
 
-	virtual void setEntitySpatialParams( int entNum, const float *origin, const float *velocity, const float *axis ) = 0;
+	virtual void setEntitySpatialParams( const EntitySpatialParams &spatialParams ) = 0;
 
 	[[nodiscard]]
 	virtual auto registerSound( const SoundSetProps &props ) -> const SoundSet * = 0;

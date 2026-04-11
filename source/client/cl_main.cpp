@@ -847,7 +847,7 @@ void SCR_ShutDownConsoleMedia( void ) {
 	SCR_ShutdownFonts();
 }
 
-void SCR_UpdateScreen( void ) {
+static std::optional<EntitySpatialParams> SCR_UpdateScreen( void ) {
 	WSW_PROFILER_SCOPE();
 
 	assert( scr_initialized && con_initialized && cls.mediaInitialized );
@@ -954,6 +954,8 @@ void SCR_UpdateScreen( void ) {
 	}
 
 	RF_EndFrame();
+
+	return cgRenderViewResult.listenerSpatialParams;
 }
 
 /*
@@ -4995,19 +4997,17 @@ void CL_Frame( int realMsec, int gameMsec ) {
 		// allow rendering DLL change
 		VID_CheckChanges();
 
+		EntitySpatialParams listenerSpatialParams;
 		if( scr_initialized && con_initialized && cls.mediaInitialized ) {
-			SCR_UpdateScreen();
-		}
-
-		// update audio
-		if( cls.state != CA_ACTIVE ) {
-			SoundSystem::instance()->updateListener( -1, vec3_origin, vec3_origin, axis_identity );
+			if( std::optional<EntitySpatialParams> povListenerParams = SCR_UpdateScreen() ) {
+				listenerSpatialParams = *povListenerParams;
+			}
 		}
 
 		// advance local effects for next frame
 		SCR_RunConsole( allRealMsec );
 
-		SoundSystem::instance()->processFrameUpdates();
+		SoundSystem::instance()->processFrameUpdates( listenerSpatialParams );
 
 		allRealMsec = 0;
 		allGameMsec = 0;

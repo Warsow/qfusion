@@ -30,13 +30,10 @@ public:
 
 	void stopSounds( unsigned flags ) override;
 
-	void updateListener( int entNum, const float *origin, const float *velocity, const mat3_t axis ) override;
-
 	void activate( bool isActive ) override;
 
-	void processFrameUpdates() override;
-
-	void setEntitySpatialParams( int entNum, const float *origin, const float *velocity, const float *axis ) override;
+	void processFrameUpdates( const EntitySpatialParams &listenerSpatialParams ) override;
+	void setEntitySpatialParams( const EntitySpatialParams &spatialParams ) override;
 
 	[[nodiscard]]
 	auto registerSound( const SoundSetProps &props ) -> const SoundSet * override;

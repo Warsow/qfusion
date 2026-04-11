@@ -212,31 +212,17 @@ void ALSoundSystem::pauseBackgroundTrack() {
 	callMethodOverPipe( m_pipe, &m_backend, &Backend::advanceBackgroundTrack, 0 );
 }
 
-void ALSoundSystem::updateListener( int entNum, const vec3_t origin, const vec3_t velocity, const mat3_t axis ) {
-	std::array<Vec3, 3> argAxis {
-		Vec3 { axis[0], axis[1], axis[2] },
-		Vec3 { axis[3], axis[4], axis[5] },
-		Vec3 { axis[6], axis[7], axis[8] }
-	};
-
-	callMethodOverPipe( m_pipe, &m_backend, &Backend::setListener, entNum, Vec3( origin ), Vec3( velocity ), argAxis );
-}
-
-void ALSoundSystem::setEntitySpatialParams( int entNum, const float *origin, const float *velocity, const float *axis ) {
-	if( m_spatialParamsBatch.count == std::size( m_spatialParamsBatch.entNums ) ) [[unlikely]] {
+void ALSoundSystem::setEntitySpatialParams( const EntitySpatialParams &spatialParams ) {
+	if( m_spatialParamsBatch.count == std::size( m_spatialParamsBatch.params ) ) [[unlikely]] {
 		flushEntitySpatialParams();
 	}
 
-	m_spatialParamsBatch.entNums[m_spatialParamsBatch.count] = entNum;
-	VectorCopy( origin, m_spatialParamsBatch.origins[m_spatialParamsBatch.count] );
-	VectorCopy( velocity, m_spatialParamsBatch.velocities[m_spatialParamsBatch.count] );
-	Matrix3_Copy( axis, m_spatialParamsBatch.axes[m_spatialParamsBatch.count] );
-	m_spatialParamsBatch.count++;
+	m_spatialParamsBatch.params[m_spatialParamsBatch.count++] = spatialParams;
 }
 
-void ALSoundSystem::processFrameUpdates() {
+void ALSoundSystem::processFrameUpdates( const EntitySpatialParams &listenerSpatialParams ) {
 	flushEntitySpatialParams();
-	callMethodOverPipe( m_pipe, &m_backend, &Backend::processFrameUpdates );
+	callMethodOverPipe( m_pipe, &m_backend, &Backend::processFrameUpdates, listenerSpatialParams );
 }
 
 void ALSoundSystem::flushEntitySpatialParams() {

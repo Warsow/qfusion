@@ -1549,6 +1549,7 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 	}
 
 	CGRenderViewResult result {
+		.listenerSpatialParams   = std::nullopt,
 		.hasBlittedTheMenu       = false,
 		.hasBlittedTheHud        = false,
 		.hasRenderedUIInternally = false,
@@ -1579,8 +1580,6 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 			cg.renderSystem->commitDraw2DRequest( request.get() );
 
 			CG_ClearEffects();
-
-			cg.soundSystem->updateListener( -1, vec3_origin, vec3_origin, axis_identity );
 		} else {
 			if( cg.motd && ( cg.time > cg.motd_time ) ) {
 				Q_free( cg.motd );
@@ -1646,8 +1645,16 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 			cg.oldAreabits = true;
 
 			const ViewState *primaryViewState = getPrimaryViewState();
-			cg.soundSystem->updateListener( primaryViewState->view.POVent, primaryViewState->view.origin,
-													 primaryViewState->view.velocity, primaryViewState->view.axis );
+
+			EntitySpatialParams listenerSpatialParams {
+				.entNum = primaryViewState->view.POVent,
+			};
+
+			VectorCopy( primaryViewState->view.origin, listenerSpatialParams.origin );
+			VectorCopy( primaryViewState->view.velocity, listenerSpatialParams.velocity );
+			Matrix3_Copy( primaryViewState->view.axis, listenerSpatialParams.axis );
+
+			result.listenerSpatialParams = listenerSpatialParams;
 		}
 	}
 

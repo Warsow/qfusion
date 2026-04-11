@@ -44,12 +44,11 @@ public:
 
 	void stopSounds( unsigned ) override {}
 
-	void updateListener( int, const float *, const float *, const mat3_t ) override {}
 	void activate( bool ) override {}
 
-	void processFrameUpdates() override {}
+	void processFrameUpdates( const EntitySpatialParams & ) override {}
 
-	void setEntitySpatialParams( int, const float *, const float *, const float * ) override {};
+	void setEntitySpatialParams( const EntitySpatialParams & ) override {};
 
 	[[nodiscard]]
 	auto registerSound( const SoundSetProps & ) -> const SoundSet * override { return nullptr; }
