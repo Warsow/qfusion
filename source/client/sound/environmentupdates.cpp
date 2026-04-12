@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "environmentupdates.h"
+#include "sourcemanager.h"
 #include "snd_leaf_props_cache.h"
 #include "snd_raycast_sampler.h"
 #include "snd_propagation.h"
@@ -60,44 +61,9 @@ constexpr const auto MAX_REVERB_PRIMARY_RAY_SAMPLES = 80;
 
 static_assert( PanningUpdateState::MAX_POINTS == MAX_REVERB_PRIMARY_RAY_SAMPLES, "" );
 
-void setupSourceEffectsAndEnvUpdates( src_t *src ) {
-	assert( s_environment_effects->integer );
-
-	src->envUpdateState.lastUpdateAt = 0;
-	// Force an immediate update
-	src->envUpdateState.nextUpdateAt = 0;
-	// Reset sampling patterns by setting an illegal quality value
-	src->envUpdateState.directObstructionSamplingProps.quality = -1.0f;
-
-	src->effectActive = true;
-}
-
-void disableSourceEffectsAndEnvUpdates( src_t *src ) {
-	assert( s_environment_effects->integer );
-
-	// Prevent later occasional updates
-	src->envUpdateState.lastUpdateAt = std::numeric_limits<int64_t>::max();
-	src->envUpdateState.nextUpdateAt = std::numeric_limits<int64_t>::max();
-
-	// Detach the slot from the source
-	alSource3i( src->source, AL_AUXILIARY_SEND_FILTER, AL_EFFECTSLOT_NULL, 0, AL_FILTER_NULL );
-	// Detach the effect from the slot
-	alAuxiliaryEffectSloti( src->effectSlot, AL_EFFECTSLOT_EFFECT, AL_EFFECT_NULL );
-	// Detach the direct filter
-	alSourcei( src->source, AL_DIRECT_FILTER, AL_FILTER_NULL );
-	// Restore the original source gain
-	if( src->volumeVar ) {
-		alSourcef( src->source, AL_GAIN, checkSourceGain( src->fvol * src->volumeVar->value ) );
-	} else {
-		alSourcef( src->source, AL_GAIN, checkSourceGain( src->fvol * s_volume->value ) );
-	}
-
-	src->effectActive = false;
-}
-
 class SourceUpdatePriorityQueue {
 public:
-	void add( src_t *src, float urgencyScale ) {
+	void add( Source *src, float urgencyScale ) {
 		assert( urgencyScale >= 0.0f );
 
 		float attenuationScale = src->attenuation * ( 1.0f / 20.0f );
@@ -113,7 +79,7 @@ public:
 	[[nodiscard]]
 	bool empty() const { return m_heap.empty(); }
 	[[nodiscard]]
-	auto pop() -> std::pair<src_t *, float> {
+	auto pop() -> std::pair<Source *, float> {
 		assert( !empty() );
 		wsw::pop_heap( m_heap.begin(), m_heap.end(), kCmp );
 		auto result = m_heap.back();
@@ -121,33 +87,16 @@ public:
 		return result;
 	}
 private:
-	static constexpr auto kCmp = []( const std::pair<src_t *, float> &lhs, const std::pair<src_t *, float> &rhs ) -> bool {
+	static constexpr auto kCmp = []( const std::pair<Source *, float> &lhs, const std::pair<Source *, float> &rhs ) -> bool {
 		return lhs.second < rhs.second;
 	};
-	wsw::StaticVector<std::pair<src_t *, float>, MAX_SRC> m_heap;
+	wsw::StaticVector<std::pair<Source *, float>, MAX_SRC> m_heap;
 };
 
-static void updateSourceEnv( src_t *src, const src_t *tryReusePropsSrc, const ListenerProps &listenerProps, int64_t millisNow );
+static void updateSourceEnv( Source *src, const Source *tryReusePropsSrc, const ListenerProps &listenerProps, int64_t millisNow );
 
-class SourceIterator {
-public:
-	[[nodiscard]]
-	auto getNext() -> src_t * {
-		while( m_index + 1 < src_count ) {
-			++m_index;
-			if( src_t *src = &srclist[m_index]; src->isActive && src->sfx ) {
-				return src;
-			}
-		}
-		return nullptr;
-	}
-private:
-	int m_index { -1 };
-};
-
-static void collectForcedEnvUpdates( SourceUpdatePriorityQueue *priorityQueue, int64_t ) {
-	SourceIterator sourceIterator;
-	while( src_t *src = sourceIterator.getNext() ) {
+static void collectForcedEnvUpdates( Source *srcListHead, SourceUpdatePriorityQueue *priorityQueue, int64_t ) {
+	for( Source *src = srcListHead; src; src = src->next ) {
 		if( src->priority == SRCPRI_LOCAL ) {
 			if( !src->envUpdateState.lastUpdateAt ) {
 				priorityQueue->add( src, 1.0f );
@@ -158,9 +107,8 @@ static void collectForcedEnvUpdates( SourceUpdatePriorityQueue *priorityQueue, i
 	}
 }
 
-static void collectRegularEnvUpdates( SourceUpdatePriorityQueue *priorityQueue, int64_t millisNow ) {
-	SourceIterator sourceIterator;
-	while( src_t *src = sourceIterator.getNext() ) {
+static void collectRegularEnvUpdates( Source *srcListHead, SourceUpdatePriorityQueue *priorityQueue, int64_t millisNow ) {
+	for( Source *src = srcListHead; src; src = src->next ) {
 		const EnvUpdateState &updateState = src->envUpdateState;
 		if( src->priority == SRCPRI_LOCAL ) {
 			// If this source has never been updated, add it to the queue, otherwise skip further updates.
@@ -205,7 +153,7 @@ static void processUpdatePriorityQueue( ListenerProps *listenerProps, SourceUpda
 	listenerProps->invalidateCachedUpdateState();
 
 	const SoundSet *lastProcessedSfx = nullptr;
-	const src_t *lastProcessedSrc    = nullptr;
+	const Source *lastProcessedSrc    = nullptr;
 	float lastProcessedPriority      = std::numeric_limits<float>::max();
 	unsigned numPerformedUpdates     = 0;
 	bool hasReachedSkipLimit         = false;
@@ -221,7 +169,7 @@ static void processUpdatePriorityQueue( ListenerProps *listenerProps, SourceUpda
 		}
 		// If we don't care of limits yet or if the source is a high-priority source or it has never been updated
 		if( !hasReachedSkipLimit || priorityInQueue >= 1.0f || src->envUpdateState.lastUpdateAt <= 0 ) {
-			const src_t *tryReusePropsSrc = nullptr;
+			const Source *tryReusePropsSrc = nullptr;
 			if( src->sfx == lastProcessedSfx ) {
 				tryReusePropsSrc = lastProcessedSrc;
 			}
@@ -237,9 +185,10 @@ static void processUpdatePriorityQueue( ListenerProps *listenerProps, SourceUpda
 	}
 }
 
-void updateRelativeSoundsSpatialization( const vec3_t origin, const vec3_t velocity ) {
-	SourceIterator sourceIterator;
-	while( src_t *const src = sourceIterator.getNext() ) {
+// This subroutine copies listener origin to origin of relative sounds so we can update their enviroment
+// TODO: Respect attachments !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void updateRelativeSoundsSpatialization( Source *srcListHead, const vec3_t origin, const vec3_t velocity ) {
+	for( Source *src = srcListHead; src; src = src->next ) {
 		if( src->attenuation == 0.0f ) {
 			VectorCopy( origin, src->origin );
 			VectorCopy( velocity, src->velocity );
@@ -247,21 +196,21 @@ void updateRelativeSoundsSpatialization( const vec3_t origin, const vec3_t veloc
 	}
 }
 
-static void updatePanning( int64_t millisNow, int listenerEntNum, const vec3_t origin, const mat3_t axes ) {
-	SourceIterator sourceIterator;
-	while( src_t *const src = sourceIterator.getNext() ) {
+static void updatePanning( Source *srcListHead, int listenerEntNum, const vec3_t origin, const mat3_t axes ) {
+	for( Source *src = srcListHead; src; src = src->next ) {
 		if ( IsEffectActive( src ) ) {
 			UpdateSourceEffectPanning( src, listenerEntNum, origin, axes );
 		}
 	}
 }
 
-void updateEnvOfListenerAndSources( int listenerEntNum, const vec3_t origin, const vec3_t velocity, const mat3_t axes ) {
+void updateEnvOfListenerAndSources( Source *srcListHead, int64_t millisNow, int listenerEntNum,
+									const vec3_t origin, const vec3_t velocity, const mat3_t axes ) {
 	assert( s_environment_effects->integer );
 
 	bool needsForcedUpdate = false;
 
-	updateRelativeSoundsSpatialization( origin, velocity );
+	updateRelativeSoundsSpatialization( srcListHead, origin, velocity );
 
 	// Check whether we have teleported or entered/left a liquid.
 	// Run a forced major update in this case.
@@ -296,22 +245,21 @@ void updateEnvOfListenerAndSources( int listenerEntNum, const vec3_t origin, con
 	// Caution! This code relies on an assumtion that the priority queue does not perform heap allocation.
 	// Otherwise, cache the queue instance.
 	SourceUpdatePriorityQueue priorityQueue;
-	const int64_t millisNow = Sys_Milliseconds();
 
 	if( needsForcedUpdate ) {
-		collectForcedEnvUpdates( &priorityQueue, millisNow );
+		collectForcedEnvUpdates( srcListHead, &priorityQueue, millisNow );
 	} else {
-		collectRegularEnvUpdates( &priorityQueue, millisNow );
+		collectRegularEnvUpdates( srcListHead, &priorityQueue, millisNow );
 	}
 
 	processUpdatePriorityQueue( &g_listenerProps, &priorityQueue, millisNow );
 
 	// Panning info is dependent of environment one, make sure it is executed last
-	updatePanning( millisNow, listenerEntNum, testedOrigin, axes );
+	updatePanning( srcListHead, listenerEntNum, testedOrigin, axes );
 }
 
 [[nodiscard]]
-static bool tryReuseSourceReverbProps( src_t *src, const src_t *tryReusePropsSrc, ReverbEffectProps *effectProps ) {
+static bool tryReuseSourceReverbProps( Source *src, const Source *tryReusePropsSrc, ReverbEffectProps *effectProps ) {
 	if( !tryReusePropsSrc ) {
 		return false;
 	}
@@ -356,10 +304,10 @@ static bool tryReuseSourceReverbProps( src_t *src, const src_t *tryReusePropsSrc
 }
 
 [[nodiscard]]
-static auto computeDirectObstruction( const ListenerProps &listenerProps, wsw::RandomGenerator *choiceRng, src_t *src ) -> float;
-static void computeReverberation( const ListenerProps &listenerProps_, src_t *src, int srcLeafNum, ReverbEffectProps *effectProps );
+static auto computeDirectObstruction( const ListenerProps &listenerProps, wsw::RandomGenerator *choiceRng, Source *src ) -> float;
+static void computeReverberation( const ListenerProps &listenerProps_, Source *src, int srcLeafNum, ReverbEffectProps *effectProps );
 
-static void updateSourceEnv( src_t *src, const src_t *tryReusePropsSrc, const ListenerProps &listenerProps, int64_t millisNow ) {
+static void updateSourceEnv( Source *src, const Source *tryReusePropsSrc, const ListenerProps &listenerProps, int64_t millisNow ) {
 	EnvUpdateState *const updateState = &src->envUpdateState;
 
 	if( src->priority == SRCPRI_LOCAL ) {
@@ -445,9 +393,9 @@ static auto getNumSamplesForCurrentQuality( unsigned minSamples, unsigned maxSam
 	return numSamples;
 }
 
-static void setupDirectObstructionSamplingProps( src_t *src, wsw::RandomGenerator *choiceRng, unsigned minSamples, unsigned maxSamples ) {
-	const float quality    = s_environment_sampling_quality->value;
-	samplingProps_t *props = &src->envUpdateState.directObstructionSamplingProps;
+static void setupDirectObstructionSamplingProps( Source *src, wsw::RandomGenerator *choiceRng, unsigned minSamples, unsigned maxSamples ) {
+	const float quality        = s_environment_sampling_quality->value;
+	SamplingProps *const props = &src->envUpdateState.directObstructionSamplingProps;
 
 	// If the quality is not valid or has been modified since the pattern has been set
 	if( props->quality != quality ) {
@@ -475,7 +423,7 @@ struct DirectObstructionOffsetsHolder {
 
 static const DirectObstructionOffsetsHolder g_directObstructionOffsetsHolder;
 
-static auto computeDirectObstruction( const ListenerProps &listenerProps, wsw::RandomGenerator *choiceRng, src_t *src ) -> float {
+static auto computeDirectObstruction( const ListenerProps &listenerProps, wsw::RandomGenerator *choiceRng, Source *src ) -> float {
 	vec3_t testedListenerOrigin;
 	VectorCopy( listenerProps.origin, testedListenerOrigin );
 	// TODO: We assume standard view height
@@ -614,7 +562,7 @@ static CachedPresetTracker g_largeMetallicRoomPreset { "s_largeMetallicRoomPrese
 static CachedPresetTracker g_hugeMetallicRoomPreset { "s_hugeMetallicRoomPreset", "factory_hall factory_hall hangar" };
 
 [[nodiscard]]
-static auto calcEmissionRadius( const src_t *src ) -> float {
+static auto calcEmissionRadius( const Source *src ) -> float {
 	// Do not even bother casting rays 99999 units ahead for very attenuated sources.
 	// However, clamp/normalize the hit distance using the same defined threshold
 	float attenuation = src->attenuation;
@@ -630,7 +578,7 @@ static auto calcEmissionRadius( const src_t *src ) -> float {
 	return scale * REVERB_ENV_DISTANCE_THRESHOLD;
 }
 
-static void computeReverberation( const ListenerProps &listenerProps, src_t *src, int srcLeafNum, ReverbEffectProps *effectProps ) {
+static void computeReverberation( const ListenerProps &listenerProps, Source *src, int srcLeafNum, ReverbEffectProps *effectProps ) {
 	const unsigned numPrimaryRays = getNumSamplesForCurrentQuality( 16, MAX_REVERB_PRIMARY_RAY_SAMPLES );
 
 	vec3_t primaryRayDirs[MAX_REVERB_PRIMARY_RAY_SAMPLES];

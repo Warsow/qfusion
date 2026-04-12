@@ -159,4 +159,11 @@ public:
 	static auto getPathForName( const wsw::StringView &name ) -> wsw::PodVector<char>;
 };
 
+struct EntitySpatialParams {
+	float origin[3] { 0.0f, 0.0f, 0.0f };
+	float velocity[3] { 0.0f, 0.0f, 0.0f };
+	float axis[9] { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+	int entNum { -1 };
+};
+
 #endif

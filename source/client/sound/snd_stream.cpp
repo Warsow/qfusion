@@ -22,9 +22,23 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "snd_local.h"
+#include "sourcemanager.h"
 
+/*
+* S_AllocRawSource
+*/
+Source *S_AllocRawSource( int entNum, float fvol, float attenuation, cvar_t *volumeVar ) {
+	return nullptr;
+}
+
+/*
+* S_GetALSource
+*/
+ALuint S_GetALSource( const Source *src ) {
+	return src->source;
+}
 typedef struct {
-	src_t *src;
+	Source *src;
 	ALuint source;
 	int entNum;
 	ALuint samples_length;

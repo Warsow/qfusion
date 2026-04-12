@@ -162,31 +162,8 @@ static bool S_Init( void *hwnd, int maxEntities, bool verbose ) {
 		Com_Printf( "Failed to init decoders\n" );
 		return false;
 	}
-	if( !S_InitSources( maxEntities, verbose ) ) {
-		Com_Printf( "Failed to init sources\n" );
-		return false;
-	}
 
 	return true;
-}
-
-static void S_SetListener( int entNum, const vec3_t origin, const vec3_t velocity, const mat3_t axis ) {
-	float orientation[6];
-
-	orientation[0] = axis[AXIS_FORWARD + 0];
-	orientation[1] = axis[AXIS_FORWARD + 1];
-	orientation[2] = axis[AXIS_FORWARD + 2];
-	orientation[3] = axis[AXIS_UP + 0];
-	orientation[4] = axis[AXIS_UP + 1];
-	orientation[5] = axis[AXIS_UP + 2];
-
-	alListenerfv( AL_POSITION, origin );
-	alListenerfv( AL_VELOCITY, velocity );
-	alListenerfv( AL_ORIENTATION, orientation );
-
-	if( s_environment_effects->integer ) {
-		updateEnvOfListenerAndSources( entNum, origin, velocity, axis );
-	}
 }
 
 namespace wsw::snd {
@@ -195,7 +172,8 @@ namespace wsw::snd {
 void Backend::init( bool verbose ) {
 	if( S_Init( nullptr, MAX_EDICTS, verbose ) ) {
 		m_soundSetCache = new SoundSetCache;
-		m_initialized = true;
+		m_sourceManager = new SourceManager;
+		m_initialized   = true;
 	}
 }
 
@@ -204,9 +182,9 @@ void Backend::shutdown( bool verbose ) {
 	S_LockBackgroundTrack( false );
 	S_StopBackgroundTrack();
 
+	delete m_sourceManager;
 	delete m_soundSetCache;
 
-	S_ShutdownSources();
 	S_ShutdownDecoders( verbose );
 
 	if( alContext ) {
@@ -225,15 +203,38 @@ void Backend::shutdown( bool verbose ) {
 
 void Backend::stopSounds( unsigned flags ) {
 	S_StopStreams();
-	S_StopAllSources( ( flags & SoundSystem::RetainLocal ) != 0 );
+	m_sourceManager->stopAllSources( ( flags & SoundSystem::RetainLocal ) != 0 );
 	if( flags & SoundSystem::StopMusic ) {
 		S_StopBackgroundTrack();
 	}
 }
 
 void Backend::processFrameUpdates( const EntitySpatialParams &listenerSpatialParams ) {
-	S_SetListener( listenerSpatialParams.entNum, listenerSpatialParams.origin, listenerSpatialParams.velocity, listenerSpatialParams.axis );
-	S_UpdateSources();
+	const float *origin   = listenerSpatialParams.origin;
+	const float *axis     = listenerSpatialParams.axis;
+	const float *velocity = listenerSpatialParams.velocity;
+	const int entNum      = listenerSpatialParams.entNum;
+
+	float orientation[6];
+
+	orientation[0] = axis[AXIS_FORWARD + 0];
+	orientation[1] = axis[AXIS_FORWARD + 1];
+	orientation[2] = axis[AXIS_FORWARD + 2];
+	orientation[3] = axis[AXIS_UP + 0];
+	orientation[4] = axis[AXIS_UP + 1];
+	orientation[5] = axis[AXIS_UP + 2];
+
+	alListenerfv( AL_POSITION, origin );
+	alListenerfv( AL_VELOCITY, velocity );
+	alListenerfv( AL_ORIENTATION, orientation );
+
+	const int64_t millisNow = Sys_Milliseconds();
+
+	m_sourceManager->updateSources( millisNow, listenerSpatialParams.origin );
+
+	if( s_environment_effects->integer ) {
+		updateEnvOfListenerAndSources( m_sourceManager->getActiveSourcesHead(), millisNow, entNum, origin, velocity, axis );
+	}
 }
 
 auto Backend::loadSound( const SoundSetProps &props ) -> const SoundSet * {
@@ -250,13 +251,14 @@ void Backend::endRegistration() {
 
 void Backend::setEntitySpatialParams( const EntitySpatialParamsBatch &batch ) {
 	for( unsigned i = 0; i < batch.count; ++i ) {
-		S_SetEntitySpatialization( batch.params[i].entNum, batch.params[i].origin, batch.params[i].velocity, batch.params[i].axis );
+		m_sourceManager->setEntitySpatialParams( batch.params[i] );
 	}
 }
 
 void Backend::startLocalSound( const SoundSet *sound, float volume ) {
 	if( const std::optional<std::pair<ALuint, unsigned>> bufferAndIndex = m_soundSetCache->getBufferForPlayback( sound, true ) ) {
-		S_StartLocalSound( sound, *bufferAndIndex, m_soundSetCache->getPitchForPlayback( sound ), volume );
+		const float pitch = m_soundSetCache->getPitchForPlayback( sound );
+		m_sourceManager->startLocalSound( sound, *bufferAndIndex, pitch, volume );
 	}
 }
 
@@ -269,24 +271,27 @@ void Backend::startLocalSoundByName( const wsw::PodVector<char> &name, float vol
 
 void Backend::startFixedSound( const SoundSet *sound, const Vec3 &origin, int channel, float volume, float attenuation ) {
 	if( const std::optional<std::pair<ALuint, unsigned>> bufferAndIndex = m_soundSetCache->getBufferForPlayback( sound ) ) {
-		S_StartFixedSound( sound, *bufferAndIndex, m_soundSetCache->getPitchForPlayback( sound ),
-						   origin.data(), channel, volume, attenuation );
+		const float pitch = m_soundSetCache->getPitchForPlayback( sound );
+		m_sourceManager->startFixedSound( sound, *bufferAndIndex, pitch, origin.data(), channel, volume, attenuation );
 	}
 }
 
 void Backend::startRelativeSound( const SoundSet *sound, SoundSystem::AttachmentTag attachmentTag,
 								  int entNum, int channel, float volume, float attenuation ) {
 	if( const std::optional<std::pair<ALuint, unsigned>> bufferAndIndex = m_soundSetCache->getBufferForPlayback( sound ) ) {
-		S_StartRelativeSound( sound, attachmentTag, *bufferAndIndex, m_soundSetCache->getPitchForPlayback( sound ),
-							  entNum, channel, volume, attenuation );
+		const float pitch = m_soundSetCache->getPitchForPlayback( sound );
+		m_sourceManager->startRelativeSound( sound, attachmentTag, *bufferAndIndex, pitch, entNum,
+											 channel, volume, attenuation );
 	}
 }
 
 void Backend::addLoopSound( const SoundSet *sound, SoundSystem::AttachmentTag attachmentTag,
 							int entNum, uintptr_t identifyingToken, float volume, float attenuation ) {
 	if( const std::optional<std::pair<ALuint, unsigned>> bufferAndIndex = m_soundSetCache->getBufferForPlayback( sound ) ) {
-		S_AddLoopSound( sound, attachmentTag, *bufferAndIndex, m_soundSetCache->getPitchForPlayback( sound ),
-						entNum, identifyingToken, volume, attenuation );
+		// TODO: How is pitch managed for looping sounds
+		const float pitch = m_soundSetCache->getPitchForPlayback( sound );
+		m_sourceManager->touchLoopSound( sound, attachmentTag, *bufferAndIndex, pitch, entNum,
+										 identifyingToken, volume, attenuation );
 	}
 }
 
@@ -323,9 +328,6 @@ void Backend::activate( bool active ) {
 	}
 }
 
-}
-
-void S_Clear() {
 }
 
 static void S_Update( void ) {
