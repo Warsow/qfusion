@@ -23,11 +23,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <common/helpers/q_math.h>
 
-struct src_s;
-
+struct Source;
 struct PanningUpdateState;
 
-void updateEnvOfListenerAndSources( int entNum, const vec3_t origin, const vec3_t velocity, const mat3_t axes );
+void updateEnvOfListenerAndSources( Source *sourceListHead, int64_t millisNow, int entNum,
+									const vec3_t origin, const vec3_t velocity, const mat3_t axes );
 
 void calcReverbPan( const vec3_t listenerOrigin, const mat3_t listenerAxes,
 					const PanningUpdateState *updateState, vec3_t earlyPan, vec3_t latePan );
@@ -35,8 +35,8 @@ void calcReverbPan( const vec3_t listenerOrigin, const mat3_t listenerAxes,
 void calcPropagationOrigin( const vec3_t listenerOrigin, const vec3_t realSourceOrigin,
 							float *sourcePitchScale, vec3_t sourceOriginToUse );
 
-void setupSourceEffectsAndEnvUpdates( struct src_s *src );
+void setupSourceEffectsAndEnvUpdates( Source *src );
 
-void disableSourceEffectsAndEnvUpdates( struct src_s *src );
+void disableSourceEffectsAndEnvUpdates( Source *src );
 
 #endif

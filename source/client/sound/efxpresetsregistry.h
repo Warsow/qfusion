@@ -1,6 +1,7 @@
 #ifndef WSW_f7aab381_683d_4dce_ae3a_57a81e46af6b_H
 #define WSW_f7aab381_683d_4dce_ae3a_57a81e46af6b_H
 
+#define AL_ALEXT_PROTOTYPES
 #define AL_LIBTYPE_STATIC
 #include <AL/efx.h>
 

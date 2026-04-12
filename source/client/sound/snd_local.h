@@ -92,13 +92,6 @@ static inline auto checkSourceGain( float givenVolume ) -> float {
 
 // playing
 
-void S_StartFixedSound( const SoundSet *sfx, std::pair<ALuint, unsigned> bufferAndIndex, float pitch, const vec3_t origin, int channel, float fvol, float attenuation );
-void S_StartRelativeSound( const SoundSet *sfx, SoundSystem::AttachmentTag attachmentTag, std::pair<ALuint, unsigned> bufferAndIndex, float pitch, int entnum, int channel, float fvol, float attenuation );
-
-void S_StartLocalSound( const SoundSet *sound, std::pair<ALuint, unsigned> bufferAndIndex, float pitch, float fvol );
-
-void S_AddLoopSound( const SoundSet *sound, SoundSystem::AttachmentTag attachmentTag, std::pair<ALuint, unsigned> bufferAndIndex, float pitch, int entnum, uintptr_t identifyingToken, float fvol, float attenuation );
-
 void S_RawSamples2( unsigned int samples, unsigned int rate,
 					unsigned short width, unsigned short channels, const uint8_t *data, bool music, float fvol );
 
@@ -118,103 +111,14 @@ const char *S_ErrorMessage( ALenum error );
 ALuint S_GetBufferLength( ALuint buffer );
 void *S_BackgroundUpdateProc( void *param );
 
-typedef struct {
-	float quality;
-	unsigned numSamples;
-	uint16_t valueIndex;
-} samplingProps_t;
-
-struct PanningUpdateState {
-	static constexpr auto MAX_POINTS = 80;
-	vec3_t reflectionPoints[MAX_POINTS];
-	unsigned numPrimaryRays;
-	unsigned numPassedSecondaryRays;
-};
-
-struct ReverbEffectProps {
-	EfxReverbProps reverbProps {};
-	float directObstruction { 0.0f };
-	float secondaryRaysObstruction { 0.0f };
-};
-
-struct EnvUpdateState {
-	int64_t nextUpdateAt { 0 };
-	int64_t lastUpdateAt { 0 };
-
-	ReverbEffectProps effectProps;
-
-	samplingProps_t directObstructionSamplingProps;
-
-	vec3_t lastUpdateOrigin;
-	vec3_t lastUpdateVelocity;
-
-	// A distance between emitter and listener at last props update
-	float distanceAtLastUpdate { 0.0f };
-};
-
-/*
-* Source management
-*/
-typedef struct src_s {
-	ALuint source;
-
-	ALuint directFilter;
-	ALuint effect;
-	ALuint effectSlot;
-
-	const SoundSet *sfx;
-	unsigned bufferIndex;
-
-	cvar_t *volumeVar;
-
-	int64_t lastUse;    // Last time used
-
-	uintptr_t loopIdentifyingToken;
-
-	int priority;
-	int entNum;
-	int channel;
-	SoundSystem::AttachmentTag attachmentTag;
-	float chosenPitch;
-
-	float fvol; // volume modifier, for s_volume updating
-	float attenuation;
-
-	bool isActive;
-	bool isLocked;
-	bool isLooping;
-	bool isTracking;
-	bool isLingering;
-	bool touchedThisFrame;
-	bool effectActive;
-
-	int64_t lingeringTimeoutAt;
-
-	EnvUpdateState envUpdateState;
-	PanningUpdateState panningUpdateState;
-
-	vec3_t origin, velocity; // for local culling
-} src_t;
-
-extern src_t srclist[MAX_SRC];
-extern int src_count;
-
-bool S_InitSources( int maxEntities, bool verbose );
-void S_ShutdownSources( void );
-void S_UpdateSources( void );
-src_t *S_AllocSource( int priority, int entnum, int channel );
-src_t *S_FindSource( int entnum, int channel );
-void S_LockSource( src_t *src );
-void S_UnlockSource( src_t *src );
-void S_StopAllSources( bool retainLocal );
-ALuint S_GetALSource( const src_t *src );
-src_t *S_AllocRawSource( int entNum, float fvol, float attenuation, cvar_t *volumeVar );
-void S_SetEntitySpatialization( int entnum, const vec3_t origin, const vec3_t velocity, const mat3_t axis );
 static constexpr float REVERB_ENV_DISTANCE_THRESHOLD = 4096.0f;
 
-bool IsEffectActive( const src_t *src );
-void UpdateSourceEffectProps( src_s *src, const ReverbEffectProps &effectProps, const vec3_t listenerOrigin );
-void UpdateSourceEffectPanning( src_s *src, int listenerEntNum, const vec3_t listenerOrigin, const mat3_t listenerAxes );
+struct Source;
+struct ReverbEffectProps;
+
+bool IsEffectActive( const Source *src );
+void UpdateSourceEffectProps( Source *src, const ReverbEffectProps &effectProps, const vec3_t listenerOrigin );
+void UpdateSourceEffectPanning( Source *src, int listenerEntNum, const vec3_t listenerOrigin, const mat3_t listenerAxes );
 
 /*
 * Music

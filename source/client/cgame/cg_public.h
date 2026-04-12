@@ -21,6 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef __CG_PUBLIC_H__
 #define __CG_PUBLIC_H__
 
+#include <client/snd_public.h>
+
 struct orientation_s;
 struct bonepose_s;
 struct shader_s;
@@ -93,13 +95,6 @@ namespace wsw { class StringView; }
 void CG_ConfigString( int i, const wsw::StringView &string );
 
 struct ViewState;
-
-struct EntitySpatialParams {
-	vec3_t origin { 0.0f, 0.0f, 0.0f };
-	vec3_t velocity { 0.0f, 0.0f, 0.0f };
-	mat3_t axis { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
-	int entNum { -1 };
-};
 
 void CG_GameCommand( ViewState *viewState, const wsw::StringView &fullText );
 void CG_GetEntitySpatialParams( int number, EntitySpatialParams *spatialParams );

@@ -5,10 +5,9 @@
 #include <server/game/ai/vec3.h>
 #include <common/types/staticvector.h>
 #include <common/facilities/q_comref.h>
-// For EntitySpatialParams (TODO?)
-#include <client/cgame/cg_public.h>
-#include "snd_local.h"
 #include "soundsetcache.h"
+#include "sourcemanager.h"
+#include "snd_local.h"
 #include <array>
 
 namespace wsw::snd {
@@ -49,6 +48,7 @@ public:
 	void activate( bool active );
 
 private:
+	SourceManager *m_sourceManager { nullptr };
 	SoundSetCache *m_soundSetCache { nullptr };
 
 	bool m_initialized { false };
