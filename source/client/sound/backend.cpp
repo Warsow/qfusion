@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <common/facilities/cvar.h>
 #include <common/facilities/q_comref.h>
 #include <common/facilities/sysclock.h>
+#include <atomic>
 #include <span>
 
 extern int s_registration_sequence;
@@ -178,9 +179,10 @@ void Backend::init( bool verbose ) {
 }
 
 void Backend::shutdown( bool verbose ) {
-	S_StopStreams();
+	m_sourceManager->stopStreamSources();
+
 	S_LockBackgroundTrack( false );
-	S_StopBackgroundTrack();
+	S_StopBackgroundTrack( m_sourceManager );
 
 	delete m_sourceManager;
 	delete m_soundSetCache;
@@ -202,10 +204,11 @@ void Backend::shutdown( bool verbose ) {
 }
 
 void Backend::stopSounds( unsigned flags ) {
-	S_StopStreams();
-	m_sourceManager->stopAllSources( ( flags & SoundSystem::RetainLocal ) != 0 );
+	// TODO: This line actually stops music playback unconditionally (but looks like we always supply StopMusic flag)
+	m_sourceManager->stopStreamSources();
+	m_sourceManager->stopAllRegularSources( ( flags & SoundSystem::RetainLocal ) != 0 );
 	if( flags & SoundSystem::StopMusic ) {
-		S_StopBackgroundTrack();
+		S_StopBackgroundTrack( m_sourceManager );
 	}
 }
 
@@ -230,7 +233,7 @@ void Backend::processFrameUpdates( const EntitySpatialParams &listenerSpatialPar
 
 	const int64_t millisNow = Sys_Milliseconds();
 
-	m_sourceManager->updateSources( millisNow, listenerSpatialParams.origin );
+	m_sourceManager->updateRegularSources( millisNow, listenerSpatialParams.origin );
 
 	if( s_environment_effects->integer ) {
 		updateEnvOfListenerAndSources( m_sourceManager->getActiveSourcesHead(), millisNow, entNum, origin, velocity, axis );
@@ -296,11 +299,11 @@ void Backend::addLoopSound( const SoundSet *sound, SoundSystem::AttachmentTag at
 }
 
 void Backend::startBackgroundTrack( const wsw::PodVector<char> &intro, const wsw::PodVector<char> &loop, int mode ) {
-	S_StartBackgroundTrack( intro.data(), loop.data(), mode );
+	S_StartBackgroundTrack( m_sourceManager, intro.data(), loop.data(), mode );
 }
 
 void Backend::stopBackgroundTrack() {
-	S_StopBackgroundTrack();
+	S_StopBackgroundTrack( m_sourceManager );
 }
 
 void Backend::lockBackgroundTrack( bool lock ) {
@@ -330,10 +333,14 @@ void Backend::activate( bool active ) {
 
 }
 
-static void S_Update( void ) {
-	S_UpdateMusic();
+static void S_Update( std::atomic_bool *const isSoundSystemInitialized ) {
+	if( *isSoundSystemInitialized ) {
+		auto *soundSystem            = (wsw::snd::ALSoundSystem *)SoundSystem::instance();
+		SourceManager *sourceManager = soundSystem->getBackend()->getSourceManager();
 
-	S_UpdateStreams();
+		S_UpdateMusic( sourceManager );
+		sourceManager->updateStreamSources();
+	}
 
 	if( s_doppler->modified ) {
 		if( s_doppler->value > 0.0f ) {
@@ -358,7 +365,7 @@ static void S_Update( void ) {
 	}
 }
 
-static int S_EnqueuedCmdsWaiter( sndCmdPipe_t *queue, bool timeout ) {
+static int S_EnqueuedCmdsWaiter( sndCmdPipe_t *queue, void *arg, bool timeout ) {
 	const int read = QBufPipe_ReadCmds( queue );
 	if( read < 0 ) {
 		// shutdown
@@ -368,7 +375,7 @@ static int S_EnqueuedCmdsWaiter( sndCmdPipe_t *queue, bool timeout ) {
 	const int64_t now = Sys_Milliseconds();
 	if( timeout || now >= s_last_update_time + UPDATE_MSEC ) {
 		s_last_update_time = now;
-		S_Update();
+		S_Update( (std::atomic_bool *)arg );
 	}
 
 	return read;
@@ -377,13 +384,14 @@ static int S_EnqueuedCmdsWaiter( sndCmdPipe_t *queue, bool timeout ) {
 void *S_BackgroundUpdateProc( void *param ) {
 	using namespace wsw::snd;
 
-	auto *arg        = ( ALSoundSystem::ThreadProcArg *)param;
-	qbufPipe_s *pipe = arg->pipe;
+	auto *arg                      = ( ALSoundSystem::ThreadProcArg *)param;
+	qbufPipe_s *pipe               = arg->pipe;
+	void *isSoundSystemInitialized = arg->isSoundSystemInitialized;
 
 	// Don't hold the arg heap memory forever
 	Q_free( arg );
 
-	QBufPipe_Wait( pipe, S_EnqueuedCmdsWaiter, UPDATE_MSEC );
+	QBufPipe_Wait( pipe, S_EnqueuedCmdsWaiter, isSoundSystemInitialized, UPDATE_MSEC );
 
 	return NULL;
 }

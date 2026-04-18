@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "snd_local.h"
+#include "sourcemanager.h"
 
 #include <common/helpers/qthreads.h>
 #include <common/facilities/fscompat.h>
@@ -35,6 +36,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define MUSIC_BUFFERING_SIZE    ( MUSIC_BUFFER_SIZE * 4 + 4000 )
 #define BACKGROUND_TRACK_BUFFERING_TIMEOUT  5000
+
+// Not zero just to test get-by-tag facilities
+#define MUSIC_SRC_TAG  1
 
 // =================================
 
@@ -363,12 +367,13 @@ static bool S_AdvanceBackgroundTrack( int n ) {
 /*
 * Local helper functions
 */
-static bool music_process( void ) {
+static bool music_process( SourceManager *sourceManager ) {
 	int l = 0;
 	snd_stream_t *music_stream;
 	uint8_t decode_buffer[MUSIC_BUFFER_SIZE];
 
-	while( S_GetRawSamplesLength() < MUSIC_PRELOAD_MSEC ) {
+	StreamSource *const src = sourceManager->getStreamSource( MUSIC_SRC_TAG );
+	while( src->queuedSamplesMsec < MUSIC_PRELOAD_MSEC ) {
 		music_stream = s_bgTrack->stream;
 		if( music_stream ) {
 			l = S_ReadStream( music_stream, MUSIC_BUFFER_SIZE, decode_buffer );
@@ -398,10 +403,9 @@ static bool music_process( void ) {
 			continue;
 		}
 
-		S_RawSamples2( l / ( music_stream->info.bytesPerSample * music_stream->info.numChannels ),
-					   music_stream->info.sampleRate, music_stream->info.bytesPerSample,
-					   music_stream->info.numChannels, decode_buffer, true,
-					   s_bgTrackMuted ? 0 : 1 );
+		const auto nsamples = l / ( music_stream->info.bytesPerSample * music_stream->info.numChannels );
+		sourceManager->pushStreamSamples( src, nsamples, music_stream->info.sampleRate, music_stream->info.bytesPerSample,
+					   music_stream->info.numChannels, decode_buffer, s_musicvolume->value * ( s_bgTrackMuted ? 0 : 1 ) );
 	}
 
 	return true;
@@ -411,7 +415,7 @@ static bool music_process( void ) {
 * Sound system wide functions (snd_loc.h)
 */
 
-void S_UpdateMusic( void ) {
+void S_UpdateMusic( SourceManager *sourceManager ) {
 	if( !s_bgTrack ) {
 		return;
 	}
@@ -422,9 +426,9 @@ void S_UpdateMusic( void ) {
 		return;
 	}
 
-	if( !music_process() ) {
+	if( !music_process( sourceManager ) ) {
 		Com_Printf( "Error processing music data\n" );
-		S_StopBackgroundTrack();
+		S_StopBackgroundTrack( sourceManager );
 		return;
 	}
 }
@@ -432,13 +436,13 @@ void S_UpdateMusic( void ) {
 /*
 * Global functions (sound.h)
 */
-void S_StartBackgroundTrack( const char *intro, const char *loop, int mode ) {
+void S_StartBackgroundTrack( SourceManager *sourceManager, const char *intro, const char *loop, int mode ) {
 	const char *ext;
 	bgTrack_t *introTrack, *loopTrack;
 	bgTrack_t *firstTrack = NULL;
 
 	// Stop any existing music that might be playing
-	S_StopBackgroundTrack();
+	S_StopBackgroundTrack( sourceManager );
 
 	if( !intro || !intro[0] ) {
 		return;
@@ -488,19 +492,19 @@ void S_StartBackgroundTrack( const char *intro, const char *loop, int mode ) {
 start_playback:
 
 	if( !firstTrack || firstTrack->ignore ) {
-		S_StopBackgroundTrack();
+		S_StopBackgroundTrack( sourceManager );
 		return;
 	}
 
 	S_OpenBackgroundTrackTask( firstTrack );
 
-	S_UpdateMusic();
+	S_UpdateMusic( sourceManager );
 }
 
-void S_StopBackgroundTrack( void ) {
+void S_StopBackgroundTrack( SourceManager *sourceManager ) {
 	bgTrack_t *next;
 
-	S_StopRawSamples();
+	sourceManager->stopStreamSource( sourceManager->getStreamSource( MUSIC_SRC_TAG ) );
 
 	S_CloseBackgroundTrackTask();
 

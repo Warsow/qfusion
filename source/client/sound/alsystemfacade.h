@@ -12,7 +12,8 @@ class ALSoundSystem : public SoundSystem {
 public:
 	struct ThreadProcArg {
 		qbufPipe_s *pipe;
-		ALSoundSystem *instance;
+		// An address of an atomic boolean variable
+		void *isSoundSystemInitialized;
 	};
 
 	[[nodiscard]]
@@ -50,6 +51,8 @@ public:
 	void prevBackgroundTrack() override;
 	void nextBackgroundTrack() override;
 	void pauseBackgroundTrack() override;
+
+	[[nodiscard]] auto getBackend() -> Backend * { return &m_backend; }
 private:
 	void flushEntitySpatialParams();
 

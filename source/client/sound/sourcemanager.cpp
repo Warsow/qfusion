@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <common/helpers/algorithm.h>
 #include <common/helpers/links.h>
+#include <common/helpers/scopeexitaction.h>
 #include <common/facilities/cvar.h>
 #include <common/facilities/q_comref.h>
 #include <common/facilities/protocol.h>
@@ -49,14 +50,28 @@ SourceManager::SourceManager() {
 			break;
 		}
 	}
+	while( !m_cachedStreamHandles.full() ) {
+		CachedStreamHandles handles;
+		if( createStreamHandles( &handles ) ) {
+			m_cachedStreamHandles.push_back( handles );
+		} else {
+			break;
+		}
+	}
 }
 
 SourceManager::~SourceManager() {
 	for( Source *source = m_activeSourcesHead, *next; source; source = next ) { next = source->next;
 		killSource( source );
 	}
+	for( StreamSource *source = m_streamSourcesHead, *next; source; source = next ) { next = source->next;
+		killStreamSource( source );
+	}
 	for( CachedHandles &handles: m_cachedHandles ) {
 		destroyHandles( &handles );
+	}
+	for( CachedStreamHandles &handles: m_cachedStreamHandles ) {
+		destroyStreamHandles( &handles );
 	}
 }
 
@@ -141,20 +156,14 @@ void SourceManager::killSource( Source *src ) {
 	ALuint buffer = 0;
 	ALint numbufs = 0;
 
-	if( /*src->isActive wtf? */ true ) {
-		alSourceStop( src->source );
-	} else {
-		// Un-queue all queued buffers
-		alGetSourcei( src->source, AL_BUFFERS_QUEUED, &numbufs );
-		while( numbufs-- ) {
-			alSourceUnqueueBuffers( src->source, 1, &buffer );
-		}
-	}
+	alSourceStop( src->source );
 
 	// Un-queue all processed buffers
 	alGetSourcei( src->source, AL_BUFFERS_PROCESSED, &numbufs );
-	while( numbufs-- ) {
+	assert( numbufs >= 0 );
+	while( numbufs ) {
 		alSourceUnqueueBuffers( src->source, 1, &buffer );
+		numbufs--;
 	}
 
 	alSourcei( src->source, AL_BUFFER, AL_NONE );
@@ -173,6 +182,16 @@ void SourceManager::killSource( Source *src ) {
 	wsw::unlink( src, &m_activeSourcesHead );
 	src->~Source();
 	m_sourceAllocator.free( src );
+}
+
+void SourceManager::killStreamSource( StreamSource *src ) {
+	stopStreamSource( src );
+
+	m_cachedStreamHandles.push_back( CachedStreamHandles { .source = src->source } );
+
+	wsw::unlink( src, &m_streamSourcesHead );
+	src->~StreamSource();
+	m_streamSourceAllocator.free( src );
 }
 
 void SourceManager::updateSpatialParams( Source *src ) {
@@ -362,7 +381,28 @@ bool SourceManager::createHandles( CachedHandles *handles ) {
 	return succeeded;
 }
 
-void SourceManager::updateSources( int64_t millisNow, const float *listenerOrigin ) {
+bool SourceManager::createStreamHandles( CachedStreamHandles *handles ) {
+	*handles = CachedStreamHandles {};
+
+	(void)alGetError();
+
+	ALuint source = 0;
+	alGenSources( 1, &source );
+
+	if( alGetError() != AL_NO_ERROR ) {
+		return false;
+	}
+
+	handles->source = source;
+	return true;
+}
+
+void SourceManager::destroyStreamHandles( CachedStreamHandles *handles ) {
+	alDeleteSources( 1, &handles->source );
+	*handles = CachedStreamHandles {};
+}
+
+void SourceManager::updateRegularSources( int64_t millisNow, const float *listenerOrigin ) {
 	// A zombie is a source that still has an "active" flag but AL reports that it is stopped (is completed).
 
 	Source *zombieSources[kMaxSources];
@@ -552,6 +592,91 @@ void SourceManager::disableExcessiveEffects( const float *listenerOrigin, unsign
 	}
 }
 
+auto SourceManager::getStreamSource( uintptr_t tag ) -> StreamSource * {
+	for( StreamSource *source = m_streamSourcesHead; source; source = source->next ) {
+		if( source->tag == tag ) {
+			return source;
+		}
+	}
+
+	return allocStreamSource( tag );
+}
+
+void SourceManager::updateStreamSources() {
+	// Note: Contrary to regular sources, we don't destroy stopped stream sources
+	for( StreamSource *source = m_streamSourcesHead; source; source = source->next ) {
+		const unsigned processedMsec = drainProcessedSamples( source );
+		if( source->queuedSamplesMsec >= processedMsec ) {
+			source->queuedSamplesMsec -= processedMsec;
+		} else {
+			source->queuedSamplesMsec = 0;
+		}
+	}
+}
+
+void SourceManager::stopStreamSources() {
+	for( StreamSource *source = m_streamSourcesHead; source; source = source->next ) {
+		stopStreamSource( source );
+	}
+}
+
+void SourceManager::stopStreamSource( StreamSource *src ) {
+	alSourceStop( src->source );
+	(void)drainProcessedSamples( src );
+	alSourcei( src->source, AL_BUFFER, AL_NONE );
+	src->queuedSamplesMsec = 0;
+}
+
+auto SourceManager::drainProcessedSamples( StreamSource *src ) const -> unsigned {
+	ALint numBuffers      = 0;
+	unsigned resultMillis = 0;
+	alGetSourcei( src->source, AL_BUFFERS_PROCESSED, &numBuffers );
+	assert( numBuffers >= 0 );
+	while( numBuffers ) {
+		ALuint buffer = 0;
+		alSourceUnqueueBuffers( src->source, 1, &buffer );
+		resultMillis += S_GetBufferLength( buffer );
+		alDeleteBuffers( 1, &buffer );
+		numBuffers--;
+	}
+	return resultMillis;
+}
+
+void SourceManager::pushStreamSamples( StreamSource *src, unsigned samples, unsigned rate, unsigned width, unsigned channels, const uint8_t *data, float volume ) {
+	ALuint buffer = 0;
+	[[maybe_unused]] wsw::ScopeExitAction destroyBuffer( [&] { alDeleteBuffers( 1, &buffer ); });
+
+	alGenBuffers( 1, &buffer );
+	ALenum error = 0;
+	if( ( error = alGetError() ) != AL_NO_ERROR ) {
+		return;
+	}
+
+	const ALuint format = S_SoundFormat( width, channels );
+
+	alBufferData( buffer, format, data, ( samples * width * channels ), rate );
+	if( ( error = alGetError() ) != AL_NO_ERROR ) {
+		return;
+	}
+
+	alSourceQueueBuffers( src->source, 1, &buffer );
+	if( ( error = alGetError() ) != AL_NO_ERROR ) {
+		return;
+	}
+
+	src->queuedSamplesMsec += (ALuint)( (ALfloat)samples * 1000.0 / rate + 0.5f );
+
+	alSourcef( src->source, AL_GAIN, checkSourceGain( volume ) );
+
+	ALint state = 0;
+	alGetSourcei( src->source, AL_SOURCE_STATE, &state );
+	if( state != AL_PLAYING ) {
+		alSourcePlay( src->source );
+	}
+
+	destroyBuffer.cancel();
+}
+
 auto SourceManager::allocSource( int priority, int entNum, int channel ) -> Source * {
 	const int64_t millisNow = Sys_Milliseconds();
 
@@ -616,6 +741,24 @@ auto SourceManager::allocSource( int priority, int entNum, int channel ) -> Sour
 	return nullptr;
 }
 
+auto SourceManager::allocStreamSource( uintptr_t tag ) -> StreamSource * {
+	if( !m_cachedStreamHandles.empty() ) {
+		assert( !m_streamSourceAllocator.isFull() );
+
+		CachedStreamHandles handles = m_cachedStreamHandles.back();
+		m_cachedStreamHandles.pop_back();
+
+		auto *src   = new( m_streamSourceAllocator.allocOrNull() )StreamSource;
+		src->tag    = tag;
+		src->source = handles.source;
+
+		wsw::link( src, &m_streamSourcesHead );
+		return src;
+	}
+
+	return nullptr;
+}
+
 void SourceManager::startLocalSound( const SoundSet *sfx, std::pair<ALuint, unsigned> bufferAndIndex, float pitch, float fvol ) {
 	const int priority = SRCPRI_LOCAL;
 	const int entNum   = -1;
@@ -661,7 +804,7 @@ void SourceManager::startRelativeSound( const SoundSet *sfx, SoundSystem::Attach
 	startOneshotSound( sfx, bufferAndIndex, pitch, nullptr, entnum, channel, attachmentTag, fvol, attenuation );
 }
 
-void SourceManager::stopAllSources( bool retainLocal ) {
+void SourceManager::stopAllRegularSources( bool retainLocal ) {
 	for( Source *src = m_activeSourcesHead, *next; src; src = next ) { next = src->next;
 		// TODO: Identify local sounds in an explicit fashion
 		if( !retainLocal || src->attenuation != ATTN_NONE ) {

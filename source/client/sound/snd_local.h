@@ -90,15 +90,12 @@ static inline auto checkSourceGain( float givenVolume ) -> float {
 	return givenVolume;
 }
 
-// playing
-
-void S_RawSamples2( unsigned int samples, unsigned int rate,
-					unsigned short width, unsigned short channels, const uint8_t *data, bool music, float fvol );
+class SourceManager;
 
 // music
-void S_StartBackgroundTrack( const char *intro, const char *loop, int mode );
-void S_StopBackgroundTrack( void );
-void S_PrevBackgroundTrack( void );
+void S_StartBackgroundTrack( SourceManager *, const char *intro, const char *loop, int mode );
+void S_StopBackgroundTrack( SourceManager * );
+void S_PrevBackgroundTrack();
 void S_NextBackgroundTrack( void );
 void S_PauseBackgroundTrack( void );
 void S_LockBackgroundTrack( bool lock );
@@ -123,14 +120,7 @@ void UpdateSourceEffectPanning( Source *src, int listenerEntNum, const vec3_t li
 /*
 * Music
 */
-void S_UpdateMusic( void );
-
-/*
-* Stream
-*/
-void S_UpdateStreams( void );
-void S_StopStreams( void );
-void S_StopRawSamples( void );
+void S_UpdateMusic( SourceManager * );
 
 /*
 * Decoder
@@ -175,8 +165,6 @@ void S_CloseStream( snd_stream_t *stream );
 bool S_ResetStream( snd_stream_t *stream );
 bool S_EoStream( snd_stream_t *stream );
 int S_SeekSteam( snd_stream_t *stream, int ofs, int whence );
-
-unsigned S_GetRawSamplesLength( void );
 
 unsigned S_SuggestNumExtraThreadsForComputations();
 

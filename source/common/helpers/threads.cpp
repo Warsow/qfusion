@@ -368,7 +368,7 @@ int QBufPipe_ReadCmds( qbufPipe_t *pipe ) {
 /*
 * QBufPipe_Wait
 */
-void QBufPipe_Wait( qbufPipe_t *pipe, PipeWaiterFn waiterFn, unsigned timeout_msec ) {
+void QBufPipe_Wait( qbufPipe_t *pipe, PipeWaiterFn waiterFn, void *arg, unsigned timeout_msec ) {
 	while( !pipe->terminated ) {
 		bool timeout = false;
 
@@ -384,7 +384,7 @@ void QBufPipe_Wait( qbufPipe_t *pipe, PipeWaiterFn waiterFn, unsigned timeout_ms
 
 		// we're guaranteed at this point that either cmdbuf_len is > 0
 		// or that waiting on the condition variable has timed out
-		if( waiterFn( pipe, timeout ) < 0 ) {
+		if( waiterFn( pipe, arg, timeout ) < 0 ) {
 			// done
 			return;
 		}

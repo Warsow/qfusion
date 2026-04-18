@@ -8,8 +8,11 @@
 #include "snd_leaf_props_cache.h"
 #include "environmentupdates.h"
 
+#include <atomic>
+
 static SingletonHolder<wsw::snd::ALSoundSystem> alSoundSystemHolder;
 static bool s_registering;
+static std::atomic_bool g_isSoundSystemInitialized;
 int s_registration_sequence = 1;
 
 extern cvar_s *s_globalfocus;
@@ -28,11 +31,8 @@ wsw::snd::ALSoundSystem *wsw::snd::ALSoundSystem::tryCreate( client_state_s *cli
 		return nullptr;
 	}
 
-	arg->pipe     = pipe;
-	// Pass the address of the instance.
-	// It won't be accessed prior to the constructor call.
-	// TODO: There should be guarantees regarding the object placement within the holder.
-	arg->instance = (ALSoundSystem *)&::alSoundSystemHolder;
+	arg->pipe                     = pipe;
+	arg->isSoundSystemInitialized = &g_isSoundSystemInitialized;
 
 	// TODO: Pass both this instance and pipe via a heap-allocated argument
 	qthread_s *thread = QThread_Create( S_BackgroundUpdateProc, arg );
@@ -52,11 +52,14 @@ wsw::snd::ALSoundSystem *wsw::snd::ALSoundSystem::tryCreate( client_state_s *cli
 		return nullptr;
 	}
 
+	g_isSoundSystemInitialized = true;
 	return instance;
 }
 
 void ALSoundSystem::deleteSelf( bool verbose ) {
 	m_useVerboseShutdown = verbose;
+	// Don't let S_Update access the instance while we're calling the dtor
+	g_isSoundSystemInitialized = false;
 	::alSoundSystemHolder.shutdown();
 }
 

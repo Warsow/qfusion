@@ -47,6 +47,8 @@ public:
 	void advanceBackgroundTrack( int value );
 	void activate( bool active );
 
+	[[nodiscard]] auto getSourceManager() -> SourceManager * { return m_sourceManager; }
+
 private:
 	SourceManager *m_sourceManager { nullptr };
 	SoundSetCache *m_soundSetCache { nullptr };

@@ -108,10 +108,10 @@ void QBufPipe_Finish( qbufPipe_t *queue );
 uint8_t *QBufPipe_AcquireWritableBytes( qbufPipe_t *queue, unsigned bytesToAcquire );
 void QBufPipe_SubmitWrittenBytes( qbufPipe_t *queue, unsigned bytesToSubmit );
 
-using PipeWaiterFn = int (*)( qbufPipe_t *, bool );
+using PipeWaiterFn = int (*)( qbufPipe_t *, void *, bool );
 
 int QBufPipe_ReadCmds( qbufPipe_t *queue );
-void QBufPipe_Wait( qbufPipe_t *queue, PipeWaiterFn waiterFn, unsigned timeout_msec );
+void QBufPipe_Wait( qbufPipe_t *queue, PipeWaiterFn waiterFn, void *arg, unsigned timeout_msec );
 
 #ifndef CHECK_CALLING_THREAD
 #ifdef _DEBUG

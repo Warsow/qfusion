@@ -106,9 +106,6 @@ struct Source {
 	float fvol { 0.0f };
 	float attenuation { 0.0f };
 
-	// Just a stub to make stream code compile !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	bool isActive { false };
-
 	bool isLooping { false };
 	bool isTracking { false };
 	bool isLingering { false };
@@ -123,9 +120,18 @@ struct Source {
 	float origin[3] { 0.0f, 0.0f, 0.0f }, velocity[3] { 0.0f, 0.0f, 0.0f };
 };
 
+struct StreamSource {
+	StreamSource *prev { nullptr };
+	StreamSource *next { nullptr };
+	uintptr_t tag { 0 };
+	ALuint source { 0 };
+	unsigned queuedSamplesMsec { 0 };
+};
+
 class SourceManager {
 public:
-	static constexpr unsigned kMaxSources = 128;
+	static constexpr unsigned kMaxSources       = 128;
+	static constexpr unsigned kMaxStreamSources = 1;
 
 	SourceManager();
 	~SourceManager();
@@ -148,8 +154,21 @@ public:
 						 std::pair<ALuint, unsigned> bufferAndIndex,
 						 float pitch, int entnum, uintptr_t identifyingToken, float fvol, float attenuation );
 
-	void updateSources( int64_t millisNow, const float *listenerOrigin );
-	void stopAllSources( bool retainLocal );
+	void updateRegularSources( int64_t millisNow, const float *listenerOrigin );
+	void stopAllRegularSources( bool retainLocal );
+
+	// TODO: Supply volume var here?
+	[[nodiscard]]
+	auto getStreamSource( uintptr_t tag ) -> StreamSource *;
+	// Note: There's currently no API to release a stream source,
+	// since the only stream source we use is the persistent music source
+	// (and stream sources don't get recycled automatically upon stopping)
+
+	void updateStreamSources();
+	void stopStreamSources();
+
+	void stopStreamSource( StreamSource *src );
+	void pushStreamSamples( StreamSource *src, unsigned samples, unsigned rate, unsigned width, unsigned channels, const uint8_t *data, float volume );
 private:
 	void processZombieSources( int64_t millisNow, const float *listenerOrigin, Source **zombieSources,
 							   unsigned numZombieSources, unsigned numActiveEffects );
@@ -160,10 +179,17 @@ private:
 	void disableExcessiveEffects( const float *listenerOrigin, unsigned numActiveEffects, unsigned effectNumberThreshold );
 
 	void updateSpatialParams( Source *src );
+
 	void killSource( Source *src );
+	void killStreamSource( StreamSource *src );
 
 	[[nodiscard]]
 	auto allocSource( int priority, int entNum, int channel ) -> Source *;
+	[[nodiscard]]
+	auto allocStreamSource( uintptr_t tag ) -> StreamSource *;
+
+	[[nodiscard]]
+	auto drainProcessedSamples( StreamSource *source ) const -> unsigned;
 
 	void startOneshotSound( const SoundSet *sfx, std::pair<ALuint, unsigned> bufferAndIndex, float pitch,
 							const float *origin, int entNum, int channel, SoundSystem::AttachmentTag attachmentTag,
@@ -172,10 +198,6 @@ private:
 	void setupSource( Source *src, const SoundSet *sfx, std::pair<ALuint, unsigned> chosenBufferAndIndex, float chosenPitch,
 					  int priority, int entNum, int channel, SoundSystem::AttachmentTag attachmentTag, float fvol, float attenuation );
 
-	Source *m_activeSourcesHead { nullptr };
-
-	wsw::MemberBasedFreelistAllocator<sizeof( Source ), kMaxSources> m_sourceAllocator;
-
 	struct CachedHandles {
 		ALuint source { 0 };
 		ALuint directFilter { 0 };
@@ -183,12 +205,29 @@ private:
 		ALuint effectSlot { 0 };
 	};
 
+	struct CachedStreamHandles {
+		ALuint source { 0 };
+	};
+
 	[[nodiscard]]
 	bool createHandles( CachedHandles *handles );
 	void destroyHandles( CachedHandles *handles );
 
+	[[nodiscard]]
+	bool createStreamHandles( CachedStreamHandles *handles );
+	void destroyStreamHandles( CachedStreamHandles *handles );
+
 	// Note: We cut the actual capacity in half if effects are enabled
 	wsw::StaticVector<CachedHandles, kMaxSources> m_cachedHandles;
+
+	Source *m_activeSourcesHead { nullptr };
+	wsw::MemberBasedFreelistAllocator<sizeof( Source ), kMaxSources> m_sourceAllocator;
+
+	StreamSource *m_streamSourcesHead { nullptr };
+	wsw::MemberBasedFreelistAllocator<sizeof( StreamSource ), kMaxStreamSources> m_streamSourceAllocator;
+
+	wsw::StaticVector<CachedStreamHandles, kMaxStreamSources> m_cachedStreamHandles;
+
 	EntitySpatialParams m_entitySpatialParams[MAX_EDICTS];
 };
 
