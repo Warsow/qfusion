@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <atomic>
 #include <span>
 
-extern int s_registration_sequence;
-
 typedef struct qbufPipe_s sndCmdPipe_t;
 
 static ALCdevice *alDevice;
@@ -244,15 +242,22 @@ void Backend::processFrameUpdates( const EntitySpatialParams &listenerSpatialPar
 }
 
 auto Backend::loadSound( const SoundSetProps &props ) -> const SoundSet * {
-	return m_soundSetCache->loadSound( s_registration_sequence, props );
+	return m_soundSetCache->loadSound( m_registrationSequence, props );
 }
 
 auto Backend::findSoundSet( const SoundSetProps &props ) -> const SoundSet * {
 	return m_soundSetCache->findSoundSet( props );
 }
 
+void Backend::beginRegistration() {
+	m_registrationSequence++;
+	if( !m_registrationSequence ) [[unlikely]] {
+		m_registrationSequence = 1;
+	}
+}
+
 void Backend::endRegistration() {
-	m_soundSetCache->freeUnusedSoundSets( s_registration_sequence );
+	m_soundSetCache->freeUnusedSoundSets( m_registrationSequence );
 }
 
 void Backend::setEntitySpatialParams( const EntitySpatialParamsBatch &batch ) {
@@ -270,7 +275,7 @@ void Backend::startLocalSound( const SoundSet *sound, float volume ) {
 
 void Backend::startLocalSoundByName( const wsw::PodVector<char> &name, float volume ) {
 	const SoundSetProps soundSetProps { .name = SoundSetProps::Exact( wsw::StringView( name.data(), name.size() ) ) };
-	if( const SoundSet *soundSet = m_soundSetCache->loadSound( s_registration_sequence, soundSetProps ) ) {
+	if( const SoundSet *soundSet = m_soundSetCache->loadSound( m_registrationSequence, soundSetProps ) ) {
 		startLocalSound( soundSet, volume );
 	}
 }

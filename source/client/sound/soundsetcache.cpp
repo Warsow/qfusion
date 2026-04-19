@@ -49,7 +49,7 @@ void SoundSetCache::releaseFileDataBuffers( SoundSet *soundSet ) {
 	soundSet->numBuffers = 0;
 }
 
-void SoundSetCache::freeUnusedSoundSets( int registrationSequence ) {
+void SoundSetCache::freeUnusedSoundSets( unsigned registrationSequence ) {
 	for( SoundSet *soundSet = m_registeredSoundSetsHead, *next; soundSet; soundSet = next ) { next = soundSet->next;
 		if( soundSet->registrationSequence != registrationSequence ) {
 			unlinkAndFree( soundSet );
@@ -114,7 +114,7 @@ static auto sanitizePitchVariations( const wsw::StringView &soundSetName, float 
 	return numSanitizedValues;
 }
 
-auto SoundSetCache::loadSound( int registrationSequence, const SoundSetProps &props ) -> const SoundSet * {
+auto SoundSetCache::loadSound( unsigned registrationSequence, const SoundSetProps &props ) -> const SoundSet * {
 	[[maybe_unused]] const wsw::StringView name( getSoundSetName( props ) );
 
 	float pitchVariations[SoundSet::kMaxPitchVariations];

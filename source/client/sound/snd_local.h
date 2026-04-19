@@ -50,7 +50,7 @@ struct SoundSet {
 	SoundSet *prev { nullptr }, *next { nullptr };
 	SoundSetProps props;
 
-	mutable int registrationSequence { 0 };
+	mutable unsigned registrationSequence { 0 };
 
 	static constexpr unsigned kMaxBuffers { 16 };
 	const FileDataBuffer *buffers[kMaxBuffers];

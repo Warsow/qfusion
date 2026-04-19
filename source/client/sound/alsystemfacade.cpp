@@ -13,7 +13,6 @@
 static SingletonHolder<wsw::snd::ALSoundSystem> alSoundSystemHolder;
 static bool s_registering;
 static std::atomic_bool g_isSoundSystemInitialized;
-int s_registration_sequence = 1;
 
 extern cvar_s *s_globalfocus;
 
@@ -113,12 +112,9 @@ void ALSoundSystem::postInit() {
 }
 
 void ALSoundSystem::beginRegistration() {
-	s_registration_sequence++;
-	if( !s_registration_sequence ) {
-		s_registration_sequence = 1;
-	}
-
 	s_registering = true;
+
+	callMethodOverPipe( m_pipe, &m_backend, &Backend::beginRegistration );
 
 	// wait for the queue to be processed
 	QBufPipe_Finish( m_pipe );

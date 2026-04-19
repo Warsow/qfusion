@@ -25,6 +25,7 @@ public:
 	[[nodiscard]]
 	auto findSoundSet( const SoundSetProps &props ) -> const SoundSet *;
 
+	void beginRegistration();
 	void endRegistration();
 
 	struct EntitySpatialParamsBatch {
@@ -52,6 +53,8 @@ public:
 private:
 	SourceManager *m_sourceManager { nullptr };
 	SoundSetCache *m_soundSetCache { nullptr };
+
+	unsigned m_registrationSequence { 1 };
 
 	bool m_initialized { false };
 };

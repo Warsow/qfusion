@@ -32,10 +32,10 @@ class SoundSetCache {
 public:
 	~SoundSetCache();
 
-	void freeUnusedSoundSets( int registrationSequence );
+	void freeUnusedSoundSets( unsigned registrationSequence );
 
 	[[maybe_unused]]
-	auto loadSound( int registrationSequence, const SoundSetProps &props ) -> const SoundSet *;
+	auto loadSound( unsigned registrationSequence, const SoundSetProps &props ) -> const SoundSet *;
 	[[nodiscard]]
 	auto findSoundSet( const SoundSetProps &props ) -> const SoundSet *;
 
