@@ -602,6 +602,14 @@ void SourceManager::disableExcessiveEffects( const float *listenerOrigin, unsign
 
 		disableSourceEffectsAndEnvUpdates( src );
 		numActiveEffects--;
+
+		if( src->hasPendingPlayCall ) {
+			// The actual origin has not been set yet.
+			// Normally, we rely on delegated spatialization which is performed by
+			// environment update facilities, but they are no longer going to process this source.
+			// TODO: make spatial params management more clean/consistent, split updateSpatialParams()
+			updateSpatialParams( src );
+		}
 	}
 }
 
