@@ -111,6 +111,7 @@ struct Source {
 	bool isLingering { false };
 	bool touchedThisFrame { false };
 	bool effectActive { false };
+	bool hasPendingPlayCall { false };
 
 	int64_t lingeringTimeoutAt { 0 };
 
@@ -155,6 +156,7 @@ public:
 						 float pitch, int entnum, uintptr_t identifyingToken, float fvol, float attenuation );
 
 	void updateRegularSources( int64_t millisNow, const float *listenerOrigin );
+	void startPendingRegularSources();
 	void stopAllRegularSources( bool retainLocal );
 
 	// TODO: Supply volume var here?

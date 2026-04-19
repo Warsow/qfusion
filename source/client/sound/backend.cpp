@@ -238,6 +238,9 @@ void Backend::processFrameUpdates( const EntitySpatialParams &listenerSpatialPar
 	if( s_environment_effects->integer ) {
 		updateEnvOfListenerAndSources( m_sourceManager->getActiveSourcesHead(), millisNow, entNum, origin, velocity, axis );
 	}
+
+	// We can start sources as their origins have been properly set up by the previous calls
+	m_sourceManager->startPendingRegularSources();
 }
 
 auto Backend::loadSound( const SoundSetProps &props ) -> const SoundSet * {

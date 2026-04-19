@@ -150,6 +150,8 @@ void SourceManager::setupSource( Source *src, const SoundSet *sfx, std::pair<ALu
 	if( s_environment_effects->integer ) {
 		setupSourceEffectsAndEnvUpdates( src );
 	}
+
+	src->hasPendingPlayCall = true;
 }
 
 void SourceManager::killSource( Source *src ) {
@@ -281,8 +283,6 @@ void SourceManager::touchLoopSound( const SoundSet *sfx, SoundSystem::Attachment
 
 		// TODO: When do we update params of existing sounds?
 		updateSpatialParams( chosenSrc );
-
-		alSourcePlay( chosenSrc->source );
 	}
 
 	chosenSrc->touchedThisFrame = true;
@@ -418,45 +418,58 @@ void SourceManager::updateRegularSources( int64_t millisNow, const float *listen
 			adjustGain( src );
 		}
 
-		ALint state;
-		alGetSourcei( src->source, AL_SOURCE_STATE, &state );
-		if( state == AL_STOPPED ) {
-			// Do not even bother adding the source to the list of zombie sources in these cases:
-			// 1) There's no effect attached
-			// 2) There's no sfx attached
-			if( !IsEffectActive( src ) || !src->sfx ) {
-				killSource( src );
-			} else {
-				zombieSources[numZombieSources++] = src;
-			}
-			// Note: It turns out that it's better to keep it attached to the source
-			// (it's very important for POV-attached sounds which are not necessarily AL_SOURCE_RELATIVE)
-			// src->entNum = -1;
+		if( src->hasPendingPlayCall ) {
+			updateSpatialParams( src );
 		} else {
-			bool isKept = true;
-			if( src->isLooping ) {
-				// If a looping effect hasn't been touched this frame, kill it
-				// Note: lingering produces bad results in this case
-				if( !src->touchedThisFrame ) {
-					const bool wasEffectActive = IsEffectActive( src );
-					// Don't even bother adding this source to a list of zombie sources...
+			ALint state;
+			alGetSourcei( src->source, AL_SOURCE_STATE, &state );
+			if( state == AL_STOPPED ) {
+				// Do not even bother adding the source to the list of zombie sources in these cases:
+				// 1) There's no effect attached
+				// 2) There's no sfx attached
+				if( !IsEffectActive( src ) || !src->sfx ) {
 					killSource( src );
-					// Do not misinform zombies processing logic
-					if( wasEffectActive ) {
-						numActiveEffects--;
-					}
-					isKept = false;
 				} else {
-					src->touchedThisFrame = false;
+					zombieSources[numZombieSources++] = src;
 				}
-			}
-			if( isKept ) {
-				updateSpatialParams( src );
+				// Note: It turns out that it's better to keep it attached to the source
+				// (it's very important for POV-attached sounds which are not necessarily AL_SOURCE_RELATIVE)
+				// src->entNum = -1;
+			} else {
+				bool isKept = true;
+				if( src->isLooping ) {
+					// If a looping effect hasn't been touched this frame, kill it
+					// Note: lingering produces bad results in this case
+					if( !src->touchedThisFrame ) {
+						const bool wasEffectActive = IsEffectActive( src );
+						// Don't even bother adding this source to a list of zombie sources...
+						killSource( src );
+						// Do not misinform zombies processing logic
+						if( wasEffectActive ) {
+							numActiveEffects--;
+						}
+						isKept = false;
+					} else {
+						src->touchedThisFrame = false;
+					}
+				}
+				if( isKept ) {
+					updateSpatialParams( src );
+				}
 			}
 		}
 	}
 
 	processZombieSources( millisNow, listenerOrigin, zombieSources, numZombieSources, numActiveEffects );
+}
+
+void SourceManager::startPendingRegularSources() {
+	for( Source *src = m_activeSourcesHead; src; src = src->next ) {
+		if( src->hasPendingPlayCall ) {
+			src->hasPendingPlayCall = false;
+			alSourcePlay( src->source );
+		}
+	}
 }
 
 void SourceManager::processZombieSources( int64_t millisNow, const float *listenerOrigin, Source **zombieSources,
@@ -768,7 +781,6 @@ void SourceManager::startLocalSound( const SoundSet *sfx, std::pair<ALuint, unsi
 		setupSource( src, sfx, bufferAndIndex, pitch, priority, entNum, channel, SoundSystem::OriginAttachment, fvol, ATTN_NONE );
 
 		alSourcei( src->source, AL_SOURCE_RELATIVE, AL_TRUE );
-		alSourcePlay( src->source );
 	}
 }
 
@@ -788,8 +800,6 @@ void SourceManager::startOneshotSound( const SoundSet *sfx, std::pair<ALuint, un
 		}
 
 		updateSpatialParams( src );
-
-		alSourcePlay( src->source );
 	}
 }
 
