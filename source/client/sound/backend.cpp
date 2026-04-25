@@ -30,125 +30,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 typedef struct qbufPipe_s sndCmdPipe_t;
 
-static ALCdevice *alDevice;
-static ALCcontext *alContext;
-
 #define UPDATE_MSEC 10
 static int64_t s_last_update_time;
 
-static bool S_Init( void *hwnd, int maxEntities, bool verbose ) {
-	int numDevices;
-	int userDeviceNum = -1;
-	char *devices, *defaultDevice;
-	cvar_t *s_openAL_device;
-	int attrList[6];
-	int *attrPtr;
-
-	alDevice = NULL;
-	alContext = NULL;
-
+static bool S_Init( bool verbose ) {
 	s_last_update_time = 0;
-
-	// get system default device identifier
-	defaultDevice = ( char * )alcGetString( NULL, ALC_DEFAULT_DEVICE_SPECIFIER );
-	if( !defaultDevice ) {
-		Com_Printf( "Failed to get openAL default device\n" );
-		return false;
-	}
-
-	s_openAL_device = Cvar_Get( "s_openAL_device", defaultDevice, CVAR_ARCHIVE | CVAR_LATCH_SOUND );
-
-	devices = ( char * )alcGetString( NULL, ALC_DEVICE_SPECIFIER );
-	for( numDevices = 0; *devices; devices += strlen( devices ) + 1, numDevices++ ) {
-		if( !Q_stricmp( s_openAL_device->string, devices ) ) {
-			userDeviceNum = numDevices;
-
-			// force case sensitive
-			if( strcmp( s_openAL_device->string, devices ) ) {
-				Cvar_ForceSet( "s_openAL_device", devices );
-			}
-		}
-	}
-
-	if( !numDevices ) {
-		Com_Printf( "Failed to get openAL devices\n" );
-		return false;
-	}
-
-	// the device assigned by the user is not available
-	if( userDeviceNum == -1 ) {
-		Com_Printf( "'s_openAL_device': incorrect device name, reseting to default\n" );
-
-		Cvar_ForceSet( "s_openAL_device", defaultDevice );
-
-		devices = ( char * )alcGetString( NULL, ALC_DEVICE_SPECIFIER );
-		for( numDevices = 0; *devices; devices += strlen( devices ) + 1, numDevices++ ) {
-			if( !Q_stricmp( s_openAL_device->string, devices ) ) {
-				userDeviceNum = numDevices;
-			}
-		}
-
-		if( userDeviceNum == -1 ) {
-			Cvar_ForceSet( "s_openAL_device", defaultDevice );
-		}
-	}
-
-	alDevice = alcOpenDevice( (const ALchar *)s_openAL_device->string );
-	if( !alDevice ) {
-		Com_Printf( "Failed to open device\n" );
-		return false;
-	}
-
-	attrPtr = &attrList[0];
-	if( s_environment_effects->integer ) {
-		// We limit each source to a single "auxiliary send" for optimization purposes.
-		// This means each source has a single auxiliary output that feeds an effect aside from a direct output.
-		*attrPtr++ = ALC_MAX_AUXILIARY_SENDS;
-		*attrPtr++ = 1;
-	}
-
-	*attrPtr++ = ALC_HRTF_SOFT;
-	*attrPtr++ = s_hrtf->integer ? 1 : 0;
-
-	// Terminate the attributes pairs list
-	*attrPtr++ = 0;
-	*attrPtr++ = 0;
-
-	// Create context
-	alContext = alcCreateContext( alDevice, attrList );
-	if( !alContext ) {
-		Com_Printf( "Failed to create context\n" );
-		return false;
-	}
-
-	alcMakeContextCurrent( alContext );
-
-	if( verbose ) {
-		sNotice() << "OpenAL initialized";
-
-		if( numDevices ) {
-			int i;
-
-			Com_Printf( "  Devices:    " );
-
-			devices = ( char * )alcGetString( NULL, ALC_DEVICE_SPECIFIER );
-			for( i = 0; *devices; devices += strlen( devices ) + 1, i++ )
-				Com_Printf( "%s%s", devices, ( i < numDevices - 1 ) ? ", " : "" );
-			Com_Printf( "\n" );
-
-			if( defaultDevice && *defaultDevice ) {
-				Com_Printf( "  Default system device: %s\n", defaultDevice );
-			}
-
-			Com_Printf( "\n" );
-		}
-
-		sNotice() << "  Device:     " << wsw::StringView( alcGetString( alDevice, ALC_DEVICE_SPECIFIER ) );
-		sNotice() << "  Vendor:     " << wsw::StringView( alGetString( AL_VENDOR ) );
-		sNotice() << "  Version:    " << wsw::StringView( alGetString( AL_VERSION ) );
-		sNotice() << "  Renderer:   " << wsw::StringView( alGetString( AL_RENDERER ) );
-		sNotice() << "  Extensions: " << wsw::StringView( alGetString( AL_EXTENSIONS ) );
-	}
 
 	alDopplerFactor( s_doppler->value );
 	// Defer s_sound_velocity application to S_Update() in order to avoid code duplication
@@ -165,14 +51,126 @@ static bool S_Init( void *hwnd, int maxEntities, bool verbose ) {
 	return true;
 }
 
+static void destroyContextAndDevice( ALCcontext *context, ALCdevice *device ) {
+	if( context ) {
+		alcMakeContextCurrent( nullptr );
+		alcDestroyContext( context );
+	}
+	if( device ) {
+		alcCloseDevice( device );
+	}
+}
+
+[[nodiscard]]
+static auto createDevice( bool verbose ) -> ALCdevice * {
+	if( const char *defaultDevice = alcGetString( nullptr, ALC_DEFAULT_DEVICE_SPECIFIER ) ) {
+		if( verbose ) {
+			sNotice() << "Default OpenAL device" << wsw::StringView( defaultDevice );
+		}
+		if( const char *devices = alcGetString( nullptr, ALC_DEVICE_SPECIFIER ) ) {
+			cvar_t *const var  = Cvar_Get( "s_openAL_device", defaultDevice, CVAR_ARCHIVE | CVAR_LATCH_SOUND );
+			bool hasResetToDefault = false;
+			if( !*var->string ) {
+				sWarning() << "The specified OpenAL device name is empty, resetting to default";
+				hasResetToDefault = true;
+			}
+			bool foundMatching = false;
+			if( verbose ) {
+				sNotice() << "Available OpenAL devices:";
+			}
+			for(; *devices; devices += std::strlen( devices ) + 1 ) {
+				// TODO: Reuse strlen result for making a view
+				sNotice() << " " << wsw::StringView( devices );
+				if( strcmp( devices, var->string ) == 0 ) {
+					foundMatching = true;
+				}
+			}
+			if( !foundMatching && !hasResetToDefault ) {
+				sWarning() << "Failed to find the specified device by name, resetting to default";
+				Cvar_ForceSet( var->name, defaultDevice );
+			}
+			if( ALCdevice *device = alcOpenDevice( var->string ) ) {
+				return device;
+			} else {
+				sError() << "Failed to open OpenAL device" << wsw::StringView( var->string );
+			}
+		} else {
+			sError() << "Faield to retrieve the list of available OpenAL devices";
+		}
+	} else {
+		sError() << "Failed to retrieve the default OpenAL device";
+	}
+
+	return nullptr;
+}
+
+[[nodiscard]]
+static auto createContext( ALCdevice *device ) -> ALCcontext * {
+	int attrList[6];
+	int *attrPtr = &attrList[0];
+
+	if( s_environment_effects->integer ) {
+		// We limit each source to a single "auxiliary send" for optimization purposes.
+		// This means each source has a single auxiliary output that feeds an effect aside from a direct output.
+		*attrPtr++ = ALC_MAX_AUXILIARY_SENDS;
+		*attrPtr++ = 1;
+	}
+
+	*attrPtr++ = ALC_HRTF_SOFT;
+	*attrPtr++ = s_hrtf->integer ? 1 : 0;
+
+	// Terminate the attributes pairs list
+	*attrPtr++ = 0;
+	*attrPtr++ = 0;
+
+	if( ALCcontext *context = alcCreateContext( device, attrList ) ) {
+		// TODO: Check?
+		alcMakeContextCurrent( context );
+		return context;
+	} else {
+		sError()<< "Failed to create OpenAL context";
+	}
+
+	return nullptr;
+}
+
+[[nodiscard]]
+static auto createContextAndDevice( bool verbose ) -> std::optional<std::pair<ALCcontext *, ALCdevice *>> {
+	if( ALCdevice *const device = createDevice( verbose ) ) {
+		if( ALCcontext *const context = createContext( device ) ) {
+			if( verbose ) {
+				sNotice() << "OpenAL initialized";
+				sNotice() << "  Device:     " << wsw::StringView( alcGetString( device, ALC_DEVICE_SPECIFIER ) );
+				sNotice() << "  Vendor:     " << wsw::StringView( alGetString( AL_VENDOR ) );
+				sNotice() << "  Version:    " << wsw::StringView( alGetString( AL_VERSION ) );
+				sNotice() << "  Renderer:   " << wsw::StringView( alGetString( AL_RENDERER ) );
+				sNotice() << "  Extensions: " << wsw::StringView( alGetString( AL_EXTENSIONS ) );
+			}
+			return std::make_pair( context, device );
+		} else {
+			destroyContextAndDevice( context, device );
+		}
+	} else {
+		destroyContextAndDevice( nullptr, device );
+	}
+
+	return std::nullopt;
+}
+
 namespace wsw::snd {
 
 // TODO: Get rid of init()/shutdown() calls, call free functions over pipe?
 void Backend::init( bool verbose ) {
-	if( S_Init( nullptr, MAX_EDICTS, verbose ) ) {
-		m_soundSetCache = new SoundSetCache;
-		m_sourceManager = new SourceManager;
-		m_initialized   = true;
+	if( auto maybeContextAndDevice = createContextAndDevice( verbose ) ) {
+		if( S_Init( verbose ) ) {
+			m_context       = maybeContextAndDevice->first;
+			m_device        = maybeContextAndDevice->second;
+			m_soundSetCache = new SoundSetCache;
+			m_sourceManager = new SourceManager;
+			m_initialized   = true;
+		} else {
+			destroyContextAndDevice( maybeContextAndDevice->first, maybeContextAndDevice->second );
+		}
 	}
 }
 
@@ -187,16 +185,7 @@ void Backend::shutdown( bool verbose ) {
 
 	S_ShutdownDecoders( verbose );
 
-	if( alContext ) {
-		alcMakeContextCurrent( NULL );
-		alcDestroyContext( alContext );
-		alContext = NULL;
-	}
-
-	if( alDevice ) {
-		alcCloseDevice( alDevice );
-		alDevice = NULL;
-	}
+	destroyContextAndDevice( m_context, m_device );
 
 	// Note: this is followed by a separate "terminate pipe" call
 }

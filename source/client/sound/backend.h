@@ -54,6 +54,9 @@ private:
 	SourceManager *m_sourceManager { nullptr };
 	SoundSetCache *m_soundSetCache { nullptr };
 
+	ALCcontext *m_context { nullptr };
+	ALCdevice *m_device { nullptr };
+
 	unsigned m_registrationSequence { 1 };
 
 	bool m_initialized { false };
