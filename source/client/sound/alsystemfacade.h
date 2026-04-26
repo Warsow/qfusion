@@ -10,16 +10,10 @@ namespace wsw::snd {
 
 class ALSoundSystem : public SoundSystem {
 public:
-	struct ThreadProcArg {
-		qbufPipe_s *pipe;
-		// An address of an atomic boolean variable
-		void *isSoundSystemInitialized;
-	};
-
 	[[nodiscard]]
 	static auto tryCreate( client_state_s *client, bool verbose ) -> ALSoundSystem *;
 
-	ALSoundSystem( client_state_s *client, qbufPipe_s *pipe, qthread_s *thread, bool verbose );
+	ALSoundSystem( qbufPipe_s *pipe, qthread_s *thread, Backend *backend );
 	~ALSoundSystem() override;
 
 	void deleteSelf( bool verbose ) override;
@@ -52,17 +46,30 @@ public:
 	void nextBackgroundTrack() override;
 	void pauseBackgroundTrack() override;
 
-	[[nodiscard]] auto getBackend() -> Backend * { return &m_backend; }
+	[[nodiscard]] auto getBackend() -> Backend * { return m_backend; }
 private:
+	struct ThreadFuncArg {
+		qbufPipe_s *pipe;
+		// An address of an atomic boolean variable
+		void *isSoundSystemInitialized;
+	};
+
+	static auto threadFunc( void *threadProcArg ) -> void *;
+
+	struct UpdateFuncArg {
+		// An address of an atomic boolean variable
+		void *isSoundSystemInitialized;
+	};
+
+	static void updateFunc( void *arg );
+
 	void flushEntitySpatialParams();
 
 	Backend::EntitySpatialParamsBatch m_spatialParamsBatch;
 
-	qthread_s *m_thread { nullptr };
-	qbufPipe_s *m_pipe { nullptr };
-	bool m_useVerboseShutdown { false };
-
-	Backend m_backend;
+	qbufPipe_s *const m_pipe;
+	qthread_s *const m_thread;
+	Backend *const m_backend;
 };
 
 }

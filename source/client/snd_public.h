@@ -72,8 +72,6 @@ struct EntitySpatialParams;
 class SoundSystem {
 	static SoundSystem *s_instance;
 
-	client_state_s *const m_client;
-
 #ifdef WIN32
 	/**
 	 * It's a good idea to limit the access to the {@code InstanceOrNull()}
@@ -86,8 +84,6 @@ class SoundSystem {
 	 */
 	static SoundSystem *instanceOrNull() { return s_instance; }
 #endif
-protected:
-	explicit SoundSystem( client_state_s *client ) : m_client( client ) {}
 public:
 	struct InitOptions {
 		bool verbose { false };

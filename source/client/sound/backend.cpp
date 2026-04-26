@@ -1,6 +1,7 @@
 /*
 Copyright (C) 1999-2005 Id Software, Inc.
 Copyright (C) 2005 Stuart Dalton (badcdev@gmail.com)
+Copyright (C) 2017-2026 Chasseur de bots
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,34 +23,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "snd_local.h"
 #include "environmentupdates.h"
 #include "alsystemfacade.h"
+#include <common/helpers/scopeexitaction.h>
 #include <common/facilities/cvar.h>
 #include <common/facilities/q_comref.h>
 #include <common/facilities/sysclock.h>
-#include <atomic>
 #include <span>
-
-typedef struct qbufPipe_s sndCmdPipe_t;
-
-#define UPDATE_MSEC 10
-static int64_t s_last_update_time;
-
-static bool S_Init( bool verbose ) {
-	s_last_update_time = 0;
-
-	alDopplerFactor( s_doppler->value );
-	// Defer s_sound_velocity application to S_Update() in order to avoid code duplication
-	s_sound_velocity->modified = true;
-	s_doppler->modified = false;
-
-	S_LockBackgroundTrack( false );
-
-	if( !S_InitDecoders( verbose ) ) {
-		Com_Printf( "Failed to init decoders\n" );
-		return false;
-	}
-
-	return true;
-}
 
 static void destroyContextAndDevice( ALCcontext *context, ALCdevice *device ) {
 	if( context ) {
@@ -160,21 +138,57 @@ static auto createContextAndDevice( bool verbose ) -> std::optional<std::pair<AL
 namespace wsw::snd {
 
 // TODO: Get rid of init()/shutdown() calls, call free functions over pipe?
-void Backend::init( bool verbose ) {
-	if( auto maybeContextAndDevice = createContextAndDevice( verbose ) ) {
-		if( S_Init( verbose ) ) {
-			m_context       = maybeContextAndDevice->first;
-			m_device        = maybeContextAndDevice->second;
-			m_soundSetCache = new SoundSetCache;
-			m_sourceManager = new SourceManager;
-			m_initialized   = true;
+Backend::Backend( bool verbose ) {
+	ALCdevice *device   = nullptr;
+	ALCcontext *context = nullptr;
+
+	SoundSetCache *soundSetCache = nullptr;
+	SourceManager *sourceManager = nullptr;
+
+	[[maybe_unused]] wsw::ScopeExitAction<128> cleanup( [&] {
+		delete sourceManager;
+		delete soundSetCache;
+		destroyContextAndDevice( context, device );
+	});
+
+	if( std::optional<std::pair<ALCcontext *, ALCdevice *>> maybeContextAndDevice = createContextAndDevice( verbose ) ) {
+		context = maybeContextAndDevice->first;
+		device  = maybeContextAndDevice->second;
+
+		// The original S_Init body
+		// TODO: Does this code belong here
+
+		alDopplerFactor( s_doppler->value );
+		// Defer s_sound_velocity application to S_Update() in order to avoid code duplication
+		// TODO: Make it cleaner
+		s_sound_velocity->modified = true;
+		s_doppler->modified = false;
+
+		S_LockBackgroundTrack( false );
+
+		if( S_InitDecoders( verbose ) ) {
+			soundSetCache = new SoundSetCache;
+			sourceManager = new SourceManager;
+
+			m_context       = context;
+			m_device        = device;
+			m_soundSetCache = soundSetCache;
+			m_sourceManager = sourceManager;
+
+			if( verbose ) {
+				sNotice() << "Sound system backend initialized";
+			}
+
+			cleanup.cancel();
 		} else {
-			destroyContextAndDevice( maybeContextAndDevice->first, maybeContextAndDevice->second );
+			wsw::failWithRuntimeError( "Failed to initialize decoders" );
 		}
+	} else {
+		wsw::failWithRuntimeError( "Failed to create OpenAL device/context" );
 	}
 }
 
-void Backend::shutdown( bool verbose ) {
+Backend::~Backend() {
 	m_sourceManager->stopStreamSources();
 
 	S_LockBackgroundTrack( false );
@@ -183,11 +197,9 @@ void Backend::shutdown( bool verbose ) {
 	delete m_sourceManager;
 	delete m_soundSetCache;
 
-	S_ShutdownDecoders( verbose );
+	S_ShutdownDecoders( m_useVerboseShutdown );
 
 	destroyContextAndDevice( m_context, m_device );
-
-	// Note: this is followed by a separate "terminate pipe" call
 }
 
 void Backend::stopSounds( unsigned flags ) {
@@ -328,67 +340,4 @@ void Backend::activate( bool active ) {
 	}
 }
 
-}
-
-static void S_Update( std::atomic_bool *const isSoundSystemInitialized ) {
-	if( *isSoundSystemInitialized ) {
-		auto *soundSystem            = (wsw::snd::ALSoundSystem *)SoundSystem::instance();
-		SourceManager *sourceManager = soundSystem->getBackend()->getSourceManager();
-
-		S_UpdateMusic( sourceManager );
-		sourceManager->updateStreamSources();
-	}
-
-	if( s_doppler->modified ) {
-		if( s_doppler->value > 0.0f ) {
-			alDopplerFactor( s_doppler->value );
-		} else {
-			alDopplerFactor( 0.0f );
-		}
-		s_doppler->modified = false;
-	}
-
-	if( s_sound_velocity->modified ) {
-		// If environment effects are supported, we can set units to meters ratio.
-		// In this case, we have to scale the hardcoded s_sound_velocity value.
-		// (The engine used to assume that units to meters ratio is 1).
-		float appliedVelocity = s_sound_velocity->value;
-		if( appliedVelocity <= 0.0f ) {
-			appliedVelocity = 0.0f;
-		}
-		alDopplerVelocity( appliedVelocity );
-		alSpeedOfSound( appliedVelocity );
-		s_sound_velocity->modified = false;
-	}
-}
-
-static int S_EnqueuedCmdsWaiter( sndCmdPipe_t *queue, void *arg, bool timeout ) {
-	const int read = QBufPipe_ReadCmds( queue );
-	if( read < 0 ) {
-		// shutdown
-		return read;
-	}
-
-	const int64_t now = Sys_Milliseconds();
-	if( timeout || now >= s_last_update_time + UPDATE_MSEC ) {
-		s_last_update_time = now;
-		S_Update( (std::atomic_bool *)arg );
-	}
-
-	return read;
-}
-
-void *S_BackgroundUpdateProc( void *param ) {
-	using namespace wsw::snd;
-
-	auto *arg                      = ( ALSoundSystem::ThreadProcArg *)param;
-	qbufPipe_s *pipe               = arg->pipe;
-	void *isSoundSystemInitialized = arg->isSoundSystemInitialized;
-
-	// Don't hold the arg heap memory forever
-	Q_free( arg );
-
-	QBufPipe_Wait( pipe, S_EnqueuedCmdsWaiter, isSoundSystemInitialized, UPDATE_MSEC );
-
-	return NULL;
 }

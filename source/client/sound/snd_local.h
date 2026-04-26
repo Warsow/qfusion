@@ -106,7 +106,6 @@ void S_LockBackgroundTrack( bool lock );
 ALenum S_SoundFormat( int width, int channels );
 const char *S_ErrorMessage( ALenum error );
 ALuint S_GetBufferLength( ALuint buffer );
-void *S_BackgroundUpdateProc( void *param );
 
 static constexpr float REVERB_ENV_DISTANCE_THRESHOLD = 4096.0f;
 

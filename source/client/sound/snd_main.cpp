@@ -33,7 +33,7 @@ using wsw::operator""_asView;
 
 class NullSoundSystem : public SoundSystem {
 public:
-	explicit NullSoundSystem( client_state_s *client_ ) : SoundSystem( client_ ) {}
+	NullSoundSystem() = default;
 
 	void deleteSelf( bool ) override;
 
@@ -138,7 +138,7 @@ bool SoundSystem::init( client_state_t *client, const InitOptions &options ) {
 		}
 	}
 
-	::nullSoundSystemHolder.init( client );
+	::nullSoundSystemHolder.init();
 	s_instance = nullSoundSystemHolder.instance();
 	s_instance->postInit();
 	return options.useNullSystem;

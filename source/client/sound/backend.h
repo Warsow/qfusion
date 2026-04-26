@@ -15,8 +15,8 @@ namespace wsw::snd {
 class Backend {
 	friend class ALSoundSystem;
 public:
-	void init( bool verbose );
-	void shutdown( bool verbose );
+	Backend( bool verbose );
+	~Backend();
 
 	void stopSounds( unsigned flags );
 
@@ -59,7 +59,7 @@ private:
 
 	unsigned m_registrationSequence { 1 };
 
-	bool m_initialized { false };
+	bool m_useVerboseShutdown { false };
 };
 
 }
