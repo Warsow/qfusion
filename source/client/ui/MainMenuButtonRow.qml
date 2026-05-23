@@ -7,76 +7,51 @@ import net.warsow 2.6
 
 Item {
 	id: root
-	height: UI.mainMenuButtonHeight
+	height: UI.logoDecorationRowHeight
 
     property bool highlighted: false
-    property bool highlightedWithAnim: false
 	property string text
 	property bool leaningRight: false
 	property real expansionFrac: 0.0
-	property bool enableSlidingOvershoot: true
-
-	signal clicked()
 
 	function toggleExpandedState() {
 		if (state == "centered") {
-			state = leaningRight ? "pinnedToLeft" : "pinnedToRight"
+			state = leaningRight ? "goneLeft" : "goneRight"
 		} else {
 			state = "centered"
 		}
 	}
 
-	readonly property var transformMatrix:
-	    UI.ui.makeSkewXMatrix(root.height, 20.0).times(
-	        UI.ui.makeTranslateMatrix(highlightAnim.running ? ((leaningRight ? -10.0 : + 10.0) * highlightAnim.bodyShiftFrac) : 0.0, 0.0))
+	readonly property var transformMatrix: UI.ui.makeSkewXMatrix(root.height, 20.0)
 
-	readonly property color foregroundColor: Qt.lighter(Material.backgroundColor, 1.5)
+	readonly property color foregroundColor: "white"
 	readonly property color trailDecayColor: UI.ui.colorWithAlpha(Material.backgroundColor, 0.0)
 	readonly property color highlightedColor: Material.accentColor
 
-    // Can't figure out the appropriate name for the expression...
-	property real bodyWidth: (mouseArea.containsMouse || highlightAnim.highlightActive) ? UI.mainMenuButtonWidth + 12 : UI.mainMenuButtonWidth
-	property real bodyHeight: (mouseArea.containsMouse || highlightAnim.highlightActive) ? root.height + 2 : root.height
-	property color bodyColor: (mouseArea.containsMouse || highlightAnim.highlightActive) || highlighted ? highlightedColor : foregroundColor
+    // These properties used to depend of mouse/anim timers
 
-	Behavior on bodyWidth { SmoothedAnimation { duration: 333 } }
-	Behavior on bodyHeight { SmoothedAnimation { duration: 333 } }
-	Behavior on bodyColor { ColorAnimation { duration: highlightAnim.colorAnimDuration } }
+	readonly property real bodyWidth: UI.mainMenuButtonWidth
+	readonly property real bodyHeight: root.height
+	readonly property color bodyColor: foregroundColor
+
+    // Seems to be useful to keep in the source, even commented out
+
+	//Behavior on bodyWidth { SmoothedAnimation { duration: 333 } }
+	//Behavior on bodyHeight { SmoothedAnimation { duration: 333 } }
+	//Behavior on bodyColor { ColorAnimation { duration: highlightAnim.colorAnimDuration } }
 
     readonly property real baseTrailElementWidth: 24
     readonly property real trailSpacing: 4
-    property real trailElementWidth: (mouseArea.containsMouse || highlightAnim.highlightActive) ? baseTrailElementWidth + 1 : baseTrailElementWidth
+    readonly property real trailElementWidth: baseTrailElementWidth
 	readonly property int trailElementsCount: Math.floor(UI.mainMenuButtonTrailWidth / (baseTrailElementWidth + root.trailSpacing))
 
-    Behavior on trailElementWidth {
-        NumberAnimation {
-            duration: 1000
-            easing.type: Easing.OutElastic
-            easing.amplitude: 3.0
-        }
-    }
-
-    ButtonHighlightAnim {
-        id: highlightAnim
-        // TODO: The expansion frac computations should not take the translation in account
-        running: root.highlightedWithAnim && !mouseArea.containsMouse && !mouseLeftTimer.running && root.expansionFrac < 0.5 && !UI.ui.isConsoleOpen
-    }
-
-    Timer {
-        id: mouseLeftTimer
-        interval: 10000
-    }
-
-    Connections {
-        target: mouseArea
-        onContainsMouseChanged: {
-            if (mouseArea.containsMouse) {
-                UI.ui.playHoverSound();
-            } else {
-                mouseLeftTimer.start()
-            }
-        }
-    }
+    //Behavior on trailElementWidth {
+    //    NumberAnimation {
+    //        duration: 1000
+    //        easing.type: Easing.OutElastic
+    //        easing.amplitude: 3.0
+    //    }
+    //}
 
 	states: [
 		State {
@@ -88,43 +63,50 @@ Item {
 				anchors.left: undefined
 				anchors.right: undefined
 			}
-		},
-		State {
-			name: "pinnedToLeft"
-			AnchorChanges {
-				target: body
-				anchors.horizontalCenter: undefined
-				anchors.verticalCenter: root.verticalCenter
-				anchors.left: root.left
-				anchors.right: undefined
+			PropertyChanges {
+			    target: body
+			    anchors.leftMargin: 0
+			    anchors.rightMargin: 0
 			}
 		},
 		State {
-			name: "pinnedToRight"
+			name: "goneLeft"
 			AnchorChanges {
 				target: body
 				anchors.horizontalCenter: undefined
 				anchors.verticalCenter: root.verticalCenter
 				anchors.left: undefined
-				anchors.right: root.right
+				anchors.right: root.left
+		    }
+		    PropertyChanges {
+		        target: body
+		        anchors.leftMargin: 0
+				anchors.rightMargin: UI.mainMenuButtonTrailWidth
+			}
+		},
+		State {
+			name: "goneRight"
+			AnchorChanges {
+				target: body
+				anchors.horizontalCenter: undefined
+				anchors.verticalCenter: root.verticalCenter
+				anchors.left: root.right
+				anchors.right: undefined
+			}
+			PropertyChanges {
+			    target: body
+				anchors.leftMargin: UI.mainMenuButtonTrailWidth
+			    anchors.rightMargin: 0
 			}
 		}
 	]
 
 	transitions: [
 	    Transition {
-	        to: "centered"
 		    AnchorAnimation {
 			    duration: 333
 			    easing.type: Easing.OutBack
 		    }
-	    },
-	    Transition {
-	        from: "centered"
-	        AnchorAnimation {
-	            duration: 333
-	            easing.type: enableSlidingOvershoot ? Easing.OutBack : Easing.OutCubic
-	        }
 	    }
 	]
 
@@ -200,19 +182,6 @@ Item {
 			text: root.text
 			font.weight: Font.ExtraBold
 			font.capitalization: Font.AllUppercase
-		}
-
-		MouseArea {
-			id: mouseArea
-			anchors.fill: parent
-			hoverEnabled: true
-			onClicked: {
-			    let frac = root.expansionFrac
-			    // Suppress clicked() signal in an immediate state
-			    if (Math.abs(frac) < 0.001 || Math.abs(frac - 1.0) < 0.001) {
-			        root.clicked()
-			    }
-			}
 		}
 	}
 
