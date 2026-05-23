@@ -8,6 +8,8 @@ import net.warsow 2.6
 Item {
     id: root
 
+    signal playingLocallySuggested()
+
     Component.onCompleted: {
         scanTimer.start()
         applyFilter()
@@ -192,11 +194,7 @@ Item {
                 rightBodyPartSlantDegrees: 0.5 * UI.buttonBodySlantDegrees
                 textSlantDegrees: 0
                 labelHorizontalCenterOffset: 0
-                onClicked: {
-                    UI.ui.playForwardSound()
-                    // TODO: This should be less hacky
-                    primaryMenu.activePageTag = primaryMenu.pageLocalGame
-                }
+                onClicked: root.playingLocallySuggested()
             }
         }
     }

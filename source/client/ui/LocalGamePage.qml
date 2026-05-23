@@ -10,9 +10,10 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: 32
         anchors.bottomMargin: 32
+        height: UI.tabHeight
         horizontalAlignment: Qt.AlignHCenter
+        verticalAlignment: Qt.AlignVCenter
         font.weight: Font.Medium
         text: swipeView.currentItem.subpageTitle
     }

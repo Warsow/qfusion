@@ -27,6 +27,11 @@ QtObject {
     readonly property var scoreboardBetaModel: __scoreboardBetaModel
     readonly property var scoreboardMixedModel: __scoreboardMixedModel
 
+    readonly property real tabHeight: 48.0
+
+    readonly property real logoDecorationRowHeight: 11
+    readonly property real logoDecorationRowSpacing: 12
+
     readonly property real mainMenuButtonHeight: 46.0
     readonly property real regularSlantedButtonHeight: 42.0
     readonly property real buttonBodySlantDegrees: 20.0

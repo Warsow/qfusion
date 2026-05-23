@@ -76,7 +76,7 @@
         <file>MainMenu.qml</file>
         <file>MainMenuButtonRow.qml</file>
         <file>MainMenuButtonTrail.qml</file>
-        <file>MainMenuPrimaryMenu.qml</file>
+        <file>MainMenuDecoratedLogo.qml</file>
         <file>MenuRootItem.qml</file>
         <file>MouseButtonShape.qml</file>
         <file>MouseKey.qml</file>
@@ -118,6 +118,7 @@
         <file>UICheckBox.qml</file>
         <file>UILabel.qml</file>
         <file>UISlider.qml</file>
+        <file>UITabButton.qml</file>
         <file>UITextField.qml</file>
         <file>UISpinBox.qml</file>
         <file>UI.qml</file>

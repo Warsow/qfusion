@@ -7,29 +7,83 @@ import net.warsow 2.6
 Item {
 	id: root
 
-    property alias expansionFrac: primaryMenu.expansionFrac
+	property alias expansionFrac: decoratedLogo.expansionFrac
 
-	MainMenuPrimaryMenu {
-		id: primaryMenu
-		anchors.centerIn: parent
-		shouldShowExpandedButtons: parent.width >= 2400 && (parent.width / parent.height) >= 2.0
-        width: parent.width + (shouldShowExpandedButtons ? 0 : 2 * (UI.mainMenuButtonWidth + UI.mainMenuButtonTrailWidth))
-        height: parent.height
-	}
+	readonly property bool tabVisible: expansionFrac < 1.0
+	readonly property bool tabEnabled: expansionFrac <= 1.0
+	readonly property real tabOpacity: 1.0 - expansionFrac
 
-	Component {
-	    id: newsComponent
-	    NewsPage {}
-	}
+    TabBar {
+        id: menuTabBar
+        visible: tabVisible
+        enabled: tabEnabled
+        opacity: tabOpacity
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: 0.6 * contentPane.width
+        height: UI.tabHeight
+        background: null
+        Component.onCompleted: {
+            root.resetTabBarState(menuTabBar)
+            menuTabBar.contentItem.highlight = null
+        }
+        UITabButton {
+            text: "Play online"
+            width: 0.25 * menuTabBar.width
+            onClicked: root.selectComponent(playOnlineComponent)
+        }
+        UITabButton {
+            text: "Local game"
+            width: 0.25 * menuTabBar.width
+            onClicked: root.selectComponent(localGameComponent)
+        }
+        UITabButton {
+            text: "Demos"
+            width: 0.25 * menuTabBar.width
+            onClicked: root.selectComponent(demosComponent)
+        }
+        UITabButton {
+            text: "Settings"
+            width: 0.25 * menuTabBar.width
+            onClicked: root.selectComponent(settingsComponent)
+        }
+    }
 
-	Component {
-	    id: profileComponent
-	    ProfilePage {}
-	}
+    TabBar {
+        id: quitTabBar
+        visible: tabVisible
+        enabled: tabEnabled
+        opacity: tabOpacity
+        anchors.top: parent.top
+        anchors.right: parent.right
+        width: implicitWidth
+        height: UI.tabHeight
+        background: null
+        Component.onCompleted: {
+            root.resetTabBarState(quitTabBar)
+            quitTabBar.contentItem.highlight = null
+        }
+        UITabButton {
+            text: "Quit"
+            width: 0.1 * contentPane.width
+            onClicked: root.selectComponent(quitComponent)
+        }
+    }
+
+    function selectComponent(c) {
+        decoratedLogo.toggleExpandedState()
+        // replace the entire stack
+        contentPane.replace(null, c)
+    }
 
 	Component {
 	    id: playOnlineComponent
-	    PlayOnlinePage {}
+	    PlayOnlinePage {
+	        onPlayingLocallySuggested: {
+	            UI.ui.playForwardSound()
+	            contentPane.replace(null, localGameComponent)
+	        }
+	    }
 	}
 
 	Component {
@@ -48,83 +102,66 @@ Item {
     }
 
     Component {
-        id: helpComponent
-        HelpPage {}
-    }
-
-    Component {
         id: quitComponent
         QuitPage {
-            backTrigger: () => {
-                primaryMenu.handleKeyBack()
-            }
+            backTrigger: () => collapse()
         }
     }
 
     StackView {
 		id: contentPane
-		hoverEnabled: primaryMenu.expansionFrac >= 1.0
-		opacity: primaryMenu.expansionFrac
+		hoverEnabled: expansionFrac >= 1.0
+		opacity: expansionFrac
 		anchors.top: parent.top
 		anchors.bottom: parent.bottom
 		anchors.horizontalCenter: parent.horizontalCenter
 		width: 1024 + 128
 	}
 
-    Connections {
-        target: primaryMenu
-        onActivePageTagChanged: {
-            let tag = primaryMenu.activePageTag
-            if (!tag) {
-                contentPane.clear()
-                return
-            }
-            if (tag === primaryMenu.pageNews) {
-                contentPane.replace(newsComponent)
-            } else if (tag === primaryMenu.pageProfile) {
-                contentPane.replace(profileComponent)
-            } else if (tag === primaryMenu.pagePlayOnline) {
-                contentPane.replace(playOnlineComponent)
-            } else if (tag === primaryMenu.pageLocalGame) {
-                contentPane.replace(localGameComponent)
-            } else if (tag === primaryMenu.pageSettings) {
-                contentPane.replace(settingsComponent)
-            } else if (tag === primaryMenu.pageDemos) {
-                contentPane.replace(demosComponent)
-            } else if (tag === primaryMenu.pageHelp) {
-                contentPane.replace(helpComponent)
-            } else if (tag === primaryMenu.pageQuit) {
-                contentPane.replace(quitComponent)
-            }
-            contentPane.currentItem.forceActiveFocus()
-        }
+	MainMenuDecoratedLogo {
+	    id: decoratedLogo
+	    width: parent.width
+	    // TODO: It's no longer just "tabOpacity"
+	    opacity: tabOpacity
+	    anchors.verticalCenter: parent.verticalCenter
+	}
+
+	function resetTabBarState(bar) {
+	    bar.currentIndex = -1
+	    for (let i = 0; i < bar.contentChildren.length; ++i) {
+	        bar.contentChildren[i].checked = false
+	    }
+	}
+
+    function collapse() {
+        decoratedLogo.toggleExpandedState()
+        contentPane.clear()
+        resetTabBarState(menuTabBar)
+        resetTabBarState(quitTabBar)
+        root.forceActiveFocus()
+        UI.ui.playBackSound()
     }
 
 	Keys.onPressed: {
-	    if (!visible) {
-	        return
-	    }
-	    let currentPaneItem = contentPane.currentItem
+	    const currentPaneItem = contentPane.currentItem
 	    // TODO: Events propagation needs some attention and some work, e.g. setting the .accepted flag
 	    // TODO: Check whether Keys.redirectTo is applicable
 	    if (currentPaneItem) {
 	        if (currentPaneItem.hasOwnProperty("handleKeyEvent")) {
-	            let handler = currentPaneItem.handleKeyEvent
+	            const handler = currentPaneItem.handleKeyEvent
 	            if (handler && handler(event)) {
+	                console.assert(event.accepted)
 	                return
 	            }
 	        }
 	    }
-	    if (primaryMenu.handleKeyEvent(event)) {
-            return
-        }
-
-	    if (event.key !== Qt.Key_Escape) {
-	        return
+	    if (event.key === Qt.Key_Escape) {
+	        if (contentPane.empty) {
+	            UI.ui.returnFromMainMenu()
+	        } else {
+	            collapse()
+	        }
+	        event.accepted = true
 	    }
-	    UI.ui.playBackSound()
-	    UI.ui.returnFromMainMenu()
-	    root.forceActiveFocus()
-	    event.accepted = true
 	}
 }
