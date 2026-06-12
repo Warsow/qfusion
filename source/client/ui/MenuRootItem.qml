@@ -23,8 +23,8 @@ Item {
     }
 
     Keys.forwardTo: [
-        updateScreenLoader.item, introScreenLoader.item, mainMenuLoader.item, connectionScreenLoader.item,
-        demoPlaybackMenuLoader.item, inGameMenuLoader.item
+        updateScreenLoader.item, introScreenLoader.item, primaryMenuLoader.item,
+        connectionScreenLoader.item, demoPlaybackMenuLoader.item,
     ]
 
     Item {
@@ -35,7 +35,7 @@ Item {
         property real tintAlpha: 0.03
 
         property color baseTintColor: (UI.ui.isShowingIntroScreen || UI.ui.isShowingUpdateScreen ||
-            (UI.ui.isShowingMainMenu && UI.ui.isClientDisconnected)) ?
+            (UI.ui.isShowingPrimaryMenu && UI.ui.isClientDisconnected)) ?
                 Material.accent : (UI.ui.isShowingConnectionScreen ? "white" : Qt.lighter(Material.background, 1.5))
         Behavior on baseTintColor { ColorAnimation { duration: 100 } }
 
@@ -48,8 +48,8 @@ Item {
         // The gradient makes it look denser so the base value is slightly lower
         readonly property real gradientSideOpacity: UI.fullscreenOverlayOpacity - 0.1
 
-        property real expansionFrac: UI.ui.isShowingMainMenu ?
-            mainMenuLoader.item.expansionFrac : (UI.ui.isShowingScoreboard ? 1.0 : 0.0)
+        property real expansionFrac: (UI.ui.isShowingPrimaryMenu && UI.ui.isClientDisconnected) ?
+            primaryMenuLoader.item.expansionFrac : (UI.ui.isShowingScoreboard ? 1.0 : 0.0)
 
         SequentialAnimation {
             // Don't run it unless the gradient is really displayed.
@@ -114,16 +114,16 @@ Item {
         Loader {
             id: gradientLoader
             anchors.fill: parent
-            active: mainMenuLoader.active || connectionScreenLoader.active || inGameMenuLoader.active ||
-                scoreboardLoader.active || introScreenLoader.active || updateScreenLoader.active
+            active: primaryMenuLoader.active || connectionScreenLoader.active || scoreboardLoader.active ||
+                introScreenLoader.active || updateScreenLoader.active
             sourceComponent: gradientComponent
         }
 
         Loader {
-            id: mainMenuLoader
-            active: UI.ui.isShowingMainMenu
+            id: primaryMenuLoader
+            active: UI.ui.isShowingPrimaryMenu
             anchors.fill: parent
-            sourceComponent: MainMenu {}
+            sourceComponent: PrimaryMenu {}
         }
 
         Loader {
@@ -131,13 +131,6 @@ Item {
             active: UI.ui.isShowingConnectionScreen
             anchors.fill: parent
             sourceComponent: ConnectionScreen {}
-        }
-
-        Loader {
-            id: inGameMenuLoader
-            active: UI.ui.isShowingInGameMenu
-            anchors.fill: parent
-            sourceComponent: InGameMenu {}
         }
 
         Loader {

@@ -276,7 +276,7 @@ Item {
         UI.ui.callVote(selectedVoteName, chosenValue, isOperatorCall)
         stackView.replace(voteSelectionComponent)
         UI.ui.playForwardSound()
-        UI.ui.returnFromInGameMenu()
+        UI.ui.returnFromPrimaryMenu()
     }
 
     function handleKeyEvent(event) {

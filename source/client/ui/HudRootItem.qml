@@ -13,7 +13,7 @@ Item {
     property var oldMiniviews: []
     property var oldMiniviewIndices: []
 
-    readonly property bool suppressShowingTileHuds: Hud.ui.isShowingScoreboard || Hud.ui.isShowingInGameMenu || Hud.ui.isShowingMainMenu
+    readonly property bool suppressShowingTileHuds: Hud.ui.isShowingScoreboard || Hud.ui.isShowingPrimaryMenu
 
     onSuppressShowingTileHudsChanged: updateVisibilityOfTileHuds()
 
@@ -27,7 +27,7 @@ Item {
     // Try reusing the same instance due to Qml GC quirks
     InGameHud {
         // TODO: Is visibility switching it really needed (we don't draw it anyway, but property updates handling may vary)?
-        visible: Hud.ui.isShowingHud
+        visible: Hud.ui.canShowHud
         anchors.fill: parent
         layoutModel: Hud.commonDataModel.regularLayoutModel
         commonDataModel: Hud.commonDataModel

@@ -256,9 +256,8 @@ public:
 	void enterUIRenderingMode();
 	void leaveUIRenderingMode();
 
-	Q_PROPERTY( bool isShowingMainMenu READ isShowingMainMenu NOTIFY isShowingMainMenuChanged );
+	Q_PROPERTY( bool isShowingPrimaryMenu READ isShowingPrimaryMenu NOTIFY isShowingPrimaryMenuChanged );
 	Q_PROPERTY( bool isShowingConnectionScreen READ isShowingConnectionScreen NOTIFY isShowingConnectionScreenChanged );
-	Q_PROPERTY( bool isShowingInGameMenu READ isShowingInGameMenu NOTIFY isShowingInGameMenuChanged );
 	Q_PROPERTY( bool isShowingDemoPlaybackMenu READ isShowingDemoPlaybackMenu NOTIFY isShowingDemoPlaybackMenuChanged );
 	Q_PROPERTY( bool isShowingIntroScreen READ isShowingIntroScreen NOTIFY isShowingIntroScreenChanged );
 	Q_PROPERTY( bool isShowingUpdateScreen READ isShowingUpdateScreen NOTIFY isShowingUpdateScreenChanged );
@@ -274,8 +273,8 @@ public:
 	Q_PROPERTY( bool isShowingTeamChatPopup MEMBER m_isShowingTeamChatPopup NOTIFY isShowingTeamChatPopupChanged );
 	Q_PROPERTY( bool hasTeamChat MEMBER m_hasTeamChat NOTIFY hasTeamChatChanged );
 
-	Q_SIGNAL void isShowingHudChanged( bool isShowingHud );
-	Q_PROPERTY( bool isShowingHud MEMBER m_isShowingHud NOTIFY isShowingHudChanged );
+	Q_SIGNAL void canShowHudChanged( bool canShowHud );
+	Q_PROPERTY( bool canShowHud MEMBER m_canShowHud NOTIFY canShowHudChanged );
 
 	Q_PROPERTY( bool isShowingActionRequests READ isShowingActionRequests NOTIFY isShowingActionRequestsChanged );
 
@@ -332,9 +331,7 @@ public:
 
 	Q_INVOKABLE void ensureObjectDestruction( QObject *object );
 
-	Q_INVOKABLE void showMainMenu();
-	Q_INVOKABLE void returnFromInGameMenu();
-	Q_INVOKABLE void returnFromMainMenu();
+	Q_INVOKABLE void returnFromPrimaryMenu();
 	Q_INVOKABLE void finishIntro();
 	Q_INVOKABLE void hideUpdates();
 	Q_INVOKABLE void downloadUpdates();
@@ -479,9 +476,8 @@ signals:
 	Q_SIGNAL void isConsoleOpenChanged( bool isConsoleOpen );
 	Q_SIGNAL void isClientDisconnectedChanged( bool isClientDisconnected );
 
-	Q_SIGNAL void isShowingMainMenuChanged( bool isShowingMainMenu );
+	Q_SIGNAL void isShowingPrimaryMenuChanged( bool isShowingPrimaryMenu );
 	Q_SIGNAL void isShowingConnectionScreenChanged( bool isShowingConnectionScreen );
-	Q_SIGNAL void isShowingInGameMenuChanged( bool isShowingInGameMenu );
 	Q_SIGNAL void isShowingIntroScreenChanged( bool isShowingIntroScreen );
 	Q_SIGNAL void isShowingUpdateScreenChanged( bool isShowingUpdateScreen );
 
@@ -600,9 +596,8 @@ private:
 	bool m_isOperator { false };
 
 	enum ActiveMenuMask : unsigned {
-		MainMenu             = 1 << 0,
+		PrimaryMenu          = 1 << 0,
 		ConnectionScreen     = 1 << 1,
-		InGameMenu           = 1 << 2,
 		DemoPlaybackMenu     = 1 << 3,
 		IntroScreen          = 1 << 4,
 		UpdateScreen         = 1 << 5,
@@ -621,7 +616,7 @@ private:
 	bool m_isShowingActionRequests { false };
 
 	bool m_hasTeamChat { false };
-	bool m_isShowingHud { false };
+	bool m_canShowHud { false };
 
 	bool m_isConsoleOpen { false };
 	bool m_isClientDisconnected { true };
@@ -708,11 +703,9 @@ private:
 	[[nodiscard]]
 	bool isShowingDemoPlaybackMenu() const { return ( m_activeMenuMask & DemoPlaybackMenu ) != 0; }
 	[[nodiscard]]
-	bool isShowingMainMenu() const { return ( m_activeMenuMask & MainMenu ) != 0; }
+	bool isShowingPrimaryMenu() const { return ( m_activeMenuMask & PrimaryMenu ) != 0; }
 	[[nodiscard]]
 	bool isShowingConnectionScreen() const { return ( m_activeMenuMask & ConnectionScreen ) != 0; }
-	[[nodiscard]]
-	bool isShowingInGameMenu() const { return ( m_activeMenuMask & InGameMenu ) != 0; }
 	[[nodiscard]]
 	bool isShowingIntroScreen() const { return ( m_activeMenuMask & IntroScreen ) != 0; }
 	[[nodiscard]]
@@ -1364,7 +1357,7 @@ void QtUISystem::drawHudPartInMainContext( RenderSystem *renderSystem ) {
 	WSW_PROFILER_SCOPE();
 
 	if( m_hudSandbox && m_hudSandbox->m_hasValidFboContent ) {
-		if( m_isShowingHud || m_isShowingChatPopup || m_isShowingTeamChatPopup || m_isShowingActionRequests ) {
+		if( m_canShowHud || m_isShowingChatPopup || m_isShowingTeamChatPopup || m_isShowingActionRequests ) {
 			const GLuint externalTexNum = m_hudSandbox->m_framebufferObject->texture();
 			shader_s *const material    = renderSystem->wrapHudTextureHandleInMaterial( externalTexNum );
 
@@ -1536,9 +1529,11 @@ void QtUISystem::drawBackgroundMapIfNeeded( RenderSystem *renderSystem ) {
 		return;
 	}
 
-	if( !( m_activeMenuMask & ( MainMenu | IntroScreen | UpdateScreen ) ) ) {
+#if 0 // TODO: This condition seems to be redundant as checking client state is sufficient
+	if( !( m_activeMenuMask & ( PrimaryMenu | IntroScreen | UpdateScreen ) ) ) {
 		return;
 	}
+#endif
 
 	refdef_t rdf;
 	memset( &rdf, 0, sizeof( rdf ) );
@@ -1627,21 +1622,15 @@ void QtUISystem::beginRegistration() {
 void QtUISystem::endRegistration() {
 }
 
-void QtUISystem::showMainMenu() {
-	setActiveMenuMask( MainMenu );
-}
-
-void QtUISystem::returnFromInGameMenu() {
+void QtUISystem::returnFromPrimaryMenu() {
 	if( m_isPlayingADemo ) {
+		// TODO: Is it reachable?
 		setActiveMenuMask( DemoPlaybackMenu );
-	} else {
+	} else if( m_clientState == CA_ACTIVE ) {
 		setActiveMenuMask( 0 );
-	}
-}
-
-void QtUISystem::returnFromMainMenu() {
-	if( m_clientState == CA_ACTIVE ) {
-		setActiveMenuMask( InGameMenu );
+	} else {
+		// TODO: Is it reachable?
+		setActiveMenuMask( PrimaryMenu );
 	}
 }
 
@@ -1684,30 +1673,25 @@ void QtUISystem::setActiveMenuMask( unsigned activeMask ) {
 
 	const auto oldActiveMask = m_activeMenuMask;
 
-	const bool wasShowingMainMenu = isShowingMainMenu();
+	const bool wasShowingPrimaryMenu = isShowingPrimaryMenu();
 	const bool wasShowingConnectionScreen = isShowingConnectionScreen();
-	const bool wasShowingInGameMenu = isShowingInGameMenu();
 	const bool wasShowingDemoPlaybackMenu = isShowingDemoPlaybackMenu();
 	const bool wasShowingIntroScreen = isShowingIntroScreen();
 	const bool wasShowingUpdateScreen = isShowingUpdateScreen();
 
 	m_activeMenuMask = activeMask;
 
-	const bool _isShowingMainMenu = isShowingMainMenu();
+	const bool _isShowingPrimaryMenu = isShowingPrimaryMenu();
 	const bool _isShowingConnectionScreen = isShowingConnectionScreen();
-	const bool _isShowingInGameMenu = isShowingInGameMenu();
 	const bool _isShowingDemoPlaybackMenu = isShowingDemoPlaybackMenu();
 	const bool _isShowingIntroScreen = isShowingIntroScreen();
 	const bool _isShowingUpdateScreen = isShowingUpdateScreen();
 
-	if( wasShowingMainMenu != _isShowingMainMenu ) {
-		Q_EMIT isShowingMainMenuChanged( _isShowingMainMenu );
+	if( wasShowingPrimaryMenu != _isShowingPrimaryMenu ) {
+		Q_EMIT isShowingPrimaryMenuChanged( _isShowingPrimaryMenu );
 	}
 	if( wasShowingConnectionScreen != _isShowingConnectionScreen ) {
 		Q_EMIT isShowingConnectionScreenChanged( _isShowingConnectionScreen );
-	}
-	if( wasShowingInGameMenu != _isShowingInGameMenu ) {
-		Q_EMIT isShowingInGameMenuChanged( _isShowingInGameMenu );
 	}
 	if( wasShowingDemoPlaybackMenu != _isShowingDemoPlaybackMenu ) {
 		Q_EMIT isShowingDemoPlaybackMenuChanged( _isShowingDemoPlaybackMenu );
@@ -1804,14 +1788,14 @@ void QtUISystem::refreshProperties() {
 			Q_EMIT reconnectBehaviourChanged( getReconnectBehaviour() );
 			Q_EMIT isReactingToDroppedConnectionChanged( true );
 		} else if( actualClientState == CA_DISCONNECTED ) {
-			setActiveMenuMask( MainMenu );
+			setActiveMenuMask( PrimaryMenu );
 			m_chatProxy.clear();
 			m_teamChatProxy.clear();
 		} else if( actualClientState == CA_ACTIVE ) {
 			if( isPlayingADemo ) {
 				setActiveMenuMask( DemoPlaybackMenu );
 			} else {
-				setActiveMenuMask( InGameMenu );
+				setActiveMenuMask( PrimaryMenu );
 			}
 			reloadOptions();
 		} else if( actualClientState >= CA_GETTING_TICKET && actualClientState <= CA_LOADING ) {
@@ -1900,10 +1884,13 @@ void QtUISystem::refreshProperties() {
 		Q_EMIT isShowingTeamChatPopupChanged( m_isShowingTeamChatPopup );
 	}
 
-	const bool wasShowingHud = m_isShowingHud;
-	m_isShowingHud = actualClientState == CA_ACTIVE && !( m_activeMenuMask & MainMenu );
-	if( m_isShowingHud != wasShowingHud ) {
-		Q_EMIT isShowingHudChanged( m_isShowingHud );
+	const bool oldCanShowHud = m_canShowHud;
+	// TODO: Suppress from Qml if we show a fullscreen primary menu?
+	// Currently we just supply the entire menu item as a HUD occluder in this case.
+	// Note: We don't care of performance in the mentioned case as we display the primary menu anyway.
+	m_canShowHud = ( actualClientState == CA_ACTIVE );
+	if( m_canShowHud != oldCanShowHud ) {
+		Q_EMIT canShowHudChanged( m_canShowHud );
 	}
 
 	const bool wasShowingActionRequests = m_isShowingActionRequests;
@@ -2125,11 +2112,11 @@ void QtUISystem::handleEscapeKey() {
 		if( !didSpecialHandling ) {
 			if( m_activeMenuMask == 0 ) {
 				if( isPostmatch ) {
-					setActiveMenuMask( InGameMenu );
+					setActiveMenuMask( PrimaryMenu );
 					didSpecialHandling = true;
 				} else {
 					if( !m_isRequestedToShowChatPopup && !m_isRequestedToShowTeamChatPopup ) {
-						setActiveMenuMask( InGameMenu );
+						setActiveMenuMask( PrimaryMenu );
 						didSpecialHandling = true;
 					}
 				}
@@ -2743,7 +2730,7 @@ void QtUISystem::setScoreboardShown( bool shown ) {
 }
 
 bool QtUISystem::suggestsUsingVSync() const {
-	return ( m_activeMenuMask & ( MainMenu | InGameMenu | ConnectionScreen | IntroScreen | UpdateScreen ) ) != 0;
+	return ( m_activeMenuMask & ( PrimaryMenu | ConnectionScreen | IntroScreen | UpdateScreen ) ) != 0;
 }
 
 void QtUISystem::toggleChatPopup() {
@@ -2909,7 +2896,7 @@ void QtUISystem::launchLocalServer( const QByteArray &gametype, const QByteArray
 
 bool QtUISystem::isShowingModalMenu() const {
 	if( m_menuSandbox ) {
-		return ( m_activeMenuMask & ( InGameMenu | MainMenu | IntroScreen | UpdateScreen ) ) != 0;
+		return ( m_activeMenuMask & ( PrimaryMenu | IntroScreen | UpdateScreen ) ) != 0;
 	}
 	return false;
 }
