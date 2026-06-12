@@ -63,7 +63,6 @@
         <file>InGameChatPage.qml</file>
         <file>InGameGametypeOptionsPage.qml</file>
         <file>InGameHud.qml</file>
-        <file>InGameMenu.qml</file>
         <file>IntroScreen.qml</file>
         <file>KeyboardAndMouse.qml</file>
         <file>KeyboardKey.qml</file>
@@ -73,7 +72,6 @@
         <file>LocalGamePage.qml</file>
         <file>LocalGameDetailArrangement.qml</file>
         <file>LocalGameListDelegate.qml</file>
-        <file>MainMenu.qml</file>
         <file>MainMenuButtonRow.qml</file>
         <file>MainMenuButtonTrail.qml</file>
         <file>MainMenuDecoratedLogo.qml</file>
@@ -87,6 +85,7 @@
         <file>NewsPage.qml</file>
         <file>PlayerSettings.qml</file>
         <file>PlayOnlinePage.qml</file>
+        <file>PrimaryMenu.qml</file>
         <file>ProfilePage.qml</file>
         <file>QuitPage.qml</file>
         <file>RichChatList.qml</file>
