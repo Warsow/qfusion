@@ -32,7 +32,6 @@ QtObject {
     readonly property real logoDecorationRowHeight: 11
     readonly property real logoDecorationRowSpacing: 12
 
-    readonly property real mainMenuButtonHeight: 46.0
     readonly property real regularSlantedButtonHeight: 42.0
     readonly property real buttonBodySlantDegrees: 20.0
     readonly property real buttonTextSlantDegrees: 15.0

@@ -261,50 +261,69 @@ Item {
     Component {
         id: inGameGeneralComponent
         Item {
+            id: inGameGeneralPane
+            readonly property real separatorWidth: 128
+            readonly property real separatorHeight: 2
+            readonly property real separatorMargins: 8
+            readonly property real separatorRadius: 1
             ColumnLayout {
                 id: buttonsLayout
                 spacing: 20
-                width: parent.width - 64 - 192
+                width: parent.width - 92 - 192
                 anchors.centerIn: parent
 
                 SlantedButton {
-                    implicitHeight: UI.mainMenuButtonHeight
                     text: "Callvotes"
                     Layout.fillWidth: true
-                    displayIconPlaceholder: true
                     onClicked: {
                         UI.ui.playForwardSound()
                         inGameMenuStackView.push(inGameCallvotesComponent)
                     }
                 }
                 SlantedButton {
-                    implicitHeight: UI.mainMenuButtonHeight
                     text: "Chat"
                     Layout.fillWidth: true
-                    displayIconPlaceholder: true
                     onClicked: {
                         UI.ui.playForwardSound()
                         inGameMenuStackView.push(inGameChatComponent)
                     }
                 }
+
+                Rectangle {
+                    visible: canShowLoadouts
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: inGameGeneralPane.separatorWidth
+                    Layout.preferredHeight: inGameGeneralPane.separatorHeight
+                    Layout.margins: inGameGeneralPane.separatorMargins
+                    radius: inGameGeneralPane.separatorRadius
+                }
+
                 SlantedButton {
-                    implicitHeight: UI.mainMenuButtonHeight
                     visible: canShowLoadouts
                     text: canShowLoadouts ? UI.gametypeOptionsModel.tabTitle : ""
                     Layout.fillWidth: true
-                    displayIconPlaceholder: true
                     onClicked: {
                         UI.ui.playForwardSound()
                         inGameMenuStackView.push(inGameGametypeOptionsComponent)
                     }
                 }
+
+                Rectangle {
+                    visible: readyButton.visible + joinButton.visible + switchTeamButton.visible +
+                        queueButton.visible + spectateButton.visible > 1
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: inGameGeneralPane.separatorWidth
+                    Layout.preferredHeight: inGameGeneralPane.separatorHeight
+                    Layout.margins: inGameGeneralPane.separatorMargins
+                    radius: inGameGeneralPane.separatorRadius
+                }
+
                 SlantedButton {
-                    implicitHeight: UI.mainMenuButtonHeight
+                    id: readyButton
                     visible: UI.ui.canBeReady
                     highlightedWithAnim: visible && !UI.ui.isReady
                     text: UI.ui.isReady ? "Not ready" : "Ready"
                     Layout.fillWidth: true
-                    displayIconPlaceholder: true
                     onClicked: {
                         UI.ui.playForwardSound()
                         if (UI.ui.isReady) {
@@ -316,12 +335,11 @@ Item {
                     }
                 }
                 SlantedButton {
-                    implicitHeight: UI.mainMenuButtonHeight
+                    id: joinButton
                     highlightedWithAnim: visible
                     visible: UI.ui.canJoin
                     text: "Join"
                     Layout.fillWidth: true
-                    displayIconPlaceholder: true
                     onClicked: {
                         UI.ui.playForwardSound()
                         if (UI.hudCommonDataModel.hasTwoTeams && UI.ui.canJoinAlpha && UI.ui.canJoinBeta) {
@@ -333,11 +351,10 @@ Item {
                     }
                 }
                 SlantedButton {
-                    implicitHeight: UI.mainMenuButtonHeight
+                    id: switchTeamButton
                     visible: !UI.ui.canJoin && (UI.ui.canJoinAlpha !== UI.ui.canJoinBeta)
                     text: "Switch team"
                     Layout.fillWidth: true
-                    displayIconPlaceholder: true
                     onClicked: {
                         UI.ui.playForwardSound()
                         if (UI.hudCommonDataModel.isInWarmupState) {
@@ -354,11 +371,10 @@ Item {
                     }
                 }
                 SlantedButton {
-                    implicitHeight: UI.mainMenuButtonHeight
+                    id: queueButton
                     visible: UI.ui.canToggleChallengerStatus && UI.hudCommonDataModel.realClientTeam === HudDataModel.TeamSpectators
                     text: UI.ui.isInChallengersQueue ? "Leave the queue" : "Enter the queue"
                     Layout.fillWidth: true
-                    displayIconPlaceholder: true
                     onClicked: {
                         UI.ui.playForwardSound()
                         if (UI.ui.isInChallengersQueue) {
@@ -371,11 +387,10 @@ Item {
                     }
                 }
                 SlantedButton {
-                    implicitHeight: UI.mainMenuButtonHeight
+                    id: spectateButton
                     visible: UI.ui.canSpectate
                     text: "Spectate"
                     Layout.fillWidth: true
-                    displayIconPlaceholder: true
                     onClicked: {
                         UI.ui.playForwardSound()
                         if (UI.hudCommonDataModel.isInWarmupState) {
