@@ -24,7 +24,6 @@
         <file>DemosListDelegate.qml</file>
         <file>DemosPage.qml</file>
         <file>GraphicsSettings.qml</file>
-        <file>HelpPage.qml</file>
         <file>HudAwardsArea.qml</file>
         <file>HudChat.qml</file>
         <file>HudRootItem.qml</file>
@@ -82,11 +81,9 @@
         <file>MouseSettings.qml</file>
         <file>NativelyDrawnImage.qml</file>
         <file>NativelyDrawnModel.qml</file>
-        <file>NewsPage.qml</file>
         <file>PlayerSettings.qml</file>
         <file>PlayOnlinePage.qml</file>
         <file>PrimaryMenu.qml</file>
-        <file>ProfilePage.qml</file>
         <file>QuitPage.qml</file>
         <file>RichChatList.qml</file>
         <file>ScoreboardScreen.qml</file>
