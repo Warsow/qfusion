@@ -14,7 +14,24 @@ Item {
 	readonly property bool tabEnabled: expansionFrac <= 1.0
 	readonly property real tabOpacity: 1.0 - expansionFrac
 
+    readonly property real inGameMenuWidth: 600
+
     readonly property bool canShowLoadouts: UI.gametypeOptionsModel.available && UI.hudCommonDataModel.realClientTeam !== HudDataModel.TeamSpectators
+
+    Item {
+        id: tabBarHudOccluder
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: UI.tabHeight
+    }
+
+    Item {
+        id: inGameMenuHudOccluder
+        anchors.centerIn: parent
+        height: Math.max(width, 0.67 * parent.height)
+        width: root.inGameMenuWidth
+    }
 
     TabBar {
         id: menuTabBar
@@ -98,18 +115,20 @@ Item {
 		anchors.top: parent.top
 		anchors.bottom: parent.bottom
 		anchors.horizontalCenter: parent.horizontalCenter
-		width: 1024 + 128
+		// The maximal width which does not occlude default HUD health/armor bars
+		width: 1024 + 64 + 32 + 16
 	}
 
 	StackView {
 	    id: inGameMenuStackView
 	    // Assumes that we don't display the primary menu during connection
 	    visible: !UI.ui.isClientDisconnected
-	    hoverEnabled: visible
-	    width: 600
-        height: Math.max(600, 0.67 * parent.height)
+	    // Make sure they don't fight for handling hover
+	    hoverEnabled: !mainMenuStackView.hoverEnabled
+	    anchors.top: parent.top
+	    anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.verticalCenter: parent.verticalCenter
+	    width: root.inGameMenuWidth
 
         Component.onCompleted: {
             if (!UI.ui.isClientDisconnected) {
@@ -157,12 +176,15 @@ Item {
     Connections {
         target: UI.ui
         onHudOccludersRetrievalRequested: {
+            UI.ui.supplyHudOccluder(tabBarHudOccluder)
             if (mainMenuStackView.depth > 0) {
-                UI.ui.supplyHudOccluder(root)
+                UI.ui.supplyHudOccluder(mainMenuStackView)
             } else {
-                UI.ui.supplyHudOccluder(inGameMenuStackView)
-                UI.ui.supplyHudOccluder(menuTabBar)
-                UI.ui.supplyHudOccluder(quitTabBar)
+                // This occluder is permanently supplied, so hud does not blink during transitions
+                UI.ui.supplyHudOccluder(inGameMenuHudOccluder)
+                const currentItem = inGameMenuStackView.currentItem
+                if (!currentItem || !currentItem["reportsHudOccluders"])
+                    UI.ui.supplyHudOccluder(inGameMenuStackView)
             }
         }
     }
@@ -266,6 +288,17 @@ Item {
             readonly property real separatorHeight: 2
             readonly property real separatorMargins: 8
             readonly property real separatorRadius: 1
+
+            readonly property bool reportsHudOccluders: true
+
+            Connections {
+                target: UI.ui
+                onHudOccludersRetrievalRequested: {
+                    // TODO: Should we rather use some fixed-height item?
+                    UI.ui.supplyHudOccluder(buttonsLayout)
+                }
+            }
+
             ColumnLayout {
                 id: buttonsLayout
                 spacing: 20

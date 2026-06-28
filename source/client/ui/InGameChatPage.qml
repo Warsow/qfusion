@@ -7,19 +7,22 @@ import net.warsow 2.6
 Item {
     property bool isDisplayingTeamChat: false
 
-    RowLayout {
-        id: header
-        width: parent.width - 16
+    UIHeaderLabel {
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
+        text: isDisplayingTeamChat ? "Team chat" : "Common chat"
+    }
 
-        Item {
-            Layout.fillWidth: true
-        }
+    RowLayout {
+        id: controls
+        anchors.top: parent.top
+        anchors.right: parent.right
+        height: UI.tabHeight
 
         Button {
             flat: true
             visible: UI.ui.hasTeamChat
+            Layout.alignment: Qt.AlignVCenter
             Material.theme: Material.Dark
             text: isDisplayingTeamChat ? "switch to common" : "switch to team"
             onHoveredChanged: {
@@ -48,7 +51,7 @@ Item {
         model: isDisplayingTeamChat ? UI.teamChatProxy.getRichModel() : UI.chatProxy.getRichModel()
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: header.bottom
+        anchors.top: controls.bottom
         anchors.bottom: inputFrame.top
         // It look slightly lesser due to the content alginment
         anchors.leftMargin: 12

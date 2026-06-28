@@ -111,7 +111,9 @@
         <file>TeamsSettings.qml</file>
         <file>TeamSettingsTeamColumn.qml</file>
         <file>TeamSelectionTeamPane.qml</file>
+        <file>UIBackOrNextBar.qml</file>
         <file>UICheckBox.qml</file>
+        <file>UIHeaderLabel.qml</file>
         <file>UILabel.qml</file>
         <file>UISlider.qml</file>
         <file>UITabButton.qml</file>

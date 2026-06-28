@@ -66,23 +66,28 @@ Item {
         }
     ]
 
+    UIHeaderLabel {
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        text: "Play online"
+    }
+
     RowLayout {
         id: optionsBar
         anchors.top: parent.top
-        anchors.topMargin: 16
-        anchors.left: parent.left
         anchors.right: parent.right
-
-        Item { Layout.fillWidth: true }
+        height: UI.tabHeight
 
         UICheckBox {
             id: fullCheckBox
+            Layout.alignment: Qt.AlignVCenter
             Material.theme: checked ? Material.Light : Material.Dark
             text: "Show full"
             onCheckedChanged: applyFilter()
         }
         UICheckBox {
             id: emptyCheckBox
+            Layout.alignment: Qt.AlignVCenter
             Material.theme: checked ? Material.Light : Material.Dark
             text: "Show empty"
             onCheckedChanged: applyFilter()

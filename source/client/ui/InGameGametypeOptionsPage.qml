@@ -14,18 +14,27 @@ Item {
     readonly property real optionSpacing: 18
     readonly property real maxOptionsPerRow: 3
 
+    readonly property real allowedContentHeight: root.height - 2 * header.height
+
     readonly property var booleanOptionTexts: ["Off", "On"]
     readonly property var booleanOptionVals: [0, 1]
     readonly property var booleanOptionPredicates: [(x) => x === 0, (x) => x !== 0]
     readonly property var booleanOptionIcons: ["image://wsw/gfx/hud/icons/vsay/no", "image://wsw/gfx/hud/icons/vsay/yes"]
 
+    UIHeaderLabel {
+        id: header
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        text: UI.gametypeOptionsModel.tabTitle
+    }
+
     ListView {
         id: list
         anchors.centerIn: parent
         width: parent.width
-        height: parent.height > contentHeight ? contentHeight : parent.height
-        boundsBehavior: parent.height > contentHeight ? Flickable.StopAtBounds : Flickable.OvershootBounds
-        spacing: parent.height > contentHeight ? 48 : 36
+        height: root.allowedContentHeight > contentHeight ? contentHeight : root.allowedContentHeight
+        boundsBehavior: root.allowedContentHeight > contentHeight ? Flickable.StopAtBounds : Flickable.OvershootBounds
+        spacing: root.allowedContentHeight > contentHeight ? 48 : 36
         model: UI.gametypeOptionsModel
 
         delegate: Item {
