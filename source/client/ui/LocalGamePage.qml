@@ -5,11 +5,18 @@ import QtQuick.Layouts 1.12
 import net.warsow 2.6
 
 Item {
+    UIHeaderLabel {
+        id: headerLabel
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        text: "Local game"
+    }
+
     UILabel {
         id: titleLabel
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: parent.top
+        anchors.top: headerLabel.bottom
         anchors.bottomMargin: 32
         height: UI.tabHeight
         horizontalAlignment: Qt.AlignHCenter
@@ -308,50 +315,26 @@ Item {
 
     PageIndicator {
         id: pageIndicator
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: buttonsBar.anchors.bottomMargin + 16
+        anchors.centerIn: buttonsBar
         count: 3
         currentIndex: swipeView.currentIndex
         interactive: false
     }
 
-    RowLayout {
+    UIBackNextBar {
         id: buttonsBar
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 32
-        width: UI.acceptRejectRowWidthFrac * parent.width
+        anchors.bottomMargin: UI.acceptRejectRowBottomMargin
 
-        SlantedLeftSecondaryButton {
-            id: prevButton
-            text: "back"
-            visible: swipeView.currentItem.canGoPrev
-            onClicked: {
-                UI.ui.playBackSound()
-                swipeView.currentIndex = swipeView.currentIndex - 1
-            }
+        backButtonVisible: swipeView.currentItem.canGoPrev
+        onBackButtonClicked: {
+            UI.ui.playBackSound()
+            swipeView.currentIndex = swipeView.currentIndex - 1
         }
-
-        Item {
-            Layout.preferredWidth: prevButton.Layout.preferredWidth
-            visible: !prevButton.visible
-        }
-
-        Item { Layout.fillWidth: true }
-
-        SlantedRightPrimaryButton {
-            id: nextButton
-            highlighted: true
-            text: swipeView.currentIndex === 2 ? "start" : "next"
-            visible: swipeView.currentItem.canGoNext
-            onClicked: goNext()
-        }
-
-        Item {
-            Layout.preferredWidth: prevButton.Layout.preferredWidth
-            visible: !nextButton.visible
-        }
+        nextButtonText: swipeView.currentIndex === 2 ? "start" : "next"
+        nextButtonVisible: swipeView.currentItem.canGoNext
+        onNextButtonClicked: goNext()
     }
 
     function handleBackEvent(event) {

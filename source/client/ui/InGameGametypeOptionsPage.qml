@@ -19,10 +19,17 @@ Item {
     readonly property var booleanOptionPredicates: [(x) => x === 0, (x) => x !== 0]
     readonly property var booleanOptionIcons: ["image://wsw/gfx/hud/icons/vsay/no", "image://wsw/gfx/hud/icons/vsay/yes"]
 
+    UIHeaderLabel {
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        text: UI.gametypeOptionsModel.tabTitle
+    }
+
     ListView {
         id: list
         anchors.centerIn: parent
         width: parent.width
+        // TODO: Account for the header
         height: parent.height > contentHeight ? contentHeight : parent.height
         boundsBehavior: parent.height > contentHeight ? Flickable.StopAtBounds : Flickable.OvershootBounds
         spacing: parent.height > contentHeight ? 48 : 36

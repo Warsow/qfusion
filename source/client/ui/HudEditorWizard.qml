@@ -38,7 +38,7 @@ Item {
     StackView {
         id: stackView
         anchors.top: summaryLabel.bottom
-        anchors.bottom: buttonsBar.top
+        anchors.bottom: backNextBar.top
         anchors.left: parent.left
         anchors.right: parent.right
         clip: true
@@ -386,48 +386,25 @@ Item {
 
     PageIndicator {
         id: pageIndicator
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: buttonsBar.anchors.bottomMargin + 16
+        anchors.centerIn: backNextBar
         count: 4
         currentIndex: stackView.currentItem.stageIndex
         interactive: false
     }
 
-    RowLayout {
-        id: buttonsBar
+    UIBackNextBar {
+        id: backNextBar
+
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 32
-        width: UI.acceptRejectRowWidthFrac * parent.width
-        height: 64
+        anchors.bottomMargin: UI.acceptRejectRowBottomMargin
 
-        SlantedLeftSecondaryButton {
-            id: backButton
-            text: "back"
-            visible: stackView.currentItem.canGoBack
-            onClicked: stackView.currentItem.handleBackRequest()
-        }
+        backButtonVisible: stackView.currentItem.canGoBack
+        onBackButtonClicked: stackView.currentItem.handleBackRequest()
 
-        Item {
-            Layout.preferredWidth: backButton.Layout.preferredWidth
-            visible: !backButton.visible
-        }
-
-        Item { Layout.fillWidth: true }
-
-        SlantedRightPrimaryButton {
-            id: nextButton
-            highlighted: true
-            text: stackView.currComponent === savePageComponent ? "save" : "next"
-            visible: stackView.currentItem.canGoNext
-            onClicked: stackView.currentItem.handleNextRequest()
-        }
-
-        Item {
-            Layout.preferredWidth: backButton.Layout.preferredWidth
-            visible: !nextButton.visible
-        }
+        nextButtonText: stackView.currentItem.stageIndex === 3 ? "save" : "next"
+        nextButtonVisible: stackView.currentItem.canGoNext
+        onNextButtonClicked: stackView.currentItem.handleNextRequest()
     }
 
     function handleKeyEvent(event) {

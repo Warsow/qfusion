@@ -7,15 +7,6 @@ import net.warsow 2.6
 Item {
     id: root
 
-    StackView {
-        id: stackView
-        width: root.width - 16
-        anchors.top: parent.top
-        anchors.topMargin: 8
-        anchors.bottom: parent.bottom
-        anchors.horizontalCenter: parent.horizontalCenter
-    }
-
     property int selectedVoteIndex
     property string selectedVoteName
     property string selectedVoteDesc
@@ -26,6 +17,78 @@ Item {
     property var selectedVoteChosen
 
     property var activeCallvotesModel: UI.ui.isOperator ? UI.operatorCallvotesModel : UI.regularCallvotesModel
+
+    UIHeaderLabel {
+        id: header
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        text: "Callvotes"
+    }
+
+    // TODO: Add title (refer to the local game page)
+    // TODO: Add description (refer to the local game page)
+
+    StackView {
+        id: stackView
+        width: root.width - 16
+        anchors.top: header.bottom
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: UI.acceptRejectRowHeight + UI.acceptRejectRowBottomMargin
+        anchors.horizontalCenter: parent.horizontalCenter
+    }
+
+    UIBackNextBar {
+        id: backNextBar
+
+        visible: stackView.currentItem.stage !== 3
+
+        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottomMargin: UI.acceptRejectRowBottomMargin
+
+        nextButtonVisible: false
+        backButtonVisible: stackView.currentItem.canGoBack
+        onBackButtonClicked: stackView.currentItem.goBack()
+    }
+
+    Item {
+        visible: stackView.currentItem.stage === 3
+
+        width: UI.acceptRejectRowWidth
+        height: UI.acceptRejectRowHeight
+
+        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottomMargin: UI.acceptRejectRowBottomMargin
+
+        SlantedLeftSecondaryButton {
+            text: "back"
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            onClicked: stackView.currentItem.goBack()
+        }
+        SlantedRightPrimaryButton {
+            anchors.right: voteButton.left
+            anchors.verticalCenter: parent.verticalCenter
+            visible: UI.ui.isOperator && (selectedVoteFlags & CallvotesModel.Operator)
+            // TODO: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            enabled: argsSelectionLoader.item && argsSelectionLoader.item.canProceed
+            highlighted: enabled
+            text: "opcall"
+            onClicked: startVote(argsSelectionLoader.item.chosenValue, true)
+        }
+        SlantedRightPrimaryButton {
+            id: voteButton
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            visible: selectedVoteFlags & CallvotesModel.Regular
+            // TODO: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            enabled: argsSelectionLoader.item && argsSelectionLoader.item.canProceed
+            highlighted: enabled
+            text: "vote"
+            onClicked: startVote(argsSelectionLoader.item.chosenValue, false)
+        }
+    }
 
     onActiveCallvotesModelChanged: {
         stackView.clear()
@@ -47,6 +110,7 @@ Item {
         Item {
             id: groupsPage
             readonly property int stage: 1
+            readonly property bool canGoBack: false
 
             ListView {
                 anchors.centerIn: parent
@@ -75,6 +139,11 @@ Item {
         Item {
             id: votesPage
             readonly property int stage: 2
+            readonly property bool canGoBack: true
+            function goBack() {
+                UI.ui.playBackSound()
+                stackView.replace(groupSelectionComponent)
+            }
 
             ListView {
                 anchors.centerIn: parent
@@ -110,6 +179,20 @@ Item {
             spacing: 20
 
             readonly property int stage: 3
+            readonly property bool canGoBack: true
+
+            function goBack() {
+                UI.ui.playBackSound()
+                selectedVoteIndex = 0
+                selectedVoteName = ""
+                selectedVoteDesc = ""
+                selectedVoteFlags = 0
+                selectedVoteArgsHandle = 0
+                selectedVoteArgsKind = 0
+                selectedVoteCurrent = ""
+                selectedVoteChosen = undefined
+                stackView.replace(groupSelectionComponent)
+            }
 
             Component.onCompleted: {
                 if (selectedVoteArgsKind === CallvotesModel.Boolean) {
@@ -242,33 +325,6 @@ Item {
                 horizontalAlignment: Qt.AlignHCenter
                 text: argsSelectionLoader.item.displayedString
             }
-
-            RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-                spacing: UI.minAcceptRejectSpacing
-                SlantedLeftSecondaryButton {
-                    text: "back"
-                    onClicked: {
-                        UI.ui.playBackSound()
-                        stackView.replace(voteSelectionComponent)
-                    }
-                }
-                SlantedRightPrimaryButton {
-                    visible: UI.ui.isOperator && (selectedVoteFlags & CallvotesModel.Operator)
-                    enabled: argsSelectionLoader.item && argsSelectionLoader.item.canProceed
-                    highlighted: enabled
-                    text: "opcall"
-                    onClicked: startVote(argsSelectionLoader.item.chosenValue, true)
-                }
-                SlantedRightPrimaryButton {
-                    id: voteButton
-                    visible: selectedVoteFlags & CallvotesModel.Regular
-                    enabled: argsSelectionLoader.item && argsSelectionLoader.item.canProceed
-                    highlighted: enabled
-                    text: "vote"
-                    onClicked: startVote(argsSelectionLoader.item.chosenValue, false)
-                }
-            }
         }
     }
 
@@ -283,7 +339,9 @@ Item {
         if (event.key === Qt.Key_Escape || event.key === Qt.Key_Back) {
             const stage = stackView.currentItem.stage
             if (stage == 2 || stage == 3) {
+                // TODO: Is this redundant?
                 UI.ui.playBackSound()
+                // TODO: Use component-declared subroutines which correctly reset everything needed
                 if (stage == 2) {
                     stackView.replace(groupSelectionComponent)
                 } else {

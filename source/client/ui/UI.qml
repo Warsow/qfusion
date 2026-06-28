@@ -27,7 +27,7 @@ QtObject {
     readonly property var scoreboardBetaModel: __scoreboardBetaModel
     readonly property var scoreboardMixedModel: __scoreboardMixedModel
 
-    readonly property real tabHeight: 48.0
+    readonly property real tabHeight: 52.0
 
     readonly property real logoDecorationRowHeight: 11
     readonly property real logoDecorationRowSpacing: 12
@@ -38,7 +38,10 @@ QtObject {
     readonly property real neutralCentralButtonWidth: 144 + 16 + 8
     readonly property real acceptOrRejectButtonWidth: 128 + 16
     readonly property real minAcceptRejectSpacing: 48
-    readonly property real acceptRejectRowWidthFrac: 0.5
+
+    readonly property real acceptRejectRowWidth: 512 + 32
+    readonly property real acceptRejectRowHeight: tabHeight
+    readonly property real acceptRejectRowBottomMargin: 24
 
     readonly property real desiredPopupContentWidth: 420.0
 
