@@ -71,7 +71,7 @@ Item {
             when: !centered
             AnchorChanges {
                 target: listHeader
-                anchors.top: queryField.bottom
+                anchors.top: queryBox.bottom
                 anchors.bottom: undefined
             }
             AnchorChanges {
@@ -96,24 +96,30 @@ Item {
         }
     ]
 
-    UITextField {
-        id: queryField
+    Item {
+        id: queryBox
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
-        horizontalAlignment: Qt.AlignHCenter
-        maximumLength: 28
         width: 300
-        Material.theme: Material.Dark
-        Material.foreground: "white"
-        Material.accent: "orange"
-
-        onTextChanged: submitQuery(text)
-        onEditingFinished: submitQuery(text)
+        height: UI.tabHeight
+        UITextField {
+            id: queryField
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            horizontalAlignment: Qt.AlignHCenter
+            maximumLength: 28
+            Material.theme: Material.Dark
+            Material.foreground: "white"
+            Material.accent: "orange"
+            onTextChanged: submitQuery(text)
+            onEditingFinished: submitQuery(text)
+        }
     }
 
     UILabel {
-        anchors.left: queryField.right
-        anchors.verticalCenter: queryField.verticalCenter
+        anchors.left: queryBox.right
+        anchors.verticalCenter: queryBox.verticalCenter
         font.family: UI.ui.emojiFontFamily
         text: "\uD83D\uDD0D"
         visible: !queryField.text.length

@@ -75,7 +75,7 @@ Item {
         anchors.bottomMargin: 16
         anchors.horizontalCenter: parent.horizontalCenter
         width: 2 * parent.width / 3
-        height: 72
+        height: UI.regularSlantedButtonHeight + 2 * 16
         active: UI.ui.hasPendingCVarChanges
         sourceComponent: applyChangesComponent
     }
@@ -92,7 +92,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 radius: 4
                 width: parent.width - 16
-                height: parent.height - 16
+                height: UI.regularSlantedButtonHeight + 16
                 color: UI.ui.colorWithAlpha(Qt.darker(Material.background, 1.25), 0.67)
             }
 
