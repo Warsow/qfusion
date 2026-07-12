@@ -217,7 +217,8 @@ Item {
                 id: booleanComponent
                 InGameCallvoteScalarSelector {
                     currentValue: selectedVoteCurrent
-                    valueFormatter: v => v ? "YES" : "NO"
+                    // Note: We intentionally use loose comparison in this component, as we compare numbers and strings
+                    valueFormatter: v => (v != 0) ? "YES" : "NO"
                     delegate: RowLayout {
                         spacing: 16
                         SelectableLabel {
