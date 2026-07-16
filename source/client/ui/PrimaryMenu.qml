@@ -42,6 +42,8 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         width: 0.6 * mainMenuStackView.width
         height: UI.tabHeight
+        // Raise over in-game menu so hovering over buttons works as expected
+        z: +1
         UITabButton {
             text: "Play online"
             width: 0.25 * menuTabBar.width
@@ -73,6 +75,7 @@ Item {
         anchors.right: parent.right
         width: implicitWidth
         height: UI.tabHeight
+        z: +1
         UITabButton {
             text: UI.ui.isClientDisconnected ? "Quit" : "Disconnect"
             width: (UI.ui.isClientDisconnected ? 0.10 : 0.15) * mainMenuStackView.width

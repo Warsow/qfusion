@@ -16,10 +16,15 @@ MouseArea {
     onContainsMouseChanged: {
         if (containsMouse) {
             UI.ui.playHoverSound()
+            label.enter()
+        } else {
+            label.leave()
         }
     }
 
-    UILabel {
+    onClicked: label.flash()
+
+    UIFlashLabel {
         id: label
         text: root.text
         anchors.right: undefined
@@ -27,15 +32,11 @@ MouseArea {
 
         color: (root.containsMouse || root.selected) ? Material.accent : Material.foreground
         font.weight: Font.Bold
-        font.letterSpacing: (root.containsMouse || root.selected) ? 1.75 : 1.25
         font.capitalization: Font.AllUppercase
-
-        Behavior on font.letterSpacing { NumberAnimation { duration: 67 } }
 
         transitions: Transition {
             AnchorAnimation {
-                duration: 200
-                easing.type: Easing.OutBack
+                duration: 250
             }
         }
 
@@ -49,6 +50,10 @@ MouseArea {
                     anchors.right: root.right
                     anchors.horizontalCenter: undefined
                 }
+                PropertyChanges {
+                    target: label
+                    flashAlignment: Qt.AlignRight
+                }
             },
             State {
                 name: "initial"
@@ -57,6 +62,10 @@ MouseArea {
                     target: label
                     anchors.right: undefined
                     anchors.horizontalCenter: root.horizontalCenter
+                }
+                PropertyChanges {
+                    target: label
+                    flashAlignment: Qt.AlignHCenter
                 }
             }
         ]

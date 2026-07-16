@@ -105,15 +105,14 @@ Item {
                 anchors.right: parent.horizontalCenter
                 anchors.rightMargin: innerPaneMargin
                 interactive: false
-                delegate: UILabel {
+                delegate: UIFlashLabel {
+                    id: weaponLabel
                     width: innerPaneWidth
                     height: 36
                     horizontalAlignment: Qt.AlignRight
                     verticalAlignment: Qt.AlignVCenter
+                    flashAlignment: Qt.AlignRight
                     font.weight: Font.Bold
-                    //font.capitalization: Font.AllUppercase
-                    font.letterSpacing: mouseArea.containsMouse ? 2.0 : 1.25
-                    Behavior on font.letterSpacing { NumberAnimation { duration: 67 } }
                     color: enabled ? ((mouseArea.containsMouse || weaponsPane.selectedIndex === index) ?
                         Material.accent : Material.foreground) : "grey"
                     opacity: enabled ? 1.0 : 0.5
@@ -128,7 +127,16 @@ Item {
                         hoverEnabled: true
                         onClicked: {
                             UI.ui.playSwitchSound()
+                            weaponLabel.flash()
                             weaponsPane.selectedIndex = index
+                        }
+                        onContainsMouseChanged: {
+                            if (containsMouse) {
+                                UI.ui.playHoverSound()
+                                weaponLabel.enter()
+                            } else {
+                                weaponLabel.leave()
+                            }
                         }
                     }
                 }

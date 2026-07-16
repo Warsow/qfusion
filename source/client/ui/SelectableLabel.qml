@@ -21,18 +21,22 @@ Item {
         id: mouseArea
         enabled: root.enabled
         hoverEnabled: true
-        anchors.centerIn: parent
-        width: label.implicitWidth
-        height: label.implicitHeight
-        onClicked: root.clicked()
+        anchors.fill: label
+        onClicked: {
+            label.flash()
+            root.clicked()
+        }
         onContainsMouseChanged: {
             if (containsMouse) {
                 UI.ui.playHoverSound()
+                label.enter()
+            } else {
+                label.leave()
             }
         }
     }
 
-    UILabel {
+    UIFlashLabel {
         id: label
         width: root.width
         height: implicitHeight
@@ -40,10 +44,9 @@ Item {
         verticalAlignment: root.verticalAlignment
         font.weight: Font.ExtraBold
         font.capitalization: Font.AllUppercase
-        font.letterSpacing: mouseArea.containsMouse ? 2.5 : 1.5
-        Behavior on font.letterSpacing { SmoothedAnimation { duration: 250 } }
         color: mouseArea.containsMouse || selected ? Material.accent : Material.foreground
         opacity: root.enabled ? 1.0 : 0.5
+        style: root.enabled ? Text.Raised : Text.Normal
         text: root.text
     }
 }

@@ -17,28 +17,30 @@ Item {
     property alias text: label.text
     property alias textColor: label.color
 
-    UILabel {
+    UIFlashLabel {
         id: label
         anchors.fill: parent
         horizontalAlignment: Qt.AlignHCenter
         verticalAlignment: Qt.AlignVCenter
         color: (checked || mouseArea.containsMouse) ? Material.accent : Material.foreground
-        font.pointSize: (checked || mouseArea.containsMouse) ? UI.labelFontSize + 2 : UI.labelFontSize
-        font.letterSpacing: checked ? 2.0 : 1.25
         font.capitalization: Font.AllUppercase
         font.weight: Font.Black
-        Behavior on font.pointSize { SmoothedAnimation { duration: 250 } }
-        Behavior on font.letterSpacing { SmoothedAnimation { duration: 250 } }
     }
 
     MouseArea {
         id: mouseArea
         hoverEnabled: true
         anchors.fill: parent
-        onClicked: root.clicked()
+        onClicked: {
+            label.flash()
+            root.clicked()
+        }
         onContainsMouseChanged: {
             if (containsMouse) {
                 UI.ui.playHoverSound()
+                label.enter()
+            } else {
+                label.leave()
             }
         }
     }

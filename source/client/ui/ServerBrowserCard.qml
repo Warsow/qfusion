@@ -40,7 +40,7 @@ Item {
             Qt.rgba(base.r, base.g, base.b, 0.3)
         }
 
-        UILabel {
+        UIFlashLabel {
             id: addressLabel
             anchors.top: parent.top
             anchors.topMargin: 8
@@ -49,6 +49,10 @@ Item {
             text: address
             font.weight: Font.Bold
             font.underline: true
+            extraFontSizeOnHover: 0.0
+            extraFontSpacingOnHover: 0.0
+            maxFlashWidthOvershoot: 6.0
+            maxFlashHeightOvershoot: 6.0
             color: addressLinkMouseArea.containsMouse ? Material.accent : Material.foreground
             MouseArea {
                 id: addressLinkMouseArea
@@ -56,7 +60,16 @@ Item {
                 hoverEnabled: true
                 onClicked: {
                     UI.ui.playForwardSound()
+                    addressLabel.flash()
                     UI.ui.connectToAddress(address)
+                }
+                onContainsMouseChanged: {
+                    if (containsMouse) {
+                        UI.ui.playHoverSound()
+                        addressLabel.enter()
+                    } else {
+                        addressLabel.leave()
+                    }
                 }
             }
         }

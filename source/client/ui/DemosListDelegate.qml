@@ -30,12 +30,43 @@ MouseArea {
 
     readonly property color textColor: containsMouse || selected ? Material.accent : Material.foreground
 
+    readonly property real flashWidthOvershoot: 6.0
+    readonly property real flashHeightOvershoot: 6.0
+
     transitions: Transition {
         AnchorAnimation { duration: 67 }
     }
 
     Behavior on height {
         NumberAnimation { duration: 67 }
+    }
+
+    onContainsMouseChanged: {
+        if (containsMouse) {
+            UI.ui.playHoverSound()
+            demoNameLabel.enter()
+            serverNameLabel.enter()
+            mapNameLabel.enter()
+            gametypeLabel.enter()
+            timestampLabel.enter()
+            tagsLabel.enter()
+        } else {
+            demoNameLabel.leave()
+            serverNameLabel.leave()
+            mapNameLabel.leave()
+            gametypeLabel.leave()
+            timestampLabel.leave()
+            tagsLabel.leave()
+        }
+    }
+
+    onClicked: {
+        demoNameLabel.flash()
+        serverNameLabel.flash()
+        mapNameLabel.flash()
+        gametypeLabel.flash()
+        timestampLabel.flash()
+        tagsLabel.flash()
     }
 
     states: [
@@ -184,51 +215,69 @@ MouseArea {
 
     state: "linear"
 
-    UILabel {
+    UIFlashLabel {
         id: demoNameLabel
         anchors.margins: labelMargins
+        extraFontSpacingOnHover: 0.0
+        maxFlashWidthOvershoot: root.flashWidthOvershoot
+        maxFlashHeightOvershoot: root.flashHeightOvershoot
         horizontalAlignment: Qt.AlignLeft
         font.weight: Font.Medium
         elide: Text.ElideRight
         text: demoName
         color: textColor
     }
-    UILabel {
+    UIFlashLabel {
         id: serverNameLabel
         width: serverColumnWidth
         anchors.margins: labelMargins
+        extraFontSpacingOnHover: 0.0
+        maxFlashWidthOvershoot: root.flashWidthOvershoot
+        maxFlashHeightOvershoot: root.flashHeightOvershoot
         horizontalAlignment: Qt.AlignHCenter
         font.weight: Font.Medium
         text: serverName
         color: textColor
     }
-    UILabel {
+    UIFlashLabel {
         id: mapNameLabel
+        extraFontSpacingOnHover: 0.0
+        maxFlashWidthOvershoot: root.flashWidthOvershoot
+        maxFlashHeightOvershoot: root.flashHeightOvershoot
         anchors.margins: labelMargins
         horizontalAlignment: Qt.AlignHCenter
         font.weight: Font.Medium
         text: mapName
         color: textColor
     }
-    UILabel {
+    UIFlashLabel {
         id: gametypeLabel
+        extraFontSpacingOnHover: 0.0
+        maxFlashWidthOvershoot: root.flashWidthOvershoot
+        maxFlashHeightOvershoot: root.flashHeightOvershoot
         anchors.margins: labelMargins
         horizontalAlignment: Qt.AlignHCenter
         font.weight: Font.Medium
         text: gametype
         color: textColor
     }
-    UILabel {
+    UIFlashLabel {
         id: timestampLabel
         width: timestampColumnWidth
+        extraFontSpacingOnHover: 0.0
+        maxFlashWidthOvershoot: root.flashWidthOvershoot
+        maxFlashHeightOvershoot: root.flashHeightOvershoot
         anchors.margins: labelMargins
         horizontalAlignment: Qt.AlignRight
         font.weight: Font.Medium
         text: timestamp
         color: textColor
     }
-    UILabel {
+    UIFlashLabel {
         id: tagsLabel
+        extraFontSpacingOnHover: 0.0
+        maxFlashWidthOvershoot: root.flashWidthOvershoot
+        maxFlashHeightOvershoot: root.flashHeightOvershoot
         anchors.left: parent.left
         anchors.top: serverNameLabel.bottom
         anchors.margins: labelMargins

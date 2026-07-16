@@ -113,6 +113,7 @@
         <file>TeamSelectionTeamPane.qml</file>
         <file>UIBackOrNextBar.qml</file>
         <file>UICheckBox.qml</file>
+        <file>UIFlashLabel.qml</file>
         <file>UIHeaderLabel.qml</file>
         <file>UILabel.qml</file>
         <file>UISlider.qml</file>

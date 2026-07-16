@@ -226,12 +226,6 @@ Item {
             gametypeColumnWidth: root.gametypeColumnWidth
             timestampColumnWidth: root.timestampColumnWidth
 
-            onContainsMouseChanged: {
-                if (containsMouse) {
-                    UI.ui.playHoverSound()
-                }
-            }
-
             onClicked: {
                 if (selectedIndex >= 0) {
                     UI.ui.playSwitchSound()
