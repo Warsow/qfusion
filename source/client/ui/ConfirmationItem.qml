@@ -177,13 +177,13 @@ FocusScope {
                     // Don't try to manage it on its own
                     highlightOnActiveFocus: false
                     leftBodyPartSlantDegrees:
-                        (root.numButtons === 1) ? -0.5 * UI.buttonBodySlantDegrees :
-                            (((index === 0) ? -1.0 : +0.3) * UI.buttonBodySlantDegrees)
+                        (root.numButtons === 1) ? -0.5 * UI.maxButtonBodySlantDegrees :
+                            (((index === 0) ? -1.0 : +0.3) * UI.maxButtonBodySlantDegrees)
                     rightBodyPartSlantDegrees:
-                        (root.numButtons === 1) ? +0.5 * UI.buttonBodySlantDegrees :
-                            (((index === 0) ? -0.3 : +1.0) * UI.buttonBodySlantDegrees)
+                        (root.numButtons === 1) ? +0.5 * UI.maxButtonBodySlantDegrees :
+                            (((index === 0) ? -0.3 : +1.0) * UI.maxButtonBodySlantDegrees)
                     textSlantDegrees:
-                        (root.numButtons === 1) ? 0 : (((index === 0) ? -0.3 : +0.3) * UI.buttonTextSlantDegrees)
+                        (root.numButtons === 1) ? 0 : (((index === 0) ? -1.0 : +1.0) * UI.buttonTextSlantDegrees)
                     labelHorizontalCenterOffset: 0
                     Material.accent:
                         (root.numButtons > 1 && index === 0) ? Qt.lighter(Material.background, 2.0) : root.Material.accent

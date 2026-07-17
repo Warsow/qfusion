@@ -70,7 +70,7 @@ Item {
             anchors.right: voteButton.left
             anchors.rightMargin: 16
             anchors.verticalCenter: parent.verticalCenter
-            rightBodyPartSlantDegrees: voteButton.visible ? +0.3 * UI.buttonBodySlantDegrees : +UI.buttonBodySlantDegrees
+            rightBodyPartSlantDegrees: voteButton.visible ? +0.3 * UI.maxButtonBodySlantDegrees : +UI.maxButtonBodySlantDegrees
             visible: UI.ui.isOperator && (selectedVoteFlags & CallvotesModel.Operator)
             enabled: stackView.currentItem.canCall
             highlighted: enabled && !voteButton.enabled

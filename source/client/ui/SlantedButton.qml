@@ -31,12 +31,14 @@ Item {
     property real labelLeftMargin: 12
     property real labelHorizontalCenterOffset: -12
 
-    property real placeholderSlantDegrees: UI.buttonBodySlantDegrees - 1.0
-    property real leftBodyPartSlantDegrees: UI.buttonBodySlantDegrees
-    property real rightBodyPartSlantDegrees: UI.buttonBodySlantDegrees
-    property real textSlantDegrees: UI.buttonTextSlantDegrees
+    property real placeholderSlantDegrees: UI.maxButtonBodySlantDegrees - 1.0
+    // Defaults for general in-game menu buttons (cba to create a specialized component for that)
+    property real leftBodyPartSlantDegrees: -0.7 * UI.maxButtonBodySlantDegrees
+    property real rightBodyPartSlantDegrees: +0.7 * UI.maxButtonBodySlantDegrees
+    // Looks better if it's slightly slanted
+    property real textSlantDegrees: 1.0
 
-    property real cornerRadius: 3
+    property real cornerRadius: 4
 
     property real extraWidthOnMouseOver: 12.0
     property real extraHeightOnMouseOver: 2.0

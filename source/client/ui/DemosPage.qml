@@ -332,9 +332,8 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 // Shorter than usual
                 width: UI.acceptOrRejectButtonWidth
-                leftBodyPartSlantDegrees: -0.5 * UI.buttonBodySlantDegrees
-                rightBodyPartSlantDegrees: 0.5 * UI.buttonBodySlantDegrees
-                textSlantDegrees: 0.0
+                leftBodyPartSlantDegrees: -0.5 * UI.maxButtonBodySlantDegrees
+                rightBodyPartSlantDegrees: 0.5 * UI.maxButtonBodySlantDegrees
                 labelHorizontalCenterOffset: 0.0
                 highlighted: true
                 text: "Play"

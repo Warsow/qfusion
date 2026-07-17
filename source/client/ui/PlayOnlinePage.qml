@@ -195,9 +195,8 @@ Item {
                 Layout.alignment: Qt.AlignHCenter
                 highlighted: true
                 text: "Play offline"
-                leftBodyPartSlantDegrees: -0.5 * UI.buttonBodySlantDegrees
-                rightBodyPartSlantDegrees: 0.5 * UI.buttonBodySlantDegrees
-                textSlantDegrees: 0
+                leftBodyPartSlantDegrees: -0.5 * UI.maxButtonBodySlantDegrees
+                rightBodyPartSlantDegrees: 0.5 * UI.maxButtonBodySlantDegrees
                 labelHorizontalCenterOffset: 0
                 onClicked: root.playingLocallySuggested()
             }

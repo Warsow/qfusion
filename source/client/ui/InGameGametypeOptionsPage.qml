@@ -84,7 +84,6 @@ Item {
                                 text: booleanOptionTexts[index]
                                 leftBodyPartSlantDegrees: optionBodySlantDegrees
                                 rightBodyPartSlantDegrees: optionBodySlantDegrees
-                                textSlantDegrees: 0.0
                                 extraWidthOnMouseOver: optionExtraWidthOnMouseOver
                                 extraHeightOnMouseOver: optionExtraHeightOnMouseOver
                                 Layout.preferredWidth: optionWidth
@@ -129,7 +128,6 @@ Item {
                                         Layout.preferredWidth: optionWidth
                                         leftBodyPartSlantDegrees: optionBodySlantDegrees
                                         rightBodyPartSlantDegrees: optionBodySlantDegrees
-                                        textSlantDegrees: 0.0
                                         extraWidthOnMouseOver: optionExtraWidthOnMouseOver
                                         extraHeightOnMouseOver: optionExtraHeightOnMouseOver
                                         checked: option.optionCurrent.includes(flatIndex)

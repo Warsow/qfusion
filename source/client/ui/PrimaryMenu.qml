@@ -532,9 +532,9 @@ Item {
                     SlantedButton {
                         Layout.preferredWidth: UI.acceptOrRejectButtonWidth
                         displayIconPlaceholder: false
-                        leftBodyPartSlantDegrees: -UI.buttonBodySlantDegrees
-                        rightBodyPartSlantDegrees: -0.5 * UI.buttonBodySlantDegrees
-                        textSlantDegrees: -0.3 * UI.buttonTextSlantDegrees
+                        leftBodyPartSlantDegrees: -UI.maxButtonBodySlantDegrees
+                        rightBodyPartSlantDegrees: -0.5 * UI.maxButtonBodySlantDegrees
+                        textSlantDegrees: -UI.buttonTextSlantDegrees
                         labelHorizontalCenterOffset: 0
                         Material.background: Qt.darker(UI.hudCommonDataModel.alphaColor, 2)
                         Material.accent: Qt.darker(UI.hudCommonDataModel.alphaColor, 1.2)
@@ -550,9 +550,8 @@ Item {
                     SlantedButton {
                         Layout.preferredWidth: UI.neutralCentralButtonWidth
                         displayIconPlaceholder: false
-                        leftBodyPartSlantDegrees: -0.5 * UI.buttonBodySlantDegrees
-                        rightBodyPartSlantDegrees: +0.5 * UI.buttonBodySlantDegrees
-                        textSlantDegrees: 0
+                        leftBodyPartSlantDegrees: -0.5 * UI.maxButtonBodySlantDegrees
+                        rightBodyPartSlantDegrees: +0.5 * UI.maxButtonBodySlantDegrees
                         labelHorizontalCenterOffset: 0
                         Layout.alignment: Qt.AlignHCenter
                         text: "Any team"
@@ -567,9 +566,9 @@ Item {
                     SlantedButton {
                         Layout.preferredWidth: UI.acceptOrRejectButtonWidth
                         displayIconPlaceholder: false
-                        leftBodyPartSlantDegrees: 0.5 * UI.buttonBodySlantDegrees
-                        rightBodyPartSlantDegrees: UI.buttonBodySlantDegrees
-                        textSlantDegrees: +0.3 * UI.buttonTextSlantDegrees
+                        leftBodyPartSlantDegrees: 0.5 * UI.maxButtonBodySlantDegrees
+                        rightBodyPartSlantDegrees: UI.maxButtonBodySlantDegrees
+                        textSlantDegrees: +UI.buttonTextSlantDegrees
                         labelHorizontalCenterOffset: 0
                         Material.background: Qt.darker(UI.hudCommonDataModel.betaColor, 2)
                         Material.accent: Qt.darker(UI.hudCommonDataModel.betaColor, 1.2)

@@ -41,8 +41,11 @@ QtObject {
     readonly property real logoDecorationRowSpacing: 12
 
     readonly property real regularSlantedButtonHeight: 42.0
-    readonly property real buttonBodySlantDegrees: 20.0
-    readonly property real buttonTextSlantDegrees: 15.0
+    // The maximum used value (not the real limit)
+    readonly property real maxButtonBodySlantDegrees: 18.0
+    // Note: The default button text slant value does not match this value and is close to zero.
+    // This value is only needed if you really want a slanted text for maximally slanted buttons.
+    readonly property real buttonTextSlantDegrees: 4.5
     readonly property real neutralCentralButtonWidth: 144 + 16 + 8
     readonly property real acceptOrRejectButtonWidth: 128 + 16
     readonly property real minAcceptRejectSpacing: 48
