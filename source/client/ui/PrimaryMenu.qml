@@ -33,7 +33,7 @@ Item {
         width: root.inGameMenuWidth
     }
 
-    TabBar {
+    Row {
         id: menuTabBar
         visible: tabVisible
         enabled: tabEnabled
@@ -42,11 +42,6 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         width: 0.6 * mainMenuStackView.width
         height: UI.tabHeight
-        background: null
-        Component.onCompleted: {
-            root.resetTabBarState(menuTabBar)
-            menuTabBar.contentItem.highlight = null
-        }
         UITabButton {
             text: "Play online"
             width: 0.25 * menuTabBar.width
@@ -69,7 +64,7 @@ Item {
         }
     }
 
-    TabBar {
+    Row {
         id: quitTabBar
         visible: tabVisible
         enabled: tabEnabled
@@ -78,11 +73,6 @@ Item {
         anchors.right: parent.right
         width: implicitWidth
         height: UI.tabHeight
-        background: null
-        Component.onCompleted: {
-            root.resetTabBarState(quitTabBar)
-            quitTabBar.contentItem.highlight = null
-        }
         UITabButton {
             text: UI.ui.isClientDisconnected ? "Quit" : "Disconnect"
             width: (UI.ui.isClientDisconnected ? 0.10 : 0.15) * mainMenuStackView.width
@@ -147,30 +137,11 @@ Item {
 	    anchors.verticalCenter: parent.verticalCenter
 	}
 
-	function resetTabBarState(bar) {
-	    bar.currentIndex = -1
-	    for (let i = 0; i < bar.contentChildren.length; ++i) {
-	        bar.contentChildren[i].checked = false
-	    }
-	}
-
-    function resetStatesOfTabBars() {
-        resetTabBarState(menuTabBar)
-        resetTabBarState(quitTabBar)
-    }
-
     function collapseMainMenu() {
         decoratedLogo.toggleExpandedState()
-        resetStatesOfTabBars()
         mainMenuStackView.clear()
         root.forceActiveFocus()
         UI.ui.playBackSound()
-    }
-
-    onTabVisibleChanged: {
-        if (tabVisible) {
-            resetStatesOfTabBars()
-        }
     }
 
     Connections {

@@ -39,7 +39,7 @@ PathView {
 
         Component.onCompleted: {
             // Hacks to disable darkening of tab buttons under the "accept/decline" settings overlay
-            contentItem.color = Qt.binding(() => {
+            button.textColor = Qt.binding(() => {
                 const color = (button.down || button.checked) ? root.Material.accentColor : root.Material.foreground
                 return UI.ui.colorWithAlpha(color, root.enabled ? 1.0 : 0.7)
             })
