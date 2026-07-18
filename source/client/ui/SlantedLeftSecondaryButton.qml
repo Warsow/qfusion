@@ -7,7 +7,7 @@ SlantedButton {
     implicitWidth: UI.acceptOrRejectButtonWidth
     leftBodyPartSlantDegrees: -UI.maxButtonBodySlantDegrees
     rightBodyPartSlantDegrees: -0.3 * UI.maxButtonBodySlantDegrees
-    textSlantDegrees: -UI.buttonTextSlantDegrees
+    textSlantDegrees: -UI.maxButtonTextSlantDegrees
     labelHorizontalCenterOffset: 0
     Material.accent: Qt.lighter(Material.background, 2.0)
     font.weight: Font.Bold

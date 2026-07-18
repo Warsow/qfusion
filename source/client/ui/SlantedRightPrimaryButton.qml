@@ -7,7 +7,7 @@ SlantedButton {
     implicitWidth: UI.acceptOrRejectButtonWidth
     leftBodyPartSlantDegrees: +0.3 * UI.maxButtonBodySlantDegrees
     rightBodyPartSlantDegrees: +UI.maxButtonBodySlantDegrees
-    textSlantDegrees: +UI.buttonTextSlantDegrees
+    textSlantDegrees: +UI.maxButtonTextSlantDegrees
     labelHorizontalCenterOffset: 0
     font.weight: Font.Bold
 }

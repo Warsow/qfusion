@@ -183,7 +183,8 @@ FocusScope {
                         (root.numButtons === 1) ? +0.5 * UI.maxButtonBodySlantDegrees :
                             (((index === 0) ? -0.3 : +1.0) * UI.maxButtonBodySlantDegrees)
                     textSlantDegrees:
-                        (root.numButtons === 1) ? 0 : (((index === 0) ? -1.0 : +1.0) * UI.buttonTextSlantDegrees)
+                        (root.numButtons === 1) ? UI.neutralButtonTextSlantDegrees :
+                            (((index === 0) ? -1.0 : +1.0) * UI.maxButtonTextSlantDegrees)
                     labelHorizontalCenterOffset: 0
                     Material.accent:
                         (root.numButtons > 1 && index === 0) ? Qt.lighter(Material.background, 2.0) : root.Material.accent

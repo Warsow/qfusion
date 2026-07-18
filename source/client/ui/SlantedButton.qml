@@ -27,16 +27,14 @@ Item {
     property alias font: label.font
 
     property real iconWidthAndHeight: 20
-    property real iconOrPlaceholderLeftMargin: 20
     property real labelLeftMargin: 12
     property real labelHorizontalCenterOffset: -12
 
-    property real placeholderSlantDegrees: UI.maxButtonBodySlantDegrees - 1.0
     // Defaults for general in-game menu buttons (cba to create a specialized component for that)
     property real leftBodyPartSlantDegrees: -0.7 * UI.maxButtonBodySlantDegrees
     property real rightBodyPartSlantDegrees: +0.7 * UI.maxButtonBodySlantDegrees
     // Looks better if it's slightly slanted
-    property real textSlantDegrees: 1.0
+    property real textSlantDegrees: UI.neutralButtonTextSlantDegrees
 
     property real cornerRadius: 4
 
@@ -51,39 +49,6 @@ Item {
 
     readonly property var translationMatrix:
         UI.ui.makeTranslateMatrix(highlightAnim.running ? highlightAnimAmplitude * highlightAnim.bodyShiftFrac : 0.0, 0.0)
-
-    states: [
-        State {
-            name: "leftAligned"
-            when: iconPath.length > 0 || displayIconPlaceholder
-            AnchorChanges {
-                target: label
-                anchors.left: iconOrPlaceholder.right
-                anchors.horizontalCenter: undefined
-                anchors.verticalCenter: body.verticalCenter
-            }
-            PropertyChanges {
-                target: label
-                anchors.leftMargin: labelLeftMargin
-                anchors.horizontalCenterOffset: 0
-            }
-        },
-        State {
-            name: "centerAligned"
-            when: iconPath.length === 0 && !displayIconPlaceholder
-            AnchorChanges {
-                target: label
-                anchors.left: undefined
-                anchors.horizontalCenter: body.horizontalCenter
-                anchors.verticalCenter: body.verticalCenter
-            }
-            PropertyChanges {
-                target: label
-                anchors.leftMargin: 0
-                anchors.horizontalCenterOffset: labelHorizontalCenterOffset
-            }
-        }
-    ]
 
     ButtonHighlightAnim {
         id: highlightAnim
@@ -141,8 +106,8 @@ Item {
             implicitWidth: 12
             implicitHeight: 12
             radius: 1
-            opacity: root.enabled ? (mouseArea.containsMouse ? 1.0 : 0.7) : 0.33
-            transform: Matrix4x4 { matrix: UI.ui.makeSkewXMatrix(height, placeholderSlantDegrees).times(translationMatrix) }
+            opacity: root.enabled ? (root.hasActiveHighlight ? 1.0 : 0.7) : 0.33
+            transform: Matrix4x4 { matrix: UI.ui.makeSkewXMatrix(height, textSlantDegrees).times(translationMatrix) }
         }
     }
 
@@ -165,6 +130,12 @@ Item {
                 source: root.iconPath
             }
 
+            Loader {
+                anchors.centerIn: parent
+                active: icon.status === Image.Error
+                sourceComponent: placeholderComponent
+            }
+
             ColorOverlay {
                 visible: root.hasActiveHighlight
                 anchors.fill: icon
@@ -176,10 +147,10 @@ Item {
 
     Loader {
         id: iconOrPlaceholder
-        active: root.displayIconPlaceholder
-        anchors.left: body.left
+        active: iconPath.length > 0 || root.displayIconPlaceholder
+        anchors.right: label.left
         anchors.verticalCenter: parent.verticalCenter
-        anchors.leftMargin: root.iconOrPlaceholderLeftMargin
+        anchors.rightMargin: 6
         width: iconOrPlaceholder.item ? iconOrPlaceholder.item.implicitWidth : 0
         height: iconOrPlaceholder.item ? iconOrPlaceholder.item.implicitHeight : 0
         sourceComponent: iconPath.length > 0 ? iconComponent : placeholderComponent
@@ -187,6 +158,10 @@ Item {
 
     UILabel {
         id: label
+
+        anchors.centerIn: parent
+        anchors.horizontalCenterOffset: parent.labelHorizontalCenterOffset +
+            (iconOrPlaceholder.item ? iconOrPlaceholder.width + iconOrPlaceholder.anchors.rightMargin : 0)
 
         text: root.text
         font.weight: Font.ExtraBold

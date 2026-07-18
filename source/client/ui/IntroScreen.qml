@@ -107,7 +107,7 @@ FocusScope {
                 KeyNavigation.right: agreeButton
                 leftBodyPartSlantDegrees: -1.0 * UI.maxButtonBodySlantDegrees
                 rightBodyPartSlantDegrees: -0.3 * UI.maxButtonBodySlantDegrees
-                textSlantDegrees: -UI.buttonTextSlantDegrees
+                textSlantDegrees: -UI.maxButtonTextSlantDegrees
                 labelHorizontalCenterOffset: 0
                 onClicked: introScreen.handleDisagreeAction()
                 Keys.onEnterPressed: introScreen.handleDisagreeAction()
@@ -121,7 +121,7 @@ FocusScope {
                 KeyNavigation.left: disagreeButton
                 leftBodyPartSlantDegrees: +0.3 * UI.maxButtonBodySlantDegrees
                 rightBodyPartSlantDegrees: +1.0 * UI.maxButtonBodySlantDegrees
-                textSlantDegrees: +UI.buttonTextSlantDegrees
+                textSlantDegrees: +UI.maxButtonTextSlantDegrees
                 labelHorizontalCenterOffset: 0
                 // TODO: Get rid of this, set up focus scopes properly
                 Component.onCompleted: forceActiveFocus()

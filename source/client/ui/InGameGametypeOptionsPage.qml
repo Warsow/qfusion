@@ -7,12 +7,12 @@ import net.warsow 2.6
 Item {
     id: root
 
-    readonly property real optionWidth: 108
+    readonly property real optionWidth: 108 + 8
     readonly property real optionExtraWidthOnMouseOver: 12
     readonly property real optionExtraHeightOnMouseOver: 4
-    readonly property real optionBodySlantDegrees: 15
-    readonly property real optionSpacing: 18
     readonly property real maxOptionsPerRow: 3
+    readonly property real booleanButtonsSpacing: 32
+    readonly property real multipleButtonsSpacing: 24
 
     readonly property real allowedContentHeight: root.height - 2 * header.height
 
@@ -74,7 +74,7 @@ Item {
                     id: booleanComponent
                     RowLayout {
                         width: root.width
-                        spacing: optionSpacing
+                        spacing: booleanButtonsSpacing
 
                         Item { Layout.fillWidth: true }
 
@@ -82,8 +82,8 @@ Item {
                             model: 2
                             delegate: SlantedButton {
                                 text: booleanOptionTexts[index]
-                                leftBodyPartSlantDegrees: optionBodySlantDegrees
-                                rightBodyPartSlantDegrees: optionBodySlantDegrees
+                                leftBodyPartSlantDegrees: (index ? +0.3 : -1.0) * UI.maxButtonBodySlantDegrees
+                                rightBodyPartSlantDegrees: (index ? +1.0 : -0.3) * UI.maxButtonBodySlantDegrees
                                 extraWidthOnMouseOver: optionExtraWidthOnMouseOver
                                 extraHeightOnMouseOver: optionExtraHeightOnMouseOver
                                 Layout.preferredWidth: optionWidth
@@ -114,20 +114,30 @@ Item {
                             model: Math.max(option.optionNumItems / maxOptionsPerRow, 1)
                             RowLayout {
                                 readonly property int rowIndex: index
+                                readonly property int numOptionsInRow: rowIndex != Math.floor(option.optionNumItems / maxOptionsPerRow) ?
+                                    maxOptionsPerRow : option.optionNumItems % maxOptionsPerRow
 
                                 width: root.width
-                                spacing: optionSpacing
+                                spacing: numOptionsInRow === 2 ? booleanButtonsSpacing : multipleButtonsSpacing
 
                                 Item { Layout.fillWidth: true }
 
                                 Repeater {
-                                    model: rowIndex != Math.floor(option.optionNumItems / maxOptionsPerRow) ?
-                                        maxOptionsPerRow : option.optionNumItems % maxOptionsPerRow
+                                    id: repeater
+
+                                    model: numOptionsInRow
                                     delegate: SlantedButton {
                                         readonly property int flatIndex: rowIndex * maxOptionsPerRow + index
                                         Layout.preferredWidth: optionWidth
-                                        leftBodyPartSlantDegrees: optionBodySlantDegrees
-                                        rightBodyPartSlantDegrees: optionBodySlantDegrees
+                                        // TODO: Specify fractions, not degrees?
+                                        leftBodyPartSlantDegrees: UI.maxButtonBodySlantDegrees * (numOptionsInRow === 1 ? -1.0 :
+                                            (index === 0 ? -1.0 : (index + 1 === numOptionsInRow ? 0.3 : -0.3)))
+                                        rightBodyPartSlantDegrees: UI.maxButtonBodySlantDegrees * (numOptionsInRow === 1 ? +1.0 :
+                                            (index === 0 ? -0.3 : (index + 1 === numOptionsInRow ? 1.0 : +0.3)))
+                                        // Don't apply the neutral (non-zero) slant unless the button is the single button in row
+                                        textSlantDegrees: (numOptionsInRow === 1 ? UI.neutralButtonTextSlantDegrees :
+                                            (index === 0 ? -UI.maxButtonTextSlantDegrees :
+                                                (index + 1 === numOptionsInRow ? +UI.maxButtonTextSlantDegrees : 0.0)))
                                         extraWidthOnMouseOver: optionExtraWidthOnMouseOver
                                         extraHeightOnMouseOver: optionExtraHeightOnMouseOver
                                         checked: option.optionCurrent.includes(flatIndex)
