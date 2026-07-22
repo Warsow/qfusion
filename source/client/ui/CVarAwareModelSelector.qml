@@ -14,6 +14,9 @@ Rectangle {
     property string cvarName
     property string defaultModel
 
+    // These buttons are way too sharp, hence it's better to hide them during transitions
+    readonly property var appearDisappearTargets: [leftArrowButton, rightArrowButton]
+
     QtObject {
         id: impl
         property var pendingValue
@@ -49,6 +52,7 @@ Rectangle {
     }
 
     ToolButton {
+        id: leftArrowButton
         width: 56; height: 56
         anchors.horizontalCenter: parent.left
         anchors.verticalCenter: parent.verticalCenter
@@ -79,6 +83,7 @@ Rectangle {
     }
 
     ToolButton {
+        id: rightArrowButton
         width: 56; height: 56
         anchors.horizontalCenter: parent.right
         anchors.verticalCenter: parent.verticalCenter

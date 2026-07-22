@@ -6,15 +6,23 @@ import QtQuick.Layouts 1.12
 import net.warsow 2.6
 
 Item {
+    id: root
+
     readonly property var handleKeyEvent: stackView.currentItem["handleKeyEvent"]
+
+    readonly property bool drawNativePart: StackView.view && !StackView.view.busy && !stackView.busy
 
     Component {
         id: playerSettingsComponent
-        PlayerSettings {}
+        PlayerSettings {
+            drawNativePart: root.drawNativePart
+        }
     }
     Component {
         id: teamsSettingsComponent
-        TeamsSettings {}
+        TeamsSettings {
+            drawNativePart: root.drawNativePart
+        }
     }
     Component {
         id: graphicsSettingsComponent
@@ -26,7 +34,9 @@ Item {
     }
     Component {
         id: mouseSettingsComponent
-        MouseSettings {}
+        MouseSettings {
+            drawNativePart: root.drawNativePart
+        }
     }
     Component {
         id: keyboardSettingsComponent
@@ -40,6 +50,8 @@ Item {
     // A safety guard
     Component.onDestruction: UI.ui.rollbackPendingCVarChanges()
 
+    StackView.onStatusChanged: appearDisappearHelper.expandAndHideIfDeactivating(StackView.status)
+
     CarouselTabBar {
         id: tabBar
         enabled: !UI.ui.hasPendingCVarChanges
@@ -47,7 +59,16 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
 
-        onCurrentIndexChanged: stackView.replace(model[currentIndex]["component"])
+        AppearDisappearHelper { id: appearDisappearHelper }
+
+        onSwitchingRequested: {
+            const component = model[index]["component"]
+            if (rightToLeft) {
+                stackView.switchLeftTo(component)
+            } else {
+                stackView.switchRightTo(component)
+            }
+        }
 
         model: [
             {"text": "Player", "component" : playerSettingsComponent},
@@ -60,7 +81,7 @@ Item {
         ]
     }
 
-    StackView {
+    SwipeLikeStackView {
         id: stackView
         anchors.top: tabBar.bottom
         anchors.bottom: parent.bottom

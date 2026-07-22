@@ -6,11 +6,13 @@ import net.warsow 2.6
 
 Item {
     id: root
+
     readonly property var availableRegularCrosshairs: UI.hudCommonDataModel.getAvailableRegularCrosshairs()
     readonly property var availableStrongCrosshairs: UI.hudCommonDataModel.getAvailableStrongCrosshairs()
-    readonly property bool drawNativeParts: root.StackView.view && !root.StackView.view.busy
     readonly property real innerPaneMargin: 20.0
     readonly property real innerPaneWidth: 0.5 * root.width - innerPaneMargin
+
+    property bool drawNativePart
 
     ColumnLayout {
         width: 0.66 * root.width
@@ -158,7 +160,7 @@ Item {
                     color: Qt.rgba(1.0, 1.0, 1.0, 0.07)
 
                     NativelyDrawnImage {
-                        visible: drawNativeParts
+                        visible: drawNativePart
                         anchors.centerIn: parent
                         desiredSize: Qt.size(strongSizeSlider.value, strongSizeSlider.value)
                         borderWidth: 1
@@ -170,7 +172,7 @@ Item {
                     }
 
                     NativelyDrawnImage {
-                        visible: drawNativeParts
+                        visible: drawNativePart
                         anchors.centerIn: parent
                         desiredSize: Qt.size(regularSizeSlider.value, regularSizeSlider.value)
                         borderWidth: 1

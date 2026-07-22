@@ -5,6 +5,14 @@ import QtQuick.Layouts 1.12
 import net.warsow 2.6
 
 Item {
+    id: root
+
+    AppearDisappearHelper {
+        id: appearDisappearHelper
+        targets: [headerLabel, titleLabel, summaryLabel, pageIndicator]
+    }
+    StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
+
     UIHeaderLabel {
         id: headerLabel
         anchors.top: parent.top
@@ -21,7 +29,7 @@ Item {
         height: UI.titleLabelHeight
         horizontalAlignment: Qt.AlignHCenter
         font.weight: Font.Medium
-        text: swipeView.currentItem.subpageTitle
+        text: "Step" + (stackView.currentItem.subpageIndex + 1) + "/3 - " + stackView.currentItem.subpageTitle
     }
 
     UILabel {
@@ -35,51 +43,89 @@ Item {
         maximumLineCount: 1
         elide: Qt.ElideRight
         text: {
-            if (swipeView.currentIndex === 2) {
-                "You have selected map <b>" + selectedMapName +
-                "</b> for gametype <b>" + selectedGametypeName + "</b>"
-            } else if (swipeView.currentIndex === 1) {
-                "You have selected the gametype <b>" + selectedGametypeName + "</b>"
+            if (root.selectedGametypeName) {
+                if (root.selectedMapName) {
+                    "You have selected map <b>" + root.selectedMapName +
+                    "</b> for gametype <b>" + root.selectedGametypeName + "</b>"
+                } else {
+                    "You have selected the gametype <b>" + root.selectedGametypeName + "</b>"
+                }
             } else {
                 ""
             }
         }
     }
 
+    // Selected gametype props
+    property int selectedGametypeIndex: -1
     property var selectedGametypeTitle
     property var selectedGametypeName
-    property var selectedGametypeIndex
     property var selectedGametypeDesc
     property var gametypeMapsList
+
+    // Selected map props
+    property int selectedMapIndex: -1
     property var selectedMapName
     property var selectedMapTitle
     property var selectedMapMinPlayers
     property var selectedMapMaxPlayers
-    property var selectedMapIndex
-    property int selectedNumBots
-    property int selectedSkillLevel
-    property bool selectedInsta
-    property bool selectedPublic
 
-    SwipeView {
-        id: swipeView
+    SwipeLikeStackView {
+        id: stackView
         clip: true
-        interactive: false
         width: 0.75 * parent.width
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: summaryLabel.bottom
         anchors.topMargin: 32
         anchors.bottom: buttonsBar.top
         anchors.bottomMargin: 32
+        initialItem: gametypeComponent
+    }
 
+    Component {
+        id: gametypeComponent
         LocalGameDetailArrangement {
             id: gametypePage
-            readonly property string subpageTitle: "Step <b>1/3</b> - Select a gametype"
-            readonly property bool canGoPrev: false
-            readonly property bool canGoNext: detailed
 
-            desiredWidth: swipeView.width
-            desiredHeight: swipeView.height
+            desiredWidth: stackView.width
+            desiredHeight: stackView.height
+
+            readonly property int subpageIndex: 0
+            readonly property string subpageTitle: "Select the gametype"
+
+            readonly property bool prevButtonVisible: false
+            readonly property bool nextButtonVisible: detailed
+
+            function goNext() {
+                console.assert(root.selectedGametypeIndex >= 0)
+                stackView.switchRightTo(mapComponent)
+            }
+
+            function handleBackKey() {
+                if (detailed) {
+                    clearGlobalSelectedProps()
+                    gametypePage.selectedIndex = -1
+                    gametypePage.detailed      = false
+                    return true
+                }
+                return false
+            }
+
+            function clearGlobalSelectedProps() {
+                root.selectedGametypeIndex = -1
+                root.selectedGametypeTitle = undefined
+                root.selectedGametypeName  = undefined
+                root.selectedGametypeDesc  = undefined
+                root.gametypeMapsList      = undefined
+            }
+
+            Component.onCompleted: {
+                // Restore detailed state if we return from next pages
+                if (root.selectedGametypeIndex >= 0) {
+                    gametypePage.selectedIndex = root.selectedGametypeIndex
+                    gametypePage.detailed = true
+                }
+            }
 
             listComponent: ListView {
                 id: gametypesListView
@@ -105,11 +151,11 @@ Item {
                         }
                     }
                     function selectProps() {
-                        selectedGametypeTitle = title
-                        selectedGametypeName = name
-                        selectedGametypeIndex = index
-                        selectedGametypeDesc = desc
-                        gametypeMapsList = maps
+                        root.selectedGametypeTitle = title
+                        root.selectedGametypeName  = name
+                        root.selectedGametypeIndex = index
+                        root.selectedGametypeDesc  = desc
+                        root.gametypeMapsList      = maps
                         gametypePage.detailed = true
                     }
                 }
@@ -124,12 +170,12 @@ Item {
                     font.pointSize: 16
                     font.capitalization: Font.AllUppercase
                     font.letterSpacing: 2
-                    text: selectedGametypeTitle || ""
+                    text: root.selectedGametypeTitle || ""
                 }
                 SimpleVideoDecoration {
                     Layout.preferredWidth: gametypePage.expectedDetailsWidth
                     Layout.preferredHeight: gametypePage.expectedDetailsWidth * (9 / 16.0)
-                    filePath: "videos/gametypes/" + selectedGametypeName + ".mpeg"
+                    filePath: "videos/gametypes/" + root.selectedGametypeName + ".mpeg"
                 }
                 UILabel {
                     Layout.preferredWidth: gametypePage.expectedDetailsWidth - 16
@@ -138,23 +184,66 @@ Item {
                     maximumLineCount: 99
                     wrapMode: Text.WordWrap
                     elide: Qt.ElideRight
-                    text: selectedGametypeDesc || ""
+                    text: root.selectedGametypeDesc || ""
                 }
             }
         }
+    }
 
+    Component {
+        id: mapComponent
         LocalGameDetailArrangement {
             id: mapPage
-            readonly property string subpageTitle: "Step <b>2/3</b> - Select a map"
-            readonly property bool canGoPrev: true
-            readonly property bool canGoNext: detailed
 
-            desiredWidth: swipeView.width
-            desiredHeight: swipeView.height
+            desiredWidth: stackView.width
+            desiredHeight: stackView.height
+
+            readonly property int subpageIndex: 1
+            readonly property string subpageTitle: "Select the map"
+
+            readonly property bool prevButtonVisible: true
+            readonly property bool nextButtonVisible: detailed
+
+            function goPrev() {
+                clearGlobalSelectedProps()
+                // Supplying the correct "detailed" property helps to avoid running redundant transitions
+                stackView.switchLeftTo(gametypeComponent, {"detailed" : root.selectedGametypeIndex >= 0 })
+            }
+
+            function goNext() {
+                console.assert(root.selectedMapIndex >= 0)
+                stackView.switchRightTo(rulesComponent)
+            }
+
+            function handleBackKey() {
+                if (detailed) {
+                    clearGlobalSelectedProps()
+                    mapPage.selectedIndex = -1
+                    mapPage.detailed      = false
+                    return true
+                }
+                return false
+            }
+
+            function clearGlobalSelectedProps() {
+                root.selectedMapIndex      = -1
+                root.selectedMapName       = undefined
+                root.selectedMapTitle      = undefined
+                root.selectedMapMinPlayers = 0
+                root.selectedMapMaxPlayers = 0
+            }
+
+            Component.onCompleted: {
+                // Restore detailed state if we return from next pages
+                if (root.selectedMapIndex >= 0) {
+                    mapPage.selectedIndex = root.selectedMapIndex
+                    mapPage.detailed      = true
+                }
+            }
 
             listComponent: ListView {
                 interactive: false
-                model: gametypeMapsList
+                model: root.gametypeMapsList
                 delegate: LocalGameListDelegate {
                     detailed: mapPage.detailed
                     width: mapPage.expectedListItemWidth
@@ -175,12 +264,12 @@ Item {
                         }
                     }
                     function selectProps() {
-                        selectedMapName = modelData["name"]
-                        selectedMapTitle = modelData["title"]
-                        selectedMapIndex = index
-                        selectedMapMinPlayers = modelData["minPlayers"]
-                        selectedMapMaxPlayers = modelData["maxPlayers"]
-                        mapPage.detailed = true
+                        root.selectedMapName       = modelData["name"]
+                        root.selectedMapTitle      = modelData["title"]
+                        root.selectedMapIndex      = index
+                        root.selectedMapMinPlayers = modelData["minPlayers"]
+                        root.selectedMapMaxPlayers = modelData["maxPlayers"]
+                        mapPage.detailed           = true
                     }
                 }
             }
@@ -188,62 +277,84 @@ Item {
             detailComponent: ColumnLayout {
                 spacing: 8
                 UILabel {
-                    Layout.preferredWidth: gametypePage.expectedDetailsWidth
+                    Layout.preferredWidth: mapPage.expectedDetailsWidth
                     horizontalAlignment: Qt.AlignHCenter
                     font.weight: Font.Medium
                     font.pointSize: 16
                     font.capitalization: Font.AllUppercase
                     font.letterSpacing: 2
-                    text: selectedMapTitle || ""
+                    text: root.selectedMapTitle || ""
                 }
                 UILabel {
-                    Layout.preferredWidth: gametypePage.expectedDetailsWidth
+                    Layout.preferredWidth: mapPage.expectedDetailsWidth
                     horizontalAlignment: Qt.AlignHCenter
                     font.weight: Font.Medium
                     font.letterSpacing: 1
-                    text: selectedMapName || ""
+                    text: root.selectedMapName || ""
                 }
                 SimpleVideoDecoration {
-                    Layout.preferredWidth: gametypePage.expectedDetailsWidth
-                    Layout.preferredHeight: gametypePage.expectedDetailsWidth * (9 / 16.0)
-                    filePath: "videos/maps/" + selectedMapName + ".mpeg"
+                    Layout.preferredWidth: mapPage.expectedDetailsWidth
+                    Layout.preferredHeight: mapPage.expectedDetailsWidth * (9 / 16.0)
+                    filePath: "videos/maps/" + root.selectedMapName + ".mpeg"
                 }
                 UILabel {
                     Layout.fillWidth: true
-                    visible: !!(selectedMapMinPlayers || selectedMapMaxPlayers)
+                    visible: !!(root.selectedMapMinPlayers || root.selectedMapMaxPlayers)
                     horizontalAlignment: Qt.AlignHCenter
                     font.letterSpacing: 1
                     font.weight: Font.Medium
                     text: {
-                        if (selectedMapMinPlayers != selectedMapMaxPlayers) {
-                            "Optimal for <b>" + selectedMapMinPlayers + "-" + selectedMapMaxPlayers + "</b> players"
+                        if (root.selectedMapMinPlayers != root.selectedMapMaxPlayers) {
+                            "Optimal for <b>" + root.selectedMapMinPlayers + "-" + root.selectedMapMaxPlayers + "</b> players"
                         } else {
-                            "Optimal for <b>" + selectedMapMaxPlayers + "</b> players"
+                            "Optimal for <b>" + root.selectedMapMaxPlayers + "</b> players"
                         }
                     }
                 }
             }
         }
+    }
 
+    Component {
+        id: rulesComponent
         Item {
             id: rulesPage
-            readonly property string subpageTitle: "Step <b>3/3</b> - Set rules"
-            readonly property bool canGoPrev: true
-            readonly property bool canGoNext: true
+            readonly property int subpageIndex: 2
+            readonly property string subpageTitle: "Set rules"
+
+            readonly property bool prevButtonVisible: true
+            readonly property bool nextButtonVisible: true
 
             property bool isNumBotsDefined
             property bool isNumBotsFixed
-            property int numBots
 
-            SwipeView.onIsCurrentItemChanged: {
-                if (SwipeView.isCurrentItem) {
-                    const botConfig      = UI.gametypesModel.getBotConfig(selectedGametypeIndex, selectedMapIndex)
-                    isNumBotsDefined     = !!(botConfig["defined"])
-                    isNumBotsFixed       = !!(botConfig["fixed"])
-                    numBots              = botConfig["number"] || 0
-                    numBotsSpinBox.value = numBots
-                    selectedNumBots      = numBots
+            Component.onCompleted: {
+                const botConfig      = UI.gametypesModel.getBotConfig(root.selectedGametypeIndex, root.selectedMapIndex)
+                isNumBotsDefined     = !!(botConfig["defined"])
+                isNumBotsFixed       = !!(botConfig["fixed"])
+                numBotsSpinBox.value = botConfig["number"] || 0
+            }
+
+            function goPrev() {
+                // Supplying the correct "detailed" property helps to avoid running redundant transitions
+                stackView.switchLeftTo(mapComponent, {"detailed" : root.selectedMapIndex >= 0})
+            }
+
+            function goNext() {
+                let flags = 0
+                if (instaCheckBox.checked) {
+                    flags |= UISystem.LocalServerInsta
                 }
+                if (publicCheckBox.checked) {
+                    flags |= UISystem.LocalServerPublic
+                }
+                const numBots    = numBotsSpinBox.value
+                const skillLevel = skillLevelComboBox.currentIndex
+                UI.ui.launchLocalServer(root.selectedGametypeName, root.selectedMapName, flags, numBots, skillLevel)
+            }
+
+            function handleBackKey() {
+                return false
             }
 
             ColumnLayout {
@@ -256,7 +367,6 @@ Item {
                     UICheckBox {
                         id: instaCheckBox
                         Material.theme: checked ? Material.Light : Material.Dark
-                        onCheckedChanged: selectedInsta = checked
                     }
                 }
 
@@ -265,7 +375,6 @@ Item {
                     UICheckBox {
                         id: publicCheckBox
                         Material.theme: checked ? Material.Light : Material.Dark
-                        onCheckedChanged: selectedPublic = checked
                     }
                 }
 
@@ -278,11 +387,6 @@ Item {
                         enabled: !rulesPage.isNumBotsFixed
                         from: 0; to: 9
                         textFromValue: v => (v !== 0) ? "" + v : "(none)"
-                        onValueModified: {
-                            if (selectedNumBots != value) {
-                                selectedNumBots = value
-                            }
-                        }
                     }
                 }
 
@@ -290,15 +394,9 @@ Item {
                     visible: rulesPage.isNumBotsDefined
                     text: "Bot skill"
                     AutoFittingComboBox {
+                        id: skillLevelComboBox
                         model: ["Easy", "Medium", "Hard"]
-                        Component.onCompleted: {
-                            currentIndex = 1
-                        }
-                        onCurrentIndexChanged: {
-                            if (selectedSkillLevel != currentIndex) {
-                                selectedSkillLevel = currentIndex
-                            }
-                        }
+                        Component.onCompleted: currentIndex = 1
                     }
                 }
             }
@@ -317,7 +415,7 @@ Item {
         id: pageIndicator
         anchors.centerIn: buttonsBar
         count: 3
-        currentIndex: swipeView.currentIndex
+        currentIndex: stackView.currentItem.subpageIndex
         interactive: false
     }
 
@@ -326,74 +424,48 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: UI.acceptRejectRowBottomMargin
-
-        backButtonVisible: swipeView.currentItem.canGoPrev
-        onBackButtonClicked: {
-            UI.ui.playBackSound()
-            swipeView.currentIndex = swipeView.currentIndex - 1
-        }
-        nextButtonText: swipeView.currentIndex === 2 ? "start" : "next"
-        nextButtonVisible: swipeView.currentItem.canGoNext
+        backButtonVisible: stackView.currentItem.prevButtonVisible
+        onBackButtonClicked: goPrev()
+        nextButtonText: stackView.currentItem.subpageIndex === 2 ? "start" : "next"
+        nextButtonVisible: stackView.currentItem.nextButtonVisible
         onNextButtonClicked: goNext()
     }
 
     function handleBackEvent(event) {
-        const index = swipeView.currentIndex
-        if (index === 0) {
-            if (gametypePage.detailed) {
-                gametypePage.detailed = false
-                gametypePage.selectedIndex = -1
-                event.accepted = true
-                UI.ui.playBackSound()
-                return true
-            }
-            return false
-        }
-        if (index === 1) {
-            if (mapPage.detailed) {
-                mapPage.detailed = false
-                mapPage.selectedIndex = -1
-            } else {
-                swipeView.currentIndex = 0
-            }
+        if (stackView.currentItem.handleBackKey()) {
             UI.ui.playBackSound()
             event.accepted = true
             return true
         }
-        UI.ui.playBackSound()
-        swipeView.currentIndex = 1
-        event.accepted = true
-        return true
+        if (stackView.currentItem.prevButtonVisible) {
+            goPrev()
+            event.accepted = true
+            return true
+        }
+        return false
     }
 
     function handleCycleList(event, step) {
-        const index = swipeView.currentIndex
-        if (index === 0 && gametypePage.detailed) {
-            gametypePage.selectPrevOrNext(step)
-        }
-        if (index === 1 && mapPage.detailed) {
-            mapPage.selectPrevOrNext(step)
+        const index = stackView.currentItem.subpageIndex
+        // TODO: Fully delegate to
+        if (index === 0 && stackView.currentItem.detailed) {
+            stackView.currentItem.selectPrevOrNext(step)
+        } else if (index === 1 && stackView.currentItem.detailed) {
+            stackView.currentItem.selectPrevOrNext(step)
         }
         // Always consider it handled
         event.accepted = true
         return true
     }
 
+    function goPrev() {
+        UI.ui.playBackSound()
+        stackView.currentItem.goPrev()
+    }
+
     function goNext() {
-        console.assert(swipeView.currentItem.canGoNext)
         UI.ui.playForwardSound()
-        if (swipeView.currentIndex !== 2) {
-            swipeView.currentIndex = swipeView.currentIndex + 1
-        } else {
-            let flags = 0
-            if (selectedInsta) {
-                flags |= UISystem.LocalServerInsta
-            }
-            if (selectedPublic) {
-                flags |= UISystem.LocalServerPublic
-            }
-            UI.ui.launchLocalServer(selectedGametypeName, selectedMapName, flags, selectedNumBots, selectedSkillLevel)
-        }
+        stackView.currentItem.goNext()
     }
 
     function handleKeyEvent(event) {
@@ -401,10 +473,13 @@ Item {
         if (key === Qt.Key_Escape || key == Qt.Key_Back) {
             return handleBackEvent(event)
         }
-        if (key === Qt.Key_Left && swipeView.currentItem.canGoPrev) {
-            return handleBackEvent(event)
+        const item = stackView.currentItem
+        if (key === Qt.Key_Left && item.prevButtonVisible) {
+            goPrev()
+            event.accepted = true
+            return
         }
-        if (key === Qt.Key_Right && swipeView.currentItem.canGoNext) {
+        if (key === Qt.Key_Right && item.nextButtonVisible) {
             goNext()
             event.accepted = true
             return

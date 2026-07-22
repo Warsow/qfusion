@@ -14,6 +14,8 @@ ColumnLayout {
     property bool hasForceColorVar: false
     property bool drawNativePart
 
+    property alias appearDisappearTargets: modelSelector.appearDisappearTargets
+
     spacing: 8
 
     Rectangle {
@@ -30,6 +32,7 @@ ColumnLayout {
     }
 
     CVarAwareModelSelector {
+        id: modelSelector
         Layout.topMargin: 16
         Layout.alignment: Qt.AlignHCenter
         Layout.preferredWidth: root.modelSelectorWidth

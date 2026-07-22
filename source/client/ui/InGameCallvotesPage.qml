@@ -18,21 +18,26 @@ Item {
 
     property var activeCallvotesModel: UI.ui.isOperator ? UI.operatorCallvotesModel : UI.regularCallvotesModel
 
+    StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
+
     UIHeaderLabel {
         id: header
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         text: "Callvotes"
+        AppearDisappearHelper { id: appearDisappearHelper }
     }
 
-    // TODO: Get rid of nested stack views?
-    StackView {
+    SwipeLikeStackView {
         id: stackView
         width: root.width
         anchors.top: header.bottom
         anchors.bottom: parent.bottom
         anchors.bottomMargin: UI.acceptRejectRowHeight + UI.acceptRejectRowBottomMargin
         anchors.horizontalCenter: parent.horizontalCenter
+        initialItem: groupSelectionComponent
+        property bool completed
+        Component.onCompleted: completed = true
     }
 
     UIBackOrNextBar {
@@ -90,7 +95,9 @@ Item {
     }
 
     onActiveCallvotesModelChanged: {
-        stackView.replace(null, groupSelectionComponent)
+        if (stackView.completed) {
+            stackView.switchLeftTo(groupSelectionComponent)
+        }
     }
 
     Connections {
@@ -125,7 +132,7 @@ Item {
                     onClicked: {
                         UI.ui.playForwardSound()
                         activeCallvotesModel.setGroupFilter(group)
-                        stackView.replace(voteSelectionComponent)
+                        stackView.switchRightTo(voteSelectionComponent)
                     }
                 }
             }
@@ -142,7 +149,7 @@ Item {
             readonly property bool canCall: false
             function goBack() {
                 UI.ui.playBackSound()
-                stackView.replace(groupSelectionComponent)
+                stackView.switchLeftTo(groupSelectionComponent)
             }
 
             ListView {
@@ -165,7 +172,7 @@ Item {
                         selectedVoteArgsHandle = argsHandle
                         selectedVoteArgsKind = argsKind
                         selectedVoteCurrent = current
-                        stackView.replace(argsSelectionComponent)
+                        stackView.switchRightTo(argsSelectionComponent)
                     }
                 }
             }
@@ -182,6 +189,8 @@ Item {
             readonly property bool canCall: argsSelectionLoader.item && argsSelectionLoader.item.canProceed
             readonly property var chosenValue: argsSelectionLoader.item ? argsSelectionLoader.item.chosenValue : null
 
+            StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
+
             function goBack() {
                 UI.ui.playBackSound()
                 selectedVoteIndex = 0
@@ -192,7 +201,7 @@ Item {
                 selectedVoteArgsKind = 0
                 selectedVoteCurrent = ""
                 selectedVoteChosen = undefined
-                stackView.replace(voteSelectionComponent)
+                stackView.switchLeftTo(voteSelectionComponent)
             }
 
             Component.onCompleted: {
@@ -297,7 +306,13 @@ Item {
                 }
             }
 
+            AppearDisappearHelper {
+                id: appearDisappearHelper
+                targets: [nameLabel, voteDescLabel, argsSelectionLoader, argsDescLabel]
+            }
+
             UILabel {
+                id: nameLabel
                 Layout.topMargin: UI.titleLabelTopMargin
                 Layout.preferredWidth: root.width
                 Layout.preferredHeight: UI.titleLabelHeight
@@ -306,6 +321,7 @@ Item {
                 text: "You have selected <b>" + selectedVoteName + "</b>"
             }
             UILabel {
+                id: voteDescLabel
                 Layout.topMargin: UI.descLabelTopMargin
                 Layout.preferredWidth: root.width
                 Layout.preferredHeight: UI.descLabelHeight
@@ -323,7 +339,7 @@ Item {
             }
 
             UILabel {
-                id: descLabel
+                id: argsDescLabel
                 visible: selectedVoteArgsKind !== CallvotesModel.NoArgs
                 Layout.preferredWidth: root.width
                 Layout.bottomMargin: UI.tabHeight

@@ -21,11 +21,14 @@ Item {
     readonly property var booleanOptionPredicates: [(x) => x === 0, (x) => x !== 0]
     readonly property var booleanOptionIcons: ["image://wsw/gfx/hud/icons/vsay/no", "image://wsw/gfx/hud/icons/vsay/yes"]
 
+    StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
+
     UIHeaderLabel {
         id: header
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         text: UI.gametypeOptionsModel.tabTitle
+        AppearDisappearHelper { id: appearDisappearHelper }
     }
 
     ListView {

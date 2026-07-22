@@ -4,7 +4,8 @@ import QtQuick.Controls.Material 2.12
 import QtQuick.Layouts 1.12
 import net.warsow 2.6
 
-StackView {
+// Can't figure out a better name for this stack view component
+PrimaryMenuStackView {
     id: root
     initialItem: settingsComponent
 
@@ -12,13 +13,11 @@ StackView {
     readonly property var listOfMiniviewHuds: UI.miniviewHudEditorModel.existingHuds
 
     function startHudEditorWizard() {
-        clear(StackView.Immediate)
-        push(editorWizardComponent)
+        replace(editorWizardComponent)
     }
 
     function closeHudEditorWizard() {
-        clear(StackView.Immediate)
-        push(settingsComponent)
+        replace(settingsComponent)
     }
 
     function handleKeyEvent(event) {
@@ -193,7 +192,10 @@ StackView {
     Component {
         id: editorWizardComponent
         HudEditorWizard {
-            onExitRequested: closeHudEditorWizard()
+            onExitRequested: {
+                UI.ui.playBackSound()
+                closeHudEditorWizard()
+            }
         }
     }
 }

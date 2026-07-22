@@ -6,6 +6,16 @@ import net.warsow 2.6
 
 Item {
     id: root
+
+    property alias drawNativePart: modelSelector.drawNativePart
+
+    AppearDisappearHelper {
+        id: appearDisappearHelper
+        targets: modelSelector.appearDisappearTargets
+        disappearDuration: 33
+    }
+    StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
+
     ColumnLayout {
         anchors.centerIn: parent
         width: 0.67 * root.width
@@ -27,12 +37,12 @@ Item {
         }
 
         CVarAwareModelSelector {
+            id: modelSelector
             Layout.preferredWidth: 480
             Layout.preferredHeight: 480
             Layout.alignment: Qt.AlignHCenter
             modelColor: colorPicker.selectedColor
             fullbright: fullbrightCheckBox.checked
-            drawNativePart: root.StackView.view && !root.StackView.view.busy
             defaultModel: UI.ui.defaultPlayerModel
             cvarName: "model"
         }

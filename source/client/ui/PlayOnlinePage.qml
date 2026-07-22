@@ -17,6 +17,8 @@ Item {
 
     Component.onDestruction: UI.ui.stopServerListUpdates()
 
+    StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
+
     function applyFilter() {
         let flags = 0
         if (fullCheckBox.checked) {
@@ -66,7 +68,13 @@ Item {
         }
     ]
 
+    AppearDisappearHelper {
+        id: appearDisappearHelper
+        targets: [header, optionsBar]
+    }
+
     UIHeaderLabel {
+        id: header
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         text: "Play online"

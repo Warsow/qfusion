@@ -10,7 +10,14 @@ Item {
     readonly property real modelSelectorWidth: 270
     readonly property real modelSelectorHeight: 400
 
-    readonly property bool drawNativePart: StackView.view && !StackView.view.busy
+    property bool drawNativePart
+
+    AppearDisappearHelper {
+        id: appearDisappearHelper
+        targets: [...alphaColumn.appearDisappearTargets, ...playersColumn.appearDisappearTargets, ...betaColumn.appearDisappearTargets]
+        disappearDuration: 33
+    }
+    StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
 
     ColumnLayout {
         anchors.centerIn: parent
@@ -26,6 +33,7 @@ Item {
             Layout.topMargin: 36
 
             TeamSettingsTeamColumn {
+                id: alphaColumn
                 Layout.preferredWidth: root.modelSelectorWidth
                 modelSelectorWidth: root.modelSelectorWidth
                 modelSelectorHeight: root.modelSelectorHeight
@@ -37,6 +45,7 @@ Item {
             Item { Layout.fillWidth: true }
 
             TeamSettingsTeamColumn {
+                id: playersColumn
                 Layout.preferredWidth: root.modelSelectorWidth
                 modelSelectorWidth: root.modelSelectorWidth
                 modelSelectorHeight: root.modelSelectorHeight
@@ -49,6 +58,7 @@ Item {
             Item { Layout.fillWidth: true }
 
             TeamSettingsTeamColumn {
+                id: betaColumn
                 Layout.preferredWidth: root.modelSelectorWidth
                 modelSelectorWidth: root.modelSelectorWidth
                 modelSelectorHeight: root.modelSelectorHeight

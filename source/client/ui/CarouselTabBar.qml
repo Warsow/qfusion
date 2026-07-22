@@ -9,6 +9,8 @@ PathView {
     interactive: false
     implicitHeight: UI.tabHeight
 
+    signal switchingRequested(int index, bool rightToLeft)
+
     path: Path {
         startX: 0.5 * root.width
         startY: 0.5 * root.height
@@ -46,9 +48,13 @@ PathView {
         }
 
         onClicked: {
+            console.assert(PathView.view && PathView.view.currentItem)
             if (!PathView.isCurrentItem) {
+                const oldCurrentItemX = PathView.view.currentItem.x
+                const oldItemX        = x
                 UI.ui.playForwardSound()
                 root.currentIndex = index
+                root.switchingRequested(index, oldItemX < oldCurrentItemX)
             }
         }
     }

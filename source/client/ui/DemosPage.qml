@@ -38,6 +38,12 @@ Item {
 
     Component.onCompleted: UI.demosResolver.reload()
 
+    AppearDisappearHelper {
+        id: appearDisappearHelper
+        targets: [queryBox, queryIcon]
+    }
+    StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
+
     states: [
         State {
             name: "centered"
@@ -118,6 +124,7 @@ Item {
     }
 
     UILabel {
+        id: queryIcon
         anchors.left: queryBox.right
         anchors.verticalCenter: queryBox.verticalCenter
         font.family: UI.ui.emojiFontFamily

@@ -11,6 +11,12 @@ Item {
 
     readonly property real listItemWidth: 300
 
+    AppearDisappearHelper {
+        id: appearDisappearHelper
+        targets: [titleLabel, summaryLabel, pageIndicator, backOrNextBar]
+    }
+    StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
+
     UILabel {
         id: titleLabel
         anchors.left: parent.left
@@ -38,7 +44,7 @@ Item {
         text: stackView.currentItem.summary
     }
 
-    StackView {
+    SwipeLikeStackView {
         id: stackView
         anchors.top: summaryLabel.bottom
         anchors.bottom: backOrNextBar.top
@@ -46,7 +52,6 @@ Item {
         anchors.right: parent.right
         clip: true
         initialItem: flavorSelectionComponent
-        function setComponent(c, props) { replace(c, props) }
     }
 
     Component {
@@ -76,7 +81,7 @@ Item {
             function handleNextRequest() {
                 console.assert(selectedHudEditorModel)
                 UI.ui.playForwardSound()
-                stackView.setComponent(loadPageComponent, {"selectedHudEditorModel" : selectedHudEditorModel})
+                stackView.switchRightTo(loadPageComponent, {"selectedHudEditorModel" : selectedHudEditorModel})
             }
 
             Column {
@@ -137,7 +142,7 @@ Item {
             function handleBackRequest() {
                 console.assert(selectedHudEditorModel)
                 UI.ui.playBackSound()
-                stackView.setComponent(flavorSelectionComponent)
+                stackView.switchLeftTo(flavorSelectionComponent)
             }
 
             function handleNextRequest() {
@@ -145,7 +150,7 @@ Item {
                 console.assert(selectedForLoadingFileName)
                 if (selectedHudEditorModel.load(selectedForLoadingFileName)) {
                     UI.ui.playForwardSound()
-                    stackView.setComponent(hudEditorComponent, {
+                    stackView.switchRightTo(hudEditorComponent, {
                         "selectedHudEditorModel" : selectedHudEditorModel,
                         "selectedForLoadingFileName" : selectedForLoadingFileName,
                     })
@@ -212,14 +217,14 @@ Item {
                 console.assert(selectedHudEditorModel)
                 console.assert(selectedForLoadingFileName)
                 UI.ui.playBackSound()
-                stackView.setComponent(loadPageComponent, {"selectedHudEditorModel" : selectedHudEditorModel})
+                stackView.switchLeftTo(loadPageComponent, {"selectedHudEditorModel" : selectedHudEditorModel})
             }
 
             function handleNextRequest() {
                 console.assert(selectedHudEditorModel)
                 console.assert(selectedForLoadingFileName)
                 UI.ui.playForwardSound()
-                stackView.setComponent(savePageComponent, {
+                stackView.switchRightTo(savePageComponent, {
                     "selectedHudEditorModel" : selectedHudEditorModel,
                     "selectedForLoadingFileName" : selectedForLoadingFileName,
                 })
@@ -281,7 +286,7 @@ Item {
                 console.assert(selectedHudEditorModel)
                 console.assert(selectedForLoadingFileName)
                 UI.ui.playBackSound()
-                stackView.setComponent(hudEditorComponent, {
+                stackView.switchLeftTo(hudEditorComponent, {
                     "selectedHudEditorModel" : selectedHudEditorModel,
                     "selectedForLoadingFileName" : selectedForLoadingFileName,
                 })
