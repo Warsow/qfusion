@@ -10,7 +10,7 @@ Item {
     readonly property real modelSelectorWidth: 270
     readonly property real modelSelectorHeight: 400
 
-    readonly property bool drawNativePart: StackView.view && !StackView.view.busy
+    property bool drawNativePart
 
     ColumnLayout {
         anchors.centerIn: parent

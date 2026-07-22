@@ -4,7 +4,7 @@ import QtQuick.Controls.Material 2.12
 import QtQuick.Layouts 1.12
 import net.warsow 2.6
 
-StackView {
+PrimaryMenuStackView {
     id: root
     initialItem: settingsComponent
 
@@ -12,13 +12,11 @@ StackView {
     readonly property var listOfMiniviewHuds: UI.miniviewHudEditorModel.existingHuds
 
     function startHudEditorWizard() {
-        clear(StackView.Immediate)
-        push(editorWizardComponent)
+        replace(editorWizardComponent)
     }
 
     function closeHudEditorWizard() {
-        clear(StackView.Immediate)
-        push(settingsComponent)
+        replace(settingsComponent)
     }
 
     function handleKeyEvent(event) {

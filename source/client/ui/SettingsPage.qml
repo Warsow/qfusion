@@ -6,15 +6,23 @@ import QtQuick.Layouts 1.12
 import net.warsow 2.6
 
 Item {
+    id: root
+
     readonly property var handleKeyEvent: stackView.currentItem["handleKeyEvent"]
+
+    readonly property bool drawNativePart: StackView.view && !StackView.view.busy && !stackView.busy
 
     Component {
         id: playerSettingsComponent
-        PlayerSettings {}
+        PlayerSettings {
+            drawNativePart: root.drawNativePart
+        }
     }
     Component {
         id: teamsSettingsComponent
-        TeamsSettings {}
+        TeamsSettings {
+            drawNativePart: root.drawNativePart
+        }
     }
     Component {
         id: graphicsSettingsComponent
@@ -26,7 +34,9 @@ Item {
     }
     Component {
         id: mouseSettingsComponent
-        MouseSettings {}
+        MouseSettings {
+            drawNativePart: root.drawNativePart
+        }
     }
     Component {
         id: keyboardSettingsComponent
@@ -40,12 +50,16 @@ Item {
     // A safety guard
     Component.onDestruction: UI.ui.rollbackPendingCVarChanges()
 
+    StackView.onStatusChanged: appearDisappearHelper.expandAndHideIfDeactivating(StackView.status)
+
     CarouselTabBar {
         id: tabBar
         enabled: !UI.ui.hasPendingCVarChanges
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
+
+        AppearDisappearHelper { id: appearDisappearHelper }
 
         onCurrentIndexChanged: stackView.replace(model[currentIndex]["component"])
 
@@ -60,6 +74,7 @@ Item {
         ]
     }
 
+    // TODO: Extract a generic component for SwipeView-like stack views
     StackView {
         id: stackView
         anchors.top: tabBar.bottom

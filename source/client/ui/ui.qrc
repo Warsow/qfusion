@@ -2,6 +2,7 @@
     <qresource>
         <file>ActionRequestArea.qml</file>
         <file>AddNewListItemButton.qml</file>
+        <file>AppearDisappearHelper.qml</file>
         <file>AutoFittingComboBox.qml</file>
         <file>BindableCommand.qml</file>
         <file>BindableCommandsColumn.qml</file>
@@ -84,6 +85,7 @@
         <file>PlayerSettings.qml</file>
         <file>PlayOnlinePage.qml</file>
         <file>PrimaryMenu.qml</file>
+        <file>PrimaryMenuStackView.qml</file>
         <file>QuitPage.qml</file>
         <file>RichChatList.qml</file>
         <file>ScoreboardScreen.qml</file>

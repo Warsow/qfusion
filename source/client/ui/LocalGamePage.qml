@@ -5,6 +5,12 @@ import QtQuick.Layouts 1.12
 import net.warsow 2.6
 
 Item {
+    AppearDisappearHelper {
+        id: appearDisappearHelper
+        targets: [headerLabel, titleLabel, summaryLabel, pageIndicator]
+    }
+    StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
+
     UIHeaderLabel {
         id: headerLabel
         anchors.top: parent.top

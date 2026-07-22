@@ -18,14 +18,16 @@ Item {
 
     property var activeCallvotesModel: UI.ui.isOperator ? UI.operatorCallvotesModel : UI.regularCallvotesModel
 
+    StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
+
     UIHeaderLabel {
         id: header
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         text: "Callvotes"
+        AppearDisappearHelper { id: appearDisappearHelper }
     }
 
-    // TODO: Get rid of nested stack views?
     StackView {
         id: stackView
         width: root.width

@@ -11,8 +11,7 @@ Item {
 	property alias expansionFrac: decoratedLogo.expansionFrac
 
 	readonly property bool tabVisible: expansionFrac < 1.0 && (UI.ui.isClientDisconnected || inGameMenuStackView.depth < 2)
-	readonly property bool tabEnabled: expansionFrac <= 1.0
-	readonly property real tabOpacity: 1.0 - expansionFrac
+	readonly property bool tabEnabled: tabVisible && expansionFrac <= 1.0 && !tabAppearDisappearHelper.animating
 
     readonly property real inGameMenuWidth: 600
 
@@ -33,11 +32,24 @@ Item {
         width: root.inGameMenuWidth
     }
 
+    AppearDisappearHelper {
+        id: tabAppearDisappearHelper
+        targets: [menuTabBar, quitTabBar]
+    }
+
+    onTabVisibleChanged: {
+        if (tabVisible) {
+            quitTabBar.transformOrigin = Item.Right
+            tabAppearDisappearHelper.show()
+        } else {
+            quitTabBar.transformOrigin = Item.Left
+            tabAppearDisappearHelper.expandAndHide()
+        }
+    }
+
     Row {
         id: menuTabBar
-        visible: tabVisible
         enabled: tabEnabled
-        opacity: tabOpacity
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         width: 0.6 * mainMenuStackView.width
@@ -68,9 +80,8 @@ Item {
 
     Row {
         id: quitTabBar
-        visible: tabVisible
         enabled: tabEnabled
-        opacity: tabOpacity
+        transformOrigin: Item.Right
         anchors.top: parent.top
         anchors.right: parent.right
         width: implicitWidth
@@ -87,21 +98,14 @@ Item {
                     if (UI.hudCommonDataModel.realClientTeam === HudDataModel.TeamSpectators || UI.hudCommonDataModel.isInWarmupState) {
                         UI.ui.disconnect()
                     } else {
-                        inGameMenuStackView.push(inGameDisconnectConfirmationComponent)
+                        inGameMenuStackView.push(inGameDisconnectConfirmationComponent, {}, StackView.PushTransition)
                     }
                 }
             }
         }
     }
 
-    function selectMainMenuComponent(c) {
-        decoratedLogo.toggleExpandedState()
-        inGameMenuStackView.clear()
-        // replace the entire stack
-        mainMenuStackView.replace(null, c)
-    }
-
-    StackView {
+    PrimaryMenuStackView {
 		id: mainMenuStackView
 		hoverEnabled: expansionFrac >= 1.0
 		opacity: expansionFrac
@@ -112,7 +116,7 @@ Item {
 		width: 1024 + 64 + 32 + 16
 	}
 
-	StackView {
+	PrimaryMenuStackView {
 	    id: inGameMenuStackView
 	    // Assumes that we don't display the primary menu during connection
 	    visible: !UI.ui.isClientDisconnected
@@ -125,7 +129,7 @@ Item {
 
         Component.onCompleted: {
             if (!UI.ui.isClientDisconnected) {
-                inGameMenuStackView.push(inGameGeneralComponent)
+                inGameMenuStackView.push(inGameGeneralComponent, {}, StackView.PushTransition)
             }
         }
 	}
@@ -135,14 +139,19 @@ Item {
 	    visible: UI.ui.isClientDisconnected
 	    id: decoratedLogo
 	    width: parent.width
-	    // TODO: It's no longer just "tabOpacity"
-	    opacity: tabOpacity
+	    opacity: 1.0 - expansionFrac
 	    anchors.verticalCenter: parent.verticalCenter
 	}
 
+    function selectMainMenuComponent(c) {
+        decoratedLogo.toggleExpandedState()
+        inGameMenuStackView.clear(StackView.PopTransition)
+        mainMenuStackView.push(c, {}, StackView.PushTransition)
+    }
+
     function collapseMainMenu() {
         decoratedLogo.toggleExpandedState()
-        mainMenuStackView.clear()
+        mainMenuStackView.clear(StackView.PopTransition)
         root.forceActiveFocus()
         UI.ui.playBackSound()
     }

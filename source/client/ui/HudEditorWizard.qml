@@ -11,6 +11,12 @@ Item {
 
     readonly property real listItemWidth: 300
 
+    AppearDisappearHelper {
+        id: appearDisappearHelper
+        targets: [titleLabel, summaryLabel, pageIndicator, backOrNextBar]
+    }
+    StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
+
     UILabel {
         id: titleLabel
         anchors.left: parent.left

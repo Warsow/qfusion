@@ -7,7 +7,12 @@ import net.warsow 2.6
 Item {
     property bool isDisplayingTeamChat: false
 
+    AppearDisappearHelper {
+        targets: [header, controls, inputFrame]
+    }
+
     UIHeaderLabel {
+        id: header
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         text: isDisplayingTeamChat ? "Team chat" : "Common chat"
