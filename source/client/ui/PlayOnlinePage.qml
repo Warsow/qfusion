@@ -77,7 +77,7 @@ Item {
         id: header
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
-        text: "Play online"
+        baseText: "Play online"
     }
 
     RowLayout {

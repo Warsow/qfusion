@@ -34,10 +34,11 @@ PathView {
     delegate: UITabButton {
         id: button
 
-        text: root.model[index]["text"]
+        text: (checked && !root.moving) ? (UI.headerTextPrefix + root.model[index]["text"] + UI.headerTextSuffix) : root.model[index]["text"]
 
         // Gets broken on first click, but still is helpful to highlight the current item initially
         checked: PathView.isCurrentItem
+        clickableIfChecked: false
 
         Component.onCompleted: {
             // Hacks to disable darkening of tab buttons under the "accept/decline" settings overlay

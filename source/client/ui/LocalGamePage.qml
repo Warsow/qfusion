@@ -17,7 +17,7 @@ Item {
         id: headerLabel
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
-        text: "Local game"
+        baseText: "Local game"
     }
 
     UILabel {

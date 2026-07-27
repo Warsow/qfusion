@@ -14,6 +14,7 @@ Item {
     signal clicked()
 
     property bool checked
+    property bool clickableIfChecked: true
     property alias text: label.text
     property alias textColor: label.color
 
@@ -32,15 +33,25 @@ Item {
         hoverEnabled: true
         anchors.fill: parent
         onClicked: {
-            label.flash()
-            root.clicked()
+            if (!checked || clickableIfChecked) {
+                label.flash()
+                root.clicked()
+            }
         }
         onContainsMouseChanged: {
-            if (containsMouse) {
-                UI.ui.playHoverSound()
-                label.enter()
-            } else {
-                label.leave()
+            if (!checked || clickableIfChecked) {
+                if (containsMouse) {
+                    UI.ui.playHoverSound()
+                    label.enter()
+                } else {
+                    label.leave()
+                }
+            } else if (!clickableIfChecked) {
+                // Reset the hovered state for non-clickableIfChecked labels which become checked
+                // TODO: Figure out something less hacky?
+                if (!containsMouse && label._hovered) {
+                    label.leave()
+                }
             }
         }
     }

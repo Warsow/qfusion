@@ -24,7 +24,7 @@ Item {
         id: header
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
-        text: "Callvotes"
+        baseText: "Callvotes"
         AppearDisappearHelper { id: appearDisappearHelper }
     }
 

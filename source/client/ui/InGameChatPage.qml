@@ -15,7 +15,7 @@ Item {
         id: header
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
-        text: isDisplayingTeamChat ? "Team chat" : "Common chat"
+        baseText: isDisplayingTeamChat ? "Team chat" : "Common chat"
     }
 
     RowLayout {

@@ -27,7 +27,7 @@ Item {
         id: header
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
-        text: UI.gametypeOptionsModel.tabTitle
+        baseText: UI.gametypeOptionsModel.tabTitle
         AppearDisappearHelper { id: appearDisappearHelper }
     }
 

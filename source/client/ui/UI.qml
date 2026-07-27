@@ -75,6 +75,9 @@ QtObject {
 
     readonly property real boldLineHeight: 3.0
 
+    readonly property string headerTextPrefix: "<b>\u2013</b> "
+    readonly property string headerTextSuffix: " <b>\u2013</b>"
+
     function destroyLayer(layer) {
         if (layer) {
             layer.enabled = false
