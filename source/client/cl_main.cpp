@@ -926,7 +926,7 @@ static std::optional<EntitySpatialParams> SCR_UpdateScreen( void ) {
 		uiSystem->renderInternally();
 	}
 
-	RenderSystem *renderSystem = nullptr;
+	RenderSystem *const renderSystem = RF_GetRenderSystem();
 
 	// TODO: This should not belong to the UI module, let client manage it!
 	uiSystem->drawBackgroundMapIfNeeded( renderSystem );
