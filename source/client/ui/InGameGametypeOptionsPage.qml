@@ -10,6 +10,10 @@ Item {
     readonly property real optionWidth: 108 + 8
     readonly property real optionExtraWidthOnMouseOver: 12
     readonly property real optionExtraHeightOnMouseOver: 4
+    readonly property real optionExtraWidthOnFlash: 8
+    readonly property real optionExtraHeightOnFlash: 4
+    readonly property real optionExtraLabelWidthOnFlash: 8
+    readonly property real optionExtraLabelHeightOnFlash: 8
     readonly property real maxOptionsPerRow: 3
     readonly property real booleanButtonsSpacing: 32
     readonly property real multipleButtonsSpacing: 24
@@ -89,6 +93,10 @@ Item {
                                 rightBodyPartSlantDegrees: (index ? +1.0 : -0.3) * UI.maxButtonBodySlantDegrees
                                 extraWidthOnMouseOver: optionExtraWidthOnMouseOver
                                 extraHeightOnMouseOver: optionExtraHeightOnMouseOver
+                                extraWidthOnFlash: optionExtraWidthOnFlash
+                                extraHeightOnFlash: optionExtraHeightOnFlash
+                                extraLabelWidthOnFlash: optionExtraLabelWidthOnFlash
+                                extraLabelHeightOnFlash: optionExtraLabelHeightOnFlash
                                 Layout.preferredWidth: optionWidth
                                 checked: booleanOptionPredicates[index](option.optionCurrent)
                                 iconPath: booleanOptionIcons[index]
@@ -143,6 +151,10 @@ Item {
                                                 (index + 1 === numOptionsInRow ? +UI.maxButtonTextSlantDegrees : 0.0)))
                                         extraWidthOnMouseOver: optionExtraWidthOnMouseOver
                                         extraHeightOnMouseOver: optionExtraHeightOnMouseOver
+                                        extraWidthOnFlash: optionExtraWidthOnFlash
+                                        extraHeightOnFlash: optionExtraHeightOnFlash
+                                        extraLabelWidthOnFlash: optionExtraLabelWidthOnFlash
+                                        extraLabelHeightOnFlash: optionExtraLabelHeightOnFlash
                                         checked: option.optionCurrent.includes(flatIndex)
                                         iconPath: UI.gametypeOptionsModel.getSelectorItemIcon(option.optionRow, flatIndex)
                                         text: UI.gametypeOptionsModel.getSelectorItemTitle(option.optionRow, flatIndex)

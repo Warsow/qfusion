@@ -41,6 +41,16 @@ Item {
     property real extraWidthOnMouseOver: 12.0
     property real extraHeightOnMouseOver: 2.0
 
+    property real extraWidthOnFlash: 12.0
+    property real extraHeightOnFlash: 2.0
+
+    property real extraLabelWidthOnFlash: 20.0
+    property real extraLabelHeightOnFlash: 8.0
+
+    property real iconFlashExtraWidthAndHeight: 12.0
+    // Cba to figure out a better name
+    property real _iconFlashExtraWidthAndHeight: 0.0
+
     property real highlightAnimAmplitude: 5.0
     property int highlightInterval: 5000
 
@@ -69,19 +79,105 @@ Item {
         onContainsMouseChanged: {
             if (containsMouse) {
                 UI.ui.playHoverSound()
+                label.enter()
+                leaveAnim.stop()
+                // TODO: Should we reassing actual properties for flash anim?
+                // Keeping it as is is sufficient as it's very quick but this approach is not really correct.
+                flashAnim.start()
             } else {
                 mouseLeftTimer.start()
+                label.leave()
+                if (!flashAnim.running) {
+                    startLeaveAnim()
+                }
             }
         }
     }
 
     Keys.onEnterPressed: root.clicked()
 
+    SequentialAnimation {
+        id: flashAnim
+        ParallelAnimation {
+            NumberAnimation {
+                target: body
+                property: "width"
+                from: root.width
+                to: root.width + root.extraWidthOnMouseOver + root.extraWidthOnFlash
+                duration: 50
+            }
+            NumberAnimation {
+                target: body
+                property: "height"
+                from: root.height
+                to: root.height + root.extraHeightOnMouseOver + root.extraHeightOnFlash
+                duration: 50
+            }
+            NumberAnimation {
+                target: root
+                property: "_iconFlashExtraWidthAndHeight"
+                from: 0.0
+                to: root.iconFlashExtraWidthAndHeight
+                duration: 50
+            }
+        }
+        ParallelAnimation {
+            NumberAnimation {
+                target: body
+                property: "width"
+                from: root.width + root.extraWidthOnMouseOver + root.extraWidthOnFlash
+                to: root.width + root.extraWidthOnMouseOver
+                duration: 125
+            }
+            NumberAnimation {
+                target: body
+                property: "height"
+                from: root.height + root.extraHeightOnMouseOver + root.extraHeightOnFlash
+                to: root.height + root.extraHeightOnMouseOver
+                duration: 125
+            }
+            NumberAnimation {
+                target: root
+                property: "_iconFlashExtraWidthAndHeight"
+                from: root.iconFlashExtraWidthAndHeight
+                to: 0.0
+                duration: 125
+            }
+        }
+        onRunningChanged: {
+            if (!running && !mouseArea.containsMouse) {
+                startLeaveAnim()
+            }
+        }
+    }
+    ParallelAnimation {
+        id: leaveAnim
+        NumberAnimation {
+            id: leaveWidthAnim
+            target: body
+            property: "width"
+            to: root.width
+            duration: 125
+        }
+        NumberAnimation {
+            id: leaveHeightAnim
+            target: body
+            property: "height"
+            to: root.height
+            duration: 125
+        }
+    }
+    function startLeaveAnim() {
+        leaveWidthAnim.from = body.width
+        leaveHeightAnim.from = body.height
+        leaveAnim.start()
+    }
+
     SlantedBackground {
         id: body
         anchors.centerIn: parent
-        width: (mouseArea.containsMouse || highlightAnim.highlightActive) && root.extraWidthOnMouseOver ? parent.width + root.extraWidthOnMouseOver : parent.width
-        height: (mouseArea.containsMouse || highlightAnim.highlightActive) && root.extraHeightOnMouseOver ? parent.height + root.extraHeightOnMouseOver : parent.height
+        width: parent.width // Note: This binding gets broken upon anim activation
+        height: parent.height // Same
         radius: root.cornerRadius
         leftPartSkewDegrees: root.leftBodyPartSlantDegrees
         rightPartSkewDegrees: root.rightBodyPartSlantDegrees
@@ -93,18 +189,16 @@ Item {
         fillColor: !root.enabled ? "darkgrey" : (hasActiveHighlight ? Material.accentColor : Qt.lighter(Material.backgroundColor, 1.35))
         opacity: !root.enabled ? 0.2 : 1.0
 
-        Behavior on width { SmoothedAnimation { duration: 333 } }
-        Behavior on height { SmoothedAnimation { duration: 333 } }
         Behavior on fillColor { ColorAnimation { duration: highlightAnim.colorAnimDuration } }
     }
 
     Component {
         id: placeholderComponent
         Rectangle {
-            width: 12
-            height: 12
-            implicitWidth: 12
-            implicitHeight: 12
+            width: implicitWidth
+            height: implicitHeight
+            implicitWidth: 12 + root._iconFlashExtraWidthAndHeight
+            implicitHeight: 12 + root._iconFlashExtraWidthAndHeight
             radius: 1
             opacity: root.enabled ? (root.hasActiveHighlight ? 1.0 : 0.7) : 0.33
             transform: Matrix4x4 { matrix: UI.ui.makeSkewXMatrix(height, textSlantDegrees).times(translationMatrix) }
@@ -114,8 +208,8 @@ Item {
     Component {
         id: iconComponent
         Item {
-            width: root.iconWidthAndHeight
-            height: root.iconWidthAndHeight
+            width: implicitWidth
+            height: implicitHeight
             implicitWidth: root.iconWidthAndHeight
             implicitHeight: root.iconWidthAndHeight
 
@@ -123,8 +217,8 @@ Item {
                 id: icon
                 visible: !root.hasActiveHighlight
                 anchors.centerIn: parent
-                width: root.iconWidthAndHeight
-                height: root.iconWidthAndHeight
+                width: root.iconWidthAndHeight + root._iconFlashExtraWidthAndHeight
+                height: root.iconWidthAndHeight + root._iconFlashExtraWidthAndHeight
                 smooth: true
                 mipmap: true
                 source: root.iconPath
@@ -156,7 +250,7 @@ Item {
         sourceComponent: iconPath.length > 0 ? iconComponent : placeholderComponent
     }
 
-    UILabel {
+    UIFlashLabel {
         id: label
 
         anchors.centerIn: parent
@@ -164,9 +258,12 @@ Item {
             (iconOrPlaceholder.item ? iconOrPlaceholder.width + iconOrPlaceholder.anchors.rightMargin : 0)
 
         text: root.text
-        font.weight: Font.ExtraBold
-        font.letterSpacing: 1.5
+        font.weight: Font.Black
         font.capitalization: Font.AllUppercase
+        extraFontSpacingOnHover: 0.5
+        // Note: These calculations are only valid for centered flash
+        maxFlashWidthOvershoot: 0.5 * root.extraLabelWidthOnFlash
+        maxFlashHeightOvershoot: 0.5 * root.extraLabelHeightOnFlash
 
         transform: Matrix4x4 { matrix: UI.ui.makeSkewXMatrix(label.height, textSlantDegrees).times(translationMatrix) }
         opacity: root.enabled ? 1.0 : 0.5
