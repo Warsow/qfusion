@@ -1,53 +1,89 @@
 import QtQuick 2.12
 import QtQuick.Controls 2.12
 import QtQuick.Controls.Material 2.12
+import QtQuick.Controls.Material.impl 2.12
 import QtQuick.Layouts 1.12
 import net.warsow 2.6
 
-Item {
+FocusScope {
+    id: root
     property bool isDisplayingTeamChat: false
 
+    StackView.onStatusChanged: {
+        if (StackView.status === StackView.Deactivating) {
+            if (isDisplayingTeamChat) {
+                teamAppearDisappearHelper.shrinkAndHide()
+            } else {
+                commonAppearDisappearHelper.shrinkAndHide()
+            }
+            input.clear()
+        }
+    }
+
     AppearDisappearHelper {
-        targets: [header, controls, inputFrame]
+        id: commonAppearDisappearHelper
+        targets: [commonHeader, commonButton]
+    }
+
+    AppearDisappearHelper {
+        id: teamAppearDisappearHelper
+        targets: [teamHeader, teamButton]
+        appearDelay: -1
     }
 
     UIHeaderLabel {
-        id: header
+        id: commonHeader
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
-        baseText: isDisplayingTeamChat ? "Team chat" : "Common chat"
+        baseText: "Common chat"
+    }
+    UIHeaderLabel {
+        id: teamHeader
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        baseText: "Team chat"
     }
 
-    RowLayout {
-        id: controls
-        anchors.top: parent.top
+    UITabButton {
+        id: commonButton
         anchors.right: parent.right
-        height: UI.tabHeight
-
-        Button {
-            flat: true
-            visible: UI.ui.hasTeamChat
-            Layout.alignment: Qt.AlignVCenter
-            Material.theme: Material.Dark
-            text: isDisplayingTeamChat ? "switch to common" : "switch to team"
-            onHoveredChanged: {
-                if (hovered) {
-                    UI.ui.playHoverSound()
-                }
-            }
-            onClicked: {
-                UI.ui.playSwitchSound()
-                isDisplayingTeamChat = !isDisplayingTeamChat
-            }
+        text: "Team"
+        visible: UI.ui.hasTeamChat
+        enabled: !isDisplayingTeamChat
+        onClicked: {
+            UI.ui.playSwitchSound()
+            isDisplayingTeamChat = true
         }
+    }
+    UITabButton {
+        id: teamButton
+        anchors.right: parent.right
+        text: "Common"
+        visible: UI.ui.hasTeamChat
+        enabled: isDisplayingTeamChat
+        onClicked: {
+            UI.ui.playSwitchSound()
+            isDisplayingTeamChat = false
+        }
+    }
 
-        // Unused for now
+    onIsDisplayingTeamChatChanged: {
+        if (isDisplayingTeamChat) {
+            commonAppearDisappearHelper.expandAndHide()
+            teamAppearDisappearHelper.show()
+        } else {
+            teamAppearDisappearHelper.expandAndHide()
+            commonAppearDisappearHelper.show()
+        }
     }
 
     Connections {
         target: UI.ui
         onHasTeamChatChanged: {
-            isDisplayingTeamChat = false
+            // Note: We don't animate availabilty of switch chat buttons
+            if (isDisplayingTeamChat) {
+                isDisplayingTeamChat = false
+            }
         }
     }
 
@@ -56,73 +92,77 @@ Item {
         model: isDisplayingTeamChat ? UI.teamChatProxy.getRichModel() : UI.chatProxy.getRichModel()
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: controls.bottom
-        anchors.bottom: inputFrame.top
-        // It look slightly lesser due to the content alginment
+        anchors.top: parent.top
+        anchors.bottom: input.top
+        anchors.topMargin: 8 + UI.tabHeight
+        anchors.bottomMargin: 20
         anchors.leftMargin: 12
         anchors.rightMargin: 12
-        anchors.topMargin: 8
-        anchors.bottomMargin: 12
         clip: true
         onCountChanged: positionViewAtBeginning()
         onModelChanged: positionViewAtBeginning()
+        UILabel {
+            visible: chatList.count === 0
+            anchors.centerIn: parent
+            text: "No messages"
+        }
     }
 
     Rectangle {
-        anchors.horizontalCenter: inputFrame.horizontalCenter
-        anchors.verticalCenter: inputFrame.verticalCenter
-        color: Qt.lighter(Material.background, 1.25)
-        opacity: 0.5
-        width: inputFrame.width + 12
-        height: inputFrame.height + 4
-        radius: 3
+        anchors.horizontalCenter: input.horizontalCenter
+        anchors.verticalCenter: input.verticalCenter
+        color: Qt.lighter(Material.background, 1.5)
+        opacity: 0.7
+        width: root.width
+        height: input.height + 8
+        radius: 6
+        layer.enabled: true
+        layer.effect: ElevationEffect { elevation: 16 }
     }
 
-    ScrollView {
-        id: inputFrame
+    TextArea {
+        id: input
+        focus: true
         anchors.left: parent.left
         anchors.right: parent.right
+        height: Math.max(72, implicitHeight)
         anchors.bottom: parent.bottom
-        anchors.margins: 20
-        leftPadding: 4
-        rightPadding: 4
-        height: Math.min(Math.max(72, input.implicitHeight), 128)
+        anchors.leftMargin: 12
+        anchors.rightMargin: 12
+        anchors.bottomMargin: 20
+        selectByMouse: false
+        selectByKeyboard: false
+        wrapMode: TextEdit.Wrap
+        font.letterSpacing: UI.labelLetterSpacing
+        font.pointSize: UI.labelFontSize
+        Material.theme: (activeFocus || text.length > 0) ? Material.Light : Material.Dark
+        placeholderText: activeFocus ? "" : "Type here\u2026"
+        background: null
+        Material.accent: "white"
 
-        TextArea {
-            id: input
-            width: parent.width
-            selectByMouse: false
-            selectByKeyboard: false
-            wrapMode: TextEdit.Wrap
-            font.letterSpacing: UI.labelLetterSpacing
-            font.pointSize: UI.labelFontSize
-            Material.theme: (activeFocus || text.length > 0) ? Material.Light : Material.Dark
-            placeholderText: activeFocus ? "" : "\u2026"
+        onTextChanged: {
+            // TODO: Count bytes/respect native code limitations on the number of bytes
+            if (length > 200) {
+                remove(200, length)
+            }
+        }
 
-            onTextChanged: {
-                // TODO: Count bytes/respect native code limitations on the number of bytes
-                if (length > 200) {
-                    remove(200, length)
+        Keys.onPressed: {
+            if (event.key === Qt.Key_Enter) {
+                if (isDisplayingTeamChat) {
+                    UI.teamChatProxy.sendMessage(text)
+                } else {
+                    UI.chatProxy.sendMessage(text)
                 }
+                // We should clear the key that is being entered now, defer to the next frame
+                clearOnNextFrameTimer.start()
             }
+        }
 
-            Keys.onPressed: {
-                if (event.key === Qt.Key_Enter) {
-                    if (isDisplayingTeamChat) {
-                        UI.teamChatProxy.sendMessage(text)
-                    } else {
-                        UI.chatProxy.sendMessage(text)
-                    }
-                    // We should clear the key that is being entered now, defer to the next frame
-                    clearOnNextFrameTimer.start()
-                }
-            }
-
-            Timer {
-                id: clearOnNextFrameTimer
-                interval: 1
-                onTriggered: input.clear()
-            }
+        Timer {
+            id: clearOnNextFrameTimer
+            interval: 1
+            onTriggered: input.clear()
         }
     }
 }

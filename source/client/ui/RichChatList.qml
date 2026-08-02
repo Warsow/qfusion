@@ -19,12 +19,11 @@ ListView {
             Item {
                 implicitWidth: root.width
                 implicitHeight: Math.max(nameLabel.height, timestampLabel.height) + 20
+                // We have to align everything to the right as this alingment makes the entire thing less biased to the left
                 UILabel {
                     id: nameLabel
-                    anchors.left: parent.left
-                    anchors.leftMargin: 8
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: 8
+                    anchors.right: timestampLabel.left
+                    anchors.baseline: timestampLabel.baseline
                     font.weight: Font.Black
                     font.letterSpacing: 1
                     textFormat: Text.StyledText
@@ -33,8 +32,9 @@ ListView {
                 }
                 UILabel {
                     id: timestampLabel
-                    anchors.left: nameLabel.right
-                    anchors.baseline: nameLabel.baseline
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: 8
                     font.letterSpacing: 0
                     font.pointSize: UI.labelFontSize - 1.0
                     textFormat: Text.PlainText
@@ -51,25 +51,11 @@ ListView {
                 height: implicitHeight + 8
                 horizontalAlignment: Qt.AlignLeft
                 verticalAlignment: Qt.AlignVCenter
-                leftPadding: 8
-                rightPadding: 8
                 wrapMode: Text.WordWrap
                 textFormat: Text.StyledText
-                lineHeight: 1.2
+                lineHeight: 1.1
                 clip: true
                 text: model.regularMessageText
-                MouseArea {
-                    id: mouseArea
-                    hoverEnabled: true
-                    anchors.fill: parent
-                }
-                Rectangle {
-                    anchors.fill: parent
-                    z: -1
-                    opacity: mouseArea.containsMouse ? 0.1 : 0.0
-                    color: "black"
-                    Behavior on opacity { SmoothedAnimation { duration: 100 } }
-                }
             }
         }
     }
