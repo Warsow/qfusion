@@ -40,6 +40,8 @@ QtObject {
     readonly property real logoDecorationRowHeight: 11
     readonly property real logoDecorationRowSpacing: 12
 
+    readonly property int logoTransitionDuration: 333
+
     readonly property real regularSlantedButtonHeight: 42.0
     // The maximum used value (not the real limit)
     readonly property real maxButtonBodySlantDegrees: 18.0

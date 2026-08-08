@@ -8,14 +8,28 @@ import net.warsow 2.6
 Item {
 	id: root
 
-	property alias expansionFrac: decoratedLogo.expansionFrac
+    // An exported property for underlay
+    readonly property real expansionFrac: logoLoader.item ? logoLoader.item.expansionFrac : 1.0
 
-	readonly property bool tabVisible: expansionFrac < 1.0 && (UI.ui.isClientDisconnected || inGameMenuStackView.depth < 2)
-	readonly property bool tabEnabled: tabVisible && expansionFrac <= 1.0 && !tabAppearDisappearHelper.animating
+    QtObject {
+        id: priv
 
-    readonly property real inGameMenuWidth: 600
+        readonly property bool tabVisible: mainMenuStackView.realDepth === 0 && inGameMenuStackView.realDepth < 2
+        readonly property bool tabEnabled: tabVisible && !tabAppearDisappearHelper.animating
 
-    readonly property bool canShowLoadouts: UI.gametypeOptionsModel.available && UI.hudCommonDataModel.realClientTeam !== HudDataModel.TeamSpectators
+        readonly property real inGameMenuWidth: 600
+        readonly property bool canShowLoadouts: UI.gametypeOptionsModel.available && UI.hudCommonDataModel.realClientTeam !== HudDataModel.TeamSpectators
+
+        onTabVisibleChanged: {
+            if (tabVisible) {
+                quitTabBar.transformOrigin = Item.Right
+                tabAppearDisappearHelper.show()
+            } else {
+                quitTabBar.transformOrigin = Item.Left
+                tabAppearDisappearHelper.expandAndHide()
+            }
+        }
+    }
 
     Item {
         id: tabBarHudOccluder
@@ -29,7 +43,7 @@ Item {
         id: inGameMenuHudOccluder
         anchors.centerIn: parent
         height: Math.max(width, 0.67 * parent.height)
-        width: root.inGameMenuWidth
+        width: priv.inGameMenuWidth
     }
 
     AppearDisappearHelper {
@@ -37,19 +51,9 @@ Item {
         targets: [menuTabBar, quitTabBar]
     }
 
-    onTabVisibleChanged: {
-        if (tabVisible) {
-            quitTabBar.transformOrigin = Item.Right
-            tabAppearDisappearHelper.show()
-        } else {
-            quitTabBar.transformOrigin = Item.Left
-            tabAppearDisappearHelper.expandAndHide()
-        }
-    }
-
     Row {
         id: menuTabBar
-        enabled: tabEnabled
+        enabled: priv.tabEnabled
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         width: 0.6 * mainMenuStackView.width
@@ -80,7 +84,7 @@ Item {
 
     Row {
         id: quitTabBar
-        enabled: tabEnabled
+        enabled: priv.tabEnabled
         transformOrigin: Item.Right
         anchors.top: parent.top
         anchors.right: parent.right
@@ -106,52 +110,75 @@ Item {
     }
 
     PrimaryMenuStackView {
-		id: mainMenuStackView
-		hoverEnabled: expansionFrac >= 1.0
-		opacity: expansionFrac
-		anchors.top: parent.top
-		anchors.bottom: parent.bottom
-		anchors.horizontalCenter: parent.horizontalCenter
-		// The maximal width which does not occlude default HUD health/armor bars
-		width: 1024 + 64 + 32 + 16
-	}
-
-	PrimaryMenuStackView {
-	    id: inGameMenuStackView
-	    // Assumes that we don't display the primary menu during connection
-	    visible: !UI.ui.isClientDisconnected
-	    // Make sure they don't fight for handling hover
-	    hoverEnabled: !mainMenuStackView.hoverEnabled
-	    anchors.top: parent.top
-	    anchors.bottom: parent.bottom
+        id: mainMenuStackView
+        hoverEnabled: realDepth > 0 && !busy
+        opacity: logoLoader.item ? logoLoader.item.expansionFrac : 1.0
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
-	    width: root.inGameMenuWidth
+        // The maximal width which does not occlude default HUD health/armor bars
+        width: 1024 + 64 + 32 + 16
+
+        // For unknown reasons, depth changes are not always signaled, here's a duct-tape workaround
+        property int realDepth
+        onBusyChanged: realDepth = depth
+    }
+
+    PrimaryMenuStackView {
+        id: inGameMenuStackView
+        // Assumes that we don't display the primary menu during connection
+        visible: !UI.ui.isClientDisconnected
+        hoverEnabled: realDepth > 0 && !busy
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: priv.inGameMenuWidth
 
         Component.onCompleted: {
             if (!UI.ui.isClientDisconnected) {
                 inGameMenuStackView.push(inGameGeneralComponent, {}, StackView.PushTransition)
             }
         }
-	}
 
-	MainMenuDecoratedLogo {
-	    // TODO: Load it only if needed, extract animation properties for proper expansion frac calculations
-	    visible: UI.ui.isClientDisconnected
-	    id: decoratedLogo
-	    width: parent.width
-	    opacity: 1.0 - expansionFrac
-	    anchors.verticalCenter: parent.verticalCenter
-	    AppearDisappearHelper {}
-	}
+        property int realDepth
+        onBusyChanged: realDepth = depth
+    }
+
+    Connections {
+        target: UI.ui
+        // If ever we manage to disconnect without transition, reset the gui to the default state
+        onIsClientDisconnectedChanged: {
+            mainMenuStackView.clear(StackView.Immediate)
+            if (UI.ui.isClientDisconnected) {
+                 inGameMenuStackView.clear(StackView.Immediate)
+            }
+        }
+    }
+
+    Loader {
+        id: logoLoader
+        // TODO: Show with a sufficient delay upon disconnection
+        active: UI.ui.isClientDisconnected
+        anchors.centerIn: parent
+        width: item ? item.width: 0
+        height: item ? item.height : 0
+        sourceComponent: MainMenuDecoratedLogo {
+            width: root.width
+            height: implicitHeight
+        }
+    }
 
     function selectMainMenuComponent(c) {
-        decoratedLogo.toggleExpandedState()
+        // TODO: ?. (5.15+)
+        if (logoLoader.item) { logoLoader.item.expand() }
         inGameMenuStackView.clear(StackView.PopTransition)
         mainMenuStackView.push(c, {}, StackView.PushTransition)
+        UI.ui.playForwardSound()
     }
 
     function collapseMainMenu() {
-        decoratedLogo.toggleExpandedState()
+        // TODO: ?. (5.15+)
+        if (logoLoader.item) { logoLoader.item.collapse() }
         mainMenuStackView.clear(StackView.PopTransition)
         root.forceActiveFocus()
         UI.ui.playBackSound()
@@ -307,7 +334,7 @@ Item {
                 }
 
                 Rectangle {
-                    visible: canShowLoadouts
+                    visible: priv.canShowLoadouts
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: inGameGeneralPane.separatorWidth
                     Layout.preferredHeight: inGameGeneralPane.separatorHeight
@@ -316,8 +343,8 @@ Item {
                 }
 
                 SlantedButton {
-                    visible: canShowLoadouts
-                    text: canShowLoadouts ? UI.gametypeOptionsModel.tabTitle : ""
+                    visible: priv.canShowLoadouts
+                    text: priv.canShowLoadouts ? UI.gametypeOptionsModel.tabTitle : ""
                     Layout.fillWidth: true
                     onClicked: {
                         UI.ui.playForwardSound()

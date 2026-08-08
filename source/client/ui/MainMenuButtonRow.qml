@@ -12,15 +12,16 @@ Item {
     property bool highlighted: false
 	property string text
 	property bool leaningRight: false
-	property real expansionFrac: 0.0
 
-	function toggleExpandedState() {
-		if (state == "centered") {
-			state = leaningRight ? "goneLeft" : "goneRight"
-		} else {
-			state = "centered"
-		}
-	}
+    function expand() {
+        console.assert(state == "centered")
+        state = leaningRight ? "goneLeft" : "goneRight"
+    }
+
+    function collapse() {
+        console.assert(state == "goneLeft" || state == "goneRight")
+        state = "centered"
+    }
 
 	readonly property var transformMatrix: UI.ui.makeSkewXMatrix(root.height, 20.0)
 
@@ -36,8 +37,8 @@ Item {
 
     // Seems to be useful to keep in the source, even commented out
 
-	//Behavior on bodyWidth { SmoothedAnimation { duration: 333 } }
-	//Behavior on bodyHeight { SmoothedAnimation { duration: 333 } }
+	//Behavior on bodyWidth { SmoothedAnimation { duration: UI.logoTransitionDuration } }
+	//Behavior on bodyHeight { SmoothedAnimation { duration: UI.logoTransitionDuration } }
 	//Behavior on bodyColor { ColorAnimation { duration: highlightAnim.colorAnimDuration } }
 
     readonly property real baseTrailElementWidth: 24
@@ -104,13 +105,11 @@ Item {
 	transitions: [
 	    Transition {
 		    AnchorAnimation {
-			    duration: 333
+			    duration: UI.logoTransitionDuration
 			    easing.type: Easing.OutBack
 		    }
 	    }
 	]
-
-	state: "centered"
 
 	Loader {
 		active: !leaningRight
@@ -157,19 +156,6 @@ Item {
 		color: bodyColor
 
 		transform: Matrix4x4 { matrix: root.transformMatrix }
-
-		onXChanged: {
-			const halfContainerWidth = parent.width / 2
-			const halfThisWidth = width / 2
-			const slidingDistance = halfContainerWidth - halfThisWidth
-			let frac = 0.0
-			if (root.leaningRight) {
-				frac = Math.abs(x - halfContainerWidth + halfThisWidth) / slidingDistance
-			} else {
-				frac = Math.abs(x - halfContainerWidth + halfThisWidth) / slidingDistance
-			}
-			root.expansionFrac = Math.min(1.0, Math.max(frac, 0.0))
-		}
 
 		UILabel {
 			anchors.left: root.leaningRight ? parent.left: undefined

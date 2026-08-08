@@ -5,94 +5,148 @@ import QtQuick.Layouts 1.12
 import net.warsow 2.6
 
 Item {
-	id: root
+    id: root
 
-	property real expansionFrac: someOverlayButton.expansionFrac
-	readonly property real spacing: 12
+    readonly property real expansionFrac: logoHolder.expansionFrac
+    readonly property real spacing: 12
 
-	Item {
-		id: logoHolder
-		anchors.centerIn: parent
-		width: logo.width
-		height: logo.height
-		Image {
-			id: logo
-			anchors.centerIn: parent
-			source: "image://wsw/gfx/ui/loadinglogo"
-		}
-	}
+    // TODO: Should we really start it expanded?
+    Component.onCompleted: collapse()
 
-	ColumnLayout {
-		id: topColumn
-		anchors.top: logoHolder.bottom
-		anchors.left: parent.left
-		anchors.right: parent.right
-		spacing: UI.logoDecorationRowSpacing
+    Item {
+        id: logoHolder
+        anchors.centerIn: parent
+        width: root.width
+        height: logo.implicitHeight
+        // TODO: Using logoHolder as a private part holder
+        property real expansionFrac
+        property real animatedOpacity
+        // The builtin easing is insufficient. Consider using custom animations instead of transitions?
+        readonly property real logoOpacity: animatedOpacity * animatedOpacity * animatedOpacity
+        readonly property real rowOpacity: animatedOpacity * animatedOpacity
+        Image {
+            id: logo
+            anchors.centerIn: parent
+            source: "image://wsw/gfx/ui/loadinglogo"
+            width: implicitWidth
+            height: implicitHeight
+            opacity: logoHolder.logoOpacity
+            transform: Scale {
+                id: logoScale
+                origin.x: 0.5 * logo.width
+                origin.y: 0.5 * logo.height
+            }
+        }
+        // Note: We cannot specify implicitWidth, implicitHeight in states
+        // as they aren't known at the moment of start of an initial transition.
+        // We have to use just some huge values for scale
+        states: [
+            State {
+                name: "regular"
+                PropertyChanges {
+                    target: logoScale
+                    xScale: 1.0
+                    yScale: 1.0
+                }
+                PropertyChanges {
+                    target: logoHolder
+                    animatedOpacity: 1.0
+                    expansionFrac: 0.0
+                }
+            },
+            State {
+                name: "expanded"
+                PropertyChanges {
+                    target: logoScale
+                    xScale: 5.0
+                    yScale: 0.0
+                }
+                PropertyChanges {
+                    target: logoHolder
+                    animatedOpacity: 0.0
+                    expansionFrac: 1.0
+                }
+            }
+        ]
+        transitions: Transition {
+            NumberAnimation {
+                target: logoScale
+                properties: "xScale,yScale"
+                duration: UI.logoTransitionDuration
+                easing.type: Easing.OutQuart
+            }
+            NumberAnimation {
+                target: logoHolder
+                property: "animatedOpacity"
+                duration: UI.logoTransitionDuration
+                easing.type: Easing.OutQuart
+            }
+            NumberAnimation {
+                target: logoHolder
+                property: "expansionFrac"
+                duration: UI.logoTransitionDuration
+            }
+        }
+        state: "expanded"
+    }
 
-		MainMenuButtonRow {
-			id: someOverlayButton
-			leaningRight: true
-			Layout.fillWidth: true
-			onExpansionFracChanged: logoHolder.opacity = 1.0 - someOverlayButton.expansionFrac
-		}
+    ColumnLayout {
+        id: topColumn
+        anchors.top: logoHolder.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        spacing: UI.logoDecorationRowSpacing
 
-		MainMenuButtonRow {
-			leaningRight: true
-			Layout.fillWidth: true
-		}
+        Repeater {
+            model: 4
+            delegate: MainMenuButtonRow {
+                leaningRight: true
+                Layout.fillWidth: true
+                state: "goneLeft"
+                opacity: logoHolder.rowOpacity
+            }
+        }
+    }
 
-		MainMenuButtonRow {
-			leaningRight: true
-			Layout.fillWidth: true
-		}
+    ColumnLayout {
+        id: bottomColumn
+        anchors.bottom: logoHolder.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        spacing: UI.logoDecorationRowSpacing
 
-		MainMenuButtonRow {
-			leaningRight: true
-			Layout.fillWidth: true
-		}
-	}
+        Repeater {
+            model: 4
+            delegate: MainMenuButtonRow {
+                leaningRight: false
+                Layout.fillWidth: true
+                state: "goneRight"
+                opacity: logoHolder.rowOpacity
+            }
+        }
+    }
 
-	ColumnLayout {
-		id: bottomColumn
-		anchors.bottom: logoHolder.top
-		anchors.left: parent.left
-		anchors.right: parent.right
-		spacing: UI.logoDecorationRowSpacing
+    function _doForEveryRow(fn) {
+        // TODO: Cache/flatten acceptable children references?
+        for (let i = 0; i < topColumn.children.length; ++i) {
+            if (topColumn.children[i] instanceof MainMenuButtonRow) {
+                fn(topColumn.children[i])
+            }
+        }
+        for (let i = 0; i < bottomColumn.children.length; ++i) {
+            if (bottomColumn.children[i] instanceof MainMenuButtonRow) {
+                fn(bottomColumn.children[i])
+            }
+        }
+    }
 
-		MainMenuButtonRow {
-			leaningRight: false
-			Layout.fillWidth: true
-		}
+    function expand() {
+        _doForEveryRow(r => r.expand())
+        logoHolder.state = "expanded"
+    }
 
-		MainMenuButtonRow {
-			leaningRight: false
-			Layout.fillWidth: true
-		}
-
-		MainMenuButtonRow {
-			leaningRight: false
-			Layout.fillWidth: true
-		}
-
-		MainMenuButtonRow {
-			leaningRight: false
-			Layout.fillWidth: true
-		}
-	}
-
-	function toggleExpandedState() {
-	    // TODO: Should we perform this here?
-	    if (someOverlayButton.state === "centered") {
-	        UI.ui.playForwardSound()
-	    } else {
-	        UI.ui.playBackSound()
-	    }
-
-		for (let i = 0; i < topColumn.children.length; ++i) {
-			topColumn.children[i].toggleExpandedState()
-		}
-		for (let i = 0; i < bottomColumn.children.length; ++i) {
-			bottomColumn.children[i].toggleExpandedState()
-		}
-	}
+    function collapse() {
+        _doForEveryRow(r => r.collapse())
+        logoHolder.state = "regular"
+    }
 }
