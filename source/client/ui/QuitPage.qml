@@ -22,7 +22,6 @@ Item {
 
         function openSelf() {
             popup.parent = rootItem.windowContentItem
-            rootItem.setOrUpdatePopupMode()
             popup.open()
         }
 
@@ -33,8 +32,6 @@ Item {
                 quitPage.backTrigger()
             }
         }
-
-        onAboutToHide: rootItem.resetPopupMode()
 
         background: null
 
