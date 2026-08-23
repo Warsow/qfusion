@@ -13,6 +13,9 @@ Item {
     property var oldMiniviews: []
     property var oldMiniviewIndices: []
 
+    property real dropHudVisualPriorityFrac
+    Behavior on dropHudVisualPriorityFrac { SmoothedAnimation { duration: 100 } }
+
     readonly property bool suppressShowingTileHuds: Hud.ui.isShowingScoreboard || Hud.ui.isShowingPrimaryMenu
 
     onSuppressShowingTileHudsChanged: updateVisibilityOfTileHuds()
@@ -24,17 +27,51 @@ Item {
         }
     }
 
-    // Try reusing the same instance due to Qml GC quirks
-    InGameHud {
-        // TODO: Is visibility switching it really needed (we don't draw it anyway, but property updates handling may vary)?
-        visible: Hud.ui.canShowHud
+    Connections {
+        target: Hud.ui
+        onDropHudVisualPriorityChanged: {
+            dropHudVisualPriorityFrac = Hud.ui.dropHudVisualPriority ? 1.0 : 0.0
+        }
+    }
+
+    FocusScope {
+        id: effectSource
         anchors.fill: parent
-        layoutModel: Hud.commonDataModel.regularLayoutModel
-        commonDataModel: Hud.commonDataModel
-        povDataModel: Hud.povDataModel
-        miniviewAllocator: rootItem
-        // Ensure that it is on top of miniviews and their huds (the primary hud contains chat popups along with other things)
-        z: +1
+        // Note: Desaturate appears to be ignoring opacity of this container if it's given as source.
+        // Setting opacity to zero prevents rendering it beneath the desaturated item.
+        opacity: 1.0 - dropHudVisualPriorityFrac
+
+        // Try reusing the same instance due to Qml GC quirks
+        InGameHud {
+            // TODO: Is visibility switching it really needed (we don't draw it anyway, but property updates handling may vary)?
+            visible: Hud.ui.canShowHud
+            anchors.fill: parent
+            layoutModel: Hud.commonDataModel.regularLayoutModel
+            commonDataModel: Hud.commonDataModel
+            povDataModel: Hud.povDataModel
+            miniviewAllocator: rootItem
+            // Ensure that it is on top of miniviews and their huds (the primary hud contains chat popups along with other things)
+            z: +1
+        }
+
+        Loader {
+            active: Hud.ui.isShowingActionRequests
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
+            anchors.margins: Hud.elementMargin
+            width: 480
+            sourceComponent: ActionRequestArea {}
+        }
+    }
+
+    // TODO: Perform desaturation in the renderer during blitting the hud content.
+    // The Qml implementation has allowed a quick test of the design approach.
+    Desaturate {
+        visible: dropHudVisualPriorityFrac > 0.0
+        anchors.fill: effectSource
+        source: effectSource
+        desaturation: dropHudVisualPriorityFrac
     }
 
     Component.onCompleted: {
@@ -182,15 +219,5 @@ Item {
                 Behavior on border.color { ColorAnimation { duration: 100 } }
             }
         }
-    }
-
-    Loader {
-        active: Hud.ui.isShowingActionRequests
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-        anchors.margins: Hud.elementMargin
-        width: 480
-        sourceComponent: ActionRequestArea {}
     }
 }

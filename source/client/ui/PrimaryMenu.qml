@@ -121,7 +121,12 @@ Item {
 
         // For unknown reasons, depth changes are not always signaled, here's a duct-tape workaround
         property int realDepth
-        onBusyChanged: realDepth = depth
+        onBusyChanged: {
+            realDepth = depth
+            root.updateHudVisualPriority()
+        }
+        Component.onCompleted: root.updateHudVisualPriority()
+        onRealDepthChanged: root.updateHudVisualPriority()
     }
 
     PrimaryMenuStackView {
@@ -138,11 +143,24 @@ Item {
             if (!UI.ui.isClientDisconnected) {
                 inGameMenuStackView.push(inGameGeneralComponent, {}, StackView.PushTransition)
             }
+            root.updateHudVisualPriority()
         }
 
         property int realDepth
-        onBusyChanged: realDepth = depth
+        onBusyChanged: {
+            realDepth = depth
+            // Note: Just checking depth is insufficient (see checking the tag). Always check at the end of transitions.
+            root.updateHudVisualPriority()
+        }
+        onDepthChanged: root.updateHudVisualPriority()
     }
+
+    function updateHudVisualPriority() {
+        UI.ui.dropHudVisualPriority = mainMenuStackView.realDepth > 0 ||
+            (inGameMenuStackView.currentItem && !("generalPageTag" in inGameMenuStackView.currentItem))
+    }
+
+    Component.onDestruction: UI.ui.dropHudVisualPriority = false
 
     Connections {
         target: UI.ui
@@ -152,6 +170,7 @@ Item {
             if (UI.ui.isClientDisconnected) {
                  inGameMenuStackView.clear(StackView.Immediate)
             }
+            UI.ui.dropHudVisualPriority = false
         }
     }
 
@@ -301,6 +320,9 @@ Item {
             readonly property real separatorRadius: 1
 
             readonly property bool reportsHudOccluders: true
+
+            // TODO: Sort out navigation/stack balance issues so we don't (?) have to use this tag
+            readonly property var generalPageTag: undefined
 
             Connections {
                 target: UI.ui

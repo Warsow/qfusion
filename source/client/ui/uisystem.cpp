@@ -281,6 +281,10 @@ public:
 	Q_SIGNAL void availableUpdateVersionChanged( const QString &version );
 	Q_PROPERTY( QString availableUpdateVersion MEMBER m_availableUpdateVersion NOTIFY availableUpdateVersionChanged );
 
+	// Can't figure out a better name
+	Q_SIGNAL void dropHudVisualPriorityChanged( bool dropHudVisialPriority );
+	Q_PROPERTY( bool dropHudVisualPriority MEMBER m_dropHudVisualPriority NOTIFY dropHudVisualPriorityChanged );
+
 	// Asks Qml
 	Q_SIGNAL void displayedHudItemsRetrievalRequested();
 	// Qml should call this method in reply
@@ -634,6 +638,8 @@ private:
 
 	bool m_hasStartedBackgroundMapLoading { false };
 	bool m_hasSucceededBackgroundMapLoading { false };
+
+	bool m_dropHudVisualPriority { false };
 
 	const int m_widthInPixels;
 	const int m_heightInPixels;
