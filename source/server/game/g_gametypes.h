@@ -608,6 +608,8 @@ typedef struct {
 	void *updateScoreboardFunc;
 	void *selectSpawnPointFunc;
 	void *clientCommandFunc;
+	void *getCallvoteValueFunc;
+	void *describeCallvoteArgsFunc;
 	void *shutdownFunc;
 
 	int spawnableItemsMask;

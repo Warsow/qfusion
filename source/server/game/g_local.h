@@ -489,6 +489,8 @@ void GT_asCallPlayerRespawn( edict_t *ent, int old_team, int new_team );
 void GT_asCallScoreEvent( Client *client, const char *score_event, const char *args );
 void GT_asCallUpdateScoreboard();
 edict_t *GT_asCallSelectSpawnPoint( edict_t *ent );
+const char *GT_asCallGetCurrentCallvoteValue( const wsw::StringView &voteName, wsw::PodVector<char> *resultBuffer );
+const char *GT_asCallDescribeCallvoteArgs( const wsw::StringView &voteName, wsw::PodVector<char> *resultBuffer );
 bool GT_asCallGameCommand( Client *client, const wsw::StringView &cmd, const wsw::StringView &args, int argc );
 bool GT_asCallBotStatus( edict_t *ent );
 void GT_asCallShutdown( void );

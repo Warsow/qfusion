@@ -32,6 +32,8 @@ static void GT_ResetScriptData( void ) {
 	level.gametype.updateScoreboardFunc = NULL;
 	level.gametype.selectSpawnPointFunc = NULL;
 	level.gametype.clientCommandFunc = NULL;
+	level.gametype.getCallvoteValueFunc = NULL;
+	level.gametype.describeCallvoteArgsFunc = NULL;
 	level.gametype.shutdownFunc = NULL;
 
 	AI_ResetGametypeScript();
@@ -322,6 +324,38 @@ bool GT_asCallGameCommand( Client *client, const wsw::StringView &cmd, const wsw
 	return ctx->GetReturnByte() == 0 ? false : true;
 }
 
+static const char *retrieveVoteString( void *func, const wsw::StringView &voteName, wsw::PodVector<char> *resultBuffer ) {
+	resultBuffer->clear();
+	if( func ) {
+		asIScriptContext *ctx = qasAcquireContext( GAME_AS_ENGINE() );
+		int error = ctx->Prepare( static_cast<asIScriptFunction *>( func ) );
+		if( error >= 0 ) {
+			asstring_t *asVoteName = qasStringFactoryBuffer( voteName.data(), voteName.size() );
+			ctx->SetArgObject( 0, asVoteName );
+			error = ctx->Execute();
+			if ( G_ExecutionErrorReport( error ) ) {
+				GT_asShutdownScript();
+			} else {
+				const auto *value = static_cast<asstring_t *>( ctx->GetReturnObject() );
+				if( value->buffer && value->len > 0 ) {
+					resultBuffer->append( value->buffer, value->len );
+				}
+			}
+			qasStringRelease( asVoteName );
+		}
+	}
+	resultBuffer->append( '\0' );
+	return resultBuffer->data();
+}
+
+const char *GT_asCallGetCurrentCallvoteValue( const wsw::StringView &voteName, wsw::PodVector<char> *resultBuffer ) {
+	return retrieveVoteString( level.gametype.getCallvoteValueFunc, voteName, resultBuffer );
+}
+
+const char *GT_asCallDescribeCallvoteArgs( const wsw::StringView &voteName, wsw::PodVector<char> *resultBuffer ) {
+	return retrieveVoteString( level.gametype.describeCallvoteArgsFunc, voteName, resultBuffer );
+}
+
 //"void GT_Shutdown()"
 void GT_asCallShutdown( void ) {
 	int error;
@@ -371,6 +405,8 @@ static bool G_asInitializeGametypeScript( asIScriptModule *asModule ) {
 		{ &lgt->updateScoreboardFunc, "void GT_UpdateScoreboard()" },
 		{ &lgt->selectSpawnPointFunc, "Entity @GT_SelectSpawnPoint( Entity @ent )" },
 		{ &lgt->clientCommandFunc, "bool GT_Command( Client @client, const String &cmdString, const String &argsString, int argc )" },
+		{ &lgt->getCallvoteValueFunc, "String GT_GetCallvoteValue( const String &voteName )" },
+		{ &lgt->describeCallvoteArgsFunc, "String GT_DescribeCallvoteArgs( const String &voteName )" },
 		{ &lgt->shutdownFunc, "void GT_Shutdown()" }
 	};
 

@@ -272,6 +272,25 @@ bool GT_Command( Client @client, const String &cmdString, const String &argsStri
     return false;
 }
 
+String GT_GetCallvoteValue( const String &voteName )
+{
+    if ( voteName == "ctf_flag_instant" )
+    {
+        if ( ctfInstantFlag.boolean )
+            return "1";
+        else
+            return "0";
+    }
+    return "";
+}
+
+String GT_DescribeCallvoteArgs( const String &voteName )
+{
+    if ( voteName == "ctf_flag_instant" )
+        return "boolean";
+    return "";
+}
+
 void CTF_UpdateBotsExtraGoals()
 {
 	cFlagBase @alphaBase = @CTF_getBaseForTeam( TEAM_ALPHA );
@@ -931,7 +950,7 @@ void GT_InitGametype()
                  + "set g_teams_allow_uneven \"0\"\n"
                  + "set g_countdown_time \"5\"\n"
                  + "set g_maxtimeouts \"3\" // -1 = unlimited\n"
-                 + "set ctf_powerupDrop \"0\"\n"
+                 + "set ctf_instantFlag \"0\"\n"
                  + "\necho \"" + gametype.name + ".cfg executed\"\n";
 
         G_WriteFile( "configs/server/gametypes/" + gametype.name + ".cfg", config );
@@ -1033,9 +1052,7 @@ void GT_InitGametype()
     G_RegisterCommand( "drop" );
     G_RegisterCommand( "gametype" );
 
-    G_RegisterCallvote( "ctf_powerup_drop", "1 or 0", "bool", "Enables or disables the dropping of powerups at dying" );
     G_RegisterCallvote( "ctf_flag_instant", "1 or 0", "bool", "Enables or disables instant flag captures and unlocks" );
-
 
     G_Print( "Gametype '" + gametype.title + "' initialized\n" );
 }

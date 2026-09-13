@@ -69,9 +69,9 @@ typedef struct callvotetype_s
 	int expectedargs;               // -1 = any amount, -2 = any amount except 0
 	bool ( *validate )( callvotedata_t *data, bool first );
 	void ( *execute )( callvotedata_t *vote );
-	const char *( *current )( void );
+	const char *( *current )( const callvotetype_s *vote, wsw::PodVector<char> *buffer );
 	void ( *extraHelp )( edict_t *ent, const CmdArgs & );
-	void ( *describeClientArgs )( int configStringIndex );
+	const char *( *describeClientArgs )( const callvotetype_s *vote, wsw::PodVector<char> *buffer );
 	char *argument_format;
 	char *help;
 	const char *group;
@@ -95,6 +95,8 @@ static callvotetype_t *callvotesHeadNode = NULL;
 
 static int registrationNum = 0;
 
+static wsw::PodVector<char> g_currentValueBuffer;
+
 /*
 * shuffle/rebalance
 */
@@ -110,20 +112,20 @@ static int G_VoteCompareWeightedPlayers( const void *a, const void *b ) {
 	return pb->weight - pa->weight;
 }
 
-static void G_DescribeBooleanArg( int configStringIndex ) {
-	SV_SetConfigString( configStringIndex, "boolean" );
+static const char *G_DescribeBooleanArg( const callvotetype_s *, wsw::PodVector<char> * ) {
+	return "boolean";
 }
 
-static void G_DescribeNumberArg( int configStringIndex ) {
-	SV_SetConfigString( configStringIndex, "number" );
+static const char *G_DescribeNumberArg( const callvotetype_s *, wsw::PodVector<char> * ) {
+	return "number";
 }
 
-static void G_DescribePlayerArg( int configStringIndex ) {
-	SV_SetConfigString( configStringIndex, "player" );
+static const char *G_DescribePlayerArg( const callvotetype_s *, wsw::PodVector<char> * ) {
+	return "player";
 }
 
-static void G_DescribeMinutesArg( int configStringIndex ) {
-	SV_SetConfigString( configStringIndex, "minutes" );
+static const char *G_DescribeMinutesArg( const callvotetype_s *, wsw::PodVector<char> * ) {
+	return "minutes";
 }
 
 /*
@@ -234,19 +236,18 @@ static void addMapListToEncode( StringListEncoder &encoder ) {
 	}
 }
 
-static void G_VoteMapDescribeClientArgs( int configStringIndex ) {
+static const char *G_VoteMapDescribeClientArgs( const callvotetype_t *, wsw::PodVector<char> *buffer ) {
 	// TODO: Allow specifying string prefix to reduce the redundant copying?
 	StringListEncoder encoder;
 	addMapListToEncode( encoder );
 
 	const wsw::PodVector<char> &base64 = encoder.encode();
-	wsw::PodVector<char> buffer;
-	buffer.reserve( base64.size() + 16 );
-	buffer.append( wsw::StringView( "maplist " ) );
-	buffer.append( base64 );
-	buffer.append( '\0' );
+	buffer->reserve( base64.size() + 16 );
+	buffer->append( wsw::StringView( "maplist " ) );
+	buffer->append( base64 );
+	buffer->append( '\0' );
 
-	SV_SetConfigString( configStringIndex, buffer.data() );
+	return buffer->data();
 }
 
 static bool G_VoteMapValidate( callvotedata_t *data, bool first ) {
@@ -329,7 +330,7 @@ static void G_VoteMapPassed( callvotedata_t *vote ) {
 	G_EndMatch();
 }
 
-static const char *G_VoteMapCurrent( void ) {
+static const char *G_VoteMapCurrent( const callvotetype_t *, wsw::PodVector<char> * ) {
 	return level.mapname;
 }
 
@@ -380,7 +381,7 @@ static void G_VoteScorelimitPassed( callvotedata_t *vote ) {
 	Cvar_Set( "g_scorelimit", va( "%i", atoi( vote->argv[0] ) ) );
 }
 
-static const char *G_VoteScorelimitCurrent( void ) {
+static const char *G_VoteScorelimitCurrent( const callvotetype_t *, wsw::PodVector<char> * ) {
 	return va( "%i", g_scorelimit->integer );
 }
 
@@ -412,7 +413,7 @@ static void G_VoteTimelimitPassed( callvotedata_t *vote ) {
 	Cvar_Set( "g_timelimit", va( "%i", atoi( vote->argv[0] ) ) );
 }
 
-static const char *G_VoteTimelimitCurrent( void ) {
+static const char *G_VoteTimelimitCurrent( const callvotetype_t *, wsw::PodVector<char> * ) {
 	return va( "%i", g_timelimit->integer );
 }
 
@@ -446,7 +447,7 @@ static void G_VoteGametypeExtraHelp( edict_t *ent, const CmdArgs &cmdArgs ) {
 	G_PrintMsg( ent, "%s\n", message.data() );
 }
 
-static void G_VoteGametypeDescribeClientArgs( int configStringIndex ) {
+static const char *G_VoteGametypeDescribeClientArgs( const callvotetype_t *, wsw::PodVector<char> *buffer ) {
 	StringListEncoder encoder;
 	wsw::StringSplitter splitter( wsw::StringView( g_gametypes_list->string ) );
 	while( const auto maybeName = splitter.getNext( CHAR_GAMETYPE_SEPARATOR ) ) {
@@ -455,12 +456,12 @@ static void G_VoteGametypeDescribeClientArgs( int configStringIndex ) {
 		}
 	}
 
-	wsw::PodVector<char> configString;
-	configString.append( wsw::StringView( "options " ) );
+	buffer->append( wsw::StringView( "options " ) );
 	const wsw::PodVector<char> &encodedOptions = encoder.encode();
-	configString.append( encodedOptions.data(), encodedOptions.size() );
-	configString.append( '\0' );
-	SV_SetConfigString( configStringIndex, configString.data() );
+	buffer->append( encodedOptions.data(), encodedOptions.size() );
+	buffer->append( '\0' );
+
+	return buffer->data();
 }
 
 static bool G_VoteGametypeValidate( callvotedata_t *vote, bool first ) {
@@ -520,7 +521,7 @@ static void G_VoteGametypePassed( callvotedata_t *vote ) {
 	G_PrintMsg( NULL, "Gametype changed to %s\n", next_gametype_string );
 }
 
-static const char *G_VoteGametypeCurrent( void ) {
+static const char *G_VoteGametypeCurrent( const callvotetype_t *, wsw::PodVector<char> * ) {
 	return ggs->gametypeName;
 }
 
@@ -553,7 +554,7 @@ static void G_VoteWarmupTimelimitPassed( callvotedata_t *vote ) {
 	Cvar_Set( "g_warmup_timelimit", va( "%i", atoi( vote->argv[0] ) ) );
 }
 
-static const char *G_VoteWarmupTimelimitCurrent( void ) {
+static const char *G_VoteWarmupTimelimitCurrent( const callvotetype_t *, wsw::PodVector<char> * ) {
 	return va( "%i", g_warmup_timelimit->integer );
 }
 
@@ -586,7 +587,7 @@ static void G_VoteExtendedTimePassed( callvotedata_t *vote ) {
 	Cvar_Set( "g_match_extendedtime", va( "%i", atoi( vote->argv[0] ) ) );
 }
 
-static const char *G_VoteExtendedTimeCurrent( void ) {
+static const char *G_VoteExtendedTimeCurrent( const callvotetype_t *vote, wsw::PodVector<char> * ) {
 	return va( "%i", g_match_extendedtime->integer );
 }
 
@@ -671,7 +672,7 @@ static void G_VoteMaxTeamplayersPassed( callvotedata_t *vote ) {
 	Cvar_Set( "g_teams_maxplayers", va( "%i", atoi( vote->argv[0] ) ) );
 }
 
-static const char *G_VoteMaxTeamplayersCurrent( void ) {
+static const char *G_VoteMaxTeamplayersCurrent( const callvotetype_t *, wsw::PodVector<char> * ) {
 	return va( "%i", g_teams_maxplayers->integer );
 }
 
@@ -1085,7 +1086,7 @@ static void G_VoteNumBotsPassed( callvotedata_t *vote ) {
 	Cvar_Set( "g_numbots", vote->argv[0] );
 }
 
-static const char *G_VoteNumBotsCurrent( void ) {
+static const char *G_VoteNumBotsCurrent( const callvotetype_t *vote, wsw::PodVector<char> * ) {
 	return va( "%i", g_numbots->integer );
 }
 
@@ -1101,7 +1102,7 @@ static void G_VoteAllowTeamDamagePassed( callvotedata_t *vote ) {
 	Cvar_Set( "g_allow_teamdamage", va( "%i", atoi( vote->argv[0] ) ) );
 }
 
-static const char *G_VoteAllowTeamDamageCurrent( void ) {
+static const char *G_VoteAllowTeamDamageCurrent( const callvotetype_t *vote, wsw::PodVector<char> * ) {
 	if( g_allow_teamdamage->integer ) {
 		return "1";
 	} else {
@@ -1121,7 +1122,7 @@ static void G_VoteAllowInstajumpPassed( callvotedata_t *vote ) {
 	Cvar_Set( "g_instajump", va( "%i", atoi( vote->argv[0] ) ) );
 }
 
-static const char *G_VoteAllowInstajumpCurrent( void ) {
+static const char *G_VoteAllowInstajumpCurrent( const callvotetype_t *, wsw::PodVector<char> * ) {
 	if( g_instajump->integer ) {
 		return "1";
 	} else {
@@ -1154,7 +1155,7 @@ static void G_VoteAllowInstashieldPassed( callvotedata_t *vote ) {
 	}
 }
 
-static const char *G_VoteAllowInstashieldCurrent( void ) {
+static const char *G_VoteAllowInstashieldCurrent( const callvotetype_t *, wsw::PodVector<char> * ) {
 	if( g_instashield->integer ) {
 		return "1";
 	} else {
@@ -1174,7 +1175,7 @@ static void G_VoteAllowFallDamagePassed( callvotedata_t *vote ) {
 	Cvar_Set( "g_allow_falldamage", va( "%i", atoi( vote->argv[0] ) ) );
 }
 
-static const char *G_VoteAllowFallDamageCurrent( void ) {
+static const char *G_VoteAllowFallDamageCurrent( const callvotetype_t *, wsw::PodVector<char> * ) {
 	if( GS_FallDamage( *ggs ) ) {
 		return "1";
 	} else {
@@ -1194,7 +1195,7 @@ static void G_VoteAllowSelfDamagePassed( callvotedata_t *vote ) {
 	Cvar_Set( "g_allow_selfdamage", va( "%i", atoi( vote->argv[0] ) ) );
 }
 
-static const char *G_VoteAllowSelfDamageCurrent( void ) {
+static const char *G_VoteAllowSelfDamageCurrent( const callvotetype_t *, wsw::PodVector<char> * ) {
 	if( GS_SelfDamage( *ggs ) ) {
 		return "1";
 	} else {
@@ -1283,7 +1284,7 @@ static void G_VoteAllowUnevenPassed( callvotedata_t *vote ) {
 	Cvar_Set( "g_teams_allow_uneven", va( "%i", atoi( vote->argv[0] ) ) );
 }
 
-static const char *G_VoteAllowUnevenCurrent( void ) {
+static const char *G_VoteAllowUnevenCurrent( const callvotetype_t *vote, wsw::PodVector<char> * ) {
 	if( g_teams_allow_uneven->integer ) {
 		return "1";
 	} else {
@@ -1558,7 +1559,7 @@ static void G_CallVotes_PrintHelpToPlayer( edict_t *ent, callvotetype_t *callvot
 
 	G_PrintMsg( ent, "Usage: %s %s\n%s%s%s\n", callvote->name,
 				( callvote->argument_format ? callvote->argument_format : "" ),
-				( callvote->current ? va( "Current: %s\n", callvote->current() ) : "" ),
+				( callvote->current ? va( "Current: %s\n", callvote->current( callvote, &g_currentValueBuffer ) ) : "" ),
 				( callvote->help ? "- " : "" ), ( callvote->help ? callvote->help : "" ) );
 	if( callvote->extraHelp != NULL ) {
 		callvote->extraHelp( ent, cmdArgs );
@@ -1776,8 +1777,8 @@ void G_CallVotes_UpdateCurrentStatus() {
 		}
 
 		bool modified = false;
-		if( auto method = callvote->current ) {
-			const wsw::StringView current( method() );
+		if( auto *method = callvote->current ) {
+			const wsw::StringView current( method( callvote, &g_currentValueBuffer ) );
 			if( !callvote->lastCurrent.equals( current ) ) {
 				callvote->lastCurrent.assign( current );
 				modified = true;
@@ -2120,6 +2121,14 @@ static void G_VoteFromScriptPassed( callvotedata_t *vote ) {
 	GT_asCallGameCommand( vote->caller->r.client, "callvotepassed"_asView, wsw::StringView( argsString ), vote->argc + 1 );
 }
 
+static const char *G_VoteFromScriptCurrent( const callvotetype_t *vote, wsw::PodVector<char> *buffer ) {
+	return GT_asCallGetCurrentCallvoteValue( wsw::StringView( vote->name ), buffer );
+}
+
+static const char *G_VoteFromScriptDescribeArgs( const callvotetype_t *vote, wsw::PodVector<char> *buffer ) {
+	return GT_asCallDescribeCallvoteArgs( wsw::StringView( vote->name ), buffer );
+}
+
 /*
 * G_RegisterGametypeScriptCallvote
 */
@@ -2136,7 +2145,8 @@ void G_RegisterGametypeScriptCallvote( const char *name, const char *usage, cons
 	vote->expectedargs = -1;
 	vote->validate = G_VoteFromScriptValidate;
 	vote->execute = G_VoteFromScriptPassed;
-	vote->current = NULL;
+	vote->current = G_VoteFromScriptCurrent;
+	vote->describeClientArgs = G_VoteFromScriptDescribeArgs;
 	vote->extraHelp = NULL;
 	vote->argument_format = usage ? Q_strdup( usage ) : NULL;
 	vote->help = help ? Q_strdup( va( "%s", help ) ) : NULL;
@@ -2460,6 +2470,7 @@ void G_CallVotes_Init( void ) {
 	SV_SetConfigString( CS_CALLVOTE_GROUPS, "all, All, actions, Gameplay actions, rules, Gameplay rules, "
 										   "players, Player actions, other, Other" );
 
+	wsw::PodVector<char> describeArgsBuffer;
 	// wsw : pb : server admin can now disable a specific callvote command (g_disable_vote_<callvote name>)
 	for( callvote = callvotesHeadNode; callvote != NULL; callvote = callvote->next ) {
 		wsw::StaticString<256> votingVarName( "g_disable_voting_%s", callvote->name );
@@ -2479,11 +2490,12 @@ void G_CallVotes_Init( void ) {
 		SV_SetConfigString( configStringIndex + (unsigned)Storage::CallvoteFields::Desc, callvote->help );
 		SV_SetConfigString( configStringIndex + (unsigned)Storage::CallvoteFields::Group, callvote->group );
 
-		if( auto method = callvote->describeClientArgs ) {
-			method( configStringIndex + (unsigned)Storage::CallvoteFields::Args );
-		} else {
-			SV_SetConfigString( configStringIndex + (unsigned)Storage::CallvoteFields::Args, "" );
+		const char *args = "";
+		describeArgsBuffer.clear();
+		if( auto *method = callvote->describeClientArgs ) {
+			args = method( callvote, &describeArgsBuffer );
 		}
+		SV_SetConfigString( configStringIndex + (unsigned)Storage::CallvoteFields::Args, args );
 
 		wsw::StaticString<MAX_STRING_CHARS> status;
 		if( callvote->isVotingEnabled ) {
@@ -2493,8 +2505,8 @@ void G_CallVotes_Init( void ) {
 			status << 'o';
 		}
 
-		if( auto method = callvote->current ) {
-			status << ' ' << wsw::StringView( method() );
+		if( auto *method = callvote->current ) {
+			status << ' ' << wsw::StringView( method( callvote, &g_currentValueBuffer ) );
 		}
 
 		SV_SetConfigString( configStringIndex + (unsigned)Storage::CallvoteFields::Status, status.data() );
