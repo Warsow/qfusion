@@ -7,16 +7,7 @@ import net.warsow 2.6
 Item {
     id: root
 
-    property int selectedVoteIndex
-    property string selectedVoteName
-    property string selectedVoteDesc
-    property int selectedVoteFlags
-    property int selectedVoteArgsHandle
-    property int selectedVoteArgsKind
-    property string selectedVoteCurrent
-    property var selectedVoteChosen
-
-    property var activeCallvotesModel: UI.ui.isOperator ? UI.operatorCallvotesModel : UI.regularCallvotesModel
+    readonly property var activeCallvotesModel: UI.ui.isOperator ? UI.operatorCallvotesModel : UI.regularCallvotesModel
 
     StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
 
@@ -76,36 +67,28 @@ Item {
             anchors.rightMargin: 16
             anchors.verticalCenter: parent.verticalCenter
             rightBodyPartSlantDegrees: voteButton.visible ? +0.3 * UI.maxButtonBodySlantDegrees : +UI.maxButtonBodySlantDegrees
-            visible: UI.ui.isOperator && (selectedVoteFlags & CallvotesModel.Operator)
+            visible: UI.ui.isOperator && (stackView.currentitem.isFinalStage &&
+                (stackView.currentItem.selectedVoteFlags & CallvotesModel.Operator))
             enabled: stackView.currentItem.canCall
             highlighted: enabled && !voteButton.enabled
             text: "opcall"
-            onClicked: startVote(stackView.currentItem.chosenValue, true)
+            onClicked: startVote(stackView.currentItem.selectedVoteName, stackView.currentItem.chosenValue, true)
         }
         SlantedRightPrimaryButton {
             id: voteButton
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            visible: selectedVoteFlags & CallvotesModel.Regular
+            visible: stackView.currentItem.isFinalStage && (stackView.currentItem.selectedVoteFlags & CallvotesModel.Regular)
             enabled: stackView.currentItem.canCall
             highlighted: enabled
             text: "vote"
-            onClicked: startVote(stackView.currentItem.chosenValue, false)
+            onClicked: startVote(stackView.currentItem.selectedVoteName, stackView.currentItem.chosenValue, false)
         }
     }
 
     onActiveCallvotesModelChanged: {
         if (stackView.completed) {
             stackView.switchLeftTo(groupSelectionComponent)
-        }
-    }
-
-    Connections {
-        target: activeCallvotesModel
-        onCurrentChanged: {
-            if (index === selectedVoteIndex) {
-                selectedVoteCurrent = value
-            }
         }
     }
 
@@ -165,14 +148,15 @@ Item {
                     horizontalAlignment: Qt.AlignHCenter
                     onClicked: {
                         UI.ui.playForwardSound()
-                        selectedVoteIndex = index
-                        selectedVoteName = name
-                        selectedVoteDesc = desc
-                        selectedVoteFlags = flags
-                        selectedVoteArgsHandle = argsHandle
-                        selectedVoteArgsKind = argsKind
-                        selectedVoteCurrent = current
-                        stackView.switchRightTo(argsSelectionComponent)
+                        stackView.switchRightTo(argsSelectionComponent, {
+                            "selectedVoteIndex" : index,
+                            "selectedVoteName" : name,
+                            "selectedVoteDesc" : desc,
+                            "selectedVoteFlags" : flags,
+                            "selectedVoteArgsHandle" : argsHandle,
+                            "selectedVoteArgsKind" : argsKind,
+                            "selectedVoteCurrent" : current,
+                        })
                     }
                 }
             }
@@ -189,18 +173,30 @@ Item {
             readonly property bool canCall: argsSelectionLoader.item && argsSelectionLoader.item.canProceed
             readonly property var chosenValue: argsSelectionLoader.item ? argsSelectionLoader.item.chosenValue : null
 
+            // TODO: Alias when possible?
+            property int selectedVoteIndex
+            property string selectedVoteName
+            property string selectedVoteDesc
+            property int selectedVoteFlags
+            property int selectedVoteArgsHandle
+            property int selectedVoteArgsKind
+            property string selectedVoteCurrent
+            property var selectedVoteChosen
+
             StackView.onStatusChanged: appearDisappearHelper.shrinkAndHideIfDeactivating(StackView.status)
+
+            Connections {
+                target: activeCallvotesModel
+                // TODO: Should we care of other model modifications
+                onCurrentChanged: {
+                    if (index === selectedVoteIndex) {
+                        selectedVoteCurrent = value
+                    }
+                }
+            }
 
             function goBack() {
                 UI.ui.playBackSound()
-                selectedVoteIndex = 0
-                selectedVoteName = ""
-                selectedVoteDesc = ""
-                selectedVoteFlags = 0
-                selectedVoteArgsHandle = 0
-                selectedVoteArgsKind = 0
-                selectedVoteCurrent = ""
-                selectedVoteChosen = undefined
                 stackView.switchLeftTo(voteSelectionComponent)
             }
 
@@ -349,8 +345,8 @@ Item {
         }
     }
 
-    function startVote(chosenValue, isOperatorCall) {
-        UI.ui.callVote(selectedVoteName, chosenValue, isOperatorCall)
+    function startVote(voteName, chosenValue, isOperatorCall) {
+        UI.ui.callVote(voteName, chosenValue, isOperatorCall)
         UI.ui.playForwardSound()
         UI.ui.returnFromPrimaryMenu()
     }
