@@ -32,7 +32,6 @@ QtObject {
     readonly property int labelFontWeight: Font.Normal
 
     readonly property string infinityString: "\u221E"
-    readonly property string missingString: "\u2013"
 
     function destroyLayer(layer) {
         if (layer) {

@@ -81,7 +81,7 @@ Item {
         style: Text.Raised
         textFormat: Text.PlainText
         color: primaryAmmo ? Material.foreground : "red"
-        opacity: (strongAmmo && weakAmmo) ? 1.0 : 0.5
+        opacity: (strongAmmo && weakAmmo) ? 1.0 : 0.3
         text: (strongAmmo && weakAmmo) ? ("+" + (weakAmmo > 0 ? weakAmmo : Hud.infinityString)) :
             (strongAmmo ? "STRONG" : (weakAmmo ? "WEAK" : "OVER"))
     }

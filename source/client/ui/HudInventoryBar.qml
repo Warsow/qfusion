@@ -15,8 +15,8 @@ Item {
 
     property var povDataModel
 
-    readonly property real cardWidth: 64
-    readonly property real cardHeight: 108
+    readonly property real cardWidth: 76
+    readonly property real cardHeight: 116
     readonly property real cardRadius: 1.2 * Hud.elementRadius
 
     Connections {
@@ -39,6 +39,8 @@ Item {
                 Layout.preferredHeight: implicitHeight
                 Layout.alignment: Qt.AlignVCenter
                 visible: model.displayed
+
+                readonly property color textColor: (strongAmmoCount || weakAmmoCount) ? Material.foreground : "red"
 
                 Behavior on implicitWidth {
                     SmoothedAnimation { duration: 100 }
@@ -86,33 +88,50 @@ Item {
                 }
 
                 Label {
+                    id: strongLabel
                     anchors.top: frame.top
                     visible: delegateItem.width > 24
                     anchors.topMargin: strongAmmoCount >= 0 ? 6 : 4
                     anchors.horizontalCenter: parent.horizontalCenter
                     font.family: Hud.ui.numbersFontFamily
                     font.weight: Font.Black
-                    font.pointSize: strongAmmoCount >= 0 ? 15 : 18
-                    font.letterSpacing: 1.0
-                    opacity: strongAmmoCount ? 1.0 : 0.5
+                    font.pointSize: strongAmmoCount >= 0 ? 16 : 18
+                    font.letterSpacing: strongAmmoCount ? 1.0 : 0.0
+                    font.capitalization: Font.AllUppercase
+                    opacity: strongAmmoCount ? 1.0 : 0.3
                     textFormat: Text.PlainText
-                    text: strongAmmoCount >= 0 ? (strongAmmoCount ? strongAmmoCount : Hud.missingString) : Hud.infinityString
+                    text: strongAmmoCount >= 0 ? (strongAmmoCount ? strongAmmoCount : (weakAmmoCount ? "WEAK" : "OVER")) : Hud.infinityString
                     style: Text.Raised
+                    color: delegateItem.textColor
+                    transform: Scale {
+                        origin.x: 0.5 * strongLabel.width
+                        origin.y: 0.5 * strongLabel.height
+                        xScale: strongAmmoCount ? 1.0 : 0.8
+                        yScale: 1.0
+                    }
                 }
 
                 Label {
+                    id: weakLabel
                     anchors.bottom: frame.bottom
                     visible: delegateItem.width > 24
                     anchors.bottomMargin: weakAmmoCount >= 0 ? 6 : 4
                     anchors.horizontalCenter: parent.horizontalCenter
                     font.family: Hud.ui.numbersFontFamily
                     font.weight: Font.Black
-                    font.pointSize: weakAmmoCount >= 0 ? 15 : 18
-                    font.letterSpacing: 1.0
-                    opacity: weakAmmoCount ? 1.0 : 0.5
+                    font.pointSize: weakAmmoCount >= 0 ? 16 : 18
+                    font.letterSpacing: weakAmmoCount ? 1.0 : 0.0
+                    opacity: weakAmmoCount ? 1.0 : 0.3
                     textFormat: Text.PlainText
-                    text: weakAmmoCount >= 0 ? (weakAmmoCount ? weakAmmoCount : Hud.missingString) : Hud.infinityString
+                    text: weakAmmoCount >= 0 ? (weakAmmoCount ? weakAmmoCount : (strongAmmoCount ? "STRNG" : "OVER")) : Hud.infinityString
                     style: Text.Raised
+                    color: delegateItem.textColor
+                    transform: Scale {
+                        origin.x: 0.5 * weakLabel.width
+                        origin.y: 0.5 * weakLabel.height
+                        xScale: weakAmmoCount ? 1.0 : (strongAmmoCount ? 0.7 : 0.8)
+                        yScale: 1.0
+                    }
                 }
             }
         }
