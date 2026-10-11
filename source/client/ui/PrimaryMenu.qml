@@ -475,9 +475,9 @@ Item {
         id: inGameGametypeOptionsComponent
         InGameGametypeOptionsPage {
             Connections {
-                target: root
+                target: priv
                 onCanShowLoadoutsChanged: {
-                    if (!root.canShowLoadouts) {
+                    if (!priv.canShowLoadouts) {
                         // Make copies as we can't access these variables after pop()
                         // TODO: Move to the root component?
                         // TODO: Make the loadouts component resistant to model changes, allow fading out in transitions
