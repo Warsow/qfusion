@@ -203,8 +203,8 @@ auto InventoryModel::data( const QModelIndex &index, int role ) const -> QVarian
 				case Active: return m_entries[row].active;
 				case IconPath: return weaponPropsCache.getWeaponIconPath( m_entries[row].weaponNum );
 				case Color: return weaponPropsCache.getWeaponColor( m_entries[row].weaponNum );
-				case WeakAmmoCount: return m_entries[row].weakCount;
-				case StrongAmmoCount: return m_entries[row].strongCount;
+				case WeakAmmoCount: return m_entries[row].displayedWeakCount;
+				case StrongAmmoCount: return m_entries[row].displayedStrongCount;
 				default: return QVariant();
 			}
 		}
@@ -216,11 +216,6 @@ InventoryModel::InventoryModel() {
 	while( !m_entries.full() ) {
 		m_entries.emplace_back( Entry {
 			.weaponNum   = (int)( WEAP_GUNBLADE + m_entries.size() ),
-			.weakCount   = 0,
-			.strongCount = 0,
-			.displayed   = false,
-			.hasWeapon   = false,
-			.active      = false,
 		});
 	}
 	assert( WEAP_TOTAL - WEAP_GUNBLADE == m_entries.size() );
@@ -240,19 +235,23 @@ void InventoryModel::checkPropertyChanges( unsigned viewStateIndex ) {
 		const bool hasWeapon = CG_HasWeapon( viewStateIndex, weapon );
 
 		m_changedRolesStorage.clear();
-		if( entry.weakCount != weakCount ) {
+		if( entry.lastCheckedWeakCount != weakCount ) {
+			entry.lastCheckedWeakCount = weakCount;
 			if( weapon != WEAP_GUNBLADE ) {
-				entry.weakCount = weakCount;
+				entry.displayedWeakCount = weakCount;
 			} else {
-				entry.weakCount = -1;
+				// TODO: Do we consider the blade always available?
+				entry.displayedWeakCount = -1;
 			}
 			m_changedRolesStorage.append( WeakAmmoCount );
 		}
-		if( entry.strongCount != strongCount ) {
+		if( entry.lastCheckedStrongCount != strongCount ) {
+			entry.lastCheckedStrongCount = strongCount;
 			if( weapon != WEAP_GUNBLADE ) {
-				entry.strongCount = strongCount;
+				entry.displayedStrongCount = strongCount;
 			} else {
-				entry.strongCount = -strongCount;
+				// TODO: Are we going to handle charge/finite strong ammo?
+				entry.displayedStrongCount = -strongCount;
 			}
 			m_changedRolesStorage.append( StrongAmmoCount );
 		}

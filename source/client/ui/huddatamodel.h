@@ -41,8 +41,9 @@ private:
 	};
 
 	struct Entry {
-		int weaponNum, weakCount, strongCount;
-		bool displayed, hasWeapon, active;
+		int weaponNum { 0 }, displayedWeakCount { 0 }, displayedStrongCount { 0 };
+		std::optional<int> lastCheckedWeakCount, lastCheckedStrongCount;
+		bool displayed { false }, hasWeapon { false }, active { false };
 	};
 
 	static constexpr unsigned kNumInventoryItems { 10 };
