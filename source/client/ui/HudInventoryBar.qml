@@ -14,10 +14,14 @@ Item {
     height: implicitHeight
 
     property var povDataModel
+    property real lowAmmoAnimFrac
 
     readonly property real cardWidth: 76
     readonly property real cardHeight: 116
     readonly property real cardRadius: 1.2 * Hud.elementRadius
+
+    readonly property real lowAmmoOpacity: 0.7 + 0.2 * root.lowAmmoAnimFrac
+    readonly property real lowAmmoScale: 1.0 + 0.05 * root.lowAmmoAnimFrac
 
     Connections {
         target: Hud.ui
@@ -40,7 +44,7 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
                 visible: model.displayed
 
-                readonly property color textColor: (strongAmmoCount || weakAmmoCount) ? Material.foreground : "red"
+                readonly property color phraseTextColor: (strongAmmoCount || weakAmmoCount) ? Material.foreground : "red"
 
                 Behavior on implicitWidth {
                     SmoothedAnimation { duration: 100 }
@@ -89,6 +93,7 @@ Item {
 
                 Label {
                     id: strongLabel
+                    readonly property bool hasSufficientStrongCount: strongAmmoCount > strongLowAmmoThreshold || strongAmmoCount < 0
                     anchors.top: frame.top
                     visible: delegateItem.width > 24
                     anchors.topMargin: strongAmmoCount >= 0 ? 6 : 4
@@ -98,11 +103,12 @@ Item {
                     font.pointSize: strongAmmoCount >= 0 ? 16 : 18
                     font.letterSpacing: strongAmmoCount ? 1.0 : 0.0
                     font.capitalization: Font.AllUppercase
-                    opacity: strongAmmoCount ? 1.0 : 0.3
+                    opacity: hasSufficientStrongCount ? 1.0 : (strongAmmoCount ? (model.active ? root.lowAmmoOpacity : 0.7) : 0.3)
                     textFormat: Text.PlainText
                     text: strongAmmoCount >= 0 ? (strongAmmoCount ? strongAmmoCount : (weakAmmoCount ? "WEAK" : "OVER")) : Hud.infinityString
+                    color: strongAmmoCount ? (hasSufficientStrongCount ? Material.foreground : "red") : delegateItem.phraseTextColor
+                    scale: (strongAmmoCount && !hasSufficientStrongCount && model.active) ? root.lowAmmoScale : 1.0
                     style: Text.Raised
-                    color: delegateItem.textColor
                     transform: Scale {
                         origin.x: 0.5 * strongLabel.width
                         origin.y: 0.5 * strongLabel.height
@@ -113,6 +119,7 @@ Item {
 
                 Label {
                     id: weakLabel
+                    readonly property bool hasSufficientWeakCount: weakAmmoCount > weakLowAmmoThreshold || weakAmmoCount < 0
                     anchors.bottom: frame.bottom
                     visible: delegateItem.width > 24
                     anchors.bottomMargin: weakAmmoCount >= 0 ? 6 : 4
@@ -121,11 +128,12 @@ Item {
                     font.weight: Font.Black
                     font.pointSize: weakAmmoCount >= 0 ? 16 : 18
                     font.letterSpacing: weakAmmoCount ? 1.0 : 0.0
-                    opacity: weakAmmoCount ? 1.0 : 0.3
+                    opacity: hasSufficientWeakCount ? 1.0 : (weakAmmoCount ? (model.active ? root.lowAmmoOpacity : 0.7) : 0.3)
+                    scale: (weakAmmoCount && !hasSufficientWeakCount && model.active) ? root.lowAmmoScale : 1.0
                     textFormat: Text.PlainText
                     text: weakAmmoCount >= 0 ? (weakAmmoCount ? weakAmmoCount : (strongAmmoCount ? "STRNG" : "OVER")) : Hud.infinityString
+                    color: weakAmmoCount ? (hasSufficientWeakCount ? Material.foreground : "red") : delegateItem.phraseTextColor
                     style: Text.Raised
-                    color: delegateItem.textColor
                     transform: Scale {
                         origin.x: 0.5 * weakLabel.width
                         origin.y: 0.5 * weakLabel.height

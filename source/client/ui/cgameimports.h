@@ -34,7 +34,7 @@ int CG_ActiveWeapon( unsigned viewStateIndex );
 bool CG_HasWeapon( unsigned viewStateIndex, int weapon );
 int CG_Health( unsigned viewStateIndex );
 int CG_Armor( unsigned viewStateIndex );
-auto CG_WeaponAmmo( unsigned viewStateIndex, int weapon ) -> std::pair<int, int>;
+auto CG_WeaponAmmo( unsigned viewStateIndex, int weapon ) -> std::pair<std::pair<int, int>, std::pair<int, int>>;
 bool CG_IsPovAlive( unsigned viewStateIndex );
 
 int CG_TeamAlphaDisplayedColor();

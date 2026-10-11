@@ -16,6 +16,8 @@ Item {
     property real dropHudVisualPriorityFrac
     Behavior on dropHudVisualPriorityFrac { SmoothedAnimation { duration: 100 } }
 
+    property real lowAmmoAnimFrac
+
     readonly property bool suppressShowingTileHuds: Hud.ui.isShowingScoreboard || Hud.ui.isShowingPrimaryMenu
 
     onSuppressShowingTileHudsChanged: updateVisibilityOfTileHuds()
@@ -50,6 +52,7 @@ Item {
             commonDataModel: Hud.commonDataModel
             povDataModel: Hud.povDataModel
             miniviewAllocator: rootItem
+            lowAmmoAnimFrac: rootItem.lowAmmoAnimFrac
             // Ensure that it is on top of miniviews and their huds (the primary hud contains chat popups along with other things)
             z: +1
         }
@@ -203,6 +206,7 @@ Item {
                 layoutModel: Hud.commonDataModel.miniviewLayoutModel
                 commonDataModel: Hud.commonDataModel
                 isATileElement: miniviewItem.parent === rootItem
+                lowAmmoAnimFrac: rootItem.lowAmmoAnimFrac
                 clip: true
             }
 
@@ -218,6 +222,23 @@ Item {
                 border.width: Hud.miniviewBorderWidth
                 Behavior on border.color { ColorAnimation { duration: 100 } }
             }
+        }
+    }
+
+    SequentialAnimation {
+        running: Hud.ui.canShowHud
+        loops: Animation.Infinite
+        NumberAnimation {
+            target: rootItem
+            property: "lowAmmoAnimFrac"
+            from: 0.0; to: 1.0
+            duration: 300
+        }
+        NumberAnimation {
+            target: rootItem
+            property: "lowAmmoAnimFrac"
+            from: 1.0; to: 0.0
+            duration: 300
         }
     }
 }

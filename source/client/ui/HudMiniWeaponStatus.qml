@@ -14,6 +14,7 @@ Item {
     property var povDataModel
     property real miniviewScale
     property int displayMode
+    property real lowAmmoAnimFrac
 
     readonly property var actualScale: textMetrics.boundingRect.height / 80
 
@@ -49,9 +50,12 @@ Item {
         Behavior on height { NumberAnimation { duration: 50 } }
     }
 
-    readonly property real strongAmmo: povDataModel.activeWeaponStrongAmmo
-    readonly property real weakAmmo: povDataModel.activeWeaponWeakAmmo
-    readonly property real primaryAmmo: strongAmmo || weakAmmo
+    readonly property real strongCount: povDataModel.activeWeaponStrongCount
+    readonly property real weakCount: povDataModel.activeWeaponWeakCount
+    readonly property real primaryCount: strongCount || weakCount
+    readonly property bool hasSufficientPrimaryCount : strongCount ?
+        (strongCount > povDataModel.activeWeaponStrongThreshold || strongCount < 0) :
+        (weakCount > povDataModel.activeWeaponWeakThreshold || weakCount < 0)
 
     // Note: See HudMiniValueBar, looks like we can't rely on restoring default state (wtf?)
     states: [
@@ -97,13 +101,13 @@ Item {
             PropertyChanges {
                 target: primaryLabel
                 visible: true
-                font.pointSize: (primaryAmmo >= 0 ? 32 : 40) * (1.75 * actualScale)
-                anchors.bottomMargin: (primaryAmmo >= 0 ? -4 : -20) * (1.75 * actualScale)
+                font.pointSize: (primaryCount >= 0 ? 32 : 40) * (1.75 * actualScale)
+                anchors.bottomMargin: (primaryCount >= 0 ? -4 : -20) * (1.75 * actualScale)
             }
             PropertyChanges {
                 target: secondaryLabel
                 visible: true
-                font.pointSize: ((strongAmmo && weakAmmo) ? (weakAmmo >= 0 ? 16 : 24) : 14) * (1.75 * actualScale)
+                font.pointSize: ((strongCount && weakCount) ? (weakCount >= 0 ? 16 : 24) : 14) * (1.75 * actualScale)
             }
         },
         State {
@@ -112,13 +116,13 @@ Item {
             PropertyChanges {
                 target: primaryLabel
                 visible: true
-                font.pointSize: (primaryAmmo >= 0 ? 32 : 40) * (1.25 * actualScale)
-                anchors.bottomMargin: (primaryAmmo >= 0 ? -4 : -20) * (1.25 * actualScale)
+                font.pointSize: (primaryCount >= 0 ? 32 : 40) * (1.25 * actualScale)
+                anchors.bottomMargin: (primaryCount >= 0 ? -4 : -20) * (1.25 * actualScale)
             }
             PropertyChanges {
                 target: secondaryLabel
                 visible: true
-                font.pointSize: ((strongAmmo && weakAmmo) ? (weakAmmo >= 0 ? 16 : 24) : 14) * (1.25 * actualScale)
+                font.pointSize: ((strongCount && weakCount) ? (weakCount >= 0 ? 16 : 24) : 14) * (1.25 * actualScale)
             }
             PropertyChanges {
                 target: icon
@@ -136,8 +140,10 @@ Item {
         anchors.bottom: secondaryLabel.top
         style: Text.Raised
         textFormat: Text.PlainText
-        color: Material.foreground
-        text: (primaryAmmo >= 0) ? primaryAmmo : Hud.infinityString
+        color: hasSufficientPrimaryCount ? Material.foreground : "red"
+        opacity: hasSufficientPrimaryCount ? 1.0 : (primaryCount ? (0.5 + 0.2 * root.lowAmmoAnimFrac) : 0.5)
+        scale: (primaryCount && !hasSufficientPrimaryCount) ? (1.0 + 0.05 * root.lowAmmoAnimFrac) : 1.0
+        text: (primaryCount >= 0) ? primaryCount : Hud.infinityString
     }
 
     Text {
@@ -151,9 +157,9 @@ Item {
         font.letterSpacing: 1.25
         style: Text.Raised
         textFormat: Text.PlainText
-        color: primaryAmmo ? Material.foreground : "red"
-        opacity: (strongAmmo && weakAmmo) ? 1.0 : 0.3
-        text: (strongAmmo && weakAmmo) ? ("+" + (weakAmmo > 0 ? weakAmmo : Hud.infinityString)) :
-            (strongAmmo ? "STRNG" : (weakAmmo ? "WEAK" : "OVER"))
+        color: primaryCount ? Material.foreground : "red"
+        opacity: (strongCount && weakCount) ? 1.0 : 0.5
+        text: (strongCount && weakCount) ? ("+" + (weakCount > 0 ? weakCount : Hud.infinityString)) :
+            (strongCount ? "STRNG" : (weakCount ? "WEAK" : "OVER"))
     }
 }
