@@ -37,12 +37,15 @@ private:
 		IconPath,
 		Color,
 		WeakAmmoCount,
-		StrongAmmoCount
+		StrongAmmoCount,
+		WeakLowAmmoThreshold,
+		StrongLowAmmoThreshold,
 	};
 
 	struct Entry {
 		int weaponNum { 0 }, displayedWeakCount { 0 }, displayedStrongCount { 0 };
 		std::optional<int> lastCheckedWeakCount, lastCheckedStrongCount;
+		int weakLowAmmoThreshold { 0 }, strongLowAmmoThreshold { 0 };
 		bool displayed { false }, hasWeapon { false }, active { false };
 	};
 
@@ -301,10 +304,14 @@ public:
 	Q_PROPERTY( QByteArray activeWeaponIcon READ getActiveWeaponIcon NOTIFY activeWeaponIconChanged );
 	Q_SIGNAL void activeWeaponNameChanged( const QByteArray &activeWeaponName );
 	Q_PROPERTY( QByteArray activeWeaponName READ getActiveWeaponName NOTIFY activeWeaponNameChanged );
-	Q_SIGNAL void activeWeaponWeakAmmoChanged( int activeWeaponWeaponAmmo );
-	Q_PROPERTY( int activeWeaponWeakAmmo MEMBER m_activeWeaponWeakAmmo NOTIFY activeWeaponWeakAmmoChanged );
-	Q_SIGNAL void activeWeaponStrongAmmoChanged( int activeWeaponStrongAmmo );
-	Q_PROPERTY( int activeWeaponStrongAmmo MEMBER m_activeWeaponStrongAmmo NOTIFY activeWeaponStrongAmmoChanged );
+	Q_SIGNAL void activeWeaponWeakCountChanged( int activeWeaponWeaponAmmo );
+	Q_PROPERTY( int activeWeaponWeakCount MEMBER m_activeWeaponWeakCount NOTIFY activeWeaponWeakCountChanged );
+	Q_SIGNAL void activeWeaponWeakThresholdChanged( int activeWeaponWeakThreshold );
+	Q_PROPERTY( int activeWeaponWeakThreshold MEMBER m_activeWeaponWeakThreshold NOTIFY activeWeaponWeakThresholdChanged );
+	Q_SIGNAL void activeWeaponStrongCountChanged( int activeWeaponStrongAmmo );
+	Q_PROPERTY( int activeWeaponStrongCount MEMBER m_activeWeaponStrongCount NOTIFY activeWeaponStrongCountChanged );
+	Q_SIGNAL void activeWeaponStrongThresholdChanged( int activeWeaponStrongThreshold );
+	Q_PROPERTY( int activeWeaponStrongThreshold MEMBER m_activeWeaponStrongThreshold NOTIFY activeWeaponStrongThresholdChanged );
 	Q_SIGNAL void activeWeaponColorChanged( const QColor &activeWeaponColor );
 	Q_PROPERTY( QColor activeWeaponColor READ getActiveWeaponColor NOTIFY activeWeaponColorChanged );
 
@@ -400,8 +407,8 @@ private:
 	QString m_formattedNickname;
 
 	int m_activeWeapon { 0 };
-	int m_activeWeaponWeakAmmo { 0 };
-	int m_activeWeaponStrongAmmo { 0 };
+	int m_activeWeaponWeakCount { 0 }, m_activeWeaponWeakThreshold { 0 };
+	int m_activeWeaponStrongCount { 0 }, m_activeWeaponStrongThreshold { 0 };
 
 	int m_health { 0 }, m_armor { 0 };
 

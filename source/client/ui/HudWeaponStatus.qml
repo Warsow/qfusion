@@ -10,7 +10,9 @@ Item {
     height: implicitHeight
     implicitWidth: Hud.miniviewItemWidth
     implicitHeight: Hud.miniviewItemHeight
+
     property var povDataModel
+    property real lowAmmoAnimFrac
 
     Connections {
         target: Hud.ui
@@ -52,20 +54,27 @@ Item {
         source: povDataModel.activeWeaponIcon
     }
 
-    readonly property real strongAmmo: povDataModel.activeWeaponStrongAmmo
-    readonly property real weakAmmo: povDataModel.activeWeaponWeakAmmo
-    readonly property real primaryAmmo: strongAmmo || weakAmmo
+    readonly property real strongCount: povDataModel.activeWeaponStrongCount
+    readonly property real weakCount: povDataModel.activeWeaponWeakCount
+    readonly property real primaryCount: strongCount || weakCount
+    readonly property bool hasSufficientPrimaryCount : strongCount ?
+        (strongCount > povDataModel.activeWeaponStrongThreshold || strongCount < 0) :
+        (weakCount > povDataModel.activeWeaponWeakThreshold || weakCount < 0)
 
     Label {
+        id: primaryLabel
         font.weight: Font.Black
         font.letterSpacing: 1.25
-        font.pointSize: primaryAmmo >= 0 ? 32 : 40
+        font.pointSize: primaryCount >= 0 ? 32 : 40
         anchors.left: secondaryLabel.left
         anchors.bottom: secondaryLabel.top
-        anchors.bottomMargin: primaryAmmo >= 0 ? -4 : -20
+        anchors.bottomMargin: primaryCount >= 0 ? -4 : ((strongCount && weakCount) ? -22 : -12)
         style: Text.Raised
         textFormat: Text.PlainText
-        text: (primaryAmmo >= 0) ? primaryAmmo : Hud.infinityString
+        color: hasSufficientPrimaryCount ? Material.foreground : "red"
+        scale: hasSufficientPrimaryCount ? 1.0 : 1.0 + 0.03 * root.lowAmmoAnimFrac
+        opacity: hasSufficientPrimaryCount ? 1.0 : (primaryCount ? (0.5 + 0.25 * root.lowAmmoAnimFrac) : 0.5)
+        text: (primaryCount >= 0) ? primaryCount : Hud.infinityString
     }
 
     Label {
@@ -77,12 +86,12 @@ Item {
         font.family: Hud.ui.numbersFontFamily
         font.weight: Font.Black
         font.letterSpacing: 1.25
-        font.pointSize: (strongAmmo && weakAmmo) ? (weakAmmo >= 0 ? 16 : 24) : 14
+        font.pointSize: (strongCount && weakCount) ? (weakCount >= 0 ? 16 : 24) : 14
         style: Text.Raised
         textFormat: Text.PlainText
-        color: primaryAmmo ? Material.foreground : "red"
-        opacity: (strongAmmo && weakAmmo) ? 1.0 : 0.3
-        text: (strongAmmo && weakAmmo) ? ("+" + (weakAmmo > 0 ? weakAmmo : Hud.infinityString)) :
-            (strongAmmo ? "STRONG" : (weakAmmo ? "WEAK" : "OVER"))
+        color: primaryCount ? Material.foreground : "red"
+        opacity: (strongCount && weakCount) ? 1.0 : 0.5
+        text: (strongCount && weakCount) ? ("+" + (weakCount > 0 ? weakCount : Hud.infinityString)) :
+            (strongCount ? "STRONG" : (weakCount ? "WEAK" : "OVER"))
     }
 }

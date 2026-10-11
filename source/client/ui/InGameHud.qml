@@ -16,6 +16,8 @@ Item {
     property var miniviewAllocator
     property bool isATileElement
 
+    property real lowAmmoAnimFrac
+
     // Miniviews can't allocate miniviews
     readonly property bool isMiniview: !miniviewAllocator
 
@@ -316,6 +318,7 @@ Item {
                 id: inventoryBarComponent
                 HudInventoryBar {
                     povDataModel: hudField.povDataModel
+                    lowAmmoAnimFrac: hudField.lowAmmoAnimFrac
                 }
             }
 
@@ -334,6 +337,7 @@ Item {
                 id: weaponStatusComponent
                 HudWeaponStatus {
                     povDataModel: hudField.povDataModel
+                    lowAmmoAnimFrac: hudField.lowAmmoAnimFrac
                 }
             }
 
@@ -343,6 +347,7 @@ Item {
                     povDataModel: hudField.povDataModel
                     displayMode: hudField.displayMode
                     miniviewScale: Math.sqrt(hudField.width / rootItem.width)
+                    lowAmmoAnimFrac: hudField.lowAmmoAnimFrac
                 }
             }
 

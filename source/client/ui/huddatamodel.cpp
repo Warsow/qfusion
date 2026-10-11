@@ -186,7 +186,9 @@ auto InventoryModel::roleNames() const -> QHash<int, QByteArray> {
 		{ IconPath, "iconPath" },
 		{ Color, "color" },
 		{ WeakAmmoCount, "weakAmmoCount" },
-		{ StrongAmmoCount, "strongAmmoCount" }
+		{ StrongAmmoCount, "strongAmmoCount" },
+		{ WeakLowAmmoThreshold, "weakLowAmmoThreshold" },
+		{ StrongLowAmmoThreshold, "strongLowAmmoThreshold" },
 	};
 }
 
@@ -205,6 +207,8 @@ auto InventoryModel::data( const QModelIndex &index, int role ) const -> QVarian
 				case Color: return weaponPropsCache.getWeaponColor( m_entries[row].weaponNum );
 				case WeakAmmoCount: return m_entries[row].displayedWeakCount;
 				case StrongAmmoCount: return m_entries[row].displayedStrongCount;
+				case WeakLowAmmoThreshold: return m_entries[row].weakLowAmmoThreshold;
+				case StrongLowAmmoThreshold: return m_entries[row].strongLowAmmoThreshold;
 				default: return QVariant();
 			}
 		}
@@ -231,27 +235,27 @@ void InventoryModel::checkPropertyChanges( unsigned viewStateIndex ) {
 		Entry &entry = m_entries[weapon - 1];
 		assert( entry.weaponNum == weapon );
 
-		const auto [weakCount, strongCount] = CG_WeaponAmmo( viewStateIndex, weapon );
+		const auto [weakCountAndThreshold, strongCountAndThreshold] = CG_WeaponAmmo( viewStateIndex, weapon );
 		const bool hasWeapon = CG_HasWeapon( viewStateIndex, weapon );
 
 		m_changedRolesStorage.clear();
-		if( entry.lastCheckedWeakCount != weakCount ) {
-			entry.lastCheckedWeakCount = weakCount;
+		if( entry.lastCheckedWeakCount != weakCountAndThreshold.first ) {
+			entry.lastCheckedWeakCount = weakCountAndThreshold.first;
 			if( weapon != WEAP_GUNBLADE ) {
-				entry.displayedWeakCount = weakCount;
+				entry.displayedWeakCount = weakCountAndThreshold.first;
 			} else {
 				// TODO: Do we consider the blade always available?
 				entry.displayedWeakCount = -1;
 			}
 			m_changedRolesStorage.append( WeakAmmoCount );
 		}
-		if( entry.lastCheckedStrongCount != strongCount ) {
-			entry.lastCheckedStrongCount = strongCount;
+		if( entry.lastCheckedStrongCount != strongCountAndThreshold.first ) {
+			entry.lastCheckedStrongCount = strongCountAndThreshold.first;
 			if( weapon != WEAP_GUNBLADE ) {
-				entry.displayedStrongCount = strongCount;
+				entry.displayedStrongCount = strongCountAndThreshold.first;
 			} else {
 				// TODO: Are we going to handle charge/finite strong ammo?
-				entry.displayedStrongCount = -strongCount;
+				entry.displayedStrongCount = -strongCountAndThreshold.first;
 			}
 			m_changedRolesStorage.append( StrongAmmoCount );
 		}
@@ -260,9 +264,19 @@ void InventoryModel::checkPropertyChanges( unsigned viewStateIndex ) {
 			m_changedRolesStorage.append( HasWeapon );
 		}
 
-		if( const bool canBeDisplayed = weakCount | strongCount | hasWeapon; entry.displayed != canBeDisplayed ) {
+		const bool canBeDisplayed = entry.displayedWeakCount | entry.displayedStrongCount | hasWeapon;
+		if( entry.displayed != canBeDisplayed ) {
 			entry.displayed = canBeDisplayed;
 			m_changedRolesStorage.append( Displayed );
+		}
+
+		if( entry.weakLowAmmoThreshold != weakCountAndThreshold.second ) {
+			entry.weakLowAmmoThreshold = weakCountAndThreshold.second;
+			m_changedRolesStorage.append( WeakLowAmmoThreshold );
+		}
+		if( entry.strongLowAmmoThreshold != strongCountAndThreshold.second ) {
+			entry.strongLowAmmoThreshold = strongCountAndThreshold.second;
+			m_changedRolesStorage.append( StrongLowAmmoThreshold );
 		}
 
 		if( const bool isActive = ( weapon == activeWeapon ); entry.active != isActive ) {
@@ -1465,19 +1479,29 @@ void HudPovDataModel::checkPropertyChanges( int64_t currTime ) {
 		Q_EMIT activeWeaponColorChanged( getActiveWeaponColor() );
 	}
 
-	const auto oldActiveWeaponWeakAmmo = m_activeWeaponWeakAmmo;
-	const auto oldActiveWeaponStrongAmmo = m_activeWeaponStrongAmmo;
-	std::tie( m_activeWeaponWeakAmmo, m_activeWeaponStrongAmmo ) = CG_WeaponAmmo( m_viewStateIndex, m_activeWeapon );
+	const auto oldActiveWeaponWeakCount       = m_activeWeaponWeakCount;
+	const auto oldActiveWeaponWeakThreshold   = m_activeWeaponWeakThreshold;
+	const auto oldActiveWeaponStrongCount     = m_activeWeaponStrongCount;
+	const auto oldActiveWeaponStrongThreshold = m_activeWeaponStrongThreshold;
+	const auto newCountsAndThresholds         = CG_WeaponAmmo( m_viewStateIndex, m_activeWeapon );
+	std::tie( m_activeWeaponWeakCount, m_activeWeaponWeakThreshold )     = newCountsAndThresholds.first;
+	std::tie( m_activeWeaponStrongCount, m_activeWeaponStrongThreshold ) = newCountsAndThresholds.second;
 	if( m_activeWeapon == WEAP_GUNBLADE ) {
 		// TODO: Is it always available?
-		m_activeWeaponWeakAmmo = -1;
-		m_activeWeaponStrongAmmo = -m_activeWeaponStrongAmmo;
+		m_activeWeaponWeakCount   = -1;
+		m_activeWeaponStrongCount = -m_activeWeaponStrongCount;
 	}
-	if( oldActiveWeaponWeakAmmo != m_activeWeaponWeakAmmo ) {
-		Q_EMIT activeWeaponWeakAmmoChanged( m_activeWeaponWeakAmmo );
+	if( oldActiveWeaponWeakCount != m_activeWeaponWeakCount ) {
+		Q_EMIT activeWeaponWeakCountChanged( m_activeWeaponWeakCount );
 	}
-	if( oldActiveWeaponStrongAmmo != m_activeWeaponStrongAmmo ) {
-		Q_EMIT activeWeaponStrongAmmoChanged( m_activeWeaponStrongAmmo );
+	if( oldActiveWeaponWeakThreshold != m_activeWeaponWeakThreshold ) {
+		Q_EMIT activeWeaponWeakThresholdChanged( m_activeWeaponWeakThreshold );
+	}
+	if( oldActiveWeaponStrongCount != m_activeWeaponStrongCount ) {
+		Q_EMIT activeWeaponStrongCountChanged( m_activeWeaponStrongCount );
+	}
+	if( oldActiveWeaponStrongThreshold != m_activeWeaponStrongThreshold ) {
+		Q_EMIT activeWeaponStrongThresholdChanged( m_activeWeaponStrongThreshold );
 	}
 
 	const auto oldHealth = m_health;
