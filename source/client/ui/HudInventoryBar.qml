@@ -112,7 +112,7 @@ Item {
                     transform: Scale {
                         origin.x: 0.5 * strongLabel.width
                         origin.y: 0.5 * strongLabel.height
-                        xScale: strongAmmoCount ? 1.0 : 0.8
+                        xScale: strongAmmoCount ? (strongAmmoCount < 10 ? 1.2 : 1.0) : 0.8
                         yScale: 1.0
                     }
                 }
@@ -137,7 +137,7 @@ Item {
                     transform: Scale {
                         origin.x: 0.5 * weakLabel.width
                         origin.y: 0.5 * weakLabel.height
-                        xScale: weakAmmoCount ? 1.0 : (strongAmmoCount ? 0.7 : 0.8)
+                        xScale: weakAmmoCount ? (weakAmmoCount < 10 ? 1.2 : 1.0) : (strongAmmoCount ? 0.7 : 0.8)
                         yScale: 1.0
                     }
                 }
