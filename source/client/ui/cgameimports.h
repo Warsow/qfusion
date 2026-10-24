@@ -34,7 +34,17 @@ int CG_ActiveWeapon( unsigned viewStateIndex );
 bool CG_HasWeapon( unsigned viewStateIndex, int weapon );
 int CG_Health( unsigned viewStateIndex );
 int CG_Armor( unsigned viewStateIndex );
-auto CG_WeaponAmmo( unsigned viewStateIndex, int weapon ) -> std::pair<std::pair<int, int>, std::pair<int, int>>;
+
+// Note: the threshold changes are possible (the server may supply modified weapondefs)
+// but they still are much less frequent than ammo count updates.
+// Still, it's better for code organization to couple these two values.
+struct DisplayedAmmoStatus {
+	int count { 0 };
+	int lowThreshold { 0 };
+};
+
+auto CG_GetDisplayedAmmoStatus( unsigned viewStateIndex, int weapon ) -> std::pair<DisplayedAmmoStatus, DisplayedAmmoStatus>;
+
 bool CG_IsPovAlive( unsigned viewStateIndex );
 
 int CG_TeamAlphaDisplayedColor();

@@ -5501,13 +5501,19 @@ auto CG_HudIndicatorStatusString( int stringNum ) -> std::optional<wsw::StringVi
 	return std::nullopt;
 }
 
-std::pair<std::pair<int, int>, std::pair<int, int>> CG_WeaponAmmo( unsigned viewStateIndex, int weapon ) {
+std::pair<DisplayedAmmoStatus, DisplayedAmmoStatus> CG_GetDisplayedAmmoStatus( unsigned viewStateIndex, int weapon ) {
 	const auto *weaponDef = GS_GetWeaponDef( cggs, weapon );
 	const int *inventory = cg.viewStates[viewStateIndex].predictedPlayerState.inventory;
-	return {
-		{ inventory[weaponDef->firedef_weak.ammo_id], weaponDef->firedef_weak.ammo_low },
-		{ inventory[weaponDef->firedef.ammo_id], weaponDef->firedef.ammo_low }
+	std::pair<DisplayedAmmoStatus, DisplayedAmmoStatus> result {
+		{ .count = inventory[weaponDef->firedef_weak.ammo_id], .lowThreshold = weaponDef->firedef_weak.ammo_low },
+		{ .count = inventory[weaponDef->firedef.ammo_id], .lowThreshold = weaponDef->firedef.ammo_low },
 	};
+	if( weapon == WEAP_GUNBLADE ) {
+		// TODO: Is it always available?
+		result.first.count = -1;
+		result.second.count = result.second.count ? -1 : 0;
+	}
+	return result;
 }
 
 auto CG_GetMatchClockTime() -> std::pair<int, int> {

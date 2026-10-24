@@ -43,9 +43,8 @@ private:
 	};
 
 	struct Entry {
-		int weaponNum { 0 }, displayedWeakCount { 0 }, displayedStrongCount { 0 };
-		std::optional<int> lastCheckedWeakCount, lastCheckedStrongCount;
-		int weakLowAmmoThreshold { 0 }, strongLowAmmoThreshold { 0 };
+		DisplayedAmmoStatus displayedStrongStatus, displayedWeakStatus;
+		int weaponNum { 0 };
 		bool displayed { false }, hasWeapon { false }, active { false };
 	};
 
