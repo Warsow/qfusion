@@ -5503,17 +5503,20 @@ auto CG_HudIndicatorStatusString( int stringNum ) -> std::optional<wsw::StringVi
 
 std::pair<DisplayedAmmoStatus, DisplayedAmmoStatus> CG_GetDisplayedAmmoStatus( unsigned viewStateIndex, int weapon ) {
 	const auto *weaponDef = GS_GetWeaponDef( cggs, weapon );
-	const int *inventory = cg.viewStates[viewStateIndex].predictedPlayerState.inventory;
-	std::pair<DisplayedAmmoStatus, DisplayedAmmoStatus> result {
-		{ .count = inventory[weaponDef->firedef_weak.ammo_id], .lowThreshold = weaponDef->firedef_weak.ammo_low },
-		{ .count = inventory[weaponDef->firedef.ammo_id], .lowThreshold = weaponDef->firedef.ammo_low },
-	};
+	const int *inventory  = cg.viewStates[viewStateIndex].predictedPlayerState.inventory;
+	int weakCount         = inventory[weaponDef->firedef_weak.ammo_id];
+	int strongCount       = inventory[weaponDef->firedef.ammo_id];
+	int weakThreshold     = weaponDef->firedef_weak.ammo_low;
+	int strongThreshold   = weaponDef->firedef.ammo_low;
 	if( weapon == WEAP_GUNBLADE ) {
 		// TODO: Is it always available?
-		result.first.count = -1;
-		result.second.count = result.second.count ? -1 : 0;
+		weakCount   = -1;
+		strongCount = strongCount ? -1 : 0;
+	} else if( GS_InfiniteAmmo( *cggs ) ) {
+		weakCount   = weakCount ? -1 : 0;
+		strongCount = strongCount ? -1 : 0;
 	}
-	return result;
+	return { { weakCount, weakThreshold }, { strongCount, strongThreshold } };
 }
 
 auto CG_GetMatchClockTime() -> std::pair<int, int> {
