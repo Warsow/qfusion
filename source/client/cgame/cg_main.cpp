@@ -84,9 +84,9 @@ BoolConfigVar v_projectilePolyTrail( "cg_projectilePolyTrail"_asView, { .byDefau
 
 BoolConfigVar v_plasmaTrail( "cg_plasmaTrail"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } );
 BoolConfigVar v_playerTrail( "cg_playerTrail"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } );
-IntConfigVar v_bloodTime( "cg_bloodTime"_asView, { .byDefault = 300, .flags = CVAR_ARCHIVE } );
+UnsignedConfigVar v_bloodTime( "cg_bloodTime"_asView, { .byDefault = 300, .min = inclusive( 200u ), .max = inclusive( 400u ), .flags = CVAR_ARCHIVE } );
 IntConfigVar v_bloodStyle( "cg_bloodStyle"_asView, { .byDefault = 1, .flags = CVAR_ARCHIVE } );
-IntConfigVar v_bloodPalette( "cg_bloodPalette"_asView, { .byDefault = 0, .flags = CVAR_ARCHIVE } );
+UnsignedConfigVar v_bloodPalette( "cg_bloodPalette"_asView, { .byDefault = 0, .min = inclusive( 0u ), .max = exclusive<unsigned>( std::size( kBloodColors ) ), .flags = CVAR_ARCHIVE } );
 BoolConfigVar v_showPovBlood( "cg_showPovBlood"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } );
 
 BoolConfigVar v_heavyRocketExplosions( "cg_heavyRocketExplosions"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } );
@@ -175,8 +175,12 @@ BoolConfigVar v_teamColoredInstaBeams( "cg_teamColoredInstaBeams"_asView, { .byD
 
 static BoolConfigVar v_pickupFlash( "cg_pickupFlash"_asView, { .byDefault = false, .flags = CVAR_ARCHIVE } );
 
-IntConfigVar v_damageIndicator( "cg_damageIndicator"_asView, { .byDefault = 1, .flags = CVAR_ARCHIVE } );
-IntConfigVar v_damageIndicatorTime( "cg_damageIndicatorTime"_asView, { .byDefault = 25, .min = inclusive( 0 ), .flags = CVAR_ARCHIVE } );
+BoolConfigVar v_damageIndicator( "cg_damageIndicator"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } );
+BoolConfigVar v_damageIndicatorFollowAspectRatio( "cg_damageIndicatorFollowAspectRatio"_asView, { .byDefault = true, .flags = CVAR_ARCHIVE } );
+FloatConfigVar v_damageIndicatorStripeLengthFrac( "cg_damageIndicatorStripeLengthFrac"_asView, { .byDefault = 0.5f, .min = inclusive( kDamageIndicatorMinStripeLengthFrac ), .max = inclusive( kDamageIndicatorMaxStripeLengthFrac ), .flags = CVAR_ARCHIVE } );
+FloatConfigVar v_damageIndicatorStripeWidthFrac( "cg_damageIndicatorStripeWidthFrac"_asView, { .byDefault = 0.15f, .min = inclusive( kDamageIndicatorMinStripeWidthFrac ), .max = inclusive( kDamageIndicatorMaxStripeWidthFrac ), .flags = CVAR_ARCHIVE } );
+UnsignedConfigVar v_damageIndicatorMinTime( "cg_damageIndicatorMinTime"_asView, { .byDefault = 250u, .min = inclusive( 50u ), .max = inclusive( 500u ), .flags = CVAR_ARCHIVE } );
+UnsignedConfigVar v_damageIndicatorExtraTimePerUnit( "cg_damageIndicatorExtraTimePerUnit"_asView, { .byDefault = 20u, .min = inclusive( 0u ), .max = inclusive( 50u ), .flags = CVAR_ARCHIVE } );
 
 cg_static_t cgs;
 cg_state_t cg;

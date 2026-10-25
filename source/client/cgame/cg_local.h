@@ -313,6 +313,7 @@ struct ViewState {
 	cg_kickangles_t kickangles[MAX_ANGLES_KICKS];
 	cg_viewblend_t colorblends[MAX_COLORBLENDS];
 	int64_t damageBlends[4];
+	int64_t maxDamageBlend;
 	int64_t fallEffectTime;
 	int64_t fallEffectRebounceTime;
 
@@ -735,9 +736,16 @@ extern cvar_t *cg_teamPLAYERScolorForce;
 extern cvar_t *cg_teamALPHAcolor;
 extern cvar_t *cg_teamBETAcolor;
 
+constexpr const vec4_t kBloodColors[] {
+	{ 1.0f, 0.3f, 0.7f, 1.0f },
+	{ 1.0f, 0.6f, 0.3f, 1.0f },
+	{ 0.3f, 1.0f, 0.5f, 1.0f },
+	{ 0.3f, 0.7f, 1.0f, 1.0f },
+};
 
 class BoolConfigVar;
 class IntConfigVar;
+class UnsignedConfigVar;
 class FloatConfigVar;
 
 extern IntConfigVar v_hand;
@@ -764,7 +772,17 @@ extern BoolConfigVar v_showViewBlends, v_showZoomEffect;
 extern BoolConfigVar v_draw2D, v_showHud;
 extern FloatConfigVar v_viewSize;
 
-extern IntConfigVar v_damageIndicator, v_damageIndicatorTime;
+static constexpr float kDamageIndicatorMinStripeLengthFrac = 0.3f;
+static constexpr float kDamageIndicatorMaxStripeLengthFrac = 1.0f;
+static constexpr float kDamageIndicatorMinStripeWidthFrac  = 0.10f;
+static constexpr float kDamageIndicatorMaxStripeWidthFrac  = 0.25f;
+
+extern BoolConfigVar v_damageIndicator;
+extern BoolConfigVar v_damageIndicatorFollowAspectRatio;
+extern FloatConfigVar v_damageIndicatorStripeWidthFrac;
+extern FloatConfigVar v_damageIndicatorStripeLengthFrac;
+extern UnsignedConfigVar v_damageIndicatorMinTime;
+extern UnsignedConfigVar v_damageIndicatorExtraTimePerUnit;
 
 extern BoolConfigVar v_showClamp;
 
@@ -777,7 +795,8 @@ extern FloatConfigVar v_raceGhostsAlpha;
 extern BoolConfigVar v_particles;
 extern BoolConfigVar v_heavyRocketExplosions, v_heavyGrenadeExplosions, v_heavyShockwaveExplosions;
 extern BoolConfigVar v_explosionWave, v_explosionSmoke, v_explosionClusters;
-extern IntConfigVar v_bloodStyle, v_bloodTime, v_bloodPalette;
+extern IntConfigVar v_bloodStyle;
+extern UnsignedConfigVar v_bloodTime, v_bloodPalette;
 extern FloatConfigVar v_volumeEffects;
 extern FloatConfigVar v_ebBeamWidth, v_ebBeamTime;
 extern FloatConfigVar v_instaBeamWidth, v_instaBeamTime;

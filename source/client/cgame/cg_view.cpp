@@ -668,81 +668,61 @@ void CG_StartColorBlendEffect( float r, float g, float b, float a, int time, Vie
 	viewState->colorblends[bnum].blendtime = time;
 }
 
-void CG_DamageIndicatorAdd( int damage, const vec3_t dir, ViewState *playerViewState ) {
-	if( !v_damageIndicator.get() ) {
-		return;
-	}
+static constexpr unsigned kDamageBlendTop    = 0;
+static constexpr unsigned kDamageBlendBottom = 1;
+static constexpr unsigned kDamageBlendLeft   = 2;
+static constexpr unsigned kDamageBlendRight  = 3;
 
-// epsilons are 30 degrees
-#define INDICATOR_EPSILON 0.5f
-#define INDICATOR_EPSILON_UP 0.85f
-#define TOP_BLEND 0
-#define RIGHT_BLEND 1
-#define BOTTOM_BLEND 2
-#define LEFT_BLEND 3
+void CG_DamageIndicatorAdd( int damage, const vec3_t dir, ViewState *viewState ) {
+	assert( damage >= 0 );
+	if( v_damageIndicator.get() ) {
+		int64_t blends[4] { 0, 0, 0, 0 };
 
-	float blends[4] { 0.0f, 0.0f, 0.0f, 0.0f };
+		vec3_t playerAngles;
+		playerAngles[PITCH] = 0;
+		playerAngles[YAW]   = viewState->predictedPlayerState.viewangles[YAW];
+		playerAngles[ROLL]  = 0;
 
-	vec3_t playerAngles;
-	playerAngles[PITCH] = 0;
-	playerAngles[YAW]   = playerViewState->predictedPlayerState.viewangles[YAW];
-	playerAngles[ROLL]  = 0;
+		mat3_t playerAxis;
+		Matrix3_FromAngles( playerAngles, playerAxis );
 
-	mat3_t playerAxis;
-	Matrix3_FromAngles( playerAngles, playerAxis );
+		Vector4Set( blends, 0, 0, 0, 0 );
+		const unsigned damageTime = v_damageIndicatorMinTime.get() + damage * v_damageIndicatorExtraTimePerUnit.get();
 
-	Vector4Set( blends, 0, 0, 0, 0 );
-	const float damageTime = damage * v_damageIndicatorTime.get();
-
-	bool considerDistributedEqually = false;
-	if( !dir || VectorCompare( dir, vec3_origin ) ) {
-		considerDistributedEqually = true;
-	} else if( v_damageIndicator.get() == 2 ) {
-		considerDistributedEqually = true;
-	} else if( GS_Instagib( *cggs ) ) {
-		considerDistributedEqually = true;
-	} else if( std::abs( DotProduct( dir, &playerAxis[AXIS_UP] ) ) > INDICATOR_EPSILON_UP ) {
-		considerDistributedEqually = true;
-	}
-
-	if( considerDistributedEqually ) {
-		blends[RIGHT_BLEND] += damageTime;
-		blends[LEFT_BLEND] += damageTime;
-		blends[TOP_BLEND] += damageTime;
-		blends[BOTTOM_BLEND] += damageTime;
-	} else {
-		const float side = DotProduct( dir, &playerAxis[AXIS_RIGHT] );
-		if( side > INDICATOR_EPSILON ) {
-			blends[LEFT_BLEND] += damageTime;
-		} else if( side < -INDICATOR_EPSILON ) {
-			blends[RIGHT_BLEND] += damageTime;
+		if( dir || VectorCompare( dir, vec3_origin ) || std::abs( DotProduct( dir, &playerAxis[AXIS_UP] ) ) > 0.85f ) {
+			for( int64_t &blend : blends ) {
+				blend += damageTime;
+			}
+		} else {
+			const float dotForward       = DotProduct( dir, &playerAxis[AXIS_FORWARD] );
+			const float dotSide          = DotProduct( dir, &playerAxis[AXIS_RIGHT] );
+			constexpr float dotThreshold = 0.5f;
+			if( dotSide > dotThreshold ) {
+				blends[kDamageBlendLeft] += damageTime;
+			} else if( dotSide < -dotThreshold ) {
+				blends[kDamageBlendRight] += damageTime;
+			}
+			if( dotForward > dotThreshold ) {
+				blends[kDamageBlendBottom] += damageTime;
+			} else if( dotForward < -dotThreshold ) {
+				blends[kDamageBlendTop] += damageTime;
+			}
 		}
 
-		const float forward = DotProduct( dir, &playerAxis[AXIS_FORWARD] );
-		if( forward > INDICATOR_EPSILON ) {
-			blends[BOTTOM_BLEND] += damageTime;
-		} else if( forward < -INDICATOR_EPSILON ) {
-			blends[TOP_BLEND] += damageTime;
+		for( int i = 0; i < 4; i++ ) {
+			if( viewState->damageBlends[i] < cg.time + blends[i] ) {
+				viewState->damageBlends[i] = cg.time + blends[i];
+				viewState->maxDamageBlend  = wsw::max( viewState->maxDamageBlend, viewState->damageBlends[i] );
+			}
 		}
 	}
-
-	for( int i = 0; i < 4; i++ ) {
-		if( playerViewState->damageBlends[i] < cg.time + blends[i] ) {
-			playerViewState->damageBlends[i] = cg.time + blends[i];
-		}
-	}
-#undef TOP_BLEND
-#undef RIGHT_BLEND
-#undef BOTTOM_BLEND
-#undef LEFT_BLEND
-#undef INDICATOR_EPSILON
-#undef INDICATOR_EPSILON_UP
 }
 
 void CG_ResetDamageIndicator( ViewState *viewState ) {
 	for( int i = 0; i < 4; i++ ) {
 		viewState->damageBlends[i] = 0;
 	}
+	viewState->maxDamageBlend = 0;
 }
 
 void CG_AddEntityToScene( entity_t *ent, DrawSceneRequest *drawSceneRequest ) {
@@ -1110,6 +1090,7 @@ static void CG_SetupViewDef( cg_viewdef_t *view, int type, bool thirdperson, Vie
 
 static void CG_DrawCrosshair( Draw2DRequest *request, ViewState *viewState, std::optional<float> miniviewScale );
 static void drawNamesAndBeacons( Draw2DRequest *request, ViewState *viewState, std::optional<float> miniviewScale );
+static void drawDamageIndicator( Draw2DRequest *request, ViewState *viewState, std::optional<float> miniviewScale );
 
 static void updateFrameLerpProperties( unsigned extrapolationTime ) {
 	int snapTime = ( cg.frame.serverTime - cg.oldFrame.serverTime );
@@ -1512,6 +1493,9 @@ static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actual
 						miniviewScale = wsw::min( rcpVidWidth * (float)rd.width, rcpVidHeight * (float)rd.height );
 					}
 					drawNamesAndBeacons( request.get(), viewState, miniviewScale );
+					if( !viewState->view.thirdperson ) {
+						drawDamageIndicator( request.get(), viewState, miniviewScale );
+					}
 					if( drawCrosshair ) {
 						CG_DrawCrosshair( request.get(), viewState, miniviewScale );
 					}
@@ -2081,6 +2065,86 @@ static void drawNamesAndBeacons( Draw2DRequest *request, ViewState *viewState, s
 					drawPlayerBars( request, font, requestedX, requestedY, color, viewState->pointedHealth, viewState->pointedArmor );
 				}
 			}
+		}
+	}
+}
+
+static void drawDamageIndicator( Draw2DRequest *request, ViewState *viewState, std::optional<float> miniviewScale ) {
+	if( !viewState->view.thirdperson && viewState->maxDamageBlend > cg.time ) {
+		shader_s *const material = cgs.media.shaderDamageIndicator;
+		const refdef_t &rdf      = viewState->view.refdef;
+
+		float topBottomStripeWidthFrac = v_damageIndicatorStripeWidthFrac.get();
+		float stripeLengthFrac         = v_damageIndicatorStripeLengthFrac.get();
+		float rightLeftStripeWidthFrac = topBottomStripeWidthFrac;
+
+		if( v_damageIndicatorFollowAspectRatio.get() ) {
+			const float aspectRatio = (float)rdf.width * Q_Rcp( wsw::max( 1.0f, (float)rdf.height ) );
+			if( aspectRatio > 1.0f ) {
+				rightLeftStripeWidthFrac *= aspectRatio;
+			} else if( aspectRatio < 1.0f ) {
+				topBottomStripeWidthFrac *= aspectRatio;
+			}
+		} else {
+			if( miniviewScale != std::nullopt ) {
+				assert( *miniviewScale >= 0.0f && *miniviewScale <= 1.0f );
+				const float shrinkFrac = 1.0f - *miniviewScale;
+				topBottomStripeWidthFrac += 0.05f * shrinkFrac;
+				rightLeftStripeWidthFrac += 0.05f * shrinkFrac;
+				stripeLengthFrac += 0.11f * shrinkFrac;
+			}
+		}
+
+		// TODO: Retrieve original config values from the var?
+		stripeLengthFrac         = wsw::clamp( stripeLengthFrac,
+											   kDamageIndicatorMinStripeLengthFrac, kDamageIndicatorMaxStripeLengthFrac );
+		rightLeftStripeWidthFrac = wsw::clamp( rightLeftStripeWidthFrac,
+											   kDamageIndicatorMinStripeWidthFrac, kDamageIndicatorMaxStripeWidthFrac );
+		topBottomStripeWidthFrac = wsw::clamp( topBottomStripeWidthFrac,
+											   kDamageIndicatorMinStripeWidthFrac, kDamageIndicatorMaxStripeWidthFrac );
+
+		constexpr auto makeDamageBlendColor = []( const ViewState *viewState, unsigned blendIndex, vec4_t color ) {
+			if( const int64_t blendTimestamp = viewState->damageBlends[blendIndex]; blendTimestamp > cg.time ) {
+				const float alpha = wsw::min( 1.0f, (float)( blendTimestamp - cg.time ) / (float)v_damageIndicatorMinTime.get() );
+				const float *baseColor = kBloodColors[v_bloodPalette.get()];
+				Vector4Set( color, baseColor[0], baseColor[1], baseColor[2], alpha );
+				return true;
+			}
+			return false;
+		};
+
+		vec4_t blendColor { 0.0f, 0.0f, 0.0f, 0.0f };
+
+		if( makeDamageBlendColor( viewState, kDamageBlendTop, blendColor ) ) {
+			const int w = (int)( stripeLengthFrac * (float)rdf.width );
+			const int x = rdf.x + ( rdf.width - w ) / 2;
+			const int y = rdf.y;
+			const int h = (int)( topBottomStripeWidthFrac * (float)rdf.height );
+			request->drawRotatedStretchPic( x, y, w, h, 0, 0, 1, 1, 0.0f, blendColor, material );
+		}
+
+		if( makeDamageBlendColor( viewState, kDamageBlendBottom, blendColor ) ) {
+			const int w = (int)( stripeLengthFrac * (float)rdf.width );
+			const int x = rdf.x + ( rdf.width - w ) / 2;
+			const int h = (int)( topBottomStripeWidthFrac * (float)rdf.height );
+			const int y = rdf.y + rdf.height - h;
+			request->drawRotatedStretchPic( x, y, w, h, 0, 0, 1, 1, 180.0f, blendColor, material );
+		}
+
+		if( makeDamageBlendColor( viewState, kDamageBlendLeft, blendColor ) ) {
+			const int x = rdf.x;
+			const int h = (int)( stripeLengthFrac * (float)rdf.height );
+			const int y = rdf.y + ( rdf.height - h ) / 2;
+			const int w = (int)( rightLeftStripeWidthFrac * (float)rdf.width );
+			request->drawRotatedStretchPic( x, y, w, h, 0, 0, 1, 1, 90.0, blendColor, material );
+		}
+
+		if( makeDamageBlendColor( viewState, kDamageBlendRight, blendColor ) ) {
+			const int h = (int)( stripeLengthFrac * (float)rdf.height );
+			const int y = rdf.y + ( rdf.height - h ) / 2;
+			const int w = (int)( rightLeftStripeWidthFrac * (float)rdf.width );
+			const int x = rdf.x + rdf.width - w;
+			request->drawRotatedStretchPic( x, y, w, h, 0, 0, 1, 1, -90.0f, blendColor, material );
 		}
 	}
 }

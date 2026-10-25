@@ -255,6 +255,8 @@ public:
 
 	CachedMaterial shaderImpactRing { this, wsw::StringView( "gfx/misc/impact_ring" ) };
 
+	CachedMaterial shaderDamageIndicator { this, wsw::StringView( "gfx/hud/damage" ) };
+
 	CachedMaterial shaderNet { this, wsw::StringView( "gfx/hud/net" ) };
 	CachedMaterial shaderSelect { this, wsw::StringView( "gfx/hud/select" ) };
 	CachedMaterial shaderChatBalloon { this, wsw::StringView( PATH_BALLONCHAT_ICON ) };

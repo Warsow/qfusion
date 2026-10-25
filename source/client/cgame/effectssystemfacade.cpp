@@ -572,19 +572,10 @@ void EffectsSystemFacade::submitToScene( int64_t currTime, DrawSceneRequest *req
 	m_trackedEffectsSystem.submitToScene( currTime, request );
 }
 
-static const vec4_t kBloodColors[] {
-	{ 1.0f, 0.3f, 0.7f, 1.0f },
-	{ 1.0f, 0.6f, 0.3f, 1.0f },
-	{ 0.3f, 1.0f, 0.5f, 1.0f },
-	{ 0.3f, 0.7f, 1.0f, 1.0f },
-	{ 1.0f, 1.0f, 1.0f, 1.0f },
-};
-
 void EffectsSystemFacade::spawnPlayerHitEffect( const float *origin, const float *dir, int damage, unsigned povPlayerMask ) {
 	if( const int bloodStyle = v_bloodStyle.get() ) {
-		const int indexForPalette = wsw::clamp<int>( v_bloodPalette.get(), 0, std::size( kBloodColors ) - 1 );
-		const int baseTime        = wsw::clamp<int>( v_bloodTime.get(), 200, 400 );
-		const float *effectColor  = kBloodColors[indexForPalette];
+		const unsigned baseTime  = v_bloodTime.get();
+		const float *effectColor = kBloodColors[v_bloodPalette.get()];
 
 		if( bloodStyle < 0 ) {
 			unsigned damageLevel;
@@ -598,7 +589,7 @@ void EffectsSystemFacade::spawnPlayerHitEffect( const float *origin, const float
 				damageLevel = 4;
 			}
 			m_transientEffectsSystem.spawnBleedingVolumeEffect( origin, dir, damageLevel, effectColor,
-																(unsigned)baseTime, 1.0f, povPlayerMask );
+																baseTime, 1.0f, povPlayerMask );
 		} else {
 			unsigned numParts;
 			if( damage <= kPain1UpperInclusiveBound ) {
@@ -612,10 +603,10 @@ void EffectsSystemFacade::spawnPlayerHitEffect( const float *origin, const float
 			}
 			if( numParts == 1 ) {
 				m_transientEffectsSystem.spawnBleedingVolumeEffect( origin, dir, 1, effectColor,
-																	(unsigned)baseTime, 1.0f, povPlayerMask );
+																	baseTime, 1.0f, povPlayerMask );
 			} else {
 				m_transientEffectsSystem.spawnBleedingVolumeEffect( origin, dir, 1, effectColor,
-																	(unsigned)baseTime, 1.1f, povPlayerMask );
+																	baseTime, 1.1f, povPlayerMask );
 
 				// TODO: Avoid hardcoding it
 				const float offset = 18.0f;
