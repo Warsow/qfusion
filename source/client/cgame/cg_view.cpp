@@ -855,42 +855,94 @@ float CG_ViewSmoothFallKick( ViewState *viewState ) {
 
 [[nodiscard]]
 static bool doSwitchChaseCamMode() {
-	const ViewState *ourClientViewState = getOurClientViewState();
-	const auto actualMoveType = ourClientViewState->predictedPlayerState.pmove.pm_type;
-	if( ( actualMoveType == PM_SPECTATOR || actualMoveType == PM_CHASECAM ) && ( !cgs.demoPlaying || !cg.isDemoCamFree ) ) {
-		const bool chasecam = ourClientViewState->isUsingChasecam();
-		const bool realSpec = cgs.demoPlaying || ISREALSPECTATOR( ourClientViewState );
+	bool result          = false;
+	bool shouldSwitchCam = false;
 
-		if( ( cg.frame.multipov || chasecam ) && !cg.isDemoCamFree ) {
-			if( chasecam ) {
-				if( realSpec ) {
-					// TODO: Use well-defined bounds
-					// TODO: "camswitch" only if needed
-					if( ++cg.chaseMode >= CAM_TILED ) {
-						// if exceeds the cycle, start free fly
-						CL_Cmd_ExecuteNow( "camswitch" );
-						// TODO: Use well-defined bounds
+	// It's better to strictly separate branches by individual conditions
+	// for sake of correctness validation, even if it adds some code duplication.
+
+	if( cgs.demoPlaying ) {
+		if( !cg.isDemoCamFree ) {
+			if( cg.frame.multipov ) {
+				++cg.chaseMode;
+				if( cg.chaseMode > CAM_TILED ) {
+					cg.chaseMode = 0;
+				}
+			} else {
+				++cg.chaseMode;
+				// Don't let it enter the tiled mode (albeit this mode has no effect if there's no multiview data)
+				if( cg.chaseMode >= CAM_TILED ) {
+					cg.chaseMode    = 0;
+					shouldSwitchCam = true;
+				}
+			}
+			result = true;
+		}
+	} else {
+		const ViewState *ourClientViewState = getOurClientViewState();
+		const auto actualMoveType           = ourClientViewState->predictedPlayerState.pmove.pm_type;
+		if( actualMoveType == PM_SPECTATOR || actualMoveType == PM_CHASECAM ) {
+			const bool isRealSpectator = ISREALSPECTATOR( ourClientViewState );
+			if( cg.frame.multipov ) {
+				if( isRealSpectator ) {
+					// If we're in freefly spec mode, leave it, preserving cg.chaseMode
+					if( cg.chaseMode == 0 && cg.chasedPlayerNum == cgs.playerNum ) {
+						if( CG_FindChaseableViewportForPlayernum( cg.savedChasedPlayerNum ) != std::nullopt ) {
+							cg.pendingChasedPlayerNum = cg.savedChasedPlayerNum;
+						} else if( const auto maybePlayerNumAndIndex = CG_FindMultiviewPovToChase() ) {
+							cg.pendingChasedPlayerNum = maybePlayerNumAndIndex->first;
+						} else {
+							cg.pendingChasedPlayerNum = cgs.playerNum + 1;
+						}
+					} else {
+						++cg.chaseMode;
+						if( cg.chaseMode >= CAM_MODES ) {
+							cg.chaseMode              = 0;
+							cg.savedChasedPlayerNum   = cg.pendingChasedPlayerNum.value_or( cg.chasedPlayerNum );
+							cg.pendingChasedPlayerNum = cgs.playerNum;
+							// Initiate switch to freefly, in case when we happen to be in chasecam mode.
+							if( ourClientViewState->isUsingChasecam() ) {
+								shouldSwitchCam = true;
+							}
+						}
+					}
+				} else {
+					// Don't let it enter the third-person mode (we have to look through eyes of teammates)
+					if( cg.chaseMode != CAM_TILED ) {
+						cg.chaseMode = CAM_TILED;
+					} else {
 						cg.chaseMode = 0;
 					}
-					return true;
 				}
-				return false;
+				result = true;
+			} else {
+				// Otherwise we're fed by server-enforced pov anyway
+				if( isRealSpectator ) {
+					if( ourClientViewState->isUsingChasecam() ) {
+						++cg.chaseMode;
+						if( cg.chaseMode >= CAM_TILED ) {
+							// Switch to freefly
+							shouldSwitchCam = true;
+							cg.chaseMode    = 0;
+						}
+						result = true;
+					} else {
+						if( actualMoveType == PM_SPECTATOR ) {
+							// Switch to chase pov
+							shouldSwitchCam = true;
+							result          = true;
+						}
+					}
+				}
 			}
-
-			if( ++cg.chaseMode >= CAM_MODES ) {
-				cg.chaseMode = 0;
-			}
-			return true;
 		}
-
-		if( realSpec && ( cg.isDemoCamFree || ourClientViewState->snapPlayerState.pmove.pm_type == PM_SPECTATOR ) ) {
-			CL_Cmd_ExecuteNow( "camswitch" );
-			return true;
-		}
-
-		return false;
 	}
-	return false;
+
+	if( shouldSwitchCam ) {
+		CL_Cmd_ExecuteNow( "camswitch" );
+	}
+
+	return result;
 }
 
 bool CG_SwitchChaseCamMode() {
@@ -909,10 +961,7 @@ void CG_ClearChaseCam() {
 }
 
 static void CG_UpdateChaseCam() {
-	const ViewState *const viewState = getOurClientViewState();
-	const bool chasecam              = viewState->isUsingChasecam();
-
-	if( !( cg.frame.multipov || chasecam ) || cg.isDemoCamFree ) {
+	if( cgs.demoPlaying && cg.isDemoCamFree ) {
 		cg.chaseMode = CAM_INEYES;
 	}
 

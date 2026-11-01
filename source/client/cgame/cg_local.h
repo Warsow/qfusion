@@ -597,6 +597,8 @@ typedef struct cg_state_s {
 	unsigned ourClientViewportIndex;
 	unsigned chasedPlayerNum;
 	unsigned chasedViewportIndex;
+	// A helper for restoring to the specific pov during switching from locally-initiated freefly in mv mode
+	unsigned savedChasedPlayerNum;
 	std::optional<unsigned> pendingChasedPlayerNum;
 	bool hasPendingSwitchFromTiledMode;
 
