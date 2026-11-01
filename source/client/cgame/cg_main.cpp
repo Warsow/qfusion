@@ -3075,7 +3075,8 @@ static void CG_UpdatePlayerState() {
 		}
 	}
 
-	const auto ourActualMoveType = cg.viewStates[cg.ourClientViewportIndex].predictedPlayerState.pmove.pm_type;
+	const auto *const ourViewState = &cg.viewStates[cg.ourClientViewportIndex];
+	const auto ourActualMoveType   = ourViewState->predictedPlayerState.pmove.pm_type;
 	// Force view from our in-game client
 	if( ourActualMoveType != PM_SPECTATOR && ourActualMoveType != PM_CHASECAM ) {
 		cg.chasedViewportIndex = cg.ourClientViewportIndex;
@@ -3085,7 +3086,12 @@ static void CG_UpdatePlayerState() {
 		const unsigned requestedPlayerNum = cg.pendingChasedPlayerNum.value_or( cg.chasedPlayerNum );
 		// Check whether we have lost the pov.
 		// Update the viewport index for pov in case if it's changed.
-		if( const std::optional<unsigned> maybeIndex = CG_FindChaseableViewportForPlayernum( requestedPlayerNum ) ) {
+		// First comes the special case for the multiview real spectator in freefly mode.
+		if( !cgs.demoPlaying && cg.frame.multipov && requestedPlayerNum == cgs.playerNum &&
+			cg.chaseMode == 0 && ISREALSPECTATOR( ourViewState ) ) {
+			cg.chasedViewportIndex = cg.ourClientViewportIndex;
+			cg.chasedPlayerNum     = requestedPlayerNum;
+		} else if( const std::optional<unsigned> maybeIndex = CG_FindChaseableViewportForPlayernum( requestedPlayerNum ) ) {
 			cg.chasedViewportIndex = *maybeIndex;
 			cg.chasedPlayerNum     = requestedPlayerNum;
 		} else if( const std::optional<std::pair<unsigned, unsigned>> maybePlayerNumAndIndex = CG_FindMultiviewPovToChase() ) {
