@@ -3215,12 +3215,14 @@ static void CG_UpdatePlayerState() {
 		const int horizontalSpacing = 24 * cgs.pixelRatio;
 		const int verticalSpacing   = 24 * cgs.pixelRatio;
 
-		const int topMargin      = cgs.vidHeight / 4;
-		const int bottomMargin   = cgs.vidHeight / 8;
+		const int topMargin      = cgs.vidHeight / 5;
+		const int bottomMargin   = cgs.vidHeight / 5;
 		const int fieldHeight    = cgs.vidHeight - topMargin - bottomMargin;
 		const int baseFieldWidth = ( 5 * cgs.vidWidth ) / 6;
 
-		if( hasTwoTeams ) {
+		// Don't split screen for teams unless we're a spectator.
+		// TODO: Disable splitting in case of client-recorded multiview demos? Doing it is not straightforward.
+		if( hasTwoTeams && ourTeam == TEAM_SPECTATOR ) {
 			const int fieldWidth = baseFieldWidth / 2;
 
 			unsigned useLayoutOfPane;
@@ -5337,16 +5339,29 @@ std::optional<unsigned> CG_ActivePovOfViewState( unsigned viewStateIndex ) {
 }
 
 bool CG_IsUsingChasePov( unsigned viewStateIndex ) {
-	if( !cg.frame.multipov ) {
-		assert( viewStateIndex == cg.chasedViewportIndex );
-		const auto &playerState = cg.viewStates[viewStateIndex].predictedPlayerState;
-		return ( playerState.POVnum != playerState.playerNum + 1 ) || ( cgs.demoPlaying && CG_IsViewAttachedToPlayer() );
+	if( cg.frame.multipov ) {
+		// If it's about our own viewport
+		if( viewStateIndex == cg.ourClientViewportIndex ) {
+			// If we're looking through our own eyes in this viewport
+			if( cgs.playerNum == cg.chasedPlayerNum ) {
+				return false;
+			}
+			// In this case, our viewport is not a miniview viewport (but a blank pane)
+			if( CG_UsesTiledView() ) {
+				return false;
+			}
+		}
+		// Consider it true for (other) (mini)views
+		return true;
+	} else {
+		if( cgs.demoPlaying ) {
+			return !cg.isDemoCamFree;
+		} else {
+			assert( viewStateIndex == cg.chasedViewportIndex );
+			const auto &playerState = cg.viewStates[viewStateIndex].predictedPlayerState;
+			return playerState.POVnum != playerState.playerNum + 1;
+		}
 	}
-	if( viewStateIndex == cg.chasedViewportIndex ) {
-		return !( cg.ourClientViewportIndex == cg.chasedViewportIndex && cgs.playerNum == cg.chasedPlayerNum );
-	}
-	// Consider it true for miniviews
-	return true;
 }
 
 bool CG_IsPovAlive( unsigned viewStateIndex ) {
