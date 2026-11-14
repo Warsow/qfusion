@@ -184,29 +184,48 @@ void CG_DemoCam_FreeFly() {
 	VectorMA( cg.demoFreeCamOrigin, (float)cg.realFrameTime * 0.001f, wishvel, cg.demoFreeCamOrigin );
 }
 
+static void bumpChaseSwitchTimer() {
+	cg.chaseSwitchTimestamp = cg.time + 333;
+}
 
 static void CG_DemoFreeFly_Cmd_f( const CmdArgs &cmdArgs ) {
+	const auto oldPendingIsDemoCamFree = cg.pendingIsDemoCamFree;
 	if( Cmd_Argc() > 1 ) {
 		if( !Q_stricmp( Cmd_Argv( 1 ), "on" ) ) {
-			cg.isDemoCamFree = true;
+			cg.pendingIsDemoCamFree = std::optional( true );
 		} else if( !Q_stricmp( Cmd_Argv( 1 ), "off" ) ) {
-			cg.isDemoCamFree = false;
+			cg.pendingIsDemoCamFree = std::optional( false );
 		}
 	} else {
-		cg.isDemoCamFree = !cg.isDemoCamFree;
+		if( cg.pendingIsDemoCamFree != std::nullopt ) {
+			cg.pendingIsDemoCamFree = !*cg.pendingIsDemoCamFree;
+		} else {
+			cg.pendingIsDemoCamFree = std::optional( !cg.isDemoCamFree );
+		}
 	}
 
-	if( cg.isDemoCamFree ) {
-		// Inherit position/angles from the previously followed POV
-		const player_state_t &oldPlayerState = getPrimaryViewState()->predictedPlayerState;
-		VectorCopy( oldPlayerState.pmove.origin, cg.demoFreeCamOrigin );
-		cg.demoFreeCamOrigin[2] += oldPlayerState.viewheight;
-		VectorCopy( oldPlayerState.viewangles, cg.demoFreeCamAngles );
-		// CAUTION: Modifying view angles of the our own "physical" client (this is harmless though)
-		VectorCopy( oldPlayerState.viewangles, cl.viewangles );
-		VectorClear( cg.demoFreeCamVelocity );
-		VectorClear( cg.demoFreeCamDeltaAngles );
+	if( cg.pendingIsDemoCamFree != oldPendingIsDemoCamFree ) {
+		bumpChaseSwitchTimer();
+		if( *cg.pendingIsDemoCamFree ) {
+			// Inherit position/angles from the previously followed POV.
+			// Note: We don't wait for arrival of next snapshot to save this,
+			// as the POV may be missing from the new snapshot and we want to preserve exact position/angles.
+			// (while switching POV we are interested in switching to a POV which is present
+			// in next snapshot and is likely to be worth following, so we wait for it).
+			const player_state_t &playerState = getPrimaryViewState()->predictedPlayerState;
+			VectorCopy( playerState.pmove.origin, cg.pendingDemoFreeCamOrigin );
+			cg.pendingDemoFreeCamOrigin[2] += playerState.viewheight;
+			VectorCopy( playerState.viewangles, cg.pendingDemoFreeCamAngles );
+		}
 	}
+}
+
+void CG_SwitchToPlayerNum( unsigned playerNum ) {
+	assert( cg.chaseMode == CAM_TILED );
+	assert( playerNum >= 0 && playerNum < cggs->maxclients );
+	cg.pendingChasedPlayerNum = playerNum;
+	cg.pendingChaseMode       = CAM_INEYES;
+	bumpChaseSwitchTimer();
 }
 
 static void CG_CamSwitch_Cmd_f( const CmdArgs & ) {
@@ -227,6 +246,24 @@ void CG_DemocamShutdown() {
 		CL_Cmd_Unregister( "demoFreeFly"_asView );
 		CL_Cmd_Unregister( "camswitch"_asView );
 	}
+}
+
+[[nodiscard]]
+static bool canSwitchChasePovOrMode() {
+	return cg.pendingChaseMode == std::nullopt && cg.pendingChasedPlayerNum == std::nullopt &&
+		cg.pendingIsDemoCamFree == std::nullopt && cg.chaseSwitchTimestamp <= cg.time;
+}
+
+template <typename Fn>
+[[maybe_unused]]
+static bool switchChasePovOrMode( Fn &&fn ) {
+	if( canSwitchChasePovOrMode() ) {
+		if( fn() ) {
+			bumpChaseSwitchTimer();
+			return true;
+		}
+	}
+	return false;
 }
 
 [[nodiscard]]
@@ -288,21 +325,13 @@ static bool doChaseStep( int step ) {
 	return false;
 }
 
-static constexpr int64_t kChaseSwitchCooldown = 250;
-
 /*
 * CG_ChaseStep
 *
 * Returns whether the POV was actually requested to be changed.
 */
 bool CG_ChaseStep( int step ) {
-	if( cg.chaseSwitchTimestamp + kChaseSwitchCooldown < cg.time ) {
-		if( doChaseStep( step ) ) {
-			cg.chaseSwitchTimestamp = cg.time;
-			return true;
-		}
-	}
-	return false;
+	return switchChasePovOrMode( [&step]() { return doChaseStep( step ); } );
 }
 
 static bool postmatchsilence_set = false, demostream = false, background = false;
@@ -858,21 +887,24 @@ static bool doSwitchChaseCamMode() {
 	bool result          = false;
 	bool shouldSwitchCam = false;
 
+	// It's better to perform all operations on this local variable than fiddle with std::optional cg.pendingChaseMode
+	int chaseMode = cg.chaseMode;
+	assert( chaseMode >= 0 && chaseMode <= CAM_TILED );
+
 	// It's better to strictly separate branches by individual conditions
 	// for sake of correctness validation, even if it adds some code duplication.
-
 	if( cgs.demoPlaying ) {
 		if( !cg.isDemoCamFree ) {
 			if( cg.frame.multipov ) {
-				++cg.chaseMode;
-				if( cg.chaseMode > CAM_TILED ) {
-					cg.chaseMode = 0;
+				++chaseMode;
+				if( chaseMode > CAM_TILED ) {
+					chaseMode = 0;
 				}
 			} else {
-				++cg.chaseMode;
+				++chaseMode;
 				// Don't let it enter the tiled mode (albeit this mode has no effect if there's no multiview data)
-				if( cg.chaseMode >= CAM_TILED ) {
-					cg.chaseMode    = 0;
+				if( chaseMode >= CAM_TILED ) {
+					chaseMode       = 0;
 					shouldSwitchCam = true;
 				}
 			}
@@ -886,7 +918,7 @@ static bool doSwitchChaseCamMode() {
 			if( cg.frame.multipov ) {
 				if( isRealSpectator ) {
 					// If we're in freefly spec mode, leave it, preserving cg.chaseMode
-					if( cg.chaseMode == 0 && cg.chasedPlayerNum == cgs.playerNum ) {
+					if( chaseMode == 0 && cg.chasedPlayerNum == cgs.playerNum ) {
 						if( CG_FindChaseableViewportForPlayernum( cg.savedChasedPlayerNum ) != std::nullopt ) {
 							cg.pendingChasedPlayerNum = cg.savedChasedPlayerNum;
 						} else if( const auto maybePlayerNumAndIndex = CG_FindMultiviewPovToChase() ) {
@@ -895,9 +927,9 @@ static bool doSwitchChaseCamMode() {
 							cg.pendingChasedPlayerNum = cgs.playerNum + 1;
 						}
 					} else {
-						++cg.chaseMode;
-						if( cg.chaseMode >= CAM_MODES ) {
-							cg.chaseMode              = 0;
+						++chaseMode;
+						if( chaseMode >= CAM_MODES ) {
+							chaseMode                 = 0;
 							cg.savedChasedPlayerNum   = cg.pendingChasedPlayerNum.value_or( cg.chasedPlayerNum );
 							cg.pendingChasedPlayerNum = cgs.playerNum;
 							// Initiate switch to freefly, in case when we happen to be in chasecam mode.
@@ -908,10 +940,10 @@ static bool doSwitchChaseCamMode() {
 					}
 				} else {
 					// Don't let it enter the third-person mode (we have to look through eyes of teammates)
-					if( cg.chaseMode != CAM_TILED ) {
-						cg.chaseMode = CAM_TILED;
+					if( chaseMode != CAM_TILED ) {
+						chaseMode = CAM_TILED;
 					} else {
-						cg.chaseMode = 0;
+						chaseMode = 0;
 					}
 				}
 				result = true;
@@ -919,11 +951,11 @@ static bool doSwitchChaseCamMode() {
 				// Otherwise we're fed by server-enforced pov anyway
 				if( isRealSpectator ) {
 					if( ourClientViewState->isUsingChasecam() ) {
-						++cg.chaseMode;
-						if( cg.chaseMode >= CAM_TILED ) {
+						++chaseMode;
+						if( chaseMode >= CAM_TILED ) {
 							// Switch to freefly
 							shouldSwitchCam = true;
-							cg.chaseMode    = 0;
+							chaseMode    = 0;
 						}
 						result = true;
 					} else {
@@ -938,6 +970,9 @@ static bool doSwitchChaseCamMode() {
 		}
 	}
 
+	if( cg.chaseMode != chaseMode ) {
+		cg.pendingChaseMode = std::optional( chaseMode );
+	}
 	if( shouldSwitchCam ) {
 		CL_Cmd_ExecuteNow( "camswitch" );
 	}
@@ -946,27 +981,19 @@ static bool doSwitchChaseCamMode() {
 }
 
 bool CG_SwitchChaseCamMode() {
-	if( cg.chaseSwitchTimestamp + kChaseSwitchCooldown < cg.time ) {
-		if( doSwitchChaseCamMode() ) {
-			cg.chaseSwitchTimestamp = cg.time;
-			return true;
-		}
-	}
-	return false;
+	return switchChasePovOrMode( &doSwitchChaseCamMode );
 }
 
 void CG_ClearChaseCam() {
-	cg.chaseMode            = 0;
-	cg.chaseSwitchTimestamp = 0;
+	cg.chaseMode              = 0;
+	cg.chaseSwitchTimestamp   = 0;
+	cg.pendingChaseMode       = std::nullopt;
+	cg.pendingChasedPlayerNum = std::nullopt;
 }
 
-static void CG_UpdateChaseCam() {
-	if( cgs.demoPlaying && cg.isDemoCamFree ) {
-		cg.chaseMode = CAM_INEYES;
-	}
-
+static void checkChaseSwitchInputCmds() {
 	// If it's worth making switch attempt (its handled invidually by respective subroutines but still...)
-	if( cg.chaseSwitchTimestamp + kChaseSwitchCooldown < cg.time ) {
+	if( canSwitchChasePovOrMode() ) {
 		usercmd_t cmd;
 		NET_GetUserCmd( NET_GetCurrentUserCmdNum() - 1, &cmd );
 
@@ -1620,7 +1647,7 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 			}
 
 			CG_FlashGameWindow(); // notify player of important game events
-			CG_UpdateChaseCam();
+			checkChaseSwitchInputCmds();
 			CG_RunLightStyles();
 			CG_SetSceneTeamColors(); // update the team colors in the renderer
 

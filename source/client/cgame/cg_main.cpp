@@ -3083,6 +3083,14 @@ static void CG_UpdatePlayerState() {
 		cg.chasedPlayerNum     = cgs.playerNum;
 		cg.chaseMode           = CAM_INEYES;
 	} else {
+		if( cg.pendingChaseMode != std::nullopt ) {
+			cg.chaseMode = *cg.pendingChaseMode;
+		}
+		// Switch to INEYES if we're no longer fed by multipov data.
+		// While CAM_TILED seems to be harmless in this case, it's better to correct the value.
+		if( !cg.frame.multipov && cg.chaseMode >= CAM_TILED ) {
+			cg.chaseMode = CAM_INEYES;
+		}
 		const unsigned requestedPlayerNum = cg.pendingChasedPlayerNum.value_or( cg.chasedPlayerNum );
 		// Check whether we have lost the pov.
 		// Update the viewport index for pov in case if it's changed.
@@ -3106,18 +3114,30 @@ static void CG_UpdatePlayerState() {
 	assert( cg.chasedViewportIndex < cg.numSnapViewStates || ( cgs.demoPlaying && cg.chasedViewportIndex == MAX_CLIENTS ) );
 	assert( cg.chasedPlayerNum < MAX_CLIENTS || cgs.demoPlaying );
 
-	if( cg.hasPendingSwitchFromTiledMode ) {
-		if( cg.chaseMode == CAM_TILED ) {
-			(void)CG_SwitchChaseCamMode();
-		}
-		cg.hasPendingSwitchFromTiledMode = false;
-	}
-
 	if( cg.chaseMode != CAM_TILED ) {
 		cg.viewStates[cg.chasedViewportIndex].allowSounds = true;
 	}
 
 	cg.pendingChasedPlayerNum = std::nullopt;
+	cg.pendingChaseMode       = std::nullopt;
+
+	// If there's pending demo cam switch, perform it afterwards setting up for new frame
+	// (even if setting up for the new frame is a bit redundant). We guess that this approach is more robust.
+	if( cg.pendingIsDemoCamFree ) {
+		if( cg.isDemoCamFree != *cg.pendingIsDemoCamFree ) {
+			cg.isDemoCamFree = *cg.pendingIsDemoCamFree;
+			if( cg.isDemoCamFree ) {
+				VectorCopy( cg.pendingDemoFreeCamOrigin, cg.demoFreeCamOrigin );
+				VectorCopy( cg.pendingDemoFreeCamAngles, cg.demoFreeCamAngles );
+				// CAUTION: Modifying view angles of the our own "physical" client (this is harmless though)
+				VectorCopy( cg.pendingDemoFreeCamAngles, cl.viewangles );
+				VectorClear( cg.demoFreeCamVelocity );
+				VectorClear( cg.demoFreeCamDeltaAngles );
+				cg.chaseMode = CAM_INEYES;
+			}
+		}
+		cg.pendingIsDemoCamFree = std::nullopt;
+	}
 
 	cg.hudControlledMiniviewViewStateIndicesForPane[0].clear();
 	cg.hudControlledMiniviewViewStateIndicesForPane[1].clear();
@@ -5636,13 +5656,6 @@ bool CG_GrabsMouseMovement() {
 bool CG_UsesTiledView() {
 	assert( cg.tileMiniviewViewStateIndices.empty() || cg.tileMiniviewViewStateIndices.size() > 1 );
 	return cg.chaseMode == CAM_TILED && !cg.tileMiniviewViewStateIndices.empty();
-}
-
-void CG_SwitchToPlayerNum( unsigned playerNum ) {
-	assert( cg.chaseMode == CAM_TILED );
-	assert( playerNum >= 0 && playerNum < cggs->maxclients );
-	cg.pendingChasedPlayerNum        = playerNum;
-	cg.hasPendingSwitchFromTiledMode = true;
 }
 
 void CG_Error( const char *format, ... ) {

@@ -600,7 +600,8 @@ typedef struct cg_state_s {
 	// A helper for restoring to the specific pov during switching from locally-initiated freefly in mv mode
 	unsigned savedChasedPlayerNum;
 	std::optional<unsigned> pendingChasedPlayerNum;
-	bool hasPendingSwitchFromTiledMode;
+	std::optional<int> pendingChaseMode;
+	std::optional<bool> pendingIsDemoCamFree;
 
 	int chaseMode;
 	int64_t chaseSwitchTimestamp;
@@ -614,6 +615,9 @@ typedef struct cg_state_s {
 	vec3_t demoFreeCamVelocity;
 	short demoFreeCamDeltaAngles[3];
 	bool isDemoCamFree;
+
+	vec3_t pendingDemoFreeCamOrigin;
+	vec3_t pendingDemoFreeCamAngles;
 
 	//
 	// transient data from server
