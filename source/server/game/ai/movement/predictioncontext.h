@@ -164,6 +164,7 @@ public:
 	wsw::StaticVector<uint16_t, 12> m_elevatorTriggerEntNumsToUseDuringPrediction;
 	wsw::StaticVector<uint16_t, 12> m_elevatorMovingEntNumsToUseDuringPrediction;
 	wsw::StaticVector<uint16_t, 32> m_otherTriggerEntNumsToUseDuringPrediction;
+	wsw::StaticVector<uint16_t, 12> m_playerNumsToUseDuringPrediction;
 
 	//class BaseAction *SuggestSuitableAction();
 	//class BaseAction *SuggestDefaultAction();

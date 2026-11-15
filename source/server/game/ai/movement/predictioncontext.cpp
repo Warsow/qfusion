@@ -95,11 +95,59 @@ static void Intercepted_Trace( trace_t *t, const vec3_t start, const vec3_t mins
 			}
 		}
 	}
+	if( !currPredictionContext->m_playerNumsToUseDuringPrediction.empty() ) [[unlikely]] {
+		if( t->fraction > 0.0f ) [[likely]] {
+			const float *const clipMins = mins ? mins : vec3_origin;
+			const float *const clipMaxs = maxs ? maxs : vec3_origin;
+			vec3_t traceMins { wsw::min( start[0], end[0] ), wsw::min( start[1], end[1] ), wsw::min( start[2], end[2] ) };
+			vec3_t traceMaxs { wsw::max( start[0], end[0] ), wsw::max( start[1], end[1] ), wsw::max( start[2], end[2] ) };
+			VectorAdd( traceMins, clipMins, traceMins );
+			VectorAdd( traceMaxs, clipMins, traceMaxs );
+			constexpr float contactProximityRadius = playerbox_stand_maxs[2] - playerbox_stand_mins[2];
+			const float *const botOrigin           = currPredictionContext->movementState->entityPhysicsState.Origin();
+			// TODO: Instead of player nums, store player bounds in SIMD-friendly layout.
+			// We just don't currently have a generic math subroutine that takes 4-vectors for bounds intersection test.
+			for( const auto playerEntNum: currPredictionContext->m_playerNumsToUseDuringPrediction ) {
+				const edict_t *const player = game.edicts + playerEntNum;
+				if( BoundsIntersect( traceMins, traceMaxs, player->r.absmin, player->r.absmax ) ) {
+					// TODO: Prepare cmodels once before prediction!
+					cmodel_s *cmodel;
+					const float *angles;
+					// Prevent locking (unability to produce movement commands due to prediction failure)
+					// if we happen to contact somebody at start by testing against a slightly smaller model
+					// and using actual angles (otherwise, don't supply angles as it's more expensive).
+					// TODO: Cache information about contacting entities before prediction!
+					if( currPredictionContext->totalMillisAhead < 150 &&
+						DistanceSquared( botOrigin, player->s.origin ) < wsw::square( contactProximityRadius ) ) {
+						constexpr float offset = 0.5f;
+						vec3_t playerMins { +offset, +offset, +offset }, playerMaxs { -offset, -offset, -offset };
+						VectorAdd( player->r.mins, playerMins, playerMins );
+						VectorAdd( player->r.maxs, playerMaxs, playerMaxs );
+						cmodel = SV_ModelForBBox( playerMins, playerMaxs );
+						angles = player->s.angles;
+					} else {
+						cmodel = SV_ModelForBBox( player->r.mins, player->r.maxs );
+						angles = nullptr;
+					}
+					trace_t t2;
+					SV_TransformedBoxTrace( &t2, start, end, clipMins, clipMaxs, cmodel, contentmask, player->s.origin, angles );
+					if( t2.fraction > 0.0f ) {
+						// Consider bumping into another player a total failure which interrupts prediction (TODO: does it?)
+						t->fraction   = 0.0f;
+						t->startsolid = true;
+						t->allsolid   = true;
+						break;
+					}
+				}
+			}
+		}
+	}
 }
 
 static int Intercepted_PointContents( const vec3_t p, int timeDelta ) {
 	if( pmoveShouldTestContents ) [[unlikely]] {
 		int topNodeHint = ::collisionTopNodeCache.getTopNode( p, p, !currPredictionContext->topOfStackIndex );
+		// TODO: Should we also check for elevators/players like we do in Intercepted_Trace?
 		return SV_TransformedPointContents( p, nullptr, nullptr, nullptr, topNodeHint );
 	}
 	return 0;
@@ -524,6 +572,39 @@ void PredictionContext::SaveNearbyEntities() {
 		// Note: The overflow of both containers is possible but is very unlikely to happen,
 		// so we don't add extra code for early interruption of the loop.
 		// It's still correct in the mentioned case.
+	}
+
+	m_playerNumsToUseDuringPrediction.clear();
+	const edict_t *const botEnt = game.edicts + bot->EntNum();
+	// TODO: Query all players in surrounding box first?
+	// But it does not seem to be cheaper as the number of clients is sufficiently low.
+	for( int entNum = 1; entNum < ggs->maxclients; ++entNum ) {
+		const edict_t *const playerEnt = game.edicts + entNum;
+		if( playerEnt != botEnt ) {
+			// If we may bump into this player
+			if( !G_ISGHOSTING( playerEnt ) ) {
+				if( !( playerEnt->r.client->ps.pmove.stats[PM_STAT_FEATURES] & PMFEAT_GHOSTMOVE ) ) {
+					// Allow to pass through enemies which are considered to be worth attacking
+					// (see IsDefinitelyNotAFeasibleEnemy() code for details)
+					// In this case, assume that we're going to use melee and strive for contact.
+					if( bot->IsDefinitelyNotAFeasibleEnemy( playerEnt ) ) {
+						// Note that we're going to use this origin as-is during prediction.
+						// Just check the distance and assume that it's impossible
+						// to predict the actual movement of the player anyway beyond this limit,
+						// ignoring potential blocking in tight places like vents by relatively far-standing players.
+						// Note: We don't check whether the player is in front of the bot
+						// as we aren't necessarily going to move forward (or along the current velocity dir)
+						// TODO: Make this limit adaptive depending of speed of the bot and the player (think of CA)?
+						if( DistanceSquared( botEnt->s.origin, playerEnt->s.origin ) < wsw::square( 192.0f ) ) {
+							m_playerNumsToUseDuringPrediction.push_back( (uint16_t)entNum );
+							if( m_playerNumsToUseDuringPrediction.full() ) [[unlikely]] {
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	nearbyTriggersCache.context = this;
