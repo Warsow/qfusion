@@ -793,7 +793,7 @@ void        R_FreeFile_( void *buffer, const char *filename, int fileline );
 #define     R_LoadCacheFile( path,buffer ) R_LoadFile_( path,FS_CACHE,buffer,__FILE__,__LINE__ )
 #define     R_FreeFile( buffer ) R_FreeFile_( buffer,__FILE__,__LINE__ )
 
-void        R_BeginFrame( bool forceClear, int swapInterval );
+void        R_BeginFrame( const float *forceClearColor, int swapInterval );
 void        R_EndFrame( void );
 int         R_SetSwapInterval( int swapInterval, int oldSwapInterval );
 void        R_SetGamma( float gamma );

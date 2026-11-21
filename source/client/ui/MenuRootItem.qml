@@ -34,19 +34,17 @@ Item {
         property real horizontalRadius: rootItem.width
         property real tintAlpha: 0.03
 
-        property color baseTintColor: (UI.ui.isShowingIntroScreen || UI.ui.isShowingUpdateScreen ||
+        readonly property color baseTintColor: (UI.ui.isShowingIntroScreen || UI.ui.isShowingUpdateScreen ||
             (UI.ui.isShowingPrimaryMenu && UI.ui.isClientDisconnected)) ?
                 Material.accent : (UI.ui.isShowingConnectionScreen ? "white" : Qt.lighter(Material.background, 1.5))
-        Behavior on baseTintColor { ColorAnimation { duration: 100 } }
 
-        readonly property color gradientCentralColor:
+        // Note: Effectively disabling gradient on the scoreboard screen,
+        // so the appearance matches clear screen color in tiled/non-100% viewsize mode.
+        property color gradientCoreColor: UI.ui.isShowingScoreboard ? UI.centralGradientFadeColor :
             Qt.tint(Material.background, UI.ui.colorWithAlpha(baseTintColor, shaderSourceItem.tintAlpha))
-        property real gradientCentralOpacity: UI.ui.isShowingScoreboard ? UI.fullscreenOverlayOpacity : 0.99
-        Behavior on gradientCentralOpacity { SmoothedAnimation { duration: 100 } }
-
-        readonly property color gradientSideColor: Qt.darker(Material.background, 1.2)
-        // The gradient makes it look denser so the base value is slightly lower
-        readonly property real gradientSideOpacity: UI.fullscreenOverlayOpacity - 0.1
+        Behavior on gradientCoreColor { SmoothedAnimation { duration: 150 } }
+        property real gradientCoreOpacity: UI.ui.isShowingScoreboard ? UI.centralGradientFadeOpacity : 0.99
+        Behavior on gradientCoreOpacity { SmoothedAnimation { duration: 150 } }
 
         property real expansionFrac: (UI.ui.isShowingPrimaryMenu && UI.ui.isClientDisconnected) ?
             primaryMenuLoader.item.expansionFrac : (UI.ui.isShowingScoreboard ? 1.0 : 0.0)
@@ -101,11 +99,11 @@ Item {
                 gradient: Gradient {
                     GradientStop {
                         position: 0.00
-                        color: UI.ui.colorWithAlpha(shaderSourceItem.gradientCentralColor, shaderSourceItem.gradientCentralOpacity)
+                        color: UI.ui.colorWithAlpha(shaderSourceItem.gradientCoreColor, shaderSourceItem.gradientCoreOpacity)
                     }
                     GradientStop {
                         position: 1.00
-                        color: UI.ui.colorWithAlpha(shaderSourceItem.gradientSideColor, shaderSourceItem.gradientSideOpacity)
+                        color: UI.ui.colorWithAlpha(UI.centralGradientFadeColor, UI.centralGradientFadeOpacity)
                     }
                 }
             }

@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick 2.12
+import QtQuick.Controls.Material 2.12
 import net.warsow 2.6
 
 QtObject {
@@ -70,7 +71,8 @@ QtObject {
     readonly property real scoreboardFontSize: 13
     readonly property real scoreboardLetterSpacing: 0.75
 
-    readonly property real fullscreenOverlayOpacity: 0.90
+    readonly property real centralGradientFadeOpacity: 0.80
+    readonly property color centralGradientFadeColor: Qt.darker(Material.background, 1.25)
 
     readonly property real mainMenuButtonWidth: 224.0
     readonly property real mainMenuButtonTrailWidth: 1.5 * 224.0
@@ -86,5 +88,9 @@ QtObject {
             layer.effect  = null
             ui.ensureObjectDestruction(layer)
         }
+    }
+
+    Component.onCompleted: {
+        ui.scoreboardOverlayRgba = ui.colorWithAlpha(centralGradientFadeColor, centralGradientFadeOpacity)
     }
 }

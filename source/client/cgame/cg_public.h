@@ -101,6 +101,8 @@ void CG_GetEntitySpatialParams( int number, EntitySpatialParams *spatialParams )
 float CG_GetSensitivityScale( float sens, float zoomSens );
 bool CG_NewFrameSnap( snapshot_t *frame, snapshot_t *lerpframe );
 
+const float *CG_GetClearColor( float *colorBufferRgb );
+
 // Less namespace-polluting than enums
 struct CGRenderViewResult {
 	std::optional<EntitySpatialParams> listenerSpatialParams;
@@ -111,7 +113,8 @@ struct CGRenderViewResult {
 	bool hasRunGCIfNeeded { false };
 };
 
-CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t serverTime, unsigned extrapolationTime );
+bool CG_PrepareToRenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t serverTime );
+CGRenderViewResult CG_RenderView( unsigned extrapolationTime );
 
 void CG_InputFrame( int64_t inputTimestamp, int keyboardDeltaMillis, float mouseDeltaMillis );
 void CG_ClearInputState();

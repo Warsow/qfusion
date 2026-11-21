@@ -407,6 +407,8 @@ public:
 	Q_INVOKABLE void playForwardSound() override;
 	Q_INVOKABLE void playBackSound();
 
+	void getScoreboardOverlayRgba( float *rgba ) const override;
+
 	enum ServerListFlags {
 		ShowEmptyServers = 0x1,
 		ShowFullServers  = 0x2
@@ -469,6 +471,8 @@ public:
 	Q_PROPERTY( QString numbersFontFamily MEMBER s_numbersFontFamily CONSTANT );
 	Q_PROPERTY( QString symbolsFontFamily MEMBER s_symbolsFontFamily CONSTANT );
 	Q_PROPERTY( QString emojiFontFamily MEMBER s_emojiFontFamily CONSTANT );
+	// Note: This property gets set by Qml (the UI singleton) upon its creation
+	Q_PROPERTY( QColor scoreboardOverlayRgba MEMBER s_scoreboardOverlayRgba );
 signals:
 	Q_SIGNAL void isShowingScoreboardChanged( bool isShowingScoreboard );
 	Q_SIGNAL void isShowingChatPopupChanged( bool isShowingChatPopup );
@@ -495,6 +499,7 @@ private:
 	static inline int s_fakeArgc { 0 };
 	static inline char **s_fakeArgv { nullptr };
 	static inline QString s_charStrings[128];
+	static inline QColor s_scoreboardOverlayRgba;
 
 	static inline const qreal s_minRegularCrosshairSize { kRegularCrosshairSizeProps.minSize };
 	static inline const qreal s_maxRegularCrosshairSize { kRegularCrosshairSizeProps.maxSize };
@@ -2681,6 +2686,11 @@ void QtUISystem::playSoundUsingLimiter( /* &'static */ const char *path ) {
 		m_oldSoundPlaybackTimestamp = cls.realtime;
 		SoundSystem::instance()->startLocalSound( path, 0.7f );
 	}
+}
+
+void QtUISystem::getScoreboardOverlayRgba( float *rgba ) const {
+	Vector4Set( rgba, s_scoreboardOverlayRgba.redF(), s_scoreboardOverlayRgba.greenF(),
+				s_scoreboardOverlayRgba.blueF(), s_scoreboardOverlayRgba.alphaF() );
 }
 
 void QtUISystem::startServerListUpdates( int flags ) {

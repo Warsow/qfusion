@@ -541,7 +541,7 @@ void RenderSystem::traceAgainstBrushModel( VisualTrace *tr, const model_s *model
 	R_TransformedTraceLine( tr, start, end, model, origin, axis, skipSurfMask );
 }
 
-void R_BeginFrame( bool forceClear, int swapInterval ) {
+void R_BeginFrame( const float *forceClearColorRgb, int swapInterval ) {
 	WSW_PROFILER_SCOPE();
 
 	GLimp_BeginFrame();
@@ -550,11 +550,10 @@ void R_BeginFrame( bool forceClear, int swapInterval ) {
 
 	qglDrawBuffer( GL_BACK );
 
-	if( forceClear ) {
-		qglClearColor( 0, 0, 0, 1 );
+	if( forceClearColorRgb ) {
+		qglClearColor( forceClearColorRgb[0], forceClearColorRgb[1], forceClearColorRgb[2], 1.0f );
 		qglClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT );
 		assert( qglGetError() == GL_NO_ERROR );
-		//RB_Clear( GL_COLOR_BUFFER_BIT, 0, 0, 0, 1 );
 	}
 
 	// set swap interval (vertical synchronization)
@@ -610,14 +609,14 @@ static void RF_CheckCvars( void ) {
 	}
 }
 
-void RF_BeginFrame( bool forceClear, bool forceVsync, bool uncappedFPS ) {
+void RF_BeginFrame( const float *forceClearColorRgb, bool forceVsync ) {
 	RF_CheckCvars();
 
 	// TODO: Should it be a boolean variable?
 	int swapInterval = ( v_swapInterval.get() || forceVsync ) ? 1 : 0;
 	///clamp_low( swapInterval, r_swapinterval_min->integer );
 
-	R_BeginFrame( forceClear, swapInterval );
+	R_BeginFrame( forceClearColorRgb, swapInterval );
 }
 
 void RF_EndFrame( void ) {

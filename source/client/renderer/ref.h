@@ -697,7 +697,7 @@ RenderSystem *RF_GetRenderSystem();
 
 // TODO: This should belong to the interface
 
-void RF_BeginFrame( bool forceClear, bool forceVsync, bool uncappedFPS );
+void RF_BeginFrame( const float *forceClearColor, bool forceVsync );
 void RF_EndFrame();
 
 int RF_GetAverageFrametime();

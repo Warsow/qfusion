@@ -93,6 +93,8 @@ public:
 
 	virtual void playForwardSound() = 0;
 
+	virtual void getScoreboardOverlayRgba( float * ) const = 0;
+
 	// This is a workaround for the current lack of ranges support
 	template <typename ActionsRange>
 	void touchActionRequest( const wsw::StringView &tag, unsigned timeout,

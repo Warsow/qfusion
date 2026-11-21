@@ -1592,7 +1592,7 @@ static bool blitPreparedViews( DrawSceneRequest **drawSceneRequests, bool actual
 	return hasRenderedTheMenu;
 }
 
-CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t serverTime, unsigned extrapolationTime ) {
+bool CG_PrepareToRenderView( int frameTime, int realFrameTime, int64_t realTime, int64_t serverTime ) {
 	WSW_PROFILER_SCOPE();
 
 	// The default constructor does not allocate anything.
@@ -1608,14 +1608,6 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 		cg.effectsSystem.spawnGameDebugBeam( dl.from, dl.to, color, 0 );
 	}
 
-	CGRenderViewResult result {
-		.listenerSpatialParams   = std::nullopt,
-		.hasBlittedTheMenu       = false,
-		.hasBlittedTheHud        = false,
-		.hasRenderedUIInternally = false,
-		.hasRunGCIfNeeded        = false,
-	};
-
 	// update time
 	cg.realTime      = realTime;
 	cg.frameTime     = frameTime;
@@ -1626,99 +1618,127 @@ CGRenderViewResult CG_RenderView( int frameTime, int realFrameTime, int64_t real
 	// TODO: Is there more appropritate place to call it
 	CG_CheckSharedCrosshairState( false );
 
+	if( cg.motd && ( cg.time > cg.motd_time ) ) {
+		Q_free( cg.motd );
+		cg.motd = nullptr;
+	}
+
 	if( !cgs.precacheDone || !cg.frame.valid ) {
 		CG_Precache();
+		return false;
+	}
+
+	return true;
+}
+
+CGRenderViewResult CG_RenderView( unsigned extrapolationTime ) {
+	WSW_PROFILER_SCOPE();
+
+	updateFrameLerpProperties( extrapolationTime );
+
+	CGRenderViewResult result {
+		.listenerSpatialParams   = std::nullopt,
+		.hasBlittedTheMenu       = false,
+		.hasBlittedTheHud        = false,
+		.hasRenderedUIInternally = false,
+		.hasRunGCIfNeeded        = false,
+	};
+
+	// TODO: Is it ever going to happen?
+	if( cgs.configStrings.getWorldModel() == std::nullopt ) {
+		CG_AddLocalSounds();
+
+		DECLARE_SCOPED_DRAW_2D_REQUEST( request, cg.renderSystem );
+		request->drawStretchPic( 0, 0, cgs.vidWidth, cgs.vidHeight, 0, 0, 1, 1, colorBlack, cgs.shaderWhite );
+		cg.renderSystem->commitDraw2DRequest( request.get() );
+
+		CG_ClearEffects();
 	} else {
-		updateFrameLerpProperties( extrapolationTime );
+		CG_FlashGameWindow(); // notify player of important game events
+		checkChaseSwitchInputCmds();
+		CG_RunLightStyles();
+		CG_SetSceneTeamColors(); // update the team colors in the renderer
 
-		// TODO: Is it ever going to happen?
-		if( cgs.configStrings.getWorldModel() == std::nullopt ) {
-			CG_AddLocalSounds();
+		CG_ClearFragmentedDecals();
 
-			DECLARE_SCOPED_DRAW_2D_REQUEST( request, cg.renderSystem );
-			request->drawStretchPic( 0, 0, cgs.vidWidth, cgs.vidHeight, 0, 0, 1, 1, colorBlack, cgs.shaderWhite );
-			cg.renderSystem->commitDraw2DRequest( request.get() );
+		// Keep updating freecam_delta_angles (is it really needed?)
+		if( cgs.demoPlaying && !cg.isDemoCamFree ) {
+			usercmd_t cmd;
+			NET_GetUserCmd( NET_GetCurrentUserCmdNum() - 1, &cmd );
 
-			CG_ClearEffects();
-		} else {
-			if( cg.motd && ( cg.time > cg.motd_time ) ) {
-				Q_free( cg.motd );
-				cg.motd = NULL;
+			for( int i = 0; i < 3; i++ ) {
+				cg.demoFreeCamDeltaAngles[i] = ANGLE2SHORT( cg.demoFreeCamAngles[i] ) - cmd.angles[i];
 			}
-
-			CG_FlashGameWindow(); // notify player of important game events
-			checkChaseSwitchInputCmds();
-			CG_RunLightStyles();
-			CG_SetSceneTeamColors(); // update the team colors in the renderer
-
-			CG_ClearFragmentedDecals();
-
-			// Keep updating freecam_delta_angles (is it really needed?)
-			if( cgs.demoPlaying && !cg.isDemoCamFree ) {
-				usercmd_t cmd;
-				NET_GetUserCmd( NET_GetCurrentUserCmdNum() - 1, &cmd );
-
-				for( int i = 0; i < 3; i++ ) {
-					cg.demoFreeCamDeltaAngles[i] = ANGLE2SHORT( cg.demoFreeCamAngles[i] ) - cmd.angles[i];
-				}
-			}
-
-			Rect viewRects[MAX_CLIENTS + 1];
-			unsigned viewStateIndices[MAX_CLIENTS + 1];
-
-			const auto [actuallyUseTiledMode, numDisplayedViewStates] = prepareViewRectsAndStateIndices( viewRects, viewStateIndices );
-
-			// TODO: Use the same DrawSceneRequest instance but modify POV-specific data
-			DrawSceneRequest *drawSceneRequests[MAX_CLIENTS + 1];
-			CG_ResetTemporaryBoneposesCache();
-
-			unsigned useCachedViewsMask = 0;
-			do {
-				cg.renderSystem->beginDrawingScenes();
-				[[maybe_unused]] volatile wsw::ScopeExitAction callEndDrawingScenes( [&]() { cg.renderSystem->endDrawingScenes(); } );
-
-				useCachedViewsMask = createDrawSceneRequests( drawSceneRequests, actuallyUseTiledMode, viewRects,
-															  viewStateIndices, numDisplayedViewStates );
-
-				prepareDrawSceneRequests( drawSceneRequests, useCachedViewsMask, viewStateIndices, numDisplayedViewStates );
-				result.hasRunGCIfNeeded = true;
-
-				commitDrawSceneRequests( drawSceneRequests, actuallyUseTiledMode, viewStateIndices, numDisplayedViewStates );
-			} while( false );
-
-			result.hasRenderedUIInternally = true;
-
-			const bool hasModalOverlay = cg.uiSystem->isShowingModalMenu() || cg.uiSystem->isShowingScoreboard();
-			result.hasBlittedTheMenu   = blitPreparedViews( drawSceneRequests, actuallyUseTiledMode, hasModalOverlay,
-															viewStateIndices, numDisplayedViewStates );
-
-			CG_ResetTemporaryBoneposesCache();
-
-			// Blit the HUD first in this case (this is a hack for the demo playback menu which must be on top)
-			if( actuallyUseTiledMode && !hasModalOverlay ) {
-				cg.uiSystem->drawHudPartInMainContext( cg.renderSystem );
-				result.hasBlittedTheHud = true;
-			}
-
-			CG_AddLocalSounds();
-
-			cg.oldAreabits = true;
-
-			const ViewState *primaryViewState = getPrimaryViewState();
-
-			EntitySpatialParams listenerSpatialParams {
-				.entNum = primaryViewState->view.POVent,
-			};
-
-			VectorCopy( primaryViewState->view.origin, listenerSpatialParams.origin );
-			VectorCopy( primaryViewState->view.velocity, listenerSpatialParams.velocity );
-			Matrix3_Copy( primaryViewState->view.axis, listenerSpatialParams.axis );
-
-			result.listenerSpatialParams = listenerSpatialParams;
 		}
+
+		Rect viewRects[MAX_CLIENTS + 1];
+		unsigned viewStateIndices[MAX_CLIENTS + 1];
+
+		const auto [actuallyUseTiledMode, numDisplayedViewStates] = prepareViewRectsAndStateIndices( viewRects, viewStateIndices );
+
+		// TODO: Use the same DrawSceneRequest instance but modify POV-specific data
+		DrawSceneRequest *drawSceneRequests[MAX_CLIENTS + 1];
+		CG_ResetTemporaryBoneposesCache();
+
+		unsigned useCachedViewsMask = 0;
+		do {
+			cg.renderSystem->beginDrawingScenes();
+			[[maybe_unused]] volatile wsw::ScopeExitAction callEndDrawingScenes( [&]() { cg.renderSystem->endDrawingScenes(); } );
+
+			useCachedViewsMask = createDrawSceneRequests( drawSceneRequests, actuallyUseTiledMode, viewRects,
+														  viewStateIndices, numDisplayedViewStates );
+
+			prepareDrawSceneRequests( drawSceneRequests, useCachedViewsMask, viewStateIndices, numDisplayedViewStates );
+			result.hasRunGCIfNeeded = true;
+
+			commitDrawSceneRequests( drawSceneRequests, actuallyUseTiledMode, viewStateIndices, numDisplayedViewStates );
+		} while( false );
+
+		result.hasRenderedUIInternally = true;
+
+		const bool hasModalOverlay = cg.uiSystem->isShowingModalMenu() || cg.uiSystem->isShowingScoreboard();
+		result.hasBlittedTheMenu   = blitPreparedViews( drawSceneRequests, actuallyUseTiledMode, hasModalOverlay,
+														viewStateIndices, numDisplayedViewStates );
+
+		CG_ResetTemporaryBoneposesCache();
+
+		// Blit the HUD first in this case (this is a hack for the demo playback menu which must be on top)
+		if( actuallyUseTiledMode && !hasModalOverlay ) {
+			cg.uiSystem->drawHudPartInMainContext( cg.renderSystem );
+			result.hasBlittedTheHud = true;
+		}
+
+		CG_AddLocalSounds();
+
+		cg.oldAreabits = true;
+
+		const ViewState *primaryViewState = getPrimaryViewState();
+
+		EntitySpatialParams listenerSpatialParams {
+			.entNum = primaryViewState->view.POVent,
+		};
+
+		VectorCopy( primaryViewState->view.origin, listenerSpatialParams.origin );
+		VectorCopy( primaryViewState->view.velocity, listenerSpatialParams.velocity );
+		Matrix3_Copy( primaryViewState->view.axis, listenerSpatialParams.axis );
+
+		result.listenerSpatialParams = listenerSpatialParams;
 	}
 
 	return result;
+}
+
+const float *CG_GetClearColor( float *colorBufferRgb ) {
+	// If we show scoreboard, we have to fall back to the default black screen,
+	// so blending the scoreboard's own overlay over clear color producess the expected result
+	if( !cg.uiSystem->isShowingScoreboard() ) {
+		float rgba[4] {};
+		cg.uiSystem->getScoreboardOverlayRgba( rgba );
+		// Premultiply alpha
+		VectorScale( rgba, rgba[3], colorBufferRgb );
+		return colorBufferRgb;
+	}
+	return nullptr;
 }
 
 void CG_AddDebugLine( const float *from, const float *to, int color ) {

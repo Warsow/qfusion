@@ -856,9 +856,10 @@ static std::optional<EntitySpatialParams> SCR_UpdateScreen( void ) {
 
 	SCR_CheckSystemFontsModified();
 
-	bool canRenderView = false;
-	bool canDrawConsole = false;
-	bool canDrawDebug = false;
+	bool tryToRenderView = false;
+	bool canDrawConsole  = false;
+	bool canDrawDebug    = false;
+	bool canRenderView   = false;
 
 	auto *const uiSystem = wsw::ui::UISystem::instance();
 
@@ -869,37 +870,47 @@ static std::optional<EntitySpatialParams> SCR_UpdateScreen( void ) {
 		canDrawConsole = true;
 	} else if( cls.state == CA_CONNECTED ) {
 		if( cls.cgameActive ) {
-			canRenderView = true;
+			tryToRenderView = true;
 		}
 	} else if( cls.state == CA_ACTIVE ) {
-		canRenderView = true;
+		tryToRenderView = true;
 
 		assert( cls.frametime > 0 );
 		uiSystem->addToFrametimeTimeline( cls.realtime, cls.frametime );
 
 		canDrawConsole = true;
-		canDrawDebug = true;
+		canDrawDebug   = true;
 	}
 
 	// Perform UI refresh (that may include binding UI GL context and unbinding it) first
 	uiSystem->refreshProperties();
 
-	bool hasRenderedUI = false;
-	if( !( canRenderView && cl.cms && cge && cls.cgameActive ) ) {
+	bool hasRenderedUI      = false;
+	const float *clearColor = nullptr;
+	vec3_t tmpClearColor { 0.0f, 0.0f, 0.0f };
+	if( tryToRenderView && cl.cms && cge && cls.cgameActive ) {
+		// TOOD: Is it safe to call CG_PrepareRenderView prior to RF_BeginFrame()?
+		// At this moment, resource creation is decoupled from frame bounds/frame scope, so it seems to be ok.
+		canRenderView = CG_PrepareToRenderView( cls.frametime, cls.realFrameTime, cls.realtime, cl.serverTime );
+		if( canRenderView ) {
+			clearColor = CG_GetClearColor( tmpClearColor );
+		}
+	} else {
 		uiSystem->renderInternally();
 		hasRenderedUI = true;
 	}
 
 	// TODO: Pass as flags
 	const bool forcevsync = cls.state == CA_DISCONNECTED || uiSystem->suggestsUsingVSync();
-	const bool forceclear = true;
 	const bool timedemo   = cl_timedemo->integer && cls.demoPlayer.playing;
 
-	RF_BeginFrame( forceclear, forcevsync, timedemo );
+	// TODO: Check when it's possible to avoid clearing the color buffer.
+	// TODO: Decouple clearing the color buffer from clearing the depth buffer.
+	RF_BeginFrame( clearColor ? clearColor : colorBlack, forcevsync );
 
 	// CGame may render the menu on its own above the primary view but beneath miniviews
-	CGRenderViewResult cgRenderViewResult;
-	if( canRenderView ) {
+	CGRenderViewResult renderViewResult;
+	if( tryToRenderView ) {
 		if( timedemo ) {
 			if( !cl.timedemo.startTime ) {
 				cl.timedemo.startTime = Sys_Milliseconds();
@@ -908,17 +919,15 @@ static std::optional<EntitySpatialParams> SCR_UpdateScreen( void ) {
 		}
 
 		// frame is not valid until we load the CM data
-		if( cl.cms ) {
-			if( cge && cls.cgameActive ) {
-				assert( !hasRenderedUI );
-				unsigned extrapolationTime = cl_extrapolate->integer && !cls.demoPlayer.playing ? cl_extrapolationTime->integer : 0;
-				cgRenderViewResult = CG_RenderView( cls.frametime, cls.realFrameTime, cls.realtime, cl.serverTime, extrapolationTime );
-				hasRenderedUI = cgRenderViewResult.hasRenderedUIInternally;
-			}
+		if( canRenderView ) {
+			assert( !hasRenderedUI );
+			unsigned xerpTime = cl_extrapolate->integer && !cls.demoPlayer.playing ? cl_extrapolationTime->integer : 0;
+			renderViewResult  = CG_RenderView( xerpTime );
+			hasRenderedUI     = renderViewResult.hasRenderedUIInternally;
 		}
 	}
 
-	if( !cgRenderViewResult.hasRunGCIfNeeded ) {
+	if( !renderViewResult.hasRunGCIfNeeded ) {
 		uiSystem->runGCIfNeeded();
 	}
 
@@ -931,10 +940,10 @@ static std::optional<EntitySpatialParams> SCR_UpdateScreen( void ) {
 	// TODO: This should not belong to the UI module, let client manage it!
 	uiSystem->drawBackgroundMapIfNeeded( renderSystem );
 
-	if( !cgRenderViewResult.hasBlittedTheMenu ) {
+	if( !renderViewResult.hasBlittedTheMenu ) {
 		uiSystem->drawMenuPartInMainContext( renderSystem );
 	}
-	if( !cgRenderViewResult.hasBlittedTheHud ) {
+	if( !renderViewResult.hasBlittedTheHud ) {
 		uiSystem->drawHudPartInMainContext( renderSystem );
 	}
 
@@ -955,7 +964,7 @@ static std::optional<EntitySpatialParams> SCR_UpdateScreen( void ) {
 
 	RF_EndFrame();
 
-	return cgRenderViewResult.listenerSpatialParams;
+	return renderViewResult.listenerSpatialParams;
 }
 
 /*
