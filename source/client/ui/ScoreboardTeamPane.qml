@@ -33,8 +33,7 @@ Item {
 
             Rectangle {
                 anchors.fill: parent
-                color: "black"
-                opacity: 0.3
+                color: UI.scoreboardElementBackgroundColor
             }
 
             Row {

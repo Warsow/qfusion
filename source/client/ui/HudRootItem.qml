@@ -42,6 +42,8 @@ Item {
         // Note: Desaturate appears to be ignoring opacity of this container if it's given as source.
         // Setting opacity to zero prevents rendering it beneath the desaturated item.
         opacity: 1.0 - dropHudVisualPriorityFrac
+        // Ensure that it is on top of miniviews and their huds (the primary hud contains chat popups along with other things)
+        z: +1
 
         // Try reusing the same instance due to Qml GC quirks
         InGameHud {
@@ -53,8 +55,6 @@ Item {
             povDataModel: Hud.povDataModel
             miniviewAllocator: rootItem
             lowAmmoAnimFrac: rootItem.lowAmmoAnimFrac
-            // Ensure that it is on top of miniviews and their huds (the primary hud contains chat popups along with other things)
-            z: +1
         }
 
         Loader {
@@ -216,9 +216,9 @@ Item {
                 width: parent.width + 2.0 * border.width
                 height: parent.height + 2.0 * border.width
                 radius: Hud.elementRadius
-                border.color: !isATileElement ? Qt.rgba(0.0, 0.0, 0.0, 0.7) :
+                border.color: !isATileElement ? Hud.elementBackgroundColor :
                                 ((miniviewIndex === Hud.commonDataModel.highlightedMiniviewIndex || miniviewItem.hackyContainsMouse) ?
-                                    Material.accent : Qt.rgba(0.5, 0.5, 0.5, 1.0))
+                                    Material.accent : Hud.elementOutlineColor)
                 border.width: Hud.miniviewBorderWidth
                 Behavior on border.color { ColorAnimation { duration: 100 } }
             }

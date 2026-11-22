@@ -15,7 +15,8 @@ QtObject {
     readonly property real elementMargin: 16
     readonly property real elementRadius: 6
     readonly property real elementElevation: 16
-    readonly property color elementBackgroundColor: Qt.rgba(0.0, 0.0, 0.0, 0.7)
+    readonly property color elementBackgroundColor: ui.hudElementBackgroundRgba
+    readonly property color elementOutlineColor: ui.colorWithAlpha(elementBackgroundColor, 1.0)
     readonly property real miniviewItemWidth: 240
     readonly property real miniviewItemHeight: 160
     readonly property real miniviewBorderWidth: 4

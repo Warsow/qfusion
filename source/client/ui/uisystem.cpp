@@ -471,6 +471,7 @@ public:
 	Q_PROPERTY( QString numbersFontFamily MEMBER s_numbersFontFamily CONSTANT );
 	Q_PROPERTY( QString symbolsFontFamily MEMBER s_symbolsFontFamily CONSTANT );
 	Q_PROPERTY( QString emojiFontFamily MEMBER s_emojiFontFamily CONSTANT );
+	Q_PROPERTY( QColor hudElementBackgroundRgba MEMBER s_hudElementBackgroundRgba CONSTANT )
 	// Note: This property gets set by Qml (the UI singleton) upon its creation
 	Q_PROPERTY( QColor scoreboardOverlayRgba MEMBER s_scoreboardOverlayRgba );
 signals:
@@ -500,6 +501,7 @@ private:
 	static inline char **s_fakeArgv { nullptr };
 	static inline QString s_charStrings[128];
 	static inline QColor s_scoreboardOverlayRgba;
+	static inline QColor s_hudElementBackgroundRgba { QColor::fromRgbF( 0.05, 0.05, 0.10, 0.7 ) };
 
 	static inline const qreal s_minRegularCrosshairSize { kRegularCrosshairSizeProps.minSize };
 	static inline const qreal s_maxRegularCrosshairSize { kRegularCrosshairSizeProps.maxSize };

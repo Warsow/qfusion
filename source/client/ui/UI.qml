@@ -71,6 +71,8 @@ QtObject {
     readonly property real scoreboardFontSize: 13
     readonly property real scoreboardLetterSpacing: 0.75
 
+    readonly property color scoreboardElementBackgroundColor: ui.hudElementBackgroundRgba
+
     readonly property real centralGradientFadeOpacity: 0.80
     readonly property color centralGradientFadeColor: Qt.darker(Material.background, 1.25)
 

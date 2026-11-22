@@ -30,8 +30,8 @@ Item {
         anchors.centerIn: root
         width: row.width + 32
         height: 32
-        color: Qt.rgba(0.0, 0.0, 0.0, 0.7)
-        border.color: applyOutline ? Qt.rgba(1.0, 1.0, 1.0, 0.5) : Qt.rgba(0.0, 0.0, 0.0, 0.7)
+        color: Hud.elementBackgroundColor
+        border.color: Qt.lighter(Hud.elementOutlineColor, 1.5)
         border.width: applyOutline ? 2 : 0
         radius: 3
     }

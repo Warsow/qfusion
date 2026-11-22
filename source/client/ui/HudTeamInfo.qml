@@ -16,8 +16,8 @@ Item {
     implicitWidth: Hud.valueBarWidth
     implicitHeight: list.height + 2 * Hud.elementRadius
 
-    readonly property color evenRowColor: Qt.rgba(0.0, 0.0, 0.0, 0.7)
-    readonly property color oddRowColor: Qt.rgba(0.08, 0.08, 0.08, 0.7)
+    readonly property color evenRowColor: Hud.elementBackgroundColor
+    readonly property color oddRowColor: Qt.lighter(Hud.elementBackgroundColor, 1.5)
 
     Connections {
         target: Hud.ui
@@ -36,7 +36,7 @@ Item {
         height: list.height + 2 * Hud.elementRadius
         radius: Hud.elementRadius
         color: "transparent"
-        border.color: Qt.rgba(0.0, 0.0, 0.0, 0.7)
+        border.color: Hud.elementBackgroundColor
         border.width: Hud.elementRadius
         layer.enabled: list.count
         layer.effect: ElevationEffect { elevation: Hud.elementElevation }

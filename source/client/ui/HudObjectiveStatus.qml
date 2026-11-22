@@ -35,7 +35,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: row.width ? Qt.rgba(0.0, 0.0, 0.0, 0.6) : "transparent"
+        color: row.width ? Hud.elementBackgroundColor : "transparent"
         radius: Hud.elementRadius
 
         layer.enabled: row.width

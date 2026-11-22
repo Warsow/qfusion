@@ -8,7 +8,6 @@ Item {
     id: root
     property string title
     property var model
-    property color baseColor: "black"
 
     property int playersPerRow: 3
     property int playersInFirstRow: playersPerRow
@@ -22,8 +21,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: baseColor
-        opacity: 0.5
+        color: UI.scoreboardElementBackgroundColor
     }
 
     Label {
