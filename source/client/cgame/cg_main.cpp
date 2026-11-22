@@ -5338,20 +5338,24 @@ int CG_RealClientTeam() {
 
 std::optional<unsigned> CG_ActivePovOfViewState( unsigned viewStateIndex ) {
 	assert( viewStateIndex <= cg.numSnapViewStates || ( cgs.demoPlaying && viewStateIndex == MAX_CLIENTS ) );
-	const ViewState *viewState = cg.viewStates + viewStateIndex;
-	// Don't even bother in another case
-	if( const unsigned statePovNum = viewState->predictedPlayerState.POVnum; statePovNum > 0 ) {
-		unsigned chosenPovNum = 0;
-		if( !ISREALSPECTATOR( viewState ) ) {
-			chosenPovNum = statePovNum;
-		} else {
-			if( statePovNum != viewState->predictedPlayerState.playerNum + 1 ) {
+	// Prevent displaying PovOnly HUD elements in tiled mode
+	if( viewStateIndex != cg.ourClientViewportIndex || !CG_UsesTiledView() ) {
+		const ViewState *viewState = cg.viewStates + viewStateIndex;
+		// Don't even bother in another case.
+		// Note: It seems to naturally handle free demo cam.
+		if( const unsigned statePovNum = viewState->predictedPlayerState.POVnum; statePovNum > 0 ) {
+			unsigned chosenPovNum = 0;
+			if( !ISREALSPECTATOR( viewState ) ) {
 				chosenPovNum = statePovNum;
+			} else {
+				if( statePovNum != viewState->predictedPlayerState.playerNum + 1 ) {
+					chosenPovNum = statePovNum;
+				}
 			}
-		}
-		// Protect against chasing other entities (is it a thing?)
-		if( chosenPovNum && chosenPovNum < (unsigned)( cggs->maxclients + 1 ) ) {
-			return chosenPovNum - 1u;
+			// Protect against chasing other entities (is it a thing?)
+			if( chosenPovNum && chosenPovNum < (unsigned)( cggs->maxclients + 1 ) ) {
+				return chosenPovNum - 1u;
+			}
 		}
 	}
 
